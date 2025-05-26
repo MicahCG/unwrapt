@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from '@/components/ui/carousel';
-import { Calendar, Gift, Heart, Star, Sparkles, TreePine, Pumpkin, Clover } from 'lucide-react';
+import { Calendar, Gift, Heart, Star, Sparkles, TreePine, Ghost, Clover } from 'lucide-react';
 
 interface Holiday {
   name: string;
@@ -64,7 +63,7 @@ const holidays: Holiday[] = [
     date: "October 31, 2025",
     callToAction: "No tricks, just treats... and great gifts",
     description: "Spook-tacular surprises",
-    icon: Pumpkin,
+    icon: Ghost,
     color: "text-orange-600",
     bgGradient: "from-orange-50 to-amber-50"
   },
