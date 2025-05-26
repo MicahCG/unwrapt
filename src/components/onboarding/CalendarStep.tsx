@@ -45,15 +45,15 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
   };
 
   return (
-    <Card className="animate-fadeInUp">
+    <Card className="animate-fadeInUp border-brand-cream shadow-lg">
       <CardHeader className="text-center">
         <div className="flex justify-center mb-4">
-          <div className="bg-primary/10 p-4 rounded-full">
-            <Calendar className="h-12 w-12 text-primary" />
+          <div className="bg-brand-cream-light p-4 rounded-full">
+            <Calendar className="h-12 w-12 text-brand-charcoal" />
           </div>
         </div>
-        <CardTitle className="text-3xl mb-2">Connect your calendar to never miss important dates</CardTitle>
-        <p className="text-muted-foreground">
+        <CardTitle className="text-3xl mb-2 text-brand-charcoal">Connect your calendar to never miss important dates</CardTitle>
+        <p className="text-brand-charcoal/70">
           We'll automatically find birthdays, anniversaries, and holidays from your Google Calendar
         </p>
       </CardHeader>
@@ -64,13 +64,13 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
             {/* Google Calendar Connect Button */}
             <Button 
               size="lg" 
-              className="w-full text-lg py-6"
+              className="w-full text-lg py-6 bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
               onClick={handleGoogleConnect}
               disabled={isConnecting}
             >
               {isConnecting ? (
                 <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-brand-cream mr-2"></div>
                   Connecting to Google Calendar...
                 </>
               ) : (
@@ -82,9 +82,9 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
             </Button>
 
             {/* Benefits */}
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h4 className="font-medium mb-2">What we'll find:</h4>
-              <ul className="space-y-1 text-sm text-muted-foreground">
+            <div className="bg-white/80 p-4 rounded-lg border border-brand-cream">
+              <h4 className="font-medium mb-2 text-brand-charcoal">What we'll find:</h4>
+              <ul className="space-y-1 text-sm text-brand-charcoal/70">
                 <li>• Birthdays from your contacts</li>
                 <li>• Anniversary dates</li>
                 <li>• Holiday reminders</li>
@@ -94,7 +94,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
 
             {/* Skip Option */}
             <div className="text-center pt-4">
-              <Button variant="ghost" onClick={handleSkip}>
+              <Button variant="ghost" onClick={handleSkip} className="text-brand-charcoal hover:bg-brand-cream-light">
                 I'll add dates manually
               </Button>
             </div>
@@ -104,23 +104,23 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
             {/* Success State */}
             <div className="text-center space-y-4">
               <div className="flex justify-center">
-                <div className="bg-green-100 p-3 rounded-full">
-                  <Check className="h-8 w-8 text-green-600" />
+                <div className="bg-brand-gold/20 p-3 rounded-full">
+                  <Check className="h-8 w-8 text-brand-gold" />
                 </div>
               </div>
               
               <div>
-                <h3 className="text-xl font-semibold mb-2">Great! We found {foundDates.length} important dates</h3>
-                <p className="text-muted-foreground">Here's what we imported from your calendar:</p>
+                <h3 className="text-xl font-semibold mb-2 text-brand-charcoal">Great! We found {foundDates.length} important dates</h3>
+                <p className="text-brand-charcoal/70">Here's what we imported from your calendar:</p>
               </div>
             </div>
 
             {/* Found Dates */}
-            <div className="bg-white border rounded-lg max-h-48 overflow-y-auto">
+            <div className="bg-white border border-brand-cream rounded-lg max-h-48 overflow-y-auto">
               {foundDates.map((date, index) => (
-                <div key={index} className="flex items-center p-3 border-b last:border-b-0">
-                  <Calendar className="h-4 w-4 text-primary mr-3" />
-                  <span className="text-sm">{date}</span>
+                <div key={index} className="flex items-center p-3 border-b border-brand-cream last:border-b-0">
+                  <Calendar className="h-4 w-4 text-brand-charcoal mr-3" />
+                  <span className="text-sm text-brand-charcoal">{date}</span>
                 </div>
               ))}
             </div>
@@ -128,7 +128,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
             {/* Continue Button */}
             <Button 
               size="lg" 
-              className="w-full text-lg py-6"
+              className="w-full text-lg py-6 bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
               onClick={handleContinue}
             >
               Continue with {foundDates.length} dates

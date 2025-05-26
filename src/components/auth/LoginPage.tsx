@@ -2,23 +2,20 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Gift } from 'lucide-react';
+import { Logo } from '@/components/ui/logo';
 import { useAuth } from './AuthProvider';
 
 const LoginPage: React.FC = () => {
   const { signInWithGoogle, loading } = useAuth();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-orange-50 flex items-center justify-center px-4">
-      <Card className="w-full max-w-md animate-fadeInUp">
+    <div className="min-h-screen bg-brand-cream flex items-center justify-center px-4">
+      <Card className="w-full max-w-md animate-fadeInUp border-brand-cream shadow-lg">
         <CardHeader className="text-center pb-2">
-          <div className="flex justify-center mb-4">
-            <div className="bg-primary/10 p-4 rounded-full">
-              <Gift className="h-12 w-12 text-primary" />
-            </div>
+          <div className="flex justify-center mb-6">
+            <Logo variant="full" size="lg" />
           </div>
-          <h1 className="text-3xl font-bold mb-2">Welcome to Unwrapt</h1>
-          <p className="text-xl text-muted-foreground">
+          <p className="text-xl text-brand-charcoal/80">
             Thoughtfulness, on autopilot
           </p>
         </CardHeader>
@@ -27,34 +24,34 @@ const LoginPage: React.FC = () => {
           <div className="space-y-6">
             {/* Value Proposition */}
             <div className="text-center space-y-3">
-              <p className="text-lg font-medium">Never miss another important moment</p>
-              <p className="text-muted-foreground">
+              <p className="text-lg font-medium text-brand-charcoal">Never miss another important moment</p>
+              <p className="text-brand-charcoal/70">
                 Set up thoughtful gift-giving for the people you care about in just a few minutes
               </p>
             </div>
 
             {/* Features Preview */}
             <div className="space-y-3">
-              <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg">
-                <div className="w-2 h-2 bg-primary rounded-full"></div>
-                <span className="text-sm">Auto-import birthdays from Google Calendar</span>
+              <div className="flex items-center space-x-3 p-3 bg-white/60 rounded-lg border border-brand-cream">
+                <div className="w-2 h-2 bg-brand-charcoal rounded-full"></div>
+                <span className="text-sm text-brand-charcoal">Auto-import birthdays from Google Calendar</span>
               </div>
               
-              <div className="flex items-center space-x-3 p-3 bg-orange-50 rounded-lg">
-                <div className="w-2 h-2 bg-accent rounded-full"></div>
-                <span className="text-sm">Curated gifts based on their interests</span>
+              <div className="flex items-center space-x-3 p-3 bg-white/60 rounded-lg border border-brand-cream">
+                <div className="w-2 h-2 bg-brand-gold rounded-full"></div>
+                <span className="text-sm text-brand-charcoal">Curated gifts based on their interests</span>
               </div>
               
-              <div className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg">
-                <div className="w-2 h-2 bg-green-600 rounded-full"></div>
-                <span className="text-sm">Delivered right on time, every time</span>
+              <div className="flex items-center space-x-3 p-3 bg-white/60 rounded-lg border border-brand-cream">
+                <div className="w-2 h-2 bg-brand-charcoal rounded-full"></div>
+                <span className="text-sm text-brand-charcoal">Delivered right on time, every time</span>
               </div>
             </div>
 
             {/* Google Sign In */}
             <Button 
               size="lg" 
-              className="w-full text-lg py-6 bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+              className="w-full text-lg py-6 bg-white text-brand-charcoal border border-brand-charcoal/20 hover:bg-brand-cream-light transition-colors"
               onClick={signInWithGoogle}
               disabled={loading}
             >
@@ -67,7 +64,7 @@ const LoginPage: React.FC = () => {
               Continue with Google
             </Button>
             
-            <p className="text-center text-sm text-muted-foreground">
+            <p className="text-center text-sm text-brand-charcoal/60">
               Free tier includes up to 3 recipients • No credit card required
             </p>
           </div>
