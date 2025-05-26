@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Gift, Calendar } from 'lucide-react';
+import { Gift } from 'lucide-react';
+import { useAuth } from '@/components/auth/AuthProvider';
+import UserMenu from '@/components/auth/UserMenu';
 import WelcomeStep from '@/components/onboarding/WelcomeStep';
 import CalendarStep from '@/components/onboarding/CalendarStep';
 import RecipientStep from '@/components/onboarding/RecipientStep';
@@ -14,6 +15,7 @@ interface OnboardingFlowProps {
 const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [onboardingData, setOnboardingData] = useState({});
+  const { user } = useAuth();
 
   const totalSteps = 7;
 
@@ -60,32 +62,38 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={handleBack}
-                className="mr-4"
-              >
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back
-              </Button>
+              {currentStep > 1 && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleBack}
+                  className="mr-4"
+                >
+                  ← Back
+                </Button>
+              )}
               <div className="flex items-center">
                 <Gift className="h-6 w-6 text-primary mr-2" />
                 <span className="font-bold text-lg">Unwrapt</span>
               </div>
             </div>
             
-            {/* Progress Indicator */}
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-muted-foreground">
-                Step {currentStep} of {totalSteps}
-              </span>
-              <div className="w-32 bg-gray-200 rounded-full h-2">
-                <div 
-                  className="bg-primary h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${(currentStep / totalSteps) * 100}%` }}
-                />
+            <div className="flex items-center space-x-4">
+              {/* Progress Indicator */}
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-muted-foreground">
+                  Step {currentStep} of {totalSteps}
+                </span>
+                <div className="w-32 bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-primary h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${(currentStep / totalSteps) * 100}%` }}
+                  />
+                </div>
               </div>
+              
+              {/* User Menu */}
+              {user && <UserMenu />}
             </div>
           </div>
         </div>
