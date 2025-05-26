@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/logo';
@@ -12,19 +11,21 @@ import InterestsStep from '@/components/onboarding/InterestsStep';
 import PreferencesStep from '@/components/onboarding/PreferencesStep';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface OnboardingFlowProps {
   onBack: () => void;
 }
 
 const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
-  const [currentStep, setCurrentStep] = useState(2); // Start at step 2 (CalendarStep) instead of 1
+  const [currentStep, setCurrentStep] = useState(2); // Start at step 2 (CalendarStep)
   const [onboardingData, setOnboardingData] = useState<any>({});
   const [isCompleting, setIsCompleting] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const totalSteps = 6; // Updated to include gift scheduling
+  const totalSteps = 6;
 
   const handleStepComplete = async (stepData: any) => {
     const updatedData = { ...onboardingData, ...stepData };
@@ -34,7 +35,9 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
       // Complete onboarding and save data
       setIsCompleting(true);
       try {
-        // Save recipient
+        console.log('Completing onboarding with data:', updatedData);
+
+        // Save recipient first
         if (updatedData.firstRecipient) {
           const { data: recipientData, error: recipientError } = await supabase
             .from('recipients')
@@ -55,8 +58,10 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
             throw new Error('Failed to save recipient');
           }
 
+          console.log('Recipient saved successfully:', recipientData);
+
+          // Save first scheduled gift if provided
           if (updatedData.firstGift && recipientData) {
-            // Save first scheduled gift
             const { error: giftError } = await supabase
               .from('scheduled_gifts')
               .insert({
@@ -73,21 +78,32 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
               console.error('Error saving scheduled gift:', giftError);
               throw new Error('Failed to save scheduled gift');
             }
+
+            console.log('Scheduled gift saved successfully');
           }
         }
 
         // Calculate and save initial metrics
         if (user?.id) {
+          console.log('Calculating user metrics...');
           await supabase.rpc('calculate_user_metrics', { user_uuid: user.id });
         }
+
+        // Invalidate the onboarding status query to trigger a refresh
+        await queryClient.invalidateQueries({ queryKey: ['onboarding-status', user?.id] });
 
         toast({
           title: "Welcome to Unwrapt!",
           description: "Your onboarding is complete. Let's start making gift-giving effortless!",
         });
 
-        // Force a page refresh to trigger the onboarding status check
-        window.location.reload();
+        console.log('Onboarding completed successfully');
+
+        // Small delay to ensure toast is visible, then redirect will happen automatically
+        // due to the query invalidation triggering a re-render in Index.tsx
+        setTimeout(() => {
+          setIsCompleting(false);
+        }, 1000);
 
       } catch (error) {
         console.error('Error completing onboarding:', error);
@@ -104,7 +120,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   };
 
   const handleBack = () => {
-    if (currentStep > 2) { // Change condition from > 1 to > 2
+    if (currentStep > 2) {
       setCurrentStep(currentStep - 1);
     } else {
       onBack();
@@ -117,6 +133,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal mx-auto mb-4"></div>
           <p className="text-brand-charcoal">Completing your setup...</p>
+          <p className="text-brand-charcoal/70 text-sm mt-2">You'll be redirected to your dashboard shortly</p>
         </div>
       </div>
     );
@@ -166,7 +183,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              {currentStep > 2 && ( // Change condition from > 1 to > 2
+              {currentStep > 2 && (
                 <Button 
                   variant="ghost" 
                   size="sm" 
@@ -184,7 +201,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
             </div>
             
             <div className="flex items-center space-x-4">
-              {/* Progress Indicator - Adjust to show progress starting from step 2 */}
+              {/* Progress Indicator */}
               <div className="flex items-center space-x-2">
                 <span className="text-sm text-brand-charcoal/70">
                   Step {currentStep - 1} of {totalSteps - 1}
