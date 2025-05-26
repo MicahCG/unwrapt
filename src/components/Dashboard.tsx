@@ -11,6 +11,7 @@ import { Gift, Calendar, Clock, Users, Plus, Star, TrendingUp, Settings } from '
 import { useQuery } from '@tanstack/react-query';
 import RecipientsList from './RecipientsList';
 import UpcomingGiftsManager from './UpcomingGiftsManager';
+import HolidayCarousel from './HolidayCarousel';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -291,6 +292,9 @@ const Dashboard = () => {
                 </CardContent>
               </Card>
             )}
+
+            {/* Holiday Carousel */}
+            <HolidayCarousel />
           </div>
         );
     }
