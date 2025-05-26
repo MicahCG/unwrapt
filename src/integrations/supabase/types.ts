@@ -9,6 +9,48 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      calendar_integrations: {
+        Row: {
+          access_token: string | null
+          calendar_id: string | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          last_sync: string | null
+          provider: string
+          refresh_token: string | null
+          sync_enabled: boolean | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          calendar_id?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          last_sync?: string | null
+          provider: string
+          refresh_token?: string | null
+          sync_enabled?: boolean | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          calendar_id?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          last_sync?: string | null
+          provider?: string
+          refresh_token?: string | null
+          sync_enabled?: boolean | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -36,12 +78,155 @@ export type Database = {
         }
         Relationships: []
       }
+      recipients: {
+        Row: {
+          address: Json | null
+          anniversary: string | null
+          birthday: string | null
+          created_at: string
+          email: string | null
+          id: string
+          interests: string[] | null
+          name: string
+          notes: string | null
+          phone: string | null
+          relationship: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: Json | null
+          anniversary?: string | null
+          birthday?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          interests?: string[] | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          relationship?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: Json | null
+          anniversary?: string | null
+          birthday?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          interests?: string[] | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          relationship?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      scheduled_gifts: {
+        Row: {
+          auto_schedule: boolean | null
+          created_at: string
+          delivery_date: string | null
+          gift_description: string | null
+          gift_type: string | null
+          id: string
+          occasion: string
+          occasion_date: string
+          price_range: string | null
+          recipient_id: string
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_schedule?: boolean | null
+          created_at?: string
+          delivery_date?: string | null
+          gift_description?: string | null
+          gift_type?: string | null
+          id?: string
+          occasion: string
+          occasion_date: string
+          price_range?: string | null
+          recipient_id: string
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_schedule?: boolean | null
+          created_at?: string
+          delivery_date?: string | null
+          gift_description?: string | null
+          gift_type?: string | null
+          id?: string
+          occasion?: string
+          occasion_date?: string
+          price_range?: string | null
+          recipient_id?: string
+          status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_gifts_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "recipients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_metrics: {
+        Row: {
+          created_at: string
+          estimated_time_saved: number | null
+          id: string
+          last_calculated: string | null
+          total_delivered_gifts: number | null
+          total_recipients: number | null
+          total_scheduled_gifts: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          estimated_time_saved?: number | null
+          id?: string
+          last_calculated?: string | null
+          total_delivered_gifts?: number | null
+          total_recipients?: number | null
+          total_scheduled_gifts?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          estimated_time_saved?: number | null
+          id?: string
+          last_calculated?: string | null
+          total_delivered_gifts?: number | null
+          total_recipients?: number | null
+          total_scheduled_gifts?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      calculate_user_metrics: {
+        Args: { user_uuid: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

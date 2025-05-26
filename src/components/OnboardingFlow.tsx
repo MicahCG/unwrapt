@@ -7,6 +7,10 @@ import UserMenu from '@/components/auth/UserMenu';
 import WelcomeStep from '@/components/onboarding/WelcomeStep';
 import CalendarStep from '@/components/onboarding/CalendarStep';
 import RecipientStep from '@/components/onboarding/RecipientStep';
+import InterestsStep from '@/components/onboarding/InterestsStep';
+import PreferencesStep from '@/components/onboarding/PreferencesStep';
+import Dashboard from '@/components/Dashboard';
+import { supabase } from '@/integrations/supabase/client';
 
 interface OnboardingFlowProps {
   onBack: () => void;
@@ -14,14 +18,50 @@ interface OnboardingFlowProps {
 
 const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   const [currentStep, setCurrentStep] = useState(1);
-  const [onboardingData, setOnboardingData] = useState({});
+  const [onboardingData, setOnboardingData] = useState<any>({});
+  const [isCompleted, setIsCompleted] = useState(false);
   const { user } = useAuth();
 
-  const totalSteps = 7;
+  const totalSteps = 5;
 
-  const handleStepComplete = (stepData: any) => {
-    setOnboardingData(prev => ({ ...prev, ...stepData }));
-    if (currentStep < totalSteps) {
+  const handleStepComplete = async (stepData: any) => {
+    const updatedData = { ...onboardingData, ...stepData };
+    setOnboardingData(updatedData);
+
+    if (currentStep === totalSteps) {
+      // Complete onboarding and save data
+      try {
+        // Save recipient
+        if (updatedData.firstRecipient) {
+          const recipientData = {
+            user_id: user?.id,
+            name: updatedData.firstRecipient.fullName,
+            relationship: updatedData.firstRecipient.relationship,
+            email: updatedData.firstRecipient.email,
+            phone: updatedData.firstRecipient.phone,
+            address: updatedData.firstRecipient.address,
+            interests: updatedData.interests || []
+          };
+
+          const { error } = await supabase
+            .from('recipients')
+            .insert(recipientData);
+
+          if (error) {
+            console.error('Error saving recipient:', error);
+          }
+        }
+
+        // Calculate and save initial metrics
+        if (user?.id) {
+          await supabase.rpc('calculate_user_metrics', { user_uuid: user.id });
+        }
+
+        setIsCompleted(true);
+      } catch (error) {
+        console.error('Error completing onboarding:', error);
+      }
+    } else {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -34,6 +74,10 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
     }
   };
 
+  if (isCompleted) {
+    return <Dashboard />;
+  }
+
   const renderStep = () => {
     switch (currentStep) {
       case 1:
@@ -42,6 +86,15 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
         return <CalendarStep onNext={handleStepComplete} />;
       case 3:
         return <RecipientStep onNext={handleStepComplete} />;
+      case 4:
+        return (
+          <InterestsStep 
+            onNext={handleStepComplete} 
+            recipientName={onboardingData.firstRecipient?.fullName}
+          />
+        );
+      case 5:
+        return <PreferencesStep onNext={handleStepComplete} />;
       default:
         return (
           <div className="text-center py-8">
