@@ -1,10 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar, Check, ArrowDown, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 interface CalendarStepProps {
   onNext: (data: any) => void;
@@ -14,7 +15,9 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [foundDates, setFoundDates] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [hasProcessedCallback, setHasProcessedCallback] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const handleGoogleConnect = async () => {
     console.log('Starting Google Calendar connection...');
@@ -22,84 +25,130 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
     setError(null);
     
     try {
-      // Get Google OAuth URL
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      console.log('Getting session for auth headers...');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('No active session found');
+      }
+
+      console.log('Calling google-calendar edge function with auth headers...');
       const { data: authData, error: authError } = await supabase.functions.invoke('google-calendar', {
-        body: { action: 'get_auth_url' }
+        body: { action: 'get_auth_url' },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        }
       });
 
       console.log('Auth URL response:', { authData, authError });
 
       if (authError) {
         console.error('Error getting auth URL:', authError);
-        throw authError;
+        throw new Error(authError.message || 'Failed to get authorization URL');
       }
 
       if (!authData?.authUrl) {
-        throw new Error('No auth URL received from server');
+        throw new Error('No authorization URL received from server');
       }
 
       console.log('Redirecting to Google OAuth:', authData.authUrl);
-      // Redirect to Google OAuth
       window.location.href = authData.authUrl;
       
     } catch (error) {
       console.error('Error connecting to Google Calendar:', error);
-      setError(error instanceof Error ? error.message : 'Failed to connect to Google Calendar');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to connect to Google Calendar';
+      setError(errorMessage);
       setIsConnecting(false);
       toast({
         title: "Connection Failed",
-        description: "Unable to connect to Google Calendar. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
     }
   };
 
   // Check for OAuth callback code from sessionStorage
-  React.useEffect(() => {
+  useEffect(() => {
+    if (hasProcessedCallback) {
+      console.log('OAuth callback already processed, skipping...');
+      return;
+    }
+
     const code = sessionStorage.getItem('google_oauth_code');
     
     if (code) {
-      console.log('Found OAuth code in sessionStorage, processing...');
-      // Clear the code from sessionStorage
+      console.log('Found OAuth code in sessionStorage, processing...', code.substring(0, 20) + '...');
+      setHasProcessedCallback(true);
       sessionStorage.removeItem('google_oauth_code');
       handleOAuthCallback(code);
+    } else {
+      console.log('No OAuth code found in sessionStorage');
     }
-  }, []);
+  }, [hasProcessedCallback]);
 
   const handleOAuthCallback = async (code: string) => {
-    console.log('Processing OAuth callback with code:', code);
+    console.log('Processing OAuth callback with code length:', code.length);
     setIsConnecting(true);
     setError(null);
     
     try {
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      console.log('Getting session for token exchange...');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('No active session found');
+      }
+
       // Exchange code for token
-      console.log('Exchanging code for token...');
+      console.log('Exchanging authorization code for access token...');
       const { data: tokenData, error: tokenError } = await supabase.functions.invoke('google-calendar', {
-        body: { action: 'exchange_code', code }
+        body: { action: 'exchange_code', code },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        }
       });
 
-      console.log('Token exchange response:', { tokenData, tokenError });
+      console.log('Token exchange response:', { 
+        success: !!tokenData, 
+        hasAccessToken: !!tokenData?.access_token,
+        error: tokenError 
+      });
 
       if (tokenError) {
         console.error('Token exchange error:', tokenError);
-        throw tokenError;
+        throw new Error(tokenError.message || 'Failed to exchange authorization code');
       }
 
       if (!tokenData?.access_token) {
-        throw new Error('No access token received');
+        throw new Error('No access token received from Google');
       }
 
       // Fetch calendar events
-      console.log('Fetching calendar events...');
+      console.log('Fetching calendar events with access token...');
       const { data: eventsData, error: eventsError } = await supabase.functions.invoke('google-calendar', {
-        body: { action: 'fetch_events', access_token: tokenData.access_token }
+        body: { action: 'fetch_events', access_token: tokenData.access_token },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        }
       });
 
-      console.log('Events fetch response:', { eventsData, eventsError });
+      console.log('Events fetch response:', { 
+        success: !!eventsData, 
+        eventCount: eventsData?.events?.length || 0,
+        error: eventsError 
+      });
 
       if (eventsError) {
         console.error('Events fetch error:', eventsError);
-        throw eventsError;
+        throw new Error(eventsError.message || 'Failed to fetch calendar events');
       }
 
       const events = eventsData?.events || [];
@@ -110,13 +159,13 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
 
       // Show success toast
       toast({
-        title: "Calendar Connected!",
+        title: "Calendar Connected Successfully!",
         description: `Found ${events.length} important dates from your calendar.`,
       });
 
-      // Auto-advance to next step after a short delay to show the success state
+      // Auto-advance to next step after showing success
       setTimeout(() => {
-        console.log('Auto-advancing to next step with data:', { 
+        console.log('Auto-advancing to next step with calendar data:', { 
           calendarConnected: true,
           importedDates: events 
         });
@@ -131,8 +180,9 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
       const errorMessage = error instanceof Error ? error.message : 'Failed to process calendar connection';
       setError(errorMessage);
       setIsConnecting(false);
+      setHasProcessedCallback(false); // Allow retry
       toast({
-        title: "Connection Failed",
+        title: "Calendar Connection Failed",
         description: errorMessage,
         variant: "destructive"
       });
@@ -155,6 +205,14 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
     });
   };
 
+  const handleRetry = () => {
+    console.log('Retrying calendar connection...');
+    setError(null);
+    setIsConnecting(false);
+    setHasProcessedCallback(false);
+    setFoundDates([]);
+  };
+
   return (
     <Card className="animate-fadeInUp border-brand-cream shadow-lg">
       <CardHeader className="text-center">
@@ -173,10 +231,18 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-3">
             <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
-            <div>
+            <div className="flex-1">
               <p className="text-red-700 font-medium">Connection Error</p>
               <p className="text-red-600 text-sm">{error}</p>
             </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleRetry}
+              className="text-red-700 border-red-200 hover:bg-red-50"
+            >
+              Retry
+            </Button>
           </div>
         )}
 
@@ -191,7 +257,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
               {isConnecting ? (
                 <>
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-brand-cream mr-2"></div>
-                  {isConnecting ? 'Connecting to Google Calendar...' : 'Processing...'}
+                  Connecting to Google Calendar...
                 </>
               ) : (
                 <>
