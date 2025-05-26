@@ -29,6 +29,24 @@ Deno.serve(async (req) => {
 
     const { action, code, access_token } = await req.json()
 
+    if (action === 'get_auth_url') {
+      const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
+      const redirectUri = `${req.headers.get('origin')}/auth/callback`
+      const scope = 'https://www.googleapis.com/auth/calendar.readonly'
+      
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${clientId}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `scope=${encodeURIComponent(scope)}&` +
+        `response_type=code&` +
+        `access_type=offline&` +
+        `prompt=consent`
+
+      return new Response(JSON.stringify({ authUrl }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
     if (action === 'exchange_code') {
       // Exchange authorization code for access token
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -39,7 +57,7 @@ Deno.serve(async (req) => {
           client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') ?? '',
           code: code,
           grant_type: 'authorization_code',
-          redirect_uri: `${Deno.env.get('SUPABASE_URL')}/functions/v1/google-calendar`
+          redirect_uri: `${req.headers.get('origin')}/auth/callback`
         })
       })
 

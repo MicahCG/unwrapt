@@ -7,6 +7,7 @@ import UserMenu from '@/components/auth/UserMenu';
 import WelcomeStep from '@/components/onboarding/WelcomeStep';
 import CalendarStep from '@/components/onboarding/CalendarStep';
 import RecipientStep from '@/components/onboarding/RecipientStep';
+import GiftScheduleStep from '@/components/onboarding/GiftScheduleStep';
 import InterestsStep from '@/components/onboarding/InterestsStep';
 import PreferencesStep from '@/components/onboarding/PreferencesStep';
 import Dashboard from '@/components/Dashboard';
@@ -22,7 +23,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   const [isCompleted, setIsCompleted] = useState(false);
   const { user } = useAuth();
 
-  const totalSteps = 5;
+  const totalSteps = 6; // Updated to include gift scheduling
 
   const handleStepComplete = async (stepData: any) => {
     const updatedData = { ...onboardingData, ...stepData };
@@ -33,22 +34,39 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
       try {
         // Save recipient
         if (updatedData.firstRecipient) {
-          const recipientData = {
-            user_id: user?.id,
-            name: updatedData.firstRecipient.fullName,
-            relationship: updatedData.firstRecipient.relationship,
-            email: updatedData.firstRecipient.email,
-            phone: updatedData.firstRecipient.phone,
-            address: updatedData.firstRecipient.address,
-            interests: updatedData.interests || []
-          };
-
-          const { error } = await supabase
+          const { data: recipientData, error: recipientError } = await supabase
             .from('recipients')
-            .insert(recipientData);
+            .insert({
+              user_id: user?.id,
+              name: updatedData.firstRecipient.fullName,
+              relationship: updatedData.firstRecipient.relationship,
+              email: updatedData.firstRecipient.email,
+              phone: updatedData.firstRecipient.phone,
+              address: updatedData.firstRecipient.address,
+              interests: updatedData.interests || []
+            })
+            .select()
+            .single();
 
-          if (error) {
-            console.error('Error saving recipient:', error);
+          if (recipientError) {
+            console.error('Error saving recipient:', recipientError);
+          } else if (updatedData.firstGift && recipientData) {
+            // Save first scheduled gift
+            const { error: giftError } = await supabase
+              .from('scheduled_gifts')
+              .insert({
+                user_id: user?.id,
+                recipient_id: recipientData.id,
+                occasion: updatedData.firstGift.occasion,
+                occasion_date: updatedData.firstGift.occasionDate,
+                gift_type: updatedData.firstGift.giftType,
+                price_range: updatedData.firstGift.priceRange,
+                status: 'scheduled'
+              });
+
+            if (giftError) {
+              console.error('Error saving scheduled gift:', giftError);
+            }
           }
         }
 
@@ -88,12 +106,19 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
         return <RecipientStep onNext={handleStepComplete} />;
       case 4:
         return (
-          <InterestsStep 
+          <GiftScheduleStep 
             onNext={handleStepComplete} 
             recipientName={onboardingData.firstRecipient?.fullName}
           />
         );
       case 5:
+        return (
+          <InterestsStep 
+            onNext={handleStepComplete} 
+            recipientName={onboardingData.firstRecipient?.fullName}
+          />
+        );
+      case 6:
         return <PreferencesStep onNext={handleStepComplete} />;
       default:
         return (

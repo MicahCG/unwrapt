@@ -18,35 +18,54 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
     
     try {
       // Get Google OAuth URL
-      const clientId = 'YOUR_GOOGLE_CLIENT_ID'; // This should be configured in environment
-      const redirectUri = `${window.location.origin}/__/auth/callback`;
-      const scope = 'https://www.googleapis.com/auth/calendar.readonly';
-      
-      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-        `client_id=${clientId}&` +
-        `redirect_uri=${redirectUri}&` +
-        `scope=${scope}&` +
-        `response_type=code&` +
-        `access_type=offline`;
+      const { data: authData, error: authError } = await supabase.functions.invoke('google-calendar', {
+        body: { action: 'get_auth_url' }
+      });
 
-      // For demo purposes, we'll simulate the calendar connection
-      // In production, this would redirect to Google OAuth
-      setTimeout(async () => {
-        // Simulate fetching real calendar data
-        const mockDates = [
-          { summary: "Mom's Birthday", date: "2024-03-15", type: "birthday" },
-          { summary: "Wedding Anniversary", date: "2024-06-22", type: "anniversary" },
-          { summary: "Dad's Birthday", date: "2024-08-08", type: "birthday" },
-          { summary: "Sister's Birthday", date: "2024-11-03", type: "birthday" },
-          { summary: "Parents' Anniversary", date: "2024-09-14", type: "anniversary" }
-        ];
-        
-        setFoundDates(mockDates);
-        setIsConnecting(false);
-      }, 2000);
+      if (authError) throw authError;
+
+      // Redirect to Google OAuth
+      window.location.href = authData.authUrl;
       
     } catch (error) {
       console.error('Error connecting to Google Calendar:', error);
+      setIsConnecting(false);
+    }
+  };
+
+  // Check for OAuth callback
+  React.useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    
+    if (code) {
+      handleOAuthCallback(code);
+    }
+  }, []);
+
+  const handleOAuthCallback = async (code: string) => {
+    try {
+      // Exchange code for token
+      const { data: tokenData, error: tokenError } = await supabase.functions.invoke('google-calendar', {
+        body: { action: 'exchange_code', code }
+      });
+
+      if (tokenError) throw tokenError;
+
+      // Fetch calendar events
+      const { data: eventsData, error: eventsError } = await supabase.functions.invoke('google-calendar', {
+        body: { action: 'fetch_events', access_token: tokenData.access_token }
+      });
+
+      if (eventsError) throw eventsError;
+
+      setFoundDates(eventsData.events);
+      setIsConnecting(false);
+
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch (error) {
+      console.error('Error processing OAuth callback:', error);
       setIsConnecting(false);
     }
   };
