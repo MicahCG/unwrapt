@@ -10,8 +10,8 @@ import RecipientStep from '@/components/onboarding/RecipientStep';
 import GiftScheduleStep from '@/components/onboarding/GiftScheduleStep';
 import InterestsStep from '@/components/onboarding/InterestsStep';
 import PreferencesStep from '@/components/onboarding/PreferencesStep';
-import Dashboard from '@/components/Dashboard';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface OnboardingFlowProps {
   onBack: () => void;
@@ -20,8 +20,9 @@ interface OnboardingFlowProps {
 const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   const [currentStep, setCurrentStep] = useState(2); // Start at step 2 (CalendarStep) instead of 1
   const [onboardingData, setOnboardingData] = useState<any>({});
-  const [isCompleted, setIsCompleted] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
   const { user } = useAuth();
+  const { toast } = useToast();
 
   const totalSteps = 6; // Updated to include gift scheduling
 
@@ -31,6 +32,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
 
     if (currentStep === totalSteps) {
       // Complete onboarding and save data
+      setIsCompleting(true);
       try {
         // Save recipient
         if (updatedData.firstRecipient) {
@@ -50,7 +52,10 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
 
           if (recipientError) {
             console.error('Error saving recipient:', recipientError);
-          } else if (updatedData.firstGift && recipientData) {
+            throw new Error('Failed to save recipient');
+          }
+
+          if (updatedData.firstGift && recipientData) {
             // Save first scheduled gift
             const { error: giftError } = await supabase
               .from('scheduled_gifts')
@@ -66,6 +71,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
 
             if (giftError) {
               console.error('Error saving scheduled gift:', giftError);
+              throw new Error('Failed to save scheduled gift');
             }
           }
         }
@@ -75,9 +81,22 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
           await supabase.rpc('calculate_user_metrics', { user_uuid: user.id });
         }
 
-        setIsCompleted(true);
+        toast({
+          title: "Welcome to Unwrapt!",
+          description: "Your onboarding is complete. Let's start making gift-giving effortless!",
+        });
+
+        // Force a page refresh to trigger the onboarding status check
+        window.location.reload();
+
       } catch (error) {
         console.error('Error completing onboarding:', error);
+        toast({
+          title: "Error",
+          description: "There was a problem completing your setup. Please try again.",
+          variant: "destructive"
+        });
+        setIsCompleting(false);
       }
     } else {
       setCurrentStep(currentStep + 1);
@@ -92,8 +111,15 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
     }
   };
 
-  if (isCompleted) {
-    return <Dashboard />;
+  if (isCompleting) {
+    return (
+      <div className="min-h-screen bg-brand-cream flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal mx-auto mb-4"></div>
+          <p className="text-brand-charcoal">Completing your setup...</p>
+        </div>
+      </div>
+    );
   }
 
   const renderStep = () => {
@@ -146,6 +172,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
                   size="sm" 
                   onClick={handleBack}
                   className="mr-4 text-brand-charcoal hover:bg-brand-cream-light"
+                  disabled={isCompleting}
                 >
                   ← Back
                 </Button>
