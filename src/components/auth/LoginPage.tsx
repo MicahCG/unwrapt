@@ -24,27 +24,27 @@ const LoginPage: React.FC = () => {
           <div className="space-y-6">
             {/* Value Proposition */}
             <div className="text-center space-y-3">
-              <p className="text-lg font-medium text-brand-charcoal">Never miss another important momennt</p>
+              <p className="text-lg font-medium text-brand-charcoal">Never miss a moment</p>
               <p className="text-brand-charcoal/70">
-                Set up thoughtful gift-giving for the people you care about in just a few minutes
+                Set up thoughtful gift-giving for the people that matter
               </p>
             </div>
 
             {/* Features Preview */}
             <div className="space-y-3">
               <div className="flex items-center space-x-3 p-3 bg-white/60 rounded-lg border border-brand-cream">
-                <div className="w-2 h-2 bg-brand-charcoal rounded-full"></div>
+                <div className="w-2 h-2 bg-brand-gold rounded-full"></div>
                 <span className="text-sm text-brand-charcoal">Auto-import birthdays from Google Calendar</span>
               </div>
               
               <div className="flex items-center space-x-3 p-3 bg-white/60 rounded-lg border border-brand-cream">
                 <div className="w-2 h-2 bg-brand-gold rounded-full"></div>
-                <span className="text-sm text-brand-charcoal">Curated gifts based on their interests</span>
+                <span className="text-sm text-brand-charcoal">Stand out with carefully curated gifts</span>
               </div>
               
               <div className="flex items-center space-x-3 p-3 bg-white/60 rounded-lg border border-brand-cream">
-                <div className="w-2 h-2 bg-brand-charcoal rounded-full"></div>
-                <span className="text-sm text-brand-charcoal">Delivered right on time, every time</span>
+                <div className="w-2 h-2 bg-brand-gold rounded-full"></div>
+                <span className="text-sm text-brand-charcoal">Hassle free, saving you time and showing you care</span>
               </div>
             </div>
 
@@ -65,7 +65,7 @@ const LoginPage: React.FC = () => {
             </Button>
             
             <p className="text-center text-sm text-brand-charcoal/60">
-              Free tier includes up to 3 recipients • No credit card required
+              No subscriptions. A gift from us.
             </p>
           </div>
         </CardContent>
