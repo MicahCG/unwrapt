@@ -24,7 +24,7 @@ const LoginPage: React.FC = () => {
           <div className="space-y-6">
             {/* Value Proposition */}
             <div className="text-center space-y-3">
-              <p className="text-lg font-medium text-brand-charcoal">Never miss another important moment</p>
+              <p className="text-lg font-medium text-brand-charcoal">Never miss another important momennt</p>
               <p className="text-brand-charcoal/70">
                 Set up thoughtful gift-giving for the people you care about in just a few minutes
               </p>
