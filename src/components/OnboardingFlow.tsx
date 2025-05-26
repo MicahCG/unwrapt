@@ -18,7 +18,7 @@ interface OnboardingFlowProps {
 }
 
 const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(2); // Start at step 2 (CalendarStep) instead of 1
   const [onboardingData, setOnboardingData] = useState<any>({});
   const [isCompleted, setIsCompleted] = useState(false);
   const { user } = useAuth();
@@ -85,7 +85,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   };
 
   const handleBack = () => {
-    if (currentStep > 1) {
+    if (currentStep > 2) { // Change condition from > 1 to > 2
       setCurrentStep(currentStep - 1);
     } else {
       onBack();
@@ -140,7 +140,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              {currentStep > 1 && (
+              {currentStep > 2 && ( // Change condition from > 1 to > 2
                 <Button 
                   variant="ghost" 
                   size="sm" 
@@ -157,15 +157,15 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
             </div>
             
             <div className="flex items-center space-x-4">
-              {/* Progress Indicator */}
+              {/* Progress Indicator - Adjust to show progress starting from step 2 */}
               <div className="flex items-center space-x-2">
                 <span className="text-sm text-brand-charcoal/70">
-                  Step {currentStep} of {totalSteps}
+                  Step {currentStep - 1} of {totalSteps - 1}
                 </span>
                 <div className="w-32 bg-brand-cream-light rounded-full h-2">
                   <div 
                     className="bg-brand-charcoal h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${(currentStep / totalSteps) * 100}%` }}
+                    style={{ width: `${((currentStep - 1) / (totalSteps - 1)) * 100}%` }}
                   />
                 </div>
               </div>
