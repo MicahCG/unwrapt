@@ -33,17 +33,20 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
     }
   };
 
-  // Check for OAuth callback
+  // Check for OAuth callback code from sessionStorage
   React.useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
+    const code = sessionStorage.getItem('google_oauth_code');
     
     if (code) {
+      // Clear the code from sessionStorage
+      sessionStorage.removeItem('google_oauth_code');
       handleOAuthCallback(code);
     }
   }, []);
 
   const handleOAuthCallback = async (code: string) => {
+    setIsConnecting(true);
+    
     try {
       // Exchange code for token
       const { data: tokenData, error: tokenError } = await supabase.functions.invoke('google-calendar', {
@@ -61,9 +64,6 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
 
       setFoundDates(eventsData.events);
       setIsConnecting(false);
-
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
     } catch (error) {
       console.error('Error processing OAuth callback:', error);
       setIsConnecting(false);
