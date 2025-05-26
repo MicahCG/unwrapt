@@ -7,12 +7,14 @@ import { Logo } from '@/components/ui/logo';
 import { useAuth } from '@/components/auth/AuthProvider';
 import UserMenu from '@/components/auth/UserMenu';
 import { supabase } from '@/integrations/supabase/client';
-import { Gift, Calendar, Clock, Users, Plus, Star, TrendingUp } from 'lucide-react';
+import { Gift, Calendar, Clock, Users, Plus, Star, TrendingUp, Settings } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import RecipientsList from './RecipientsList';
+import UpcomingGiftsManager from './UpcomingGiftsManager';
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const [showAddRecipient, setShowAddRecipient] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
 
   // Fetch user metrics
   const { data: metrics } = useQuery({
@@ -87,6 +89,213 @@ const Dashboard = () => {
     }
   };
 
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'recipients':
+        return <RecipientsList />;
+      case 'gifts':
+        return <UpcomingGiftsManager />;
+      default:
+        return (
+          <div className="space-y-8">
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold text-brand-charcoal mb-2">
+                Welcome back! 👋
+              </h1>
+              <p className="text-brand-charcoal/70">
+                Here's what's happening with your gifting schedule
+              </p>
+            </div>
+
+            {/* Metrics Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <Users className="h-8 w-8 text-brand-gold" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-brand-charcoal/70">Recipients</p>
+                      <p className="text-2xl font-bold text-brand-charcoal">{metrics?.total_recipients || 0}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <Gift className="h-8 w-8 text-brand-gold" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-brand-charcoal/70">Scheduled Gifts</p>
+                      <p className="text-2xl font-bold text-brand-charcoal">{metrics?.total_scheduled_gifts || 0}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <Star className="h-8 w-8 text-brand-gold" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-brand-charcoal/70">Delivered</p>
+                      <p className="text-2xl font-bold text-brand-charcoal">{metrics?.total_delivered_gifts || 0}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <Clock className="h-8 w-8 text-brand-gold" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-brand-charcoal/70">Time Saved</p>
+                      <p className="text-2xl font-bold text-brand-charcoal">{metrics?.estimated_time_saved || 0}h</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Upcoming Gifts Preview */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between text-brand-charcoal">
+                    <div className="flex items-center">
+                      <Calendar className="h-5 w-5 mr-2" />
+                      Upcoming Gifts
+                    </div>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => setActiveTab('gifts')}
+                      className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light"
+                    >
+                      View All
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {upcomingGifts && upcomingGifts.length > 0 ? (
+                    <div className="space-y-4">
+                      {upcomingGifts.slice(0, 3).map((gift: any) => (
+                        <div key={gift.id} className="flex items-center justify-between p-3 bg-brand-cream-light rounded-lg">
+                          <div>
+                            <p className="font-medium text-brand-charcoal">{gift.recipients?.name}</p>
+                            <p className="text-sm text-brand-charcoal/70">{gift.occasion}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium text-brand-charcoal">{formatDate(gift.occasion_date)}</p>
+                            <Badge className={getStatusColor(gift.status)}>{gift.status}</Badge>
+                          </div>
+                        </div>
+                      ))}
+                      {upcomingGifts.length > 3 && (
+                        <p className="text-center text-sm text-brand-charcoal/70 pt-2">
+                          +{upcomingGifts.length - 3} more gifts
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Gift className="h-12 w-12 text-brand-charcoal/30 mx-auto mb-4" />
+                      <p className="text-brand-charcoal/70">No upcoming gifts scheduled</p>
+                      <Button 
+                        className="mt-4 bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+                        onClick={() => setActiveTab('recipients')}
+                      >
+                        Add Your First Recipient
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Recipients Preview */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between text-brand-charcoal">
+                    <div className="flex items-center">
+                      <Users className="h-5 w-5 mr-2" />
+                      Your Recipients
+                    </div>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => setActiveTab('recipients')}
+                      className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Manage
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {recipients && recipients.length > 0 ? (
+                    <div className="space-y-3">
+                      {recipients.slice(0, 5).map((recipient: any) => (
+                        <div key={recipient.id} className="flex items-center justify-between p-3 bg-brand-cream-light rounded-lg">
+                          <div>
+                            <p className="font-medium text-brand-charcoal">{recipient.name}</p>
+                            <p className="text-sm text-brand-charcoal/70">{recipient.relationship}</p>
+                          </div>
+                          <div className="text-right">
+                            {recipient.birthday && (
+                              <p className="text-xs text-brand-charcoal/70">
+                                Birthday: {formatDate(recipient.birthday)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      {recipients.length > 5 && (
+                        <p className="text-center text-sm text-brand-charcoal/70 pt-2">
+                          +{recipients.length - 5} more recipients
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Users className="h-12 w-12 text-brand-charcoal/30 mx-auto mb-4" />
+                      <p className="text-brand-charcoal/70">No recipients added yet</p>
+                      <Button 
+                        className="mt-4 bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+                        onClick={() => setActiveTab('recipients')}
+                      >
+                        Add Your First Recipient
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Motivational Section */}
+            {recipients && recipients.length > 0 && (
+              <Card className="bg-gradient-to-r from-brand-gold/10 to-brand-cream border-brand-gold/20">
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <TrendingUp className="h-8 w-8 text-brand-gold mr-4" />
+                    <div>
+                      <h3 className="text-lg font-semibold text-brand-charcoal mb-2">
+                        You're doing great! 🎉
+                      </h3>
+                      <p className="text-brand-charcoal/70">
+                        You've saved an estimated {metrics?.estimated_time_saved || 0} hours by automating your gift-giving. 
+                        Add more recipients to never miss another special moment!
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        );
+    }
+  };
+
   return (
     <div className="min-h-screen bg-brand-cream">
       {/* Header */}
@@ -99,198 +308,52 @@ const Dashboard = () => {
             </div>
             
             <div className="flex items-center space-x-4">
-              <Button 
-                onClick={() => setShowAddRecipient(true)}
-                className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Recipient
-              </Button>
               {user && <UserMenu />}
             </div>
           </div>
         </div>
       </div>
 
+      {/* Navigation Tabs */}
+      <div className="border-b border-brand-cream-light bg-white">
+        <div className="container mx-auto px-4">
+          <div className="flex space-x-8">
+            <button
+              onClick={() => setActiveTab('overview')}
+              className={`py-4 px-2 border-b-2 font-medium text-sm ${
+                activeTab === 'overview'
+                  ? 'border-brand-gold text-brand-charcoal'
+                  : 'border-transparent text-brand-charcoal/60 hover:text-brand-charcoal'
+              }`}
+            >
+              Overview
+            </button>
+            <button
+              onClick={() => setActiveTab('recipients')}
+              className={`py-4 px-2 border-b-2 font-medium text-sm ${
+                activeTab === 'recipients'
+                  ? 'border-brand-gold text-brand-charcoal'
+                  : 'border-transparent text-brand-charcoal/60 hover:text-brand-charcoal'
+              }`}
+            >
+              Recipients
+            </button>
+            <button
+              onClick={() => setActiveTab('gifts')}
+              className={`py-4 px-2 border-b-2 font-medium text-sm ${
+                activeTab === 'gifts'
+                  ? 'border-brand-gold text-brand-charcoal'
+                  : 'border-transparent text-brand-charcoal/60 hover:text-brand-charcoal'
+              }`}
+            >
+              Upcoming Gifts
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-brand-charcoal mb-2">
-            Welcome back! 👋
-          </h1>
-          <p className="text-brand-charcoal/70">
-            Here's what's happening with your gifting schedule
-          </p>
-        </div>
-
-        {/* Metrics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Users className="h-8 w-8 text-brand-gold" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-brand-charcoal/70">Recipients</p>
-                  <p className="text-2xl font-bold text-brand-charcoal">{metrics?.total_recipients || 0}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Gift className="h-8 w-8 text-brand-gold" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-brand-charcoal/70">Scheduled Gifts</p>
-                  <p className="text-2xl font-bold text-brand-charcoal">{metrics?.total_scheduled_gifts || 0}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Star className="h-8 w-8 text-brand-gold" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-brand-charcoal/70">Delivered</p>
-                  <p className="text-2xl font-bold text-brand-charcoal">{metrics?.total_delivered_gifts || 0}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Clock className="h-8 w-8 text-brand-gold" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-brand-charcoal/70">Time Saved</p>
-                  <p className="text-2xl font-bold text-brand-charcoal">{metrics?.estimated_time_saved || 0}h</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Upcoming Gifts */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center text-brand-charcoal">
-                <Calendar className="h-5 w-5 mr-2" />
-                Upcoming Gifts
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {upcomingGifts && upcomingGifts.length > 0 ? (
-                <div className="space-y-4">
-                  {upcomingGifts.map((gift: any) => (
-                    <div key={gift.id} className="flex items-center justify-between p-3 bg-brand-cream-light rounded-lg">
-                      <div>
-                        <p className="font-medium text-brand-charcoal">{gift.recipients?.name}</p>
-                        <p className="text-sm text-brand-charcoal/70">{gift.occasion}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-brand-charcoal">{formatDate(gift.occasion_date)}</p>
-                        <Badge className={getStatusColor(gift.status)}>{gift.status}</Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Gift className="h-12 w-12 text-brand-charcoal/30 mx-auto mb-4" />
-                  <p className="text-brand-charcoal/70">No upcoming gifts scheduled</p>
-                  <Button 
-                    className="mt-4 bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
-                    onClick={() => setShowAddRecipient(true)}
-                  >
-                    Add Your First Recipient
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Recipients */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between text-brand-charcoal">
-                <div className="flex items-center">
-                  <Users className="h-5 w-5 mr-2" />
-                  Your Recipients
-                </div>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => setShowAddRecipient(true)}
-                  className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add
-                </Button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {recipients && recipients.length > 0 ? (
-                <div className="space-y-3">
-                  {recipients.slice(0, 5).map((recipient: any) => (
-                    <div key={recipient.id} className="flex items-center justify-between p-3 bg-brand-cream-light rounded-lg">
-                      <div>
-                        <p className="font-medium text-brand-charcoal">{recipient.name}</p>
-                        <p className="text-sm text-brand-charcoal/70">{recipient.relationship}</p>
-                      </div>
-                      <div className="text-right">
-                        {recipient.birthday && (
-                          <p className="text-xs text-brand-charcoal/70">
-                            Birthday: {formatDate(recipient.birthday)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {recipients.length > 5 && (
-                    <p className="text-center text-sm text-brand-charcoal/70 pt-2">
-                      +{recipients.length - 5} more recipients
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Users className="h-12 w-12 text-brand-charcoal/30 mx-auto mb-4" />
-                  <p className="text-brand-charcoal/70">No recipients added yet</p>
-                  <Button 
-                    className="mt-4 bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
-                    onClick={() => setShowAddRecipient(true)}
-                  >
-                    Add Your First Recipient
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Motivational Section */}
-        {recipients && recipients.length > 0 && (
-          <Card className="mt-8 bg-gradient-to-r from-brand-gold/10 to-brand-cream border-brand-gold/20">
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <TrendingUp className="h-8 w-8 text-brand-gold mr-4" />
-                <div>
-                  <h3 className="text-lg font-semibold text-brand-charcoal mb-2">
-                    You're doing great! 🎉
-                  </h3>
-                  <p className="text-brand-charcoal/70">
-                    You've saved an estimated {metrics?.estimated_time_saved || 0} hours by automating your gift-giving. 
-                    Add more recipients to never miss another special moment!
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {renderTabContent()}
       </div>
     </div>
   );
