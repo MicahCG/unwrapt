@@ -1,23 +1,25 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Gift, Calendar, User, DollarSign, Package, Edit, Trash2 } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { supabase } from '@/integrations/supabase/client';
-import { Calendar, Edit, Trash2, ShoppingCart, Eye } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import GiftDetailsModal from './GiftDetailsModal';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import EditGiftModal from './EditGiftModal';
+import GiftDetailsModal from './GiftDetailsModal';
+import ShopifyOrderStatus from './ShopifyOrderStatus';
 
 const UpcomingGiftsManager = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedGift, setSelectedGift] = useState(null);
-  const [editingGift, setEditingGift] = useState(null);
+  const [editingGift, setEditingGift] = useState<any>(null);
+  const [viewingGift, setViewingGift] = useState<any>(null);
 
   // Fetch upcoming scheduled gifts
-  const { data: upcomingGifts } = useQuery({
+  const { data: upcomingGifts, isLoading } = useQuery({
     queryKey: ['upcoming-gifts', user?.id],
     queryFn: async () => {
       const today = new Date();
@@ -73,6 +75,7 @@ const UpcomingGiftsManager = () => {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
+      weekday: 'short',
       month: 'short',
       day: 'numeric',
       year: 'numeric'
@@ -89,106 +92,163 @@ const UpcomingGiftsManager = () => {
   };
 
   const getDaysUntil = (dateString: string) => {
-    const today = new Date();
     const targetDate = new Date(dateString);
+    const today = new Date();
     const diffTime = targetDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-brand-charcoal">Upcoming Gifts</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-brand-charcoal">Upcoming Gifts</h2>
+          <p className="text-brand-charcoal/70">
+            Manage your scheduled gifts and track their delivery status
+          </p>
+        </div>
       </div>
 
       {upcomingGifts && upcomingGifts.length > 0 ? (
-        <div className="space-y-4">
+        <div className="grid gap-4">
           {upcomingGifts.map((gift: any) => {
             const daysUntil = getDaysUntil(gift.occasion_date);
-            const isUrgent = daysUntil <= 7;
             
             return (
-              <Card key={gift.id} className={`hover:shadow-lg transition-shadow ${isUrgent ? 'border-red-200' : ''}`}>
+              <Card key={gift.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="text-lg font-semibold text-brand-charcoal">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-start space-x-3">
+                      <div className="bg-brand-gold/20 p-2 rounded-lg">
+                        <Gift className="h-5 w-5 text-brand-gold" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-brand-charcoal text-lg">
                           {gift.recipients?.name}
                         </h3>
-                        <Badge className={getStatusColor(gift.status)}>
-                          {gift.status}
-                        </Badge>
-                        {isUrgent && (
-                          <Badge variant="destructive" className="animate-pulse">
-                            Urgent
-                          </Badge>
-                        )}
+                        <p className="text-brand-charcoal/70 text-sm">
+                          {gift.recipients?.relationship}
+                        </p>
                       </div>
-                      
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-brand-charcoal/70">
-                        <div>
-                          <span className="font-medium">Occasion:</span>
-                          <p>{gift.occasion}</p>
-                        </div>
-                        <div>
-                          <span className="font-medium">Date:</span>
-                          <p>{formatDate(gift.occasion_date)}</p>
-                        </div>
-                        <div>
-                          <span className="font-medium">Days Until:</span>
-                          <p className={isUrgent ? 'text-red-600 font-medium' : ''}>
-                            {daysUntil} days
-                          </p>
-                        </div>
-                        <div>
-                          <span className="font-medium">Price Range:</span>
-                          <p>{gift.price_range || 'Not specified'}</p>
-                        </div>
-                      </div>
-                      
-                      {gift.gift_type && (
-                        <div className="mt-2">
-                          <Badge variant="outline">{gift.gift_type}</Badge>
-                        </div>
-                      )}
                     </div>
                     
-                    <div className="flex space-x-2 ml-4">
+                    <div className="flex items-center space-x-2">
+                      <Badge className={getStatusColor(gift.status)}>
+                        {gift.status === 'ordered' ? 'Processing' : gift.status}
+                      </Badge>
+                      {gift.payment_status === 'paid' && (
+                        <Badge className="bg-green-100 text-green-800">
+                          Paid
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="h-4 w-4 text-brand-charcoal/50" />
+                      <div>
+                        <p className="text-xs text-brand-charcoal/70">Occasion</p>
+                        <p className="text-sm font-medium text-brand-charcoal">
+                          {gift.occasion}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="h-4 w-4 text-brand-charcoal/50" />
+                      <div>
+                        <p className="text-xs text-brand-charcoal/70">Date</p>
+                        <p className="text-sm font-medium text-brand-charcoal">
+                          {formatDate(gift.occasion_date)}
+                          {daysUntil >= 0 && (
+                            <span className="text-xs text-brand-charcoal/60 ml-1">
+                              ({daysUntil === 0 ? 'Today' : `${daysUntil} days`})
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Package className="h-4 w-4 text-brand-charcoal/50" />
+                      <div>
+                        <p className="text-xs text-brand-charcoal/70">Gift Type</p>
+                        <p className="text-sm font-medium text-brand-charcoal">
+                          {gift.gift_type || 'Not specified'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <DollarSign className="h-4 w-4 text-brand-charcoal/50" />
+                      <div>
+                        <p className="text-xs text-brand-charcoal/70">Budget</p>
+                        <p className="text-sm font-medium text-brand-charcoal">
+                          {gift.price_range || 'Not set'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Show Shopify order status if gift is ordered */}
+                  {gift.status === 'ordered' && (
+                    <div className="mb-4">
+                      <ShopifyOrderStatus gift={gift} />
+                    </div>
+                  )}
+
+                  {gift.gift_description && (
+                    <div className="mb-4 p-3 bg-brand-cream-light rounded-lg">
+                      <p className="text-sm text-brand-charcoal">
+                        <strong>Description:</strong> {gift.gift_description.split('|')[0].trim()}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-4 border-t border-brand-cream-light">
+                    <div className="flex space-x-2">
                       <Button
                         size="sm"
-                        variant="ghost"
-                        onClick={() => setSelectedGift(gift)}
+                        variant="outline"
+                        onClick={() => setViewingGift(gift)}
+                        className="text-brand-charcoal border-brand-charcoal hover:bg-brand-cream-light"
                       >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setEditingGift(gift)}
-                      >
-                        <Edit className="h-4 w-4" />
+                        View Details
                       </Button>
                       {gift.status === 'scheduled' && (
                         <Button
                           size="sm"
-                          variant="ghost"
-                          onClick={() => handleOrderGift(gift.id)}
-                          className="text-green-600 hover:text-green-700"
+                          variant="outline"
+                          onClick={() => setEditingGift(gift)}
+                          className="text-brand-charcoal border-brand-charcoal hover:bg-brand-cream-light"
                         >
-                          <ShoppingCart className="h-4 w-4" />
+                          <Edit className="h-3 w-3 mr-1" />
+                          Edit
                         </Button>
                       )}
+                    </div>
+
+                    {gift.status === 'scheduled' && (
                       <Button
                         size="sm"
                         variant="ghost"
                         onClick={() => handleDeleteGift(gift.id)}
-                        className="text-red-600 hover:text-red-700"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3 w-3 mr-1" />
+                        Delete
                       </Button>
-                    </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -196,30 +256,33 @@ const UpcomingGiftsManager = () => {
           })}
         </div>
       ) : (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Calendar className="h-12 w-12 text-brand-charcoal/30 mx-auto mb-4" />
-            <p className="text-brand-charcoal/70 mb-4">No upcoming gifts scheduled</p>
-            <Button className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90">
-              Schedule Your First Gift
-            </Button>
+        <Card className="text-center py-8">
+          <CardContent>
+            <Gift className="h-12 w-12 text-brand-charcoal/30 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-brand-charcoal mb-2">
+              No upcoming gifts scheduled
+            </h3>
+            <p className="text-brand-charcoal/70 mb-4">
+              Start by adding recipients and scheduling gifts for their special occasions.
+            </p>
           </CardContent>
         </Card>
       )}
 
-      {selectedGift && (
-        <GiftDetailsModal
-          gift={selectedGift}
-          isOpen={!!selectedGift}
-          onClose={() => setSelectedGift(null)}
-        />
-      )}
-
+      {/* Modals */}
       {editingGift && (
         <EditGiftModal
           gift={editingGift}
           isOpen={!!editingGift}
           onClose={() => setEditingGift(null)}
+        />
+      )}
+
+      {viewingGift && (
+        <GiftDetailsModal
+          gift={viewingGift}
+          isOpen={!!viewingGift}
+          onClose={() => setViewingGift(null)}
         />
       )}
     </div>

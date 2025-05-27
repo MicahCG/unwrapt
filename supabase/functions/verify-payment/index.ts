@@ -58,6 +58,26 @@ serve(async (req) => {
             updated_at: new Date().toISOString()
           })
           .eq("id", scheduledGiftId);
+
+        // Trigger gift fulfillment if not in onboarding
+        if (scheduledGiftId !== 'onboarding-temp-id') {
+          try {
+            const fulfillmentResponse = await fetch(`${req.headers.get("origin")}/functions/process-gift-fulfillment`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+              },
+              body: JSON.stringify({ scheduledGiftId })
+            });
+
+            const fulfillmentResult = await fulfillmentResponse.json();
+            console.log('Fulfillment result:', fulfillmentResult);
+          } catch (fulfillmentError) {
+            console.error('Error triggering fulfillment:', fulfillmentError);
+            // Don't fail the payment verification if fulfillment fails
+          }
+        }
       }
     }
 
