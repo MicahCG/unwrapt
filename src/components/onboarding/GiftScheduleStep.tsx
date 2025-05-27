@@ -6,9 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Gift, ArrowDown } from 'lucide-react';
+import { CalendarIcon, Gift, ArrowDown, CreditCard } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface GiftScheduleStepProps {
   onNext: (data: any) => void;
@@ -21,25 +23,100 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ onNext, recipientNa
   const [giftType, setGiftType] = useState('');
   const [priceRange, setPriceRange] = useState('');
   const [isValid, setIsValid] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const { toast } = useToast();
 
   React.useEffect(() => {
     const formValid = occasion && occasionDate && giftType && priceRange;
     setIsValid(!!formValid);
   }, [occasion, occasionDate, giftType, priceRange]);
 
-  const handleContinue = () => {
-    onNext({ 
-      firstGift: {
-        occasion,
-        occasionDate: occasionDate?.toISOString().split('T')[0],
-        giftType,
-        priceRange
+  const getPriceRangeAmount = (range: string) => {
+    switch (range) {
+      case 'under-25': return 2500; // $25 in cents
+      case '25-50': return 5000;    // $50 in cents
+      case '50-100': return 10000;  // $100 in cents
+      case '100-200': return 20000; // $200 in cents
+      case '200-500': return 50000; // $500 in cents
+      case 'over-500': return 75000; // $750 in cents (example for over $500)
+      default: return 5000;
+    }
+  };
+
+  const handleScheduleWithPayment = async () => {
+    if (!isValid) return;
+    
+    setIsProcessingPayment(true);
+    
+    try {
+      // First save the gift data to continue with onboarding
+      const giftData = {
+        firstGift: {
+          occasion,
+          occasionDate: occasionDate?.toISOString().split('T')[0],
+          giftType,
+          priceRange
+        }
+      };
+
+      // Get payment amount based on price range
+      const amount = getPriceRangeAmount(priceRange);
+
+      // Create payment session
+      const { data: paymentData, error: paymentError } = await supabase.functions.invoke('create-gift-payment', {
+        body: {
+          amount,
+          giftDetails: {
+            recipientName: recipientName || 'your recipient',
+            occasion,
+            giftType,
+            priceRange
+          },
+          // We'll use a temporary ID for onboarding, will be replaced when gift is actually saved
+          scheduledGiftId: 'onboarding-temp-id'
+        }
+      });
+
+      if (paymentError) throw paymentError;
+
+      if (paymentData?.url) {
+        // Store the gift data for after payment
+        localStorage.setItem('pendingGiftData', JSON.stringify(giftData));
+        
+        // Open Stripe checkout in a new tab
+        window.open(paymentData.url, '_blank');
+        
+        toast({
+          title: "Payment Required",
+          description: "Please complete payment in the new tab to continue with your gift scheduling.",
+        });
       }
-    });
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      toast({
+        title: "Payment Error",
+        description: "There was a problem processing your payment. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessingPayment(false);
+    }
   };
 
   const handleSkip = () => {
     onNext({ firstGift: null });
+  };
+
+  const formatPriceRange = (range: string) => {
+    switch (range) {
+      case 'under-25': return 'Under $25';
+      case '25-50': return '$25 - $50';
+      case '50-100': return '$50 - $100';
+      case '100-200': return '$100 - $200';
+      case '200-500': return '$200 - $500';
+      case 'over-500': return 'Over $500';
+      default: return range;
+    }
   };
 
   return (
@@ -144,6 +221,19 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ onNext, recipientNa
           </div>
         </div>
 
+        {/* Payment Info */}
+        {isValid && (
+          <div className="bg-brand-gold/10 p-4 rounded-lg">
+            <div className="flex items-center space-x-2 mb-2">
+              <CreditCard className="h-4 w-4 text-brand-charcoal" />
+              <span className="font-medium text-brand-charcoal">Payment Required</span>
+            </div>
+            <p className="text-sm text-brand-charcoal/70">
+              You'll pay {formatPriceRange(priceRange)} to schedule this gift
+            </p>
+          </div>
+        )}
+
         {/* Emotional Copy */}
         <div className="bg-brand-gold/10 p-4 rounded-lg text-center">
           <p className="text-sm text-brand-charcoal">
@@ -151,15 +241,21 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ onNext, recipientNa
           </p>
         </div>
 
-        {/* Continue Button */}
+        {/* Schedule & Pay Button */}
         <Button 
           size="lg" 
           className="w-full text-lg py-6 bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
-          onClick={handleContinue}
-          disabled={!isValid}
+          onClick={handleScheduleWithPayment}
+          disabled={!isValid || isProcessingPayment}
         >
-          Schedule This Gift
-          <ArrowDown className="h-4 w-4 ml-2" />
+          {isProcessingPayment ? (
+            "Processing..."
+          ) : (
+            <>
+              Schedule & Pay for This Gift
+              <ArrowDown className="h-4 w-4 ml-2" />
+            </>
+          )}
         </Button>
 
         <div className="text-center">

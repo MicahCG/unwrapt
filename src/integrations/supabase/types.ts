@@ -51,6 +51,53 @@ export type Database = {
         }
         Relationships: []
       }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string | null
+          id: string
+          scheduled_gift_id: string | null
+          status: string | null
+          stripe_payment_intent_id: string | null
+          stripe_session_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string | null
+          id?: string
+          scheduled_gift_id?: string | null
+          status?: string | null
+          stripe_payment_intent_id?: string | null
+          stripe_session_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string | null
+          id?: string
+          scheduled_gift_id?: string | null
+          status?: string | null
+          stripe_payment_intent_id?: string | null
+          stripe_session_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_scheduled_gift_id_fkey"
+            columns: ["scheduled_gift_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_gifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -136,6 +183,8 @@ export type Database = {
           id: string
           occasion: string
           occasion_date: string
+          payment_amount: number | null
+          payment_status: string | null
           price_range: string | null
           recipient_id: string
           status: string | null
@@ -151,6 +200,8 @@ export type Database = {
           id?: string
           occasion: string
           occasion_date: string
+          payment_amount?: number | null
+          payment_status?: string | null
           price_range?: string | null
           recipient_id: string
           status?: string | null
@@ -166,6 +217,8 @@ export type Database = {
           id?: string
           occasion?: string
           occasion_date?: string
+          payment_amount?: number | null
+          payment_status?: string | null
           price_range?: string | null
           recipient_id?: string
           status?: string | null

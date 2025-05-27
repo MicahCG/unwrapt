@@ -9,6 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+import { CreditCard } from 'lucide-react';
 
 interface ScheduleGiftModalProps {
   recipient: any;
@@ -19,6 +21,7 @@ interface ScheduleGiftModalProps {
 const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen, onClose }) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     occasion: '',
     occasion_date: '',
@@ -71,6 +74,22 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     }
   }, [isOpen, recipient]);
 
+  const getPriceRangeAmount = (range: string) => {
+    switch (range) {
+      case '$0-$25': return 2500;
+      case '$25-$50': return 5000;
+      case '$50-$100': return 10000;
+      case '$100-$250': return 25000;
+      case '$250-$500': return 50000;
+      case '$500+': return 75000;
+      default: return 5000;
+    }
+  };
+
+  const formatPriceRange = (range: string) => {
+    return range;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -80,7 +99,8 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         new Date(new Date(formData.occasion_date).getTime() - 3 * 24 * 60 * 60 * 1000)
           .toISOString().split('T')[0];
 
-      const { error } = await supabase
+      // First create the scheduled gift
+      const { data: giftData, error: giftError } = await supabase
         .from('scheduled_gifts')
         .insert({
           user_id: user?.id,
@@ -91,26 +111,62 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           price_range: formData.price_range,
           gift_description: formData.gift_description,
           delivery_date: deliveryDate,
-          status: 'scheduled'
+          status: 'scheduled',
+          payment_status: 'unpaid'
+        })
+        .select()
+        .single();
+
+      if (giftError) throw giftError;
+
+      // Now process payment
+      const amount = getPriceRangeAmount(formData.price_range);
+
+      const { data: paymentData, error: paymentError } = await supabase.functions.invoke('create-gift-payment', {
+        body: {
+          scheduledGiftId: giftData.id,
+          amount,
+          giftDetails: {
+            recipientName: recipient.name,
+            occasion: formData.occasion,
+            giftType: formData.gift_type,
+            priceRange: formData.price_range
+          }
+        }
+      });
+
+      if (paymentError) throw paymentError;
+
+      if (paymentData?.url) {
+        // Open Stripe checkout in a new tab
+        window.open(paymentData.url, '_blank');
+        
+        toast({
+          title: "Payment Required",
+          description: "Please complete payment in the new tab to finalize your gift scheduling.",
         });
 
-      if (error) throw error;
-
-      // Refresh queries
-      queryClient.invalidateQueries({ queryKey: ['upcoming-gifts'] });
-      queryClient.invalidateQueries({ queryKey: ['user-metrics'] });
-      
-      onClose();
-      setFormData({
-        occasion: '',
-        occasion_date: '',
-        gift_type: '',
-        price_range: '',
-        gift_description: '',
-        delivery_date: ''
-      });
+        // Refresh queries
+        queryClient.invalidateQueries({ queryKey: ['upcoming-gifts'] });
+        queryClient.invalidateQueries({ queryKey: ['user-metrics'] });
+        
+        onClose();
+        setFormData({
+          occasion: '',
+          occasion_date: '',
+          gift_type: '',
+          price_range: '',
+          gift_description: '',
+          delivery_date: ''
+        });
+      }
     } catch (error) {
       console.error('Error scheduling gift:', error);
+      toast({
+        title: "Error",
+        description: "There was a problem scheduling your gift. Please try again.",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
@@ -182,7 +238,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="price_range">Price Range</Label>
+            <Label htmlFor="price_range">Price Range *</Label>
             <Select 
               value={formData.price_range} 
               onValueChange={(value) => setFormData(prev => ({ ...prev, price_range: value }))}
@@ -225,12 +281,25 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             </p>
           </div>
 
+          {/* Payment Info */}
+          {formData.price_range && (
+            <div className="bg-brand-gold/10 p-3 rounded-lg">
+              <div className="flex items-center space-x-2 mb-1">
+                <CreditCard className="h-4 w-4 text-brand-charcoal" />
+                <span className="font-medium text-sm text-brand-charcoal">Payment Required</span>
+              </div>
+              <p className="text-xs text-brand-charcoal/70">
+                You'll pay {formatPriceRange(formData.price_range)} to schedule this gift
+              </p>
+            </div>
+          )}
+
           <div className="flex justify-end space-x-2 pt-4">
             <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
               Cancel
             </Button>
             <Button type="submit" disabled={isLoading} className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90">
-              {isLoading ? 'Scheduling...' : 'Schedule Gift'}
+              {isLoading ? 'Processing...' : 'Schedule & Pay for Gift'}
             </Button>
           </div>
         </form>
