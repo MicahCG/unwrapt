@@ -2,7 +2,6 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   Carousel,
   CarouselContent,
@@ -131,17 +130,22 @@ const HolidayCarousel: React.FC = () => {
     // TODO: Implement add recipient modal
   };
 
-  // Filter holidays to show only upcoming ones for this year
+  // Filter holidays to show only upcoming ones for the current year
   const getUpcomingHolidays = () => {
     const today = new Date();
     const currentYear = today.getFullYear();
     
     return holidays
-      .map(holiday => ({
-        ...holiday,
-        // Parse the date and set to current year for comparison
-        parsedDate: new Date(`${holiday.date.split(',')[0]}, ${currentYear}`)
-      }))
+      .map(holiday => {
+        // Parse the date correctly - extract month and day from the original date
+        const [monthDay, year] = holiday.date.split(', ');
+        const holidayThisYear = new Date(`${monthDay}, ${currentYear}`);
+        
+        return {
+          ...holiday,
+          parsedDate: holidayThisYear
+        };
+      })
       .filter(holiday => holiday.parsedDate >= today)
       .sort((a, b) => a.parsedDate.getTime() - b.parsedDate.getTime());
   };
@@ -152,15 +156,20 @@ const HolidayCarousel: React.FC = () => {
     return null; // Don't show the section if no upcoming holidays
   }
 
+  const formatDate = (dateString: string) => {
+    const [monthDay] = dateString.split(', ');
+    return monthDay;
+  };
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex items-center space-x-3">
+        <Calendar className="h-5 w-5 text-brand-gold" />
         <div>
-          <h3 className="text-xl font-semibold text-brand-charcoal flex items-center">
-            <Calendar className="h-5 w-5 mr-2 text-brand-gold" />
+          <h3 className="text-xl font-semibold text-brand-charcoal">
             Upcoming Holidays & Celebrations
           </h3>
-          <p className="text-brand-charcoal/70 text-sm">
+          <p className="text-brand-charcoal/60 text-sm">
             Never miss a special moment - pre-schedule gifts for upcoming holidays
           </p>
         </div>
@@ -169,52 +178,55 @@ const HolidayCarousel: React.FC = () => {
       <Carousel
         opts={{
           align: "start",
-          loop: true,
+          loop: false,
         }}
         className="w-full"
       >
-        <CarouselContent className="-ml-2 md:-ml-4">
+        <CarouselContent className="-ml-3">
           {upcomingHolidays.map((holiday, index) => {
             const IconComponent = holiday.icon;
             return (
-              <CarouselItem key={index} className="pl-2 md:pl-4 md:basis-1/2 lg:basis-1/3">
-                <Card className="bg-white border border-brand-cream-light hover:border-brand-gold/30 transition-all duration-200 shadow-sm hover:shadow-md">
+              <CarouselItem key={index} className="pl-3 basis-full md:basis-1/2 lg:basis-1/3">
+                <Card className="bg-white border border-gray-100 hover:border-brand-gold/20 transition-all duration-200 shadow-sm hover:shadow-md group">
                   <CardContent className="p-6">
                     <div className="space-y-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div className="p-2 bg-brand-cream rounded-lg">
-                            <IconComponent className={`h-5 w-5 ${holiday.color}`} />
-                          </div>
-                          <div>
-                            <h4 className="font-semibold text-brand-charcoal text-lg">{holiday.name}</h4>
-                            <Badge variant="outline" className="text-xs border-brand-gold/30 text-brand-charcoal/70 mt-1">
-                              {holiday.date}
-                            </Badge>
-                          </div>
+                      {/* Header with icon and title */}
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 rounded-full bg-brand-cream flex items-center justify-center">
+                          <IconComponent className="h-5 w-5 text-brand-gold" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-medium text-brand-charcoal text-lg leading-tight">
+                            {holiday.name}
+                          </h4>
+                          <p className="text-sm text-brand-gold font-medium">
+                            {formatDate(holiday.date)}
+                          </p>
                         </div>
                       </div>
 
-                      <div className="space-y-3">
-                        <p className="text-sm text-brand-charcoal/80 font-medium leading-relaxed">
-                          "{holiday.callToAction}"
+                      {/* Call to action */}
+                      <div className="bg-brand-cream/30 rounded-lg p-3">
+                        <p className="text-sm text-brand-charcoal/80 leading-relaxed">
+                          {holiday.callToAction}
                         </p>
                       </div>
 
-                      <div className="flex flex-col space-y-2 pt-2">
+                      {/* Actions */}
+                      <div className="space-y-2">
                         <Button
                           size="sm"
                           onClick={() => handleScheduleGift(holiday)}
-                          className="bg-brand-charcoal text-white hover:bg-brand-charcoal/90 transition-colors"
+                          className="w-full bg-brand-charcoal text-white hover:bg-brand-charcoal/90 transition-colors h-9"
                         >
-                          <Gift className="h-3 w-3 mr-2" />
+                          <Gift className="h-4 w-4 mr-2" />
                           Schedule Gift
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => handleAddRecipient(holiday)}
-                          className="border-brand-charcoal/20 text-brand-charcoal hover:bg-brand-cream transition-colors"
+                          className="w-full border-brand-charcoal/20 text-brand-charcoal hover:bg-brand-cream/50 transition-colors h-9"
                         >
                           Add Recipient
                         </Button>
@@ -226,8 +238,8 @@ const HolidayCarousel: React.FC = () => {
             );
           })}
         </CarouselContent>
-        <CarouselPrevious className="hidden md:flex border-brand-charcoal/20 text-brand-charcoal hover:bg-brand-cream" />
-        <CarouselNext className="hidden md:flex border-brand-charcoal/20 text-brand-charcoal hover:bg-brand-cream" />
+        <CarouselPrevious className="hidden md:flex -left-4 border-brand-charcoal/10 text-brand-charcoal hover:bg-brand-cream/50" />
+        <CarouselNext className="hidden md:flex -right-4 border-brand-charcoal/10 text-brand-charcoal hover:bg-brand-cream/50" />
       </Carousel>
     </div>
   );
