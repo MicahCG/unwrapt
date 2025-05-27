@@ -11,7 +11,11 @@ const LoginPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-brand-cream flex items-center justify-center px-4">
       <Card className="w-full max-w-md animate-fadeInUp border-brand-cream shadow-lg">
-        
+        <CardHeader className="text-center pb-2">
+          <div className="flex justify-center mb-6">
+            <Logo variant="full" size="lg" />
+          </div>
+        </CardHeader>
         
         <CardContent className="pt-6">
           <div className="space-y-6">
