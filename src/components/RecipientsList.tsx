@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,12 +8,14 @@ import { Edit, Trash2, Gift, Calendar, Plus } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import EditRecipientModal from './EditRecipientModal';
 import ScheduleGiftModal from './ScheduleGiftModal';
+import AddRecipientModal from './AddRecipientModal';
 
 const RecipientsList = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [editingRecipient, setEditingRecipient] = useState(null);
   const [schedulingGift, setSchedulingGift] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   // Fetch recipients
   const { data: recipients } = useQuery({
@@ -89,6 +90,7 @@ const RecipientsList = () => {
         <h2 className="text-2xl font-bold text-brand-charcoal">Recipients</h2>
         <Button 
           className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+          onClick={() => setShowAddModal(true)}
         >
           <Plus className="h-4 w-4 mr-2" />
           Add Recipient
@@ -185,7 +187,10 @@ const RecipientsList = () => {
             <div className="text-brand-charcoal/50 mb-4">
               No recipients added yet
             </div>
-            <Button className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90">
+            <Button 
+              className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+              onClick={() => setShowAddModal(true)}
+            >
               Add Your First Recipient
             </Button>
           </CardContent>
@@ -207,6 +212,11 @@ const RecipientsList = () => {
           onClose={() => setSchedulingGift(null)}
         />
       )}
+
+      <AddRecipientModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+      />
     </div>
   );
 };
