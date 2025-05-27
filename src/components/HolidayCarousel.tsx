@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,7 +19,6 @@ interface Holiday {
   description: string;
   icon: React.ComponentType<any>;
   color: string;
-  bgGradient: string;
 }
 
 const holidays: Holiday[] = [
@@ -28,8 +28,7 @@ const holidays: Holiday[] = [
     callToAction: "Give Mom something that says 'thanks for not selling me to the circus'",
     description: "Show Mom some love",
     icon: Heart,
-    color: "text-pink-600",
-    bgGradient: "from-pink-50 to-rose-50"
+    color: "text-brand-gold"
   },
   {
     name: "Father's Day",
@@ -37,8 +36,7 @@ const holidays: Holiday[] = [
     callToAction: "Get Dad something better than another tie he'll never wear",
     description: "Dad deserves the best",
     icon: Star,
-    color: "text-blue-600",
-    bgGradient: "from-blue-50 to-indigo-50"
+    color: "text-brand-gold"
   },
   {
     name: "Valentine's Day",
@@ -46,8 +44,7 @@ const holidays: Holiday[] = [
     callToAction: "Love is in the air... and on your calendar",
     description: "Spread the love",
     icon: Heart,
-    color: "text-red-600",
-    bgGradient: "from-red-50 to-pink-50"
+    color: "text-brand-gold"
   },
   {
     name: "Christmas",
@@ -55,8 +52,7 @@ const holidays: Holiday[] = [
     callToAction: "Get on the nice list with the perfect gift",
     description: "Ho ho ho-ly amazing gifts",
     icon: TreePine,
-    color: "text-green-600",
-    bgGradient: "from-green-50 to-emerald-50"
+    color: "text-brand-gold"
   },
   {
     name: "Halloween",
@@ -64,8 +60,7 @@ const holidays: Holiday[] = [
     callToAction: "No tricks, just treats... and great gifts",
     description: "Spook-tacular surprises",
     icon: Ghost,
-    color: "text-orange-600",
-    bgGradient: "from-orange-50 to-amber-50"
+    color: "text-brand-gold"
   },
   {
     name: "Easter",
@@ -73,8 +68,7 @@ const holidays: Holiday[] = [
     callToAction: "Some bunny is going to love this",
     description: "Hop into gift-giving",
     icon: Sparkles,
-    color: "text-purple-600",
-    bgGradient: "from-purple-50 to-violet-50"
+    color: "text-brand-gold"
   },
   {
     name: "Thanksgiving",
@@ -82,8 +76,7 @@ const holidays: Holiday[] = [
     callToAction: "Turkey's temporary, great gifts are forever",
     description: "Give thanks with gifts",
     icon: Star,
-    color: "text-amber-600",
-    bgGradient: "from-amber-50 to-yellow-50"
+    color: "text-brand-gold"
   },
   {
     name: "Fourth of July",
@@ -91,8 +84,7 @@ const holidays: Holiday[] = [
     callToAction: "Declare independence from boring gifts",
     description: "Celebrate freedom and friendship",
     icon: Star,
-    color: "text-blue-700",
-    bgGradient: "from-blue-50 to-red-50"
+    color: "text-brand-gold"
   },
   {
     name: "New Year's",
@@ -100,8 +92,7 @@ const holidays: Holiday[] = [
     callToAction: "Resolution: be an amazing gift-giver",
     description: "Start the year right",
     icon: Sparkles,
-    color: "text-gold-600",
-    bgGradient: "from-yellow-50 to-gold-50"
+    color: "text-brand-gold"
   },
   {
     name: "St. Patrick's Day",
@@ -109,8 +100,7 @@ const holidays: Holiday[] = [
     callToAction: "Make them feel lucky with the perfect gift",
     description: "Lucky gifts for lucky people",
     icon: Clover,
-    color: "text-green-700",
-    bgGradient: "from-green-50 to-lime-50"
+    color: "text-brand-gold"
   },
   {
     name: "Back to School",
@@ -118,8 +108,7 @@ const holidays: Holiday[] = [
     callToAction: "School supplies are basic - be brilliant instead",
     description: "Smart gifts for smart cookies",
     icon: Star,
-    color: "text-indigo-600",
-    bgGradient: "from-indigo-50 to-blue-50"
+    color: "text-brand-gold"
   },
   {
     name: "Graduation Season",
@@ -127,23 +116,41 @@ const holidays: Holiday[] = [
     callToAction: "Give them something smarter than student loans",
     description: "Celebrate their achievement",
     icon: Star,
-    color: "text-purple-700",
-    bgGradient: "from-purple-50 to-pink-50"
+    color: "text-brand-gold"
   }
 ];
 
 const HolidayCarousel: React.FC = () => {
   const handleScheduleGift = (holiday: Holiday) => {
-    // This would open a modal to schedule a gift for this holiday
     console.log(`Scheduling gift for ${holiday.name}`);
     // TODO: Implement gift scheduling modal
   };
 
   const handleAddRecipient = (holiday: Holiday) => {
-    // This would open a modal to add a recipient for this holiday
     console.log(`Adding recipient for ${holiday.name}`);
     // TODO: Implement add recipient modal
   };
+
+  // Filter holidays to show only upcoming ones for this year
+  const getUpcomingHolidays = () => {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    
+    return holidays
+      .map(holiday => ({
+        ...holiday,
+        // Parse the date and set to current year for comparison
+        parsedDate: new Date(`${holiday.date.split(',')[0]}, ${currentYear}`)
+      }))
+      .filter(holiday => holiday.parsedDate >= today)
+      .sort((a, b) => a.parsedDate.getTime() - b.parsedDate.getTime());
+  };
+
+  const upcomingHolidays = getUpcomingHolidays();
+
+  if (upcomingHolidays.length === 0) {
+    return null; // Don't show the section if no upcoming holidays
+  }
 
   return (
     <div className="space-y-4">
@@ -167,46 +174,47 @@ const HolidayCarousel: React.FC = () => {
         className="w-full"
       >
         <CarouselContent className="-ml-2 md:-ml-4">
-          {holidays.map((holiday, index) => {
+          {upcomingHolidays.map((holiday, index) => {
             const IconComponent = holiday.icon;
             return (
               <CarouselItem key={index} className="pl-2 md:pl-4 md:basis-1/2 lg:basis-1/3">
-                <Card className={`bg-gradient-to-br ${holiday.bgGradient} border-none shadow-md hover:shadow-lg transition-shadow`}>
+                <Card className="bg-white border border-brand-cream-light hover:border-brand-gold/30 transition-all duration-200 shadow-sm hover:shadow-md">
                   <CardContent className="p-6">
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <IconComponent className={`h-6 w-6 ${holiday.color}`} />
-                          <h4 className="font-semibold text-brand-charcoal">{holiday.name}</h4>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2 bg-brand-cream rounded-lg">
+                            <IconComponent className={`h-5 w-5 ${holiday.color}`} />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-brand-charcoal text-lg">{holiday.name}</h4>
+                            <Badge variant="outline" className="text-xs border-brand-gold/30 text-brand-charcoal/70 mt-1">
+                              {holiday.date}
+                            </Badge>
+                          </div>
                         </div>
-                        <Badge variant="outline" className="text-xs">
-                          {holiday.date}
-                        </Badge>
                       </div>
 
-                      <div className="space-y-2">
-                        <p className="text-sm text-brand-charcoal/80 font-medium italic">
+                      <div className="space-y-3">
+                        <p className="text-sm text-brand-charcoal/80 font-medium leading-relaxed">
                           "{holiday.callToAction}"
                         </p>
-                        <p className="text-xs text-brand-charcoal/60">
-                          {holiday.description}
-                        </p>
                       </div>
 
-                      <div className="flex flex-col space-y-2">
+                      <div className="flex flex-col space-y-2 pt-2">
                         <Button
                           size="sm"
                           onClick={() => handleScheduleGift(holiday)}
-                          className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 text-xs"
+                          className="bg-brand-charcoal text-white hover:bg-brand-charcoal/90 transition-colors"
                         >
-                          <Gift className="h-3 w-3 mr-1" />
+                          <Gift className="h-3 w-3 mr-2" />
                           Schedule Gift
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => handleAddRecipient(holiday)}
-                          className="border-brand-charcoal/20 text-brand-charcoal hover:bg-brand-cream-light text-xs"
+                          className="border-brand-charcoal/20 text-brand-charcoal hover:bg-brand-cream transition-colors"
                         >
                           Add Recipient
                         </Button>
@@ -218,8 +226,8 @@ const HolidayCarousel: React.FC = () => {
             );
           })}
         </CarouselContent>
-        <CarouselPrevious className="hidden md:flex" />
-        <CarouselNext className="hidden md:flex" />
+        <CarouselPrevious className="hidden md:flex border-brand-charcoal/20 text-brand-charcoal hover:bg-brand-cream" />
+        <CarouselNext className="hidden md:flex border-brand-charcoal/20 text-brand-charcoal hover:bg-brand-cream" />
       </Carousel>
     </div>
   );
