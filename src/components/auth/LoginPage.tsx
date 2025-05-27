@@ -15,6 +15,9 @@ const LoginPage: React.FC = () => {
           <div className="flex justify-center mb-6">
             <Logo variant="full" size="lg" />
           </div>
+          <p className="text-xl text-brand-charcoal/80">
+            Thoughtfulness, on autopilot
+          </p>
         </CardHeader>
         
         <CardContent className="pt-6">
