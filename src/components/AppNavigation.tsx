@@ -19,7 +19,8 @@ import {
   Package,
   BarChart3,
   Heart,
-  Bell
+  Bell,
+  UserPlus
 } from 'lucide-react';
 
 const AppNavigation = () => {
@@ -31,7 +32,13 @@ const AppNavigation = () => {
       title: 'Dashboard', 
       path: '/', 
       icon: Home, 
-      description: 'Overview and metrics' 
+      description: 'Main dashboard overview' 
+    },
+    { 
+      title: 'Onboarding', 
+      path: '/onboarding', 
+      icon: UserPlus, 
+      description: 'Setup and onboarding flow' 
     },
     { 
       title: 'Recipients', 

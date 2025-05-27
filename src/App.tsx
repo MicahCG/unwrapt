@@ -14,6 +14,7 @@ import Analytics from "./pages/Analytics";
 import Wishlist from "./pages/Wishlist";
 import Notifications from "./pages/Notifications";
 import Settings from "./pages/Settings";
+import Onboarding from "./pages/Onboarding";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,7 @@ function App() {
           <AuthProvider>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/onboarding" element={<Onboarding />} />
               <Route path="/payment-success" element={<PaymentSuccess />} />
               <Route path="/calendar" element={<CalendarView />} />
               <Route path="/history" element={<GiftHistory />} />
