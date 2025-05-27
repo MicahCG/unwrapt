@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -23,7 +22,7 @@
     --muted: 248 246 241; /* Lighter cream */
     --muted-foreground: 107 107 107; /* Medium gray */
 
-    --accent: 212 175 55; /* Brand gold #D4AF37 */
+    --accent: 230 197 71; /* Updated brand gold #E6C547 */
     --accent-foreground: 74 74 74;
 
     --destructive: 220 38 38;
@@ -64,7 +63,7 @@
     --muted: 68 64 60;
     --muted-foreground: 163 163 163;
 
-    --accent: 212 175 55; /* Keep gold accent */
+    --accent: 230 197 71; /* Updated gold accent #E6C547 */
     --accent-foreground: 41 37 36;
 
     --destructive: 220 38 38;
@@ -72,16 +71,16 @@
 
     --border: 68 64 60;
     --input: 68 64 60;
-    --ring: 212 175 55;
+    --ring: 230 197 71; /* Updated ring color */
 
     --sidebar-background: 24 24 27;
     --sidebar-foreground: 250 250 250;
-    --sidebar-primary: 212 175 55;
+    --sidebar-primary: 230 197 71; /* Updated sidebar primary */
     --sidebar-primary-foreground: 9 9 11;
     --sidebar-accent: 39 39 42;
     --sidebar-accent-foreground: 250 250 250;
     --sidebar-border: 39 39 42;
-    --sidebar-ring: 212 175 55;
+    --sidebar-ring: 230 197 71; /* Updated sidebar ring */
   }
 }
 

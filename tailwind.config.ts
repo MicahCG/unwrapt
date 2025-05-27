@@ -1,4 +1,3 @@
-
 import type { Config } from "tailwindcss";
 
 export default {
@@ -42,7 +41,7 @@ export default {
 					foreground: '#6B6B6B' // Medium gray
 				},
 				accent: {
-					DEFAULT: '#D4AF37', // Gold accent for highlights
+					DEFAULT: '#E6C547', // Updated gold accent color
 					foreground: '#4A4A4A'
 				},
 				popover: {
@@ -68,7 +67,7 @@ export default {
 					charcoal: '#4A4A4A',
 					cream: '#F5F2ED',
 					'cream-light': '#F8F6F1',
-					gold: '#D4AF37'
+					gold: '#E6C547' // Updated gold color
 				}
 			},
 			borderRadius: {
