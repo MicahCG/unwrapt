@@ -8,15 +8,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, Settings, User } from 'lucide-react';
+import { LogOut, Settings } from 'lucide-react';
 import { useAuth } from './AuthProvider';
+import { useNavigate } from 'react-router-dom';
 
 const UserMenu: React.FC = () => {
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
   if (!user) return null;
 
   const userInitial = user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || 'U';
+
+  const handleSettingsClick = () => {
+    navigate('/settings');
+  };
 
   return (
     <DropdownMenu>
@@ -37,11 +43,7 @@ const UserMenu: React.FC = () => {
             </p>
           </div>
         </div>
-        <DropdownMenuItem>
-          <User className="mr-2 h-4 w-4" />
-          <span>Profile</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={handleSettingsClick}>
           <Settings className="mr-2 h-4 w-4" />
           <span>Settings</span>
         </DropdownMenuItem>
