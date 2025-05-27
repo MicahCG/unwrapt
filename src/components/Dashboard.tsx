@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/ui/logo';
 import { useAuth } from '@/components/auth/AuthProvider';
 import UserMenu from '@/components/auth/UserMenu';
+import AppNavigation from '@/components/AppNavigation';
 import { supabase } from '@/integrations/supabase/client';
 import { Gift, Calendar, Clock, Users, Plus, Star, TrendingUp, Settings } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -16,6 +16,18 @@ import HolidayCarousel from './HolidayCarousel';
 const Dashboard = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
+
+  // Listen for tab change events from navigation
+  useEffect(() => {
+    const handleTabChange = (event: CustomEvent) => {
+      setActiveTab(event.detail);
+    };
+
+    window.addEventListener('changeTab', handleTabChange as EventListener);
+    return () => {
+      window.removeEventListener('changeTab', handleTabChange as EventListener);
+    };
+  }, []);
 
   // Fetch user metrics
   const { data: metrics } = useQuery({
@@ -314,6 +326,7 @@ const Dashboard = () => {
             </div>
             
             <div className="flex items-center space-x-4 flex-shrink-0">
+              <AppNavigation />
               {user && <UserMenu />}
             </div>
           </div>

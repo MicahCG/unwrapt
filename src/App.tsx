@@ -8,6 +8,12 @@ import { AuthProvider } from "@/components/auth/AuthProvider";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import PaymentSuccess from "./pages/PaymentSuccess";
+import CalendarView from "./pages/CalendarView";
+import GiftHistory from "./pages/GiftHistory";
+import Analytics from "./pages/Analytics";
+import Wishlist from "./pages/Wishlist";
+import Notifications from "./pages/Notifications";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +28,12 @@ function App() {
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/payment-success" element={<PaymentSuccess />} />
+              <Route path="/calendar" element={<CalendarView />} />
+              <Route path="/history" element={<GiftHistory />} />
+              <Route path="/analytics" element={<Analytics />} />
+              <Route path="/wishlist" element={<Wishlist />} />
+              <Route path="/notifications" element={<Notifications />} />
+              <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>
