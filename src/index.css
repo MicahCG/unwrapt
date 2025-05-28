@@ -113,10 +113,10 @@
   .text-green-400,
   .text-green-500,
   .text-green-600,
-  [style*="color: #D7EE8C"],
-  [style*="color: rgb(215, 238, 140)"],
-  [style*="color:rgb(215, 238, 140)"],
-  [style*="color:#D7EE8C"] {
+  [style*="color: #4A4A4A"],
+  [style*="color: rgb(74, 74, 74)"],
+  [style*="color:rgb(74, 74, 74)"],
+  [style*="color:#4A4A4A"] {
     color: #4A4A4A !important;
   }
   
@@ -126,25 +126,25 @@
   .bg-green-400,
   .bg-green-500,
   .bg-green-600,
-  [style*="background: #D7EE8C"],
-  [style*="background-color: #D7EE8C"],
-  [style*="background: rgb(215, 238, 140)"],
-  [style*="background-color: rgb(215, 238, 140)"],
-  [style*="background:#D7EE8C"],
-  [style*="background-color:#D7EE8C"] {
+  [style*="background: #4A4A4A"],
+  [style*="background-color: #4A4A4A"],
+  [style*="background: rgb(74, 74, 74)"],
+  [style*="background-color: rgb(74, 74, 74)"],
+  [style*="background:#4A4A4A"],
+  [style*="background-color:#4A4A4A"] {
     background-color: #4A4A4A !important;
   }
   
   /* CRITICAL: Override border colors with the problematic color */
-  [style*="border-color: #D7EE8C"],
-  [style*="border-color: rgb(215, 238, 140)"],
-  [style*="border-color:#D7EE8C"],
-  [style*="border: 1px solid #D7EE8C"],
-  [style*="border: 2px solid #D7EE8C"],
-  [style*="border-top-color: #D7EE8C"],
-  [style*="border-bottom-color: #D7EE8C"],
-  [style*="border-left-color: #D7EE8C"],
-  [style*="border-right-color: #D7EE8C"] {
+  [style*="border-color: #4A4A4A"],
+  [style*="border-color: rgb(74, 74, 74)"],
+  [style*="border-color:#4A4A4A"],
+  [style*="border: 1px solid #4A4A4A"],
+  [style*="border: 2px solid #4A4A4A"],
+  [style*="border-top-color: #4A4A4A"],
+  [style*="border-bottom-color: #4A4A4A"],
+  [style*="border-left-color: #4A4A4A"],
+  [style*="border-right-color: #4A4A4A"] {
     border-color: #E5E0D8 !important;
   }
   
@@ -158,9 +158,9 @@
   }
   
   /* Specific override for the problematic color in any format */
-  [style*="#D7EE8C"],
-  [style*="rgb(215, 238, 140)"],
-  [style*="215, 238, 140"] {
+  [style*="#4A4A4A"],
+  [style*="rgb(74, 74, 74)"],
+  [style*="74, 74, 74"] {
     color: #4A4A4A !important;
     background-color: transparent !important;
     border-color: #E5E0D8 !important;
