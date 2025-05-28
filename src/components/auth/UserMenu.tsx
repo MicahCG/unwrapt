@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -27,27 +26,44 @@ const UserMenu: React.FC = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+        <Button 
+          variant="ghost" 
+          className="relative h-8 w-8 rounded-full text-brand-charcoal hover:bg-brand-cream hover:text-brand-charcoal"
+        >
           <Avatar className="h-8 w-8">
             <AvatarImage src={user.user_metadata?.avatar_url} alt={user.user_metadata?.full_name} />
-            <AvatarFallback>{userInitial}</AvatarFallback>
+            <AvatarFallback className="bg-brand-charcoal text-brand-cream">
+              {userInitial}
+            </AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" align="end" forceMount>
+      <DropdownMenuContent 
+        className="w-56 bg-white border-brand-cream text-brand-charcoal" 
+        align="end" 
+        forceMount
+      >
         <div className="flex items-center justify-start gap-2 p-2">
           <div className="flex flex-col space-y-1 leading-none">
-            <p className="font-medium">{user.user_metadata?.full_name}</p>
-            <p className="w-[200px] truncate text-sm text-muted-foreground">
+            <p className="font-medium text-brand-charcoal">
+              {user.user_metadata?.full_name}
+            </p>
+            <p className="w-[200px] truncate text-sm text-brand-charcoal/70">
               {user.email}
             </p>
           </div>
         </div>
-        <DropdownMenuItem onClick={handleSettingsClick}>
+        <DropdownMenuItem 
+          onClick={handleSettingsClick}
+          className="text-brand-charcoal hover:bg-brand-cream hover:text-brand-charcoal cursor-pointer"
+        >
           <Settings className="mr-2 h-4 w-4" />
           <span>Settings</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={signOut}>
+        <DropdownMenuItem 
+          onClick={signOut}
+          className="text-brand-charcoal hover:bg-brand-cream hover:text-brand-charcoal cursor-pointer"
+        >
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
         </DropdownMenuItem>
