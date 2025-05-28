@@ -121,6 +121,37 @@
     color: #4A4A4A !important;
     background-color: transparent !important;
   }
+  
+  /* Force override any Radix UI components that might be using the problematic color */
+  [data-radix-select-content] {
+    background-color: white !important;
+    color: #4A4A4A !important;
+  }
+  
+  [data-radix-select-item] {
+    color: #4A4A4A !important;
+    background-color: white !important;
+  }
+  
+  [data-radix-select-item]:hover,
+  [data-radix-select-item][data-highlighted] {
+    background-color: #F5F2ED !important;
+    color: #4A4A4A !important;
+  }
+  
+  [data-radix-select-item][data-state="checked"] {
+    background-color: #4A4A4A !important;
+    color: #F5F2ED !important;
+  }
+  
+  /* Override any computed styles that might contain the problematic color */
+  * {
+    --select-item-bg: white !important;
+    --select-item-text: #4A4A4A !important;
+    --select-item-hover-bg: #F5F2ED !important;
+    --select-item-checked-bg: #4A4A4A !important;
+    --select-item-checked-text: #F5F2ED !important;
+  }
 }
 
 /* Custom animations for smooth interactions */
