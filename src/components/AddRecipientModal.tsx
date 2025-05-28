@@ -97,8 +97,8 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
       <DebugColors />
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-brand-charcoal">Add New Recipient</DialogTitle>
+          <DialogHeader className="!text-brand-charcoal">
+            <DialogTitle className="!text-brand-charcoal">Add New Recipient</DialogTitle>
           </DialogHeader>
           
           <form onSubmit={handleSubmit} className="space-y-4">
