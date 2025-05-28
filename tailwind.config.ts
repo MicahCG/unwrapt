@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -17,59 +18,98 @@ export default {
 				'2xl': '1400px'
 			}
 		},
-		extend: {
-			colors: {
-				border: 'hsl(var(--border))',
-				input: 'hsl(var(--input))',
-				ring: 'hsl(var(--ring))',
-				background: 'hsl(var(--background))',
-				foreground: 'hsl(var(--foreground))',
-				primary: {
-					DEFAULT: '#4A4A4A', // Dark charcoal from the logo
-					foreground: '#F5F2ED' // Light cream
-				},
-				secondary: {
-					DEFAULT: '#F5F2ED', // Light cream background
-					foreground: '#4A4A4A' // Dark charcoal text
-				},
-				destructive: {
-					DEFAULT: 'hsl(var(--destructive))',
-					foreground: 'hsl(var(--destructive-foreground))'
-				},
-				muted: {
-					DEFAULT: '#F8F6F1', // Slightly darker cream
-					foreground: '#6B6B6B' // Medium gray
-				},
-				accent: {
-					DEFAULT: '#E6C547', // Updated gold accent color
-					foreground: '#4A4A4A'
-				},
-				popover: {
-					DEFAULT: 'hsl(var(--popover))',
-					foreground: 'hsl(var(--popover-foreground))'
-				},
-				card: {
-					DEFAULT: '#FFFFFF', // Pure white for cards
-					foreground: '#4A4A4A'
-				},
-				sidebar: {
-					DEFAULT: 'hsl(var(--sidebar-background))',
-					foreground: 'hsl(var(--sidebar-foreground))',
-					primary: 'hsl(var(--sidebar-primary))',
-					'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
-					accent: 'hsl(var(--sidebar-accent))',
-					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
-					border: 'hsl(var(--sidebar-border))',
-					ring: 'hsl(var(--sidebar-ring))'
-				},
-				// Brand specific colors
-				brand: {
-					charcoal: '#4A4A4A',
-					cream: '#F5F2ED',
-					'cream-light': '#F8F6F1',
-					gold: '#E6C547' // Updated gold color
-				}
+		colors: {
+			// Override default Tailwind colors to prevent conflicts
+			transparent: 'transparent',
+			current: 'currentColor',
+			white: '#ffffff',
+			black: '#000000',
+			
+			// CSS variables for shadcn/ui compatibility
+			border: 'hsl(var(--border))',
+			input: 'hsl(var(--input))',
+			ring: 'hsl(var(--ring))',
+			background: 'hsl(var(--background))',
+			foreground: 'hsl(var(--foreground))',
+			
+			primary: {
+				DEFAULT: '#4A4A4A', // Dark charcoal from the logo
+				foreground: '#F5F2ED' // Light cream
 			},
+			secondary: {
+				DEFAULT: '#F5F2ED', // Light cream background
+				foreground: '#4A4A4A' // Dark charcoal text
+			},
+			destructive: {
+				DEFAULT: 'hsl(var(--destructive))',
+				foreground: 'hsl(var(--destructive-foreground))'
+			},
+			muted: {
+				DEFAULT: '#F8F6F1', // Slightly darker cream
+				foreground: '#6B6B6B' // Medium gray
+			},
+			accent: {
+				DEFAULT: '#E6C547', // Updated gold accent color
+				foreground: '#4A4A4A'
+			},
+			popover: {
+				DEFAULT: 'hsl(var(--popover))',
+				foreground: 'hsl(var(--popover-foreground))'
+			},
+			card: {
+				DEFAULT: '#FFFFFF', // Pure white for cards
+				foreground: '#4A4A4A'
+			},
+			sidebar: {
+				DEFAULT: 'hsl(var(--sidebar-background))',
+				foreground: 'hsl(var(--sidebar-foreground))',
+				primary: 'hsl(var(--sidebar-primary))',
+				'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
+				accent: 'hsl(var(--sidebar-accent))',
+				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
+				border: 'hsl(var(--sidebar-border))',
+				ring: 'hsl(var(--sidebar-ring))'
+			},
+			
+			// Brand specific colors - these will override any default Tailwind colors
+			brand: {
+				charcoal: '#4A4A4A',
+				cream: '#F5F2ED',
+				'cream-light': '#F8F6F1',
+				gold: '#E6C547'
+			},
+			
+			// Override specific Tailwind colors that might conflict
+			gray: {
+				50: '#F8F6F1',
+				100: '#F5F2ED',
+				200: '#E5E0D8',
+				300: '#D0C8BD',
+				400: '#A8A8A8',
+				500: '#6B6B6B',
+				600: '#4A4A4A',
+				700: '#3A3A3A',
+				800: '#2A2A2A',
+				900: '#1A1A1A',
+				950: '#0F0F0F'
+			},
+			
+			// Ensure green colors use our brand palette
+			green: {
+				50: '#F8F6F1',
+				100: '#F5F2ED',
+				200: '#E5E0D8',
+				300: '#D0C8BD',
+				400: '#A8A8A8',
+				500: '#4A4A4A', // Override with brand charcoal
+				600: '#3A3A3A',
+				700: '#2A2A2A',
+				800: '#1A1A1A',
+				900: '#0F0F0F',
+				950: '#050505'
+			}
+		},
+		extend: {
 			borderRadius: {
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',
