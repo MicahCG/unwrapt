@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -46,42 +45,33 @@
   }
 
   .dark {
-    --background: 41 37 36; /* Dark brown for dark mode */
+    --background: 41 37 36;
     --foreground: 245 242 237;
-
     --card: 41 37 36;
     --card-foreground: 245 242 237;
-
     --popover: 41 37 36;
     --popover-foreground: 245 242 237;
-
     --primary: 245 242 237;
     --primary-foreground: 41 37 36;
-
     --secondary: 68 64 60;
     --secondary-foreground: 245 242 237;
-
     --muted: 68 64 60;
     --muted-foreground: 163 163 163;
-
-    --accent: 230 197 71; /* Updated gold accent #E6C547 */
+    --accent: 230 197 71;
     --accent-foreground: 41 37 36;
-
     --destructive: 220 38 38;
     --destructive-foreground: 245 242 237;
-
     --border: 68 64 60;
     --input: 68 64 60;
-    --ring: 230 197 71; /* Updated ring color */
-
+    --ring: 230 197 71;
     --sidebar-background: 24 24 27;
     --sidebar-foreground: 250 250 250;
-    --sidebar-primary: 230 197 71; /* Updated sidebar primary */
+    --sidebar-primary: 230 197 71;
     --sidebar-primary-foreground: 9 9 11;
     --sidebar-accent: 39 39 42;
     --sidebar-accent-foreground: 250 250 250;
     --sidebar-border: 39 39 42;
-    --sidebar-ring: 230 197 71; /* Updated sidebar ring */
+    --sidebar-ring: 230 197 71;
   }
 }
 
@@ -93,163 +83,6 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
-  }
-  
-  /* FORCE OVERRIDE CSS VARIABLES - NUCLEAR APPROACH */
-  :root,
-  :root *,
-  html,
-  html *,
-  body,
-  body * {
-    --foreground: 74 74 74 !important;
-    --card-foreground: 74 74 74 !important;
-    --popover-foreground: 74 74 74 !important;
-    --muted-foreground: 107 107 107 !important;
-  }
-  
-  /* COMPREHENSIVE COLOR OVERRIDE - Target ALL instances */
-  * {
-    /* Override any inline styles or computed styles */
-    --lime-500: #4A4A4A !important;
-    --lime-400: #4A4A4A !important;
-    --lime-600: #4A4A4A !important;
-    --green-500: #4A4A4A !important;
-    --green-400: #4A4A4A !important;
-    --green-600: #4A4A4A !important;
-  }
-  
-  /* Force override any remaining lime/green colors */
-  .text-lime-400,
-  .text-lime-500,
-  .text-lime-600,
-  .text-green-400,
-  .text-green-500,
-  .text-green-600,
-  [style*="color: #4A4A4A"],
-  [style*="color: rgb(74, 74, 74)"],
-  [style*="color:rgb(74, 74, 74)"],
-  [style*="color:#4A4A4A"] {
-    color: #4A4A4A !important;
-  }
-  
-  .bg-lime-400,
-  .bg-lime-500,
-  .bg-lime-600,
-  .bg-green-400,
-  .bg-green-500,
-  .bg-green-600,
-  [style*="background: #4A4A4A"],
-  [style*="background-color: #4A4A4A"],
-  [style*="background: rgb(74, 74, 74)"],
-  [style*="background-color: rgb(74, 74, 74)"],
-  [style*="background:#4A4A4A"],
-  [style*="background-color:#4A4A4A"] {
-    background-color: #4A4A4A !important;
-  }
-  
-  /* CRITICAL: Override border colors */
-  [style*="border-color: #4A4A4A"],
-  [style*="border-color: rgb(74, 74, 74)"],
-  [style*="border-color:#4A4A4A"],
-  [style*="border: 1px solid #4A4A4A"],
-  [style*="border: 2px solid #4A4A4A"],
-  [style*="border-top-color: #4A4A4A"],
-  [style*="border-bottom-color: #4A4A4A"],
-  [style*="border-left-color: #4A4A4A"],
-  [style*="border-right-color: #4A4A4A"] {
-    border-color: #E5E0D8 !important;
-  }
-  
-  /* SPECIFIC TARGETING FOR RADIX UI COMPONENTS */
-  [data-radix-dialog-content],
-  [data-radix-dialog-overlay],
-  [data-radix-dialog-title],
-  [data-radix-popover-content],
-  [data-radix-select-content],
-  [data-radix-dropdown-menu-content] {
-    --foreground: 74 74 74 !important;
-    color: hsl(74 74 74) !important;
-    background-color: white !important;
-    border-color: #E5E0D8 !important;
-  }
-  
-  [data-radix-dialog-content] *,
-  [data-radix-popover-content] *,
-  [data-radix-select-content] *,
-  [data-radix-dropdown-menu-content] * {
-    --foreground: 74 74 74 !important;
-    color: hsl(74 74 74) !important;
-  }
-  
-  [data-radix-select-item],
-  [data-radix-dialog-close],
-  [data-radix-dropdown-menu-item] {
-    --foreground: 74 74 74 !important;
-    color: hsl(74 74 74) !important;
-    background-color: white !important;
-    border-color: #E5E0D8 !important;
-  }
-  
-  [data-radix-select-item]:hover,
-  [data-radix-select-item][data-highlighted],
-  [data-radix-dropdown-menu-item]:hover,
-  [data-radix-dropdown-menu-item][data-highlighted] {
-    background-color: #F5F2ED !important;
-    color: hsl(74 74 74) !important;
-    border-color: #E5E0D8 !important;
-  }
-  
-  [data-radix-select-item][data-state="checked"] {
-    background-color: #4A4A4A !important;
-    color: #F5F2ED !important;
-    border-color: #4A4A4A !important;
-  }
-  
-  /* DIALOG AND MODAL SPECIFIC OVERRIDES */
-  .fixed.inset-0,
-  .fixed.left-\\[50\\%\\].top-\\[50\\%\\],
-  [role="dialog"],
-  [role="alertdialog"] {
-    --foreground: 74 74 74 !important;
-    background-color: white !important;
-    border-color: #E5E0D8 !important;
-    color: hsl(74 74 74) !important;
-  }
-  
-  [role="dialog"] *,
-  [role="alertdialog"] * {
-    --foreground: 74 74 74 !important;
-    color: inherit !important;
-  }
-  
-  /* FORM ELEMENTS SPECIFIC OVERRIDES */
-  input,
-  textarea,
-  select,
-  label,
-  .form-control,
-  .input,
-  .textarea,
-  .label {
-    --foreground: 74 74 74 !important;
-    color: hsl(74 74 74) !important;
-    border-color: #E5E0D8 !important;
-  }
-  
-  /* BUTTON OVERRIDES */
-  button,
-  [role="button"],
-  .cursor-pointer {
-    color: inherit !important;
-    border-color: #E5E0D8 !important;
-  }
-  
-  /* NUCLEAR OPTION: Override ANY element that uses hsl(var(--foreground)) */
-  *[style*="hsl(var(--foreground))"],
-  *[class*="text-foreground"] {
-    --foreground: 74 74 74 !important;
-    color: hsl(74 74 74) !important;
   }
 }
 
