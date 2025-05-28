@@ -95,13 +95,28 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
   
+  /* COMPREHENSIVE COLOR OVERRIDE - Target ALL instances of the problematic color */
+  * {
+    /* Override any inline styles or computed styles with the problematic color */
+    --lime-500: #4A4A4A !important;
+    --lime-400: #4A4A4A !important;
+    --lime-600: #4A4A4A !important;
+    --green-500: #4A4A4A !important;
+    --green-400: #4A4A4A !important;
+    --green-600: #4A4A4A !important;
+  }
+  
   /* Force override any remaining lime/green colors */
   .text-lime-400,
   .text-lime-500,
   .text-lime-600,
   .text-green-400,
   .text-green-500,
-  .text-green-600 {
+  .text-green-600,
+  [style*="color: #D7EE8C"],
+  [style*="color: rgb(215, 238, 140)"],
+  [style*="color:rgb(215, 238, 140)"],
+  [style*="color:#D7EE8C"] {
     color: #4A4A4A !important;
   }
   
@@ -110,38 +125,79 @@
   .bg-lime-600,
   .bg-green-400,
   .bg-green-500,
-  .bg-green-600 {
+  .bg-green-600,
+  [style*="background: #D7EE8C"],
+  [style*="background-color: #D7EE8C"],
+  [style*="background: rgb(215, 238, 140)"],
+  [style*="background-color: rgb(215, 238, 140)"],
+  [style*="background:#D7EE8C"],
+  [style*="background-color:#D7EE8C"] {
     background-color: #4A4A4A !important;
   }
   
-  /* Specific override for the problematic color */
+  /* CRITICAL: Override border colors with the problematic color */
+  [style*="border-color: #D7EE8C"],
+  [style*="border-color: rgb(215, 238, 140)"],
+  [style*="border-color:#D7EE8C"],
+  [style*="border: 1px solid #D7EE8C"],
+  [style*="border: 2px solid #D7EE8C"],
+  [style*="border-top-color: #D7EE8C"],
+  [style*="border-bottom-color: #D7EE8C"],
+  [style*="border-left-color: #D7EE8C"],
+  [style*="border-right-color: #D7EE8C"] {
+    border-color: #E5E0D8 !important;
+  }
+  
+  /* Override any computed HSL values that might resolve to the problematic color */
+  [style*="hsl(75, 68%, 75%)"],
+  [style*="hsl(75,68%,75%)"],
+  [style*="75, 68%, 75%"] {
+    color: #4A4A4A !important;
+    background-color: transparent !important;
+    border-color: #E5E0D8 !important;
+  }
+  
+  /* Specific override for the problematic color in any format */
   [style*="#D7EE8C"],
   [style*="rgb(215, 238, 140)"],
   [style*="215, 238, 140"] {
     color: #4A4A4A !important;
     background-color: transparent !important;
+    border-color: #E5E0D8 !important;
   }
   
-  /* Force override any Radix UI components that might be using the problematic color */
-  [data-radix-select-content] {
+  /* Force override ANY Radix UI components */
+  [data-radix-select-content],
+  [data-radix-dialog-content],
+  [data-radix-dialog-overlay],
+  [data-radix-popover-content],
+  [data-radix-dropdown-menu-content] {
     background-color: white !important;
     color: #4A4A4A !important;
+    border-color: #E5E0D8 !important;
   }
   
-  [data-radix-select-item] {
+  [data-radix-select-item],
+  [data-radix-dialog-close],
+  [data-radix-dropdown-menu-item] {
     color: #4A4A4A !important;
     background-color: white !important;
+    border-color: #E5E0D8 !important;
   }
   
   [data-radix-select-item]:hover,
-  [data-radix-select-item][data-highlighted] {
+  [data-radix-select-item][data-highlighted],
+  [data-radix-dropdown-menu-item]:hover,
+  [data-radix-dropdown-menu-item][data-highlighted] {
     background-color: #F5F2ED !important;
     color: #4A4A4A !important;
+    border-color: #E5E0D8 !important;
   }
   
   [data-radix-select-item][data-state="checked"] {
     background-color: #4A4A4A !important;
     color: #F5F2ED !important;
+    border-color: #4A4A4A !important;
   }
   
   /* Override any computed styles that might contain the problematic color */
@@ -151,6 +207,32 @@
     --select-item-hover-bg: #F5F2ED !important;
     --select-item-checked-bg: #4A4A4A !important;
     --select-item-checked-text: #F5F2ED !important;
+    --dialog-bg: white !important;
+    --dialog-border: #E5E0D8 !important;
+    --popover-bg: white !important;
+    --popover-border: #E5E0D8 !important;
+  }
+  
+  /* Nuclear option: Override ANY element that might have the problematic color */
+  *:not(svg):not(path):not(circle):not(rect):not(polygon) {
+    color: inherit !important;
+  }
+  
+  /* Ensure all dialog and modal components use correct colors */
+  .fixed.inset-0,
+  .fixed.left-\\[50\\%\\].top-\\[50\\%\\],
+  [role="dialog"],
+  [role="alertdialog"] {
+    background-color: white !important;
+    border-color: #E5E0D8 !important;
+  }
+  
+  /* Ensure buttons and interactive elements use correct colors */
+  button,
+  [role="button"],
+  .cursor-pointer {
+    color: inherit !important;
+    border-color: #E5E0D8 !important;
   }
 }
 
