@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -101,14 +102,13 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
             color: '#4A4A4A !important',
             backgroundColor: 'white !important',
             borderColor: '#E5E0D8 !important'
-          }}
+          } as React.CSSProperties}
         >
           <DialogHeader>
             <DialogTitle 
               style={{ 
-                color: '#4A4A4A !important',
-                '--foreground': '74 74 74'
-              }}
+                color: '#4A4A4A !important'
+              } as React.CSSProperties}
             >
               Add New Recipient
             </DialogTitle>
@@ -118,7 +118,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
             <div className="space-y-2">
               <Label 
                 htmlFor="name" 
-                style={{ color: '#4A4A4A !important' }}
+                style={{ color: '#4A4A4A !important' } as React.CSSProperties}
               >
                 Name *
               </Label>
@@ -127,14 +127,14 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
                 value={formData.name}
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                 required
-                style={{ color: '#4A4A4A !important' }}
+                style={{ color: '#4A4A4A !important' } as React.CSSProperties}
               />
             </div>
 
             <div className="space-y-2">
               <Label 
                 htmlFor="relationship" 
-                style={{ color: '#4A4A4A !important' }}
+                style={{ color: '#4A4A4A !important' } as React.CSSProperties}
               >
                 Relationship
               </Label>
@@ -142,7 +142,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
                 value={formData.relationship} 
                 onValueChange={(value) => setFormData(prev => ({ ...prev, relationship: value }))}
               >
-                <SelectTrigger style={{ color: '#4A4A4A !important' }}>
+                <SelectTrigger style={{ color: '#4A4A4A !important' } as React.CSSProperties}>
                   <SelectValue placeholder="Select relationship" />
                 </SelectTrigger>
                 <SelectContent>
@@ -161,7 +161,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
             <div className="space-y-2">
               <Label 
                 htmlFor="email" 
-                style={{ color: '#4A4A4A !important' }}
+                style={{ color: '#4A4A4A !important' } as React.CSSProperties}
               >
                 Email
               </Label>
@@ -170,14 +170,14 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                style={{ color: '#4A4A4A !important' }}
+                style={{ color: '#4A4A4A !important' } as React.CSSProperties}
               />
             </div>
 
             <div className="space-y-2">
               <Label 
                 htmlFor="phone" 
-                style={{ color: '#4A4A4A !important' }}
+                style={{ color: '#4A4A4A !important' } as React.CSSProperties}
               >
                 Phone
               </Label>
@@ -185,7 +185,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
                 id="phone"
                 value={formData.phone}
                 onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                style={{ color: '#4A4A4A !important' }}
+                style={{ color: '#4A4A4A !important' } as React.CSSProperties}
               />
             </div>
 
@@ -193,7 +193,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
               <div className="space-y-2">
                 <Label 
                   htmlFor="birthday" 
-                  style={{ color: '#4A4A4A !important' }}
+                  style={{ color: '#4A4A4A !important' } as React.CSSProperties}
                 >
                   Birthday
                 </Label>
@@ -202,7 +202,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
                   type="date"
                   value={formData.birthday}
                   onChange={(e) => setFormData(prev => ({ ...prev, birthday: e.target.value }))}
-                  style={{ color: '#4A4A4A !important' }}
+                  style={{ color: '#4A4A4A !important' } as React.CSSProperties}
                 />
               </div>
             </div>
@@ -210,7 +210,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
             <div className="space-y-2">
               <Label 
                 htmlFor="interests" 
-                style={{ color: '#4A4A4A !important' }}
+                style={{ color: '#4A4A4A !important' } as React.CSSProperties}
               >
                 Interests
               </Label>
@@ -219,14 +219,14 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
                 placeholder="Enter interests separated by commas"
                 value={formData.interests}
                 onChange={(e) => setFormData(prev => ({ ...prev, interests: e.target.value }))}
-                style={{ color: '#4A4A4A !important' }}
+                style={{ color: '#4A4A4A !important' } as React.CSSProperties}
               />
             </div>
 
             <div className="space-y-2">
               <Label 
                 htmlFor="notes" 
-                style={{ color: '#4A4A4A !important' }}
+                style={{ color: '#4A4A4A !important' } as React.CSSProperties}
               >
                 Notes
               </Label>
@@ -235,7 +235,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
                 placeholder="Any additional notes about this recipient"
                 value={formData.notes}
                 onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                style={{ color: '#4A4A4A !important' }}
+                style={{ color: '#4A4A4A !important' } as React.CSSProperties}
               />
             </div>
 

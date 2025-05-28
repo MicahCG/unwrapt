@@ -41,11 +41,10 @@ const DialogContent = React.forwardRef<
         className
       )}
       style={{ 
-        '--foreground': '74 74 74',
         color: '#4A4A4A',
         backgroundColor: 'white',
         borderColor: '#E5E0D8'
-      }}
+      } as React.CSSProperties}
       {...props}
     >
       {children}
@@ -97,9 +96,8 @@ const DialogTitle = React.forwardRef<
       className
     )}
     style={{ 
-      '--foreground': '74 74 74',
       color: '#4A4A4A'
-    }}
+    } as React.CSSProperties}
     {...props}
   />
 ))
