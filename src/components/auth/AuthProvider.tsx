@@ -39,7 +39,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    // Listen for fake auth events (development only)
+    const handleFakeAuth = (event: CustomEvent) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Fake auth triggered:', event.detail);
+        setUser(event.detail.user as User);
+        setLoading(false);
+      }
+    };
+
+    window.addEventListener('fake-auth', handleFakeAuth as EventListener);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('fake-auth', handleFakeAuth as EventListener);
+    };
   }, []);
 
   const signInWithGoogle = async () => {
@@ -55,6 +69,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    // Clear fake user state
+    if (process.env.NODE_ENV === 'development') {
+      setUser(null);
+    }
+    
     const { error } = await supabase.auth.signOut();
     if (error) {
       console.error('Error signing out:', error);

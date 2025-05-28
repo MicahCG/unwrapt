@@ -16,6 +16,11 @@ const Index = () => {
     queryFn: async () => {
       if (!user?.id) return false;
       
+      // For fake dev user, always return true to skip onboarding
+      if (process.env.NODE_ENV === 'development' && user.id === 'dev-user-123') {
+        return true;
+      }
+      
       // Check for recipients first (primary indicator of completed onboarding)
       const { data: recipients, error: recipientsError } = await supabase
         .from('recipients')
