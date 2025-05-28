@@ -31,10 +31,12 @@ export const useShopifyProductTypes = () => {
       return data;
     },
     staleTime: 1000 * 60 * 30, // Cache for 30 minutes
-    cacheTime: 1000 * 60 * 60, // Keep in cache for 1 hour
+    gcTime: 1000 * 60 * 60, // Keep in cache for 1 hour (renamed from cacheTime)
     retry: 1,
-    onError: (error) => {
-      console.error('Failed to fetch Shopify product types:', error);
+    meta: {
+      onError: (error: Error) => {
+        console.error('Failed to fetch Shopify product types:', error);
+      }
     }
   });
 };
