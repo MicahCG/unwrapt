@@ -46,8 +46,8 @@ const InterestsStep: React.FC<InterestsStepProps> = ({ onNext, recipientName }) 
     <Card className="animate-fadeInUp">
       <CardHeader className="text-center">
         <div className="flex justify-center mb-4">
-          <div className="bg-brand-gold/20 p-4 rounded-full">
-            <Heart className="h-12 w-12 text-brand-gold" />
+          <div className="bg-brand-charcoal/10 p-4 rounded-full">
+            <Heart className="h-12 w-12 text-brand-charcoal" />
           </div>
         </div>
         <CardTitle className="text-3xl mb-2 text-brand-charcoal">

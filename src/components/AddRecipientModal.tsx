@@ -195,7 +195,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
           </div>
 
           <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isLoading} className="border-brand-charcoal text-brand-charcoal hover:bg-brand-charcoal hover:text-brand-cream">
               Cancel
             </Button>
             <Button type="submit" disabled={isLoading} className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90">

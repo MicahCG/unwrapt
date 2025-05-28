@@ -69,8 +69,8 @@ const RecipientStep: React.FC<RecipientStepProps> = ({ onNext }) => {
     <Card className="animate-fadeInUp">
       <CardHeader className="text-center">
         <div className="flex justify-center mb-4">
-          <div className="bg-accent/20 p-4 rounded-full">
-            <Gift className="h-12 w-12 text-accent" />
+          <div className="bg-brand-charcoal/10 p-4 rounded-full">
+            <Gift className="h-12 w-12 text-brand-charcoal" />
           </div>
         </div>
         <CardTitle className="text-3xl mb-2">Who's the most important person in your life?</CardTitle>
@@ -205,7 +205,7 @@ const RecipientStep: React.FC<RecipientStepProps> = ({ onNext }) => {
         {/* Continue Button */}
         <Button 
           size="lg" 
-          className="w-full text-lg py-6"
+          className="w-full text-lg py-6 bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
           onClick={handleContinue}
           disabled={!isValid}
         >
