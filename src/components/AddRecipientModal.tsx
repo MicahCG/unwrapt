@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -96,30 +95,54 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
     <>
       <DebugColors />
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="!text-brand-charcoal sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="!text-brand-charcoal">
-            <DialogTitle className="!text-brand-charcoal">Add New Recipient</DialogTitle>
+        <DialogContent 
+          className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto"
+          style={{ 
+            color: '#4A4A4A !important',
+            backgroundColor: 'white !important',
+            borderColor: '#E5E0D8 !important'
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle 
+              style={{ 
+                color: '#4A4A4A !important',
+                '--foreground': '74 74 74'
+              }}
+            >
+              Add New Recipient
+            </DialogTitle>
           </DialogHeader>
           
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name" className="!text-brand-charcoal">Name *</Label>
+              <Label 
+                htmlFor="name" 
+                style={{ color: '#4A4A4A !important' }}
+              >
+                Name *
+              </Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                 required
-                className="!text-brand-charcoal"
+                style={{ color: '#4A4A4A !important' }}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="relationship" className="!text-brand-charcoal">Relationship</Label>
+              <Label 
+                htmlFor="relationship" 
+                style={{ color: '#4A4A4A !important' }}
+              >
+                Relationship
+              </Label>
               <Select 
                 value={formData.relationship} 
                 onValueChange={(value) => setFormData(prev => ({ ...prev, relationship: value }))}
               >
-                <SelectTrigger className="!text-brand-charcoal">
+                <SelectTrigger style={{ color: '#4A4A4A !important' }}>
                   <SelectValue placeholder="Select relationship" />
                 </SelectTrigger>
                 <SelectContent>
@@ -136,66 +159,101 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="!text-brand-charcoal">Email</Label>
+              <Label 
+                htmlFor="email" 
+                style={{ color: '#4A4A4A !important' }}
+              >
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                className="!text-brand-charcoal"
+                style={{ color: '#4A4A4A !important' }}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone" className="!text-brand-charcoal">Phone</Label>
+              <Label 
+                htmlFor="phone" 
+                style={{ color: '#4A4A4A !important' }}
+              >
+                Phone
+              </Label>
               <Input
                 id="phone"
                 value={formData.phone}
                 onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                className="!text-brand-charcoal"
+                style={{ color: '#4A4A4A !important' }}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="birthday" className="!text-brand-charcoal">Birthday</Label>
+                <Label 
+                  htmlFor="birthday" 
+                  style={{ color: '#4A4A4A !important' }}
+                >
+                  Birthday
+                </Label>
                 <Input
                   id="birthday"
                   type="date"
                   value={formData.birthday}
                   onChange={(e) => setFormData(prev => ({ ...prev, birthday: e.target.value }))}
-                  className="!text-brand-charcoal"
+                  style={{ color: '#4A4A4A !important' }}
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="interests" className="!text-brand-charcoal">Interests</Label>
+              <Label 
+                htmlFor="interests" 
+                style={{ color: '#4A4A4A !important' }}
+              >
+                Interests
+              </Label>
               <Input
                 id="interests"
                 placeholder="Enter interests separated by commas"
                 value={formData.interests}
                 onChange={(e) => setFormData(prev => ({ ...prev, interests: e.target.value }))}
-                className="!text-brand-charcoal"
+                style={{ color: '#4A4A4A !important' }}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="notes" className="!text-brand-charcoal">Notes</Label>
+              <Label 
+                htmlFor="notes" 
+                style={{ color: '#4A4A4A !important' }}
+              >
+                Notes
+              </Label>
               <Textarea
                 id="notes"
                 placeholder="Any additional notes about this recipient"
                 value={formData.notes}
                 onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                className="!text-brand-charcoal"
+                style={{ color: '#4A4A4A !important' }}
               />
             </div>
 
             <div className="flex justify-end space-x-2 pt-4">
-              <Button type="button" variant="outline" onClick={onClose} disabled={isLoading} className="border-brand-charcoal text-brand-charcoal hover:bg-brand-charcoal hover:text-brand-cream">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={onClose} 
+                disabled={isLoading} 
+                className="border-brand-charcoal text-brand-charcoal hover:bg-brand-charcoal hover:text-brand-cream"
+              >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isLoading} className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90">
+              <Button 
+                type="submit" 
+                disabled={isLoading} 
+                className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+              >
                 {isLoading ? 'Adding...' : 'Add Recipient'}
               </Button>
             </div>

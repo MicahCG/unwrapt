@@ -95,9 +95,22 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
   
-  /* COMPREHENSIVE COLOR OVERRIDE - Target ALL instances of the problematic color */
+  /* FORCE OVERRIDE CSS VARIABLES - NUCLEAR APPROACH */
+  :root,
+  :root *,
+  html,
+  html *,
+  body,
+  body * {
+    --foreground: 74 74 74 !important;
+    --card-foreground: 74 74 74 !important;
+    --popover-foreground: 74 74 74 !important;
+    --muted-foreground: 107 107 107 !important;
+  }
+  
+  /* COMPREHENSIVE COLOR OVERRIDE - Target ALL instances */
   * {
-    /* Override any inline styles or computed styles with the problematic color */
+    /* Override any inline styles or computed styles */
     --lime-500: #4A4A4A !important;
     --lime-400: #4A4A4A !important;
     --lime-600: #4A4A4A !important;
@@ -135,7 +148,7 @@
     background-color: #4A4A4A !important;
   }
   
-  /* CRITICAL: Override border colors with the problematic color */
+  /* CRITICAL: Override border colors */
   [style*="border-color: #4A4A4A"],
   [style*="border-color: rgb(74, 74, 74)"],
   [style*="border-color:#4A4A4A"],
@@ -148,39 +161,32 @@
     border-color: #E5E0D8 !important;
   }
   
-  /* Override any computed HSL values that might resolve to the problematic color */
-  [style*="hsl(75, 68%, 75%)"],
-  [style*="hsl(75,68%,75%)"],
-  [style*="75, 68%, 75%"] {
-    color: #4A4A4A !important;
-    background-color: transparent !important;
-    border-color: #E5E0D8 !important;
-  }
-  
-  /* Specific override for the problematic color in any format */
-  [style*="#4A4A4A"],
-  [style*="rgb(74, 74, 74)"],
-  [style*="74, 74, 74"] {
-    color: #4A4A4A !important;
-    background-color: transparent !important;
-    border-color: #E5E0D8 !important;
-  }
-  
-  /* Force override ANY Radix UI components */
-  [data-radix-select-content],
+  /* SPECIFIC TARGETING FOR RADIX UI COMPONENTS */
   [data-radix-dialog-content],
   [data-radix-dialog-overlay],
+  [data-radix-dialog-title],
   [data-radix-popover-content],
+  [data-radix-select-content],
   [data-radix-dropdown-menu-content] {
+    --foreground: 74 74 74 !important;
+    color: hsl(74 74 74) !important;
     background-color: white !important;
-    color: #4A4A4A !important;
     border-color: #E5E0D8 !important;
+  }
+  
+  [data-radix-dialog-content] *,
+  [data-radix-popover-content] *,
+  [data-radix-select-content] *,
+  [data-radix-dropdown-menu-content] * {
+    --foreground: 74 74 74 !important;
+    color: hsl(74 74 74) !important;
   }
   
   [data-radix-select-item],
   [data-radix-dialog-close],
   [data-radix-dropdown-menu-item] {
-    color: #4A4A4A !important;
+    --foreground: 74 74 74 !important;
+    color: hsl(74 74 74) !important;
     background-color: white !important;
     border-color: #E5E0D8 !important;
   }
@@ -190,7 +196,7 @@
   [data-radix-dropdown-menu-item]:hover,
   [data-radix-dropdown-menu-item][data-highlighted] {
     background-color: #F5F2ED !important;
-    color: #4A4A4A !important;
+    color: hsl(74 74 74) !important;
     border-color: #E5E0D8 !important;
   }
   
@@ -200,39 +206,50 @@
     border-color: #4A4A4A !important;
   }
   
-  /* Override any computed styles that might contain the problematic color */
-  * {
-    --select-item-bg: white !important;
-    --select-item-text: #4A4A4A !important;
-    --select-item-hover-bg: #F5F2ED !important;
-    --select-item-checked-bg: #4A4A4A !important;
-    --select-item-checked-text: #F5F2ED !important;
-    --dialog-bg: white !important;
-    --dialog-border: #E5E0D8 !important;
-    --popover-bg: white !important;
-    --popover-border: #E5E0D8 !important;
-  }
-  
-  /* Nuclear option: Override ANY element that might have the problematic color */
-  *:not(svg):not(path):not(circle):not(rect):not(polygon) {
-    color: inherit !important;
-  }
-  
-  /* Ensure all dialog and modal components use correct colors */
+  /* DIALOG AND MODAL SPECIFIC OVERRIDES */
   .fixed.inset-0,
   .fixed.left-\\[50\\%\\].top-\\[50\\%\\],
   [role="dialog"],
   [role="alertdialog"] {
+    --foreground: 74 74 74 !important;
     background-color: white !important;
+    border-color: #E5E0D8 !important;
+    color: hsl(74 74 74) !important;
+  }
+  
+  [role="dialog"] *,
+  [role="alertdialog"] * {
+    --foreground: 74 74 74 !important;
+    color: inherit !important;
+  }
+  
+  /* FORM ELEMENTS SPECIFIC OVERRIDES */
+  input,
+  textarea,
+  select,
+  label,
+  .form-control,
+  .input,
+  .textarea,
+  .label {
+    --foreground: 74 74 74 !important;
+    color: hsl(74 74 74) !important;
     border-color: #E5E0D8 !important;
   }
   
-  /* Ensure buttons and interactive elements use correct colors */
+  /* BUTTON OVERRIDES */
   button,
   [role="button"],
   .cursor-pointer {
     color: inherit !important;
     border-color: #E5E0D8 !important;
+  }
+  
+  /* NUCLEAR OPTION: Override ANY element that uses hsl(var(--foreground)) */
+  *[style*="hsl(var(--foreground))"],
+  *[class*="text-foreground"] {
+    --foreground: 74 74 74 !important;
+    color: hsl(74 74 74) !important;
   }
 }
 
