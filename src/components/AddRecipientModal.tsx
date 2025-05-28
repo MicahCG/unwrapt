@@ -95,7 +95,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto text-brand-charcoal bg-white border-brand-cream">
         <DialogHeader>
           <DialogTitle className="text-brand-charcoal">
-            Add New Recipient
+            Add New Cipent
           </DialogTitle>
         </DialogHeader>
         
