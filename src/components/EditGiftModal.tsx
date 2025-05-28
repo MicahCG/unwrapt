@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { useShopifyProductTypes } from '@/hooks/useShopifyProductTypes';
 
 interface EditGiftModalProps {
   gift: any;
@@ -17,6 +18,7 @@ interface EditGiftModalProps {
 
 const EditGiftModal: React.FC<EditGiftModalProps> = ({ gift, isOpen, onClose }) => {
   const queryClient = useQueryClient();
+  const { data: productTypesData, isLoading: isLoadingProductTypes } = useShopifyProductTypes();
   const [formData, setFormData] = useState({
     occasion: gift?.occasion || '',
     occasion_date: gift?.occasion_date || '',
@@ -56,6 +58,9 @@ const EditGiftModal: React.FC<EditGiftModalProps> = ({ gift, isOpen, onClose }) 
       setIsLoading(false);
     }
   };
+
+  // Get product types from Shopify or use fallback
+  const productTypes = productTypesData?.productTypes || [];
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -103,23 +108,27 @@ const EditGiftModal: React.FC<EditGiftModalProps> = ({ gift, isOpen, onClose }) 
             <Select 
               value={formData.gift_type} 
               onValueChange={(value) => setFormData(prev => ({ ...prev, gift_type: value }))}
+              disabled={isLoadingProductTypes}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select gift type" />
+                <SelectValue placeholder={isLoadingProductTypes ? "Loading gift types..." : "Select gift type"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Electronics">Electronics</SelectItem>
-                <SelectItem value="Clothing">Clothing</SelectItem>
-                <SelectItem value="Books">Books</SelectItem>
-                <SelectItem value="Home & Garden">Home & Garden</SelectItem>
-                <SelectItem value="Sports & Outdoors">Sports & Outdoors</SelectItem>
-                <SelectItem value="Beauty & Personal Care">Beauty & Personal Care</SelectItem>
-                <SelectItem value="Jewelry">Jewelry</SelectItem>
-                <SelectItem value="Experience">Experience</SelectItem>
-                <SelectItem value="Food & Beverages">Food & Beverages</SelectItem>
-                <SelectItem value="Custom">Custom</SelectItem>
+                {productTypes.map((type: string) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+                {productTypes.length === 0 && !isLoadingProductTypes && (
+                  <SelectItem value="" disabled>No gift types available</SelectItem>
+                )}
               </SelectContent>
             </Select>
+            {productTypesData?.success === false && (
+              <p className="text-xs text-amber-600">
+                Using fallback options - Shopify connection unavailable
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
