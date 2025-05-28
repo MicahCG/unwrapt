@@ -103,13 +103,16 @@ const RecipientsList = () => {
             const nextOccasion = getNextOccasion(recipient);
             
             return (
-              <Card key={recipient.id} className="hover:shadow-lg transition-shadow">
+              <Card key={recipient.id} className="hover:shadow-lg transition-shadow bg-white border-brand-cream">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div>
                       <CardTitle className="text-lg text-brand-charcoal">{recipient.name}</CardTitle>
                       {recipient.relationship && (
-                        <Badge variant="secondary" className="mt-1">
+                        <Badge 
+                          variant="secondary" 
+                          className="mt-1 bg-brand-cream text-brand-charcoal border-brand-cream"
+                        >
                           {recipient.relationship}
                         </Badge>
                       )}
@@ -119,6 +122,7 @@ const RecipientsList = () => {
                         size="sm"
                         variant="ghost"
                         onClick={() => setEditingRecipient(recipient)}
+                        className="text-brand-charcoal hover:bg-brand-cream hover:text-brand-charcoal"
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -126,7 +130,7 @@ const RecipientsList = () => {
                         size="sm"
                         variant="ghost"
                         onClick={() => handleDeleteRecipient(recipient.id)}
-                        className="text-red-600 hover:text-red-700"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -156,12 +160,19 @@ const RecipientsList = () => {
                   {recipient.interests && recipient.interests.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {recipient.interests.slice(0, 3).map((interest: string, index: number) => (
-                        <Badge key={index} variant="outline" className="text-xs">
+                        <Badge 
+                          key={index} 
+                          variant="outline" 
+                          className="text-xs bg-white text-brand-charcoal border-brand-charcoal hover:bg-brand-cream"
+                        >
                           {interest}
                         </Badge>
                       ))}
                       {recipient.interests.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
+                        <Badge 
+                          variant="outline" 
+                          className="text-xs bg-white text-brand-charcoal border-brand-charcoal hover:bg-brand-cream"
+                        >
                           +{recipient.interests.length - 3}
                         </Badge>
                       )}
@@ -182,7 +193,7 @@ const RecipientsList = () => {
           })}
         </div>
       ) : (
-        <Card>
+        <Card className="bg-white border-brand-cream">
           <CardContent className="py-12 text-center">
             <div className="text-brand-charcoal/50 mb-4">
               No recipients added yet
