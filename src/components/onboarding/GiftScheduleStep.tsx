@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +10,7 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useShopifyProductTypes } from '@/hooks/useShopifyProductTypes';
 
 interface GiftScheduleStepProps {
   onNext: (data: any) => void;
@@ -25,6 +25,7 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ onNext, recipientNa
   const [isValid, setIsValid] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const { toast } = useToast();
+  const { data: productTypesData, isLoading: isLoadingProductTypes } = useShopifyProductTypes();
 
   React.useEffect(() => {
     const formValid = occasion && occasionDate && giftType && priceRange;
@@ -119,6 +120,9 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ onNext, recipientNa
     }
   };
 
+  // Get product types from Shopify or use fallback
+  const productTypes = productTypesData?.productTypes || [];
+
   return (
     <Card className="animate-fadeInUp border-brand-cream shadow-lg">
       <CardHeader className="text-center">
@@ -185,21 +189,26 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ onNext, recipientNa
           {/* Gift Type */}
           <div className="space-y-2">
             <Label htmlFor="giftType">What type of gift? *</Label>
-            <Select onValueChange={setGiftType}>
+            <Select onValueChange={setGiftType} disabled={isLoadingProductTypes}>
               <SelectTrigger>
-                <SelectValue placeholder="Select gift type" />
+                <SelectValue placeholder={isLoadingProductTypes ? "Loading gift types..." : "Select gift type"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="flowers">Flowers</SelectItem>
-                <SelectItem value="chocolate">Chocolate & Sweets</SelectItem>
-                <SelectItem value="jewelry">Jewelry</SelectItem>
-                <SelectItem value="book">Books</SelectItem>
-                <SelectItem value="tech">Tech & Gadgets</SelectItem>
-                <SelectItem value="home">Home & Garden</SelectItem>
-                <SelectItem value="experience">Experience Gift</SelectItem>
-                <SelectItem value="custom">Custom/Personalized</SelectItem>
+                {productTypes.map((type: string) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+                {productTypes.length === 0 && !isLoadingProductTypes && (
+                  <SelectItem value="" disabled>No gift types available</SelectItem>
+                )}
               </SelectContent>
             </Select>
+            {productTypesData?.success === false && (
+              <p className="text-xs text-amber-600">
+                Using fallback options - Shopify connection unavailable
+              </p>
+            )}
           </div>
 
           {/* Price Range */}

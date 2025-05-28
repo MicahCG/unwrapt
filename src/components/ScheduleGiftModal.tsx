@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { CreditCard } from 'lucide-react';
+import { useShopifyProductTypes } from '@/hooks/useShopifyProductTypes';
 
 interface ScheduleGiftModalProps {
   recipient: any;
@@ -22,6 +22,8 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { data: productTypesData, isLoading: isLoadingProductTypes } = useShopifyProductTypes();
+  
   const [formData, setFormData] = useState({
     occasion: '',
     occasion_date: '',
@@ -172,6 +174,9 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     }
   };
 
+  // Get product types from Shopify or use fallback
+  const productTypes = productTypesData?.productTypes || [];
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
@@ -218,23 +223,27 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             <Select 
               value={formData.gift_type} 
               onValueChange={(value) => setFormData(prev => ({ ...prev, gift_type: value }))}
+              disabled={isLoadingProductTypes}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select gift type" />
+                <SelectValue placeholder={isLoadingProductTypes ? "Loading gift types..." : "Select gift type"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Electronics">Electronics</SelectItem>
-                <SelectItem value="Clothing">Clothing</SelectItem>
-                <SelectItem value="Books">Books</SelectItem>
-                <SelectItem value="Home & Garden">Home & Garden</SelectItem>
-                <SelectItem value="Sports & Outdoors">Sports & Outdoors</SelectItem>
-                <SelectItem value="Beauty & Personal Care">Beauty & Personal Care</SelectItem>
-                <SelectItem value="Jewelry">Jewelry</SelectItem>
-                <SelectItem value="Experience">Experience</SelectItem>
-                <SelectItem value="Food & Beverages">Food & Beverages</SelectItem>
-                <SelectItem value="Custom">Custom</SelectItem>
+                {productTypes.map((type: string) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+                {productTypes.length === 0 && !isLoadingProductTypes && (
+                  <SelectItem value="" disabled>No gift types available</SelectItem>
+                )}
               </SelectContent>
             </Select>
+            {productTypesData?.success === false && (
+              <p className="text-xs text-amber-600">
+                Using fallback options - Shopify connection unavailable
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
