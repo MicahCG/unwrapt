@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/components/ui/use-toast';
-import DebugColors from '@/components/ui/debug-colors';
 
 interface AddRecipientModalProps {
   isOpen: boolean;
@@ -93,174 +91,139 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
   };
 
   return (
-    <>
-      <DebugColors />
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent 
-          className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto"
-          style={{ 
-            color: '#4A4A4A !important',
-            backgroundColor: 'white !important',
-            borderColor: '#E5E0D8 !important'
-          } as React.CSSProperties}
-        >
-          <DialogHeader>
-            <DialogTitle 
-              style={{ 
-                color: '#4A4A4A !important'
-              } as React.CSSProperties}
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto text-brand-charcoal bg-white border-brand-cream">
+        <DialogHeader>
+          <DialogTitle className="text-brand-charcoal">
+            Add New Recipient
+          </DialogTitle>
+        </DialogHeader>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="name" className="text-brand-charcoal">
+              Name *
+            </Label>
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              required
+              className="text-brand-charcoal border-brand-cream"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="relationship" className="text-brand-charcoal">
+              Relationship
+            </Label>
+            <Select 
+              value={formData.relationship} 
+              onValueChange={(value) => setFormData(prev => ({ ...prev, relationship: value }))}
             >
-              Add New Recipient
-            </DialogTitle>
-          </DialogHeader>
-          
-          <form onSubmit={handleSubmit} className="space-y-4">
+              <SelectTrigger className="text-brand-charcoal border-brand-cream">
+                <SelectValue placeholder="Select relationship" />
+              </SelectTrigger>
+              <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
+                <SelectItem value="mom">Mom</SelectItem>
+                <SelectItem value="dad">Dad</SelectItem>
+                <SelectItem value="partner">Partner/Spouse</SelectItem>
+                <SelectItem value="sibling">Sibling</SelectItem>
+                <SelectItem value="friend">Friend</SelectItem>
+                <SelectItem value="child">Child</SelectItem>
+                <SelectItem value="grandparent">Grandparent</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-brand-charcoal">
+              Email
+            </Label>
+            <Input
+              id="email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+              className="text-brand-charcoal border-brand-cream"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="phone" className="text-brand-charcoal">
+              Phone
+            </Label>
+            <Input
+              id="phone"
+              value={formData.phone}
+              onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+              className="text-brand-charcoal border-brand-cream"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label 
-                htmlFor="name" 
-                style={{ color: '#4A4A4A !important' } as React.CSSProperties}
-              >
-                Name *
+              <Label htmlFor="birthday" className="text-brand-charcoal">
+                Birthday
               </Label>
               <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                required
-                style={{ color: '#4A4A4A !important' } as React.CSSProperties}
+                id="birthday"
+                type="date"
+                value={formData.birthday}
+                onChange={(e) => setFormData(prev => ({ ...prev, birthday: e.target.value }))}
+                className="text-brand-charcoal border-brand-cream"
               />
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <Label 
-                htmlFor="relationship" 
-                style={{ color: '#4A4A4A !important' } as React.CSSProperties}
-              >
-                Relationship
-              </Label>
-              <Select 
-                value={formData.relationship} 
-                onValueChange={(value) => setFormData(prev => ({ ...prev, relationship: value }))}
-              >
-                <SelectTrigger style={{ color: '#4A4A4A !important' } as React.CSSProperties}>
-                  <SelectValue placeholder="Select relationship" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="mom">Mom</SelectItem>
-                  <SelectItem value="dad">Dad</SelectItem>
-                  <SelectItem value="partner">Partner/Spouse</SelectItem>
-                  <SelectItem value="sibling">Sibling</SelectItem>
-                  <SelectItem value="friend">Friend</SelectItem>
-                  <SelectItem value="child">Child</SelectItem>
-                  <SelectItem value="grandparent">Grandparent</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="interests" className="text-brand-charcoal">
+              Interests
+            </Label>
+            <Input
+              id="interests"
+              placeholder="Enter interests separated by commas"
+              value={formData.interests}
+              onChange={(e) => setFormData(prev => ({ ...prev, interests: e.target.value }))}
+              className="text-brand-charcoal border-brand-cream"
+            />
+          </div>
 
-            <div className="space-y-2">
-              <Label 
-                htmlFor="email" 
-                style={{ color: '#4A4A4A !important' } as React.CSSProperties}
-              >
-                Email
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                style={{ color: '#4A4A4A !important' } as React.CSSProperties}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="notes" className="text-brand-charcoal">
+              Notes
+            </Label>
+            <Textarea
+              id="notes"
+              placeholder="Any additional notes about this recipient"
+              value={formData.notes}
+              onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+              className="text-brand-charcoal border-brand-cream"
+            />
+          </div>
 
-            <div className="space-y-2">
-              <Label 
-                htmlFor="phone" 
-                style={{ color: '#4A4A4A !important' } as React.CSSProperties}
-              >
-                Phone
-              </Label>
-              <Input
-                id="phone"
-                value={formData.phone}
-                onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                style={{ color: '#4A4A4A !important' } as React.CSSProperties}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label 
-                  htmlFor="birthday" 
-                  style={{ color: '#4A4A4A !important' } as React.CSSProperties}
-                >
-                  Birthday
-                </Label>
-                <Input
-                  id="birthday"
-                  type="date"
-                  value={formData.birthday}
-                  onChange={(e) => setFormData(prev => ({ ...prev, birthday: e.target.value }))}
-                  style={{ color: '#4A4A4A !important' } as React.CSSProperties}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label 
-                htmlFor="interests" 
-                style={{ color: '#4A4A4A !important' } as React.CSSProperties}
-              >
-                Interests
-              </Label>
-              <Input
-                id="interests"
-                placeholder="Enter interests separated by commas"
-                value={formData.interests}
-                onChange={(e) => setFormData(prev => ({ ...prev, interests: e.target.value }))}
-                style={{ color: '#4A4A4A !important' } as React.CSSProperties}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label 
-                htmlFor="notes" 
-                style={{ color: '#4A4A4A !important' } as React.CSSProperties}
-              >
-                Notes
-              </Label>
-              <Textarea
-                id="notes"
-                placeholder="Any additional notes about this recipient"
-                value={formData.notes}
-                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                style={{ color: '#4A4A4A !important' } as React.CSSProperties}
-              />
-            </div>
-
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={onClose} 
-                disabled={isLoading} 
-                className="border-brand-charcoal text-brand-charcoal hover:bg-brand-charcoal hover:text-brand-cream"
-              >
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={isLoading} 
-                className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
-              >
-                {isLoading ? 'Adding...' : 'Add Recipient'}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </>
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={onClose} 
+              disabled={isLoading} 
+              className="border-brand-charcoal text-brand-charcoal hover:bg-brand-charcoal hover:text-brand-cream"
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={isLoading} 
+              className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+            >
+              {isLoading ? 'Adding...' : 'Add Recipient'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 };
 
