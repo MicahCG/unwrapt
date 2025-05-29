@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -104,7 +103,7 @@ const ShopifyTestModal: React.FC<ShopifyTestModalProps> = ({ gift, isOpen, onClo
               <Button
                 onClick={() => handleTestIntegration(true)}
                 disabled={isTestingDry}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
               >
                 {isTestingDry ? 'Testing...' : 'Run Dry Test'}
                 <TestTube2 className="h-4 w-4 ml-2" />
@@ -120,7 +119,6 @@ const ShopifyTestModal: React.FC<ShopifyTestModalProps> = ({ gift, isOpen, onClo
                 onClick={() => handleTestIntegration(false)}
                 disabled={isTestingLive}
                 className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
-                variant="destructive"
               >
                 {isTestingLive ? 'Creating Order...' : 'Create Live Order'}
                 <ShoppingCart className="h-4 w-4 ml-2" />
