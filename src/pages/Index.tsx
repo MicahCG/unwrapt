@@ -17,7 +17,7 @@ const Index = () => {
       if (!user?.id) return false;
       
       // For fake dev user, always return true to skip onboarding
-      if (process.env.NODE_ENV === 'development' && user.id === 'dev-user-123') {
+      if (process.env.NODE_ENV === 'development' && user.id === '00000000-0000-0000-0000-000000000001') {
         return true;
       }
       
