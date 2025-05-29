@@ -27,16 +27,20 @@ Deno.serve(async (req) => {
       })
     }
 
-    const { action, code, access_token } = await req.json()
+    const { action, code, access_token, redirect_context } = await req.json()
 
     if (action === 'get_auth_url') {
       const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
-      const redirectUri = `${req.headers.get('origin')}/auth/callback`
+      // Use different redirect URLs based on context
+      const baseRedirectUri = redirect_context === 'settings' 
+        ? `${req.headers.get('origin')}/auth/callback/settings`
+        : `${req.headers.get('origin')}/auth/callback`
+      
       const scope = 'https://www.googleapis.com/auth/calendar.readonly'
       
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
         `client_id=${clientId}&` +
-        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `redirect_uri=${encodeURIComponent(baseRedirectUri)}&` +
         `scope=${encodeURIComponent(scope)}&` +
         `response_type=code&` +
         `access_type=offline&` +
@@ -48,6 +52,11 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'exchange_code') {
+      // Determine redirect URI based on the current context
+      const redirectUri = req.headers.get('referer')?.includes('/settings') 
+        ? `${req.headers.get('origin')}/auth/callback/settings`
+        : `${req.headers.get('origin')}/auth/callback`
+
       // Exchange authorization code for access token
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
@@ -57,7 +66,7 @@ Deno.serve(async (req) => {
           client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') ?? '',
           code: code,
           grant_type: 'authorization_code',
-          redirect_uri: `${req.headers.get('origin')}/auth/callback`
+          redirect_uri: redirectUri
         })
       })
 

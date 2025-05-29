@@ -15,6 +15,8 @@ import Wishlist from "./pages/Wishlist";
 import Notifications from "./pages/Notifications";
 import Settings from "./pages/Settings";
 import Onboarding from "./pages/Onboarding";
+import OAuthCallback from "./components/auth/OAuthCallback";
+import SettingsOAuthCallback from "./components/auth/SettingsOAuthCallback";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +38,8 @@ function App() {
               <Route path="/wishlist" element={<Wishlist />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/auth/callback" element={<OAuthCallback />} />
+              <Route path="/auth/callback/settings" element={<SettingsOAuthCallback />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>
