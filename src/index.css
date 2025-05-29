@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -23,7 +22,7 @@
     --muted: 248 246 241; /* Lighter cream */
     --muted-foreground: 107 107 107; /* Medium gray */
 
-    --accent: 244 211 94; /* Updated brand gold #F4D35E */
+    --accent: 245 242 237; /* Updated to match light brown/tan */
     --accent-foreground: 74 74 74;
 
     --destructive: 220 38 38;
@@ -58,21 +57,21 @@
     --secondary-foreground: 245 242 237;
     --muted: 68 64 60;
     --muted-foreground: 163 163 163;
-    --accent: 244 211 94;
+    --accent: 245 242 237;
     --accent-foreground: 41 37 36;
     --destructive: 220 38 38;
     --destructive-foreground: 245 242 237;
     --border: 68 64 60;
     --input: 68 64 60;
-    --ring: 244 211 94;
+    --ring: 245 242 237;
     --sidebar-background: 24 24 27;
     --sidebar-foreground: 250 250 250;
-    --sidebar-primary: 244 211 94;
+    --sidebar-primary: 245 242 237;
     --sidebar-primary-foreground: 9 9 11;
     --sidebar-accent: 39 39 42;
     --sidebar-accent-foreground: 250 250 250;
     --sidebar-border: 39 39 42;
-    --sidebar-ring: 244 211 94;
+    --sidebar-ring: 245 242 237;
   }
 }
 
