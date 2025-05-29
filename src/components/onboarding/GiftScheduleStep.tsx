@@ -124,11 +124,11 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ onNext, recipientNa
   const productTypes = productTypesData?.productTypes || [];
 
   return (
-    <Card className="animate-fadeInUp border-brand-cream shadow-lg">
+    <Card className="animate-fadeInUp border-brand-cream shadow-lg bg-white">
       <CardHeader className="text-center">
         <div className="flex justify-center mb-4">
-          <div className="bg-brand-gold/20 p-4 rounded-full">
-            <Gift className="h-12 w-12 text-brand-gold" />
+          <div className="bg-brand-cream p-4 rounded-full">
+            <Gift className="h-12 w-12 text-brand-charcoal" />
           </div>
         </div>
         <CardTitle className="text-3xl mb-2 text-brand-charcoal">
@@ -143,12 +143,12 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ onNext, recipientNa
         <div className="space-y-4">
           {/* Occasion */}
           <div className="space-y-2">
-            <Label htmlFor="occasion">What's the occasion? *</Label>
+            <Label htmlFor="occasion" className="text-brand-charcoal">What's the occasion? *</Label>
             <Select onValueChange={setOccasion}>
-              <SelectTrigger>
+              <SelectTrigger className="text-brand-charcoal border-brand-cream">
                 <SelectValue placeholder="Select an occasion" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
                 <SelectItem value="birthday">Birthday</SelectItem>
                 <SelectItem value="anniversary">Anniversary</SelectItem>
                 <SelectItem value="holiday">Holiday</SelectItem>
@@ -161,26 +161,27 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ onNext, recipientNa
 
           {/* Date */}
           <div className="space-y-2">
-            <Label>When is this occasion? *</Label>
+            <Label className="text-brand-charcoal">When is this occasion? *</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !occasionDate && "text-muted-foreground"
+                    "w-full justify-start text-left font-normal text-brand-charcoal border-brand-cream hover:bg-brand-cream",
+                    !occasionDate && "text-brand-charcoal/50"
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {occasionDate ? format(occasionDate, "PPP") : "Pick a date"}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
+              <PopoverContent className="w-auto p-0 bg-white border-brand-cream">
                 <Calendar
                   mode="single"
                   selected={occasionDate}
                   onSelect={setOccasionDate}
                   initialFocus
+                  className="text-brand-charcoal"
                 />
               </PopoverContent>
             </Popover>
@@ -188,12 +189,12 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ onNext, recipientNa
 
           {/* Gift Type */}
           <div className="space-y-2">
-            <Label htmlFor="giftType">What type of gift? *</Label>
+            <Label htmlFor="giftType" className="text-brand-charcoal">What type of gift? *</Label>
             <Select onValueChange={setGiftType} disabled={isLoadingProductTypes}>
-              <SelectTrigger>
+              <SelectTrigger className="text-brand-charcoal border-brand-cream">
                 <SelectValue placeholder={isLoadingProductTypes ? "Loading gift types..." : "Select gift type"} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
                 {productTypes.map((type: string) => (
                   <SelectItem key={type} value={type}>
                     {type}
@@ -205,7 +206,7 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ onNext, recipientNa
               </SelectContent>
             </Select>
             {productTypesData?.success === false && (
-              <p className="text-xs text-amber-600">
+              <p className="text-xs text-brand-charcoal/60">
                 Using fallback options - Shopify connection unavailable
               </p>
             )}
@@ -213,12 +214,12 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ onNext, recipientNa
 
           {/* Price Range */}
           <div className="space-y-2">
-            <Label htmlFor="priceRange">What's your budget? *</Label>
+            <Label htmlFor="priceRange" className="text-brand-charcoal">What's your budget? *</Label>
             <Select onValueChange={setPriceRange}>
-              <SelectTrigger>
+              <SelectTrigger className="text-brand-charcoal border-brand-cream">
                 <SelectValue placeholder="Select price range" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
                 <SelectItem value="under-25">Under $25</SelectItem>
                 <SelectItem value="25-50">$25 - $50</SelectItem>
                 <SelectItem value="50-100">$50 - $100</SelectItem>
@@ -232,7 +233,7 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ onNext, recipientNa
 
         {/* Payment Info */}
         {isValid && (
-          <div className="bg-brand-gold/10 p-4 rounded-lg">
+          <div className="bg-brand-cream p-4 rounded-lg border border-brand-cream">
             <div className="flex items-center space-x-2 mb-2">
               <CreditCard className="h-4 w-4 text-brand-charcoal" />
               <span className="font-medium text-brand-charcoal">Payment Required</span>
@@ -244,7 +245,7 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ onNext, recipientNa
         )}
 
         {/* Emotional Copy */}
-        <div className="bg-brand-gold/10 p-4 rounded-lg text-center">
+        <div className="bg-brand-cream p-4 rounded-lg border border-brand-cream text-center">
           <p className="text-sm text-brand-charcoal">
             🎁 We'll curate the perfect gift and handle everything from selection to delivery
           </p>
@@ -268,7 +269,11 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ onNext, recipientNa
         </Button>
 
         <div className="text-center">
-          <Button variant="ghost" onClick={handleSkip} className="text-brand-charcoal hover:bg-brand-cream-light">
+          <Button 
+            variant="ghost" 
+            onClick={handleSkip} 
+            className="text-brand-charcoal hover:bg-brand-cream"
+          >
             I'll schedule gifts later
           </Button>
         </div>

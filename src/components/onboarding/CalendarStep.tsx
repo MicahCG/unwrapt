@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -214,10 +213,10 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
   };
 
   return (
-    <Card className="animate-fadeInUp border-brand-cream shadow-lg">
+    <Card className="animate-fadeInUp border-brand-cream shadow-lg bg-white">
       <CardHeader className="text-center">
         <div className="flex justify-center mb-4">
-          <div className="bg-brand-cream-light p-4 rounded-full">
+          <div className="bg-brand-cream p-4 rounded-full">
             <Calendar className="h-12 w-12 text-brand-charcoal" />
           </div>
         </div>
@@ -267,7 +266,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
               )}
             </Button>
 
-            <div className="bg-white/80 p-4 rounded-lg border border-brand-cream">
+            <div className="bg-white p-4 rounded-lg border border-brand-cream">
               <h4 className="font-medium mb-2 text-brand-charcoal">What we'll find:</h4>
               <ul className="space-y-1 text-sm text-brand-charcoal/70">
                 <li>• Birthdays from your contacts</li>
@@ -278,7 +277,12 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
             </div>
 
             <div className="text-center pt-4">
-              <Button variant="ghost" onClick={handleSkip} className="text-brand-charcoal hover:bg-brand-cream-light" disabled={isConnecting}>
+              <Button 
+                variant="ghost" 
+                onClick={handleSkip} 
+                className="text-brand-charcoal hover:bg-brand-cream" 
+                disabled={isConnecting}
+              >
                 I'll add dates manually
               </Button>
             </div>
@@ -287,8 +291,8 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
           <>
             <div className="text-center space-y-4">
               <div className="flex justify-center">
-                <div className="bg-brand-gold/20 p-3 rounded-full">
-                  <Check className="h-8 w-8 text-brand-gold" />
+                <div className="bg-brand-cream p-3 rounded-full">
+                  <Check className="h-8 w-8 text-brand-charcoal" />
                 </div>
               </div>
               
