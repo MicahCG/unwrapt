@@ -1,3 +1,5 @@
+
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -48,7 +50,7 @@ export default {
 				foreground: '#6B6B6B' // Medium gray
 			},
 			accent: {
-				DEFAULT: '#F5F2ED', // Updated to match light brown/tan
+				DEFAULT: '#F4D35E', // Updated gold accent color
 				foreground: '#4A4A4A'
 			},
 			popover: {
@@ -75,7 +77,7 @@ export default {
 				charcoal: '#4A4A4A',
 				cream: '#F5F2ED',
 				'cream-light': '#F8F6F1',
-				gold: '#F5F2ED' // Changed to match the light brown/tan
+				gold: '#F4D35E'
 			},
 			
 			// Override ALL color ranges that might conflict
@@ -175,8 +177,8 @@ export default {
 				100: '#F5F2ED',
 				200: '#E5E0D8',
 				300: '#D0C8BD',
-				400: '#F5F2ED', // Use light brown/tan here
-				500: '#F5F2ED',
+				400: '#F4D35E', // Use brand gold here
+				500: '#F4D35E',
 				600: '#E6C547',
 				700: '#B8A032',
 				800: '#9A8629',
@@ -188,8 +190,8 @@ export default {
 				100: '#F5F2ED',
 				200: '#E5E0D8',
 				300: '#D0C8BD',
-				400: '#F5F2ED',
-				500: '#F5F2ED',
+				400: '#F4D35E',
+				500: '#F4D35E',
 				600: '#E6C547',
 				700: '#B8A032',
 				800: '#9A8629',
@@ -398,3 +400,4 @@ export default {
 	},
 	plugins: [require("tailwindcss-animate")],
 } satisfies Config;
+

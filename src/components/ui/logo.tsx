@@ -18,10 +18,19 @@ export const Logo: React.FC<LogoProps> = ({
     lg: variant === 'full' ? 'h-16' : 'h-12 w-12'
   };
 
-  // Use the new logo for both icon and full variants
+  if (variant === 'icon') {
+    return (
+      <img 
+        src="/lovable-uploads/0dd0f99c-7052-4aa1-9ca4-e9e642b08d12.png" 
+        alt="Unwrapt Logo" 
+        className={`${sizeClasses[size]} ${className}`}
+      />
+    );
+  }
+
   return (
     <img 
-      src="/lovable-uploads/ad3aea9a-6848-4173-9d2f-5ea84fbf838a.png" 
+      src="/lovable-uploads/5e876361-cd0b-44c2-8d35-c09f883762e3.png" 
       alt="Unwrapt" 
       className={`${sizeClasses[size]} ${className}`}
     />
