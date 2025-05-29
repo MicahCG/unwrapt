@@ -19,7 +19,11 @@ serve(async (req) => {
       throw new Error("Shopify credentials not configured");
     }
 
-    const shopifyApiUrl = `https://${shopifyStore}/admin/api/2024-01`;
+    // Clean the store URL - remove any extra slashes or protocols
+    const cleanStoreUrl = shopifyStore.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const shopifyApiUrl = `https://${cleanStoreUrl}/admin/api/2024-01`;
+
+    console.log('Making request to:', `${shopifyApiUrl}/products.json?limit=250&fields=product_type`);
 
     // Fetch products to get unique product types
     const productsResponse = await fetch(`${shopifyApiUrl}/products.json?limit=250&fields=product_type`, {

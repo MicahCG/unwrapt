@@ -10,7 +10,6 @@ import RecipientStep from '@/components/onboarding/RecipientStep';
 import GiftScheduleStep from '@/components/onboarding/GiftScheduleStep';
 import InterestsStep from '@/components/onboarding/InterestsStep';
 import PreferencesStep from '@/components/onboarding/PreferencesStep';
-import PaymentStep from '@/components/onboarding/PaymentStep';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -27,7 +26,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const totalSteps = 7; // Updated to include payment step
+  const totalSteps = 6; // Removed payment step
 
   const handleStepComplete = async (stepData: any) => {
     const updatedData = { ...onboardingData, ...stepData };
@@ -165,8 +164,6 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
         );
       case 6:
         return <PreferencesStep onNext={handleStepComplete} />;
-      case 7:
-        return <PaymentStep onNext={handleStepComplete} />;
       default:
         return (
           <div className="text-center py-8">
