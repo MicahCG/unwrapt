@@ -236,7 +236,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
                   </SelectItem>
                 ))}
                 {productTypes.length === 0 && !isLoadingProductTypes && (
-                  <SelectItem value="" disabled>No gift types available</SelectItem>
+                  <SelectItem value="no-types-available" disabled>No gift types available</SelectItem>
                 )}
               </SelectContent>
             </Select>

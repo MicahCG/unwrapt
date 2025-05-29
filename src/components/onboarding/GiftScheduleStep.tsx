@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -261,7 +260,7 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ onNext, recipientNa
                   </SelectItem>
                 ))}
                 {productTypes.length === 0 && !isLoadingProductTypes && (
-                  <SelectItem value="" disabled>No gift types available</SelectItem>
+                  <SelectItem value="no-types-available" disabled>No gift types available</SelectItem>
                 )}
               </SelectContent>
             </Select>

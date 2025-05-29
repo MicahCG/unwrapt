@@ -7,6 +7,51 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Hardcoded interest to variant ID mapping
+const INTEREST_TO_PRODUCT_MAPPING: Record<string, number> = {
+  candle: 44718901371329,
+  coffee: 44718901371329,
+  books: 44718901371329,
+  skincare: 44718901371329,
+  wellness: 44718901371329,
+  technology: 44718901371329,
+  cooking: 44718901371329,
+  pets: 44718901371329,
+  travel: 44718901371329,
+  fitness: 44718901371329,
+  art: 44718901371329,
+  tea: 44718901371329,
+  music: 44718901371329,
+  gaming: 44718901371329,
+  fashion: 44718901371329,
+  'home decor': 44718901371329,
+  jewelry: 44718901371329,
+  'outdoor activities': 44718901371329,
+  sports: 44718901371329,
+};
+
+// Predefined gift types that match your products
+const AVAILABLE_GIFT_TYPES = [
+  'Candles',
+  'Coffee & Tea',
+  'Books',
+  'Skincare',
+  'Wellness',
+  'Technology',
+  'Cooking',
+  'Pet Supplies',
+  'Travel',
+  'Fitness',
+  'Art Supplies',
+  'Music',
+  'Gaming',
+  'Fashion',
+  'Home Decor',
+  'Jewelry',
+  'Outdoor',
+  'Sports'
+];
+
 interface ShopifyProduct {
   id: string;
   title: string;
@@ -33,12 +78,6 @@ interface ShopifyOrderRequest {
     phone?: string;
   };
   testMode?: boolean;
-}
-
-interface ProductMatch {
-  product: ShopifyProduct;
-  score: number;
-  reason: string;
 }
 
 serve(async (req) => {
@@ -83,166 +122,49 @@ serve(async (req) => {
       price_range: giftData.price_range
     });
 
-    // Shopify API configuration
+    // Find the best variant ID based on interests
+    const interests = giftData.recipients?.interests || [];
+    let selectedVariantId = INTEREST_TO_PRODUCT_MAPPING['candle']; // Default fallback
+    let matchReason = 'default candle product';
+    
+    // Try to find a better match based on interests
+    for (const interest of interests) {
+      const interestLower = interest.toLowerCase();
+      if (INTEREST_TO_PRODUCT_MAPPING[interestLower]) {
+        selectedVariantId = INTEREST_TO_PRODUCT_MAPPING[interestLower];
+        matchReason = `matched interest: ${interest}`;
+        break;
+      }
+    }
+
+    console.log(`Selected variant ID: ${selectedVariantId} (${matchReason})`);
+
+    // Get variant price from Shopify (optional, for logging)
+    let variantPrice = "25.00"; // Default price
     const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
     const shopifyToken = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
     
-    if (!shopifyStore || !shopifyToken) {
-      throw new Error("Shopify credentials not configured");
-    }
-
-    const shopifyApiUrl = `https://${shopifyStore}/admin/api/2024-01`;
-
-    // Fetch products from Shopify
-    const productsResponse = await fetch(`${shopifyApiUrl}/products.json?limit=100`, {
-      headers: {
-        'X-Shopify-Access-Token': shopifyToken,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!productsResponse.ok) {
-      throw new Error(`Shopify API error: ${productsResponse.statusText}`);
-    }
-
-    const { products }: { products: ShopifyProduct[] } = await productsResponse.json();
-    console.log(`Found ${products.length} products in Shopify store`);
-
-    // Enhanced product matching logic
-    const matchProducts = (interests: string[], giftType?: string): ProductMatch[] => {
-      const matches: ProductMatch[] = [];
-      
-      products.forEach(product => {
-        let score = 0;
-        let reasons: string[] = [];
+    if (shopifyStore && shopifyToken) {
+      try {
+        const cleanStoreUrl = shopifyStore.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        const shopifyApiUrl = `https://${cleanStoreUrl}/admin/api/2024-01`;
         
-        const title = product.title.toLowerCase();
-        const tags = product.tags.toLowerCase();
-        const productType = product.product_type.toLowerCase();
+        const variantResponse = await fetch(`${shopifyApiUrl}/variants/${selectedVariantId}.json`, {
+          headers: {
+            'X-Shopify-Access-Token': shopifyToken,
+            'Content-Type': 'application/json',
+          },
+        });
         
-        // Check interests (coffee/tea)
-        if (interests) {
-          interests.forEach(interest => {
-            const interestLower = interest.toLowerCase();
-            
-            if (interestLower === 'coffee') {
-              if (title.includes('coffee') || tags.includes('coffee') || productType.includes('coffee')) {
-                score += 10;
-                reasons.push('matches coffee interest');
-              }
-              if (title.includes('espresso') || title.includes('latte') || title.includes('cappuccino')) {
-                score += 8;
-                reasons.push('matches coffee variety');
-              }
-              if (title.includes('bean') || title.includes('roast')) {
-                score += 6;
-                reasons.push('coffee related');
-              }
-            }
-            
-            if (interestLower === 'tea') {
-              if (title.includes('tea') || tags.includes('tea') || productType.includes('tea')) {
-                score += 10;
-                reasons.push('matches tea interest');
-              }
-              if (title.includes('green tea') || title.includes('black tea') || title.includes('herbal')) {
-                score += 8;
-                reasons.push('matches tea variety');
-              }
-              if (title.includes('chai') || title.includes('matcha') || title.includes('oolong')) {
-                score += 7;
-                reasons.push('specialty tea');
-              }
-            }
-            
-            // Custom interests that include coffee/tea
-            if (interestLower.includes('coffee') || interestLower.includes('tea')) {
-              if (title.includes(interestLower)) {
-                score += 12;
-                reasons.push(`matches custom interest: ${interest}`);
-              }
-            }
-          });
+        if (variantResponse.ok) {
+          const { variant } = await variantResponse.json();
+          variantPrice = variant.price;
+          console.log(`Retrieved variant price: $${variantPrice}`);
         }
-        
-        // Check gift type
-        if (giftType) {
-          const giftTypeLower = giftType.toLowerCase();
-          if (title.includes(giftTypeLower) || tags.includes(giftTypeLower) || productType.includes(giftTypeLower)) {
-            score += 5;
-            reasons.push('matches gift type');
-          }
-        }
-        
-        // Bonus points for gift-related terms
-        if (title.includes('gift') || title.includes('set') || title.includes('collection')) {
-          score += 3;
-          reasons.push('gift-friendly product');
-        }
-        
-        if (score > 0) {
-          matches.push({
-            product,
-            score,
-            reason: reasons.join(', ')
-          });
-        }
-      });
-      
-      return matches.sort((a, b) => b.score - a.score);
-    };
-
-    // Get product matches
-    const interests = giftData.recipients?.interests || [];
-    const productMatches = matchProducts(interests, giftData.gift_type);
-    
-    console.log(`Found ${productMatches.length} product matches:`, 
-      productMatches.slice(0, 3).map(m => ({ 
-        title: m.product.title, 
-        score: m.score, 
-        reason: m.reason 
-      }))
-    );
-
-    if (productMatches.length === 0) {
-      throw new Error("No suitable products found matching recipient interests");
+      } catch (error) {
+        console.log('Could not fetch variant price, using default:', error.message);
+      }
     }
-
-    // Filter by price range
-    const priceRange = giftData.price_range || '';
-    let maxPrice = 50; // Default
-    
-    if (priceRange.includes('25-50')) maxPrice = 50;
-    else if (priceRange.includes('50-100')) maxPrice = 100;
-    else if (priceRange.includes('100-250')) maxPrice = 250;
-    else if (priceRange.includes('250-500')) maxPrice = 500;
-    else if (priceRange.includes('500+')) maxPrice = 1000;
-
-    console.log(`Filtering by price range: $${maxPrice}`);
-
-    const affordableMatches = productMatches.filter(match => 
-      match.product.variants.some(variant => 
-        parseFloat(variant.price) <= maxPrice && variant.available
-      )
-    );
-
-    if (affordableMatches.length === 0) {
-      throw new Error(`No products found within price range $${maxPrice} that match interests`);
-    }
-
-    // Select the best match
-    const selectedMatch = affordableMatches[0];
-    const selectedProduct = selectedMatch.product;
-    const selectedVariant = selectedProduct.variants.find(v => 
-      parseFloat(v.price) <= maxPrice && v.available
-    );
-
-    if (!selectedVariant) {
-      throw new Error("No available variant found for selected product");
-    }
-
-    console.log(`Selected product: ${selectedProduct.title} (Score: ${selectedMatch.score}, Price: $${selectedVariant.price})`);
-    console.log(`Matching reason: ${selectedMatch.reason}`);
 
     // Create Shopify order (skip in test mode)
     let orderResult;
@@ -256,11 +178,18 @@ serve(async (req) => {
       };
       console.log('TEST MODE: Skipping actual order creation');
     } else {
+      if (!shopifyStore || !shopifyToken) {
+        throw new Error("Shopify credentials not configured for live orders");
+      }
+
+      const cleanStoreUrl = shopifyStore.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      const shopifyApiUrl = `https://${cleanStoreUrl}/admin/api/2024-01`;
+
       const orderData = {
         order: {
           line_items: [
             {
-              variant_id: parseInt(selectedVariant.id),
+              variant_id: selectedVariantId,
               quantity: 1,
             }
           ],
@@ -298,7 +227,7 @@ serve(async (req) => {
       .update({
         status: testMode ? 'test-ordered' : 'ordered',
         updated_at: new Date().toISOString(),
-        gift_description: `${giftData.gift_description || ''} | Product: ${selectedProduct.title} | Match Score: ${selectedMatch.score} | Reason: ${selectedMatch.reason}${testMode ? ' | TEST MODE' : ''}`
+        gift_description: `${giftData.gift_description || ''} | Variant ID: ${selectedVariantId} | Match: ${matchReason}${testMode ? ' | TEST MODE' : ''}`
       })
       .eq('id', scheduledGiftId);
 
@@ -314,18 +243,14 @@ serve(async (req) => {
       shopifyOrderId: orderResult.id,
       shopifyOrderName: orderResult.name,
       selectedProduct: {
-        title: selectedProduct.title,
-        id: selectedProduct.id,
-        matchScore: selectedMatch.score,
-        matchReason: selectedMatch.reason
+        variantId: selectedVariantId,
+        matchReason: matchReason
       },
       variant: {
-        id: selectedVariant.id,
-        price: selectedVariant.price
+        id: selectedVariantId,
+        price: variantPrice
       },
       interests: interests,
-      totalMatches: productMatches.length,
-      affordableMatches: affordableMatches.length,
       trackingUrl: testMode ? null : `https://${shopifyStore}/admin/orders/${orderResult.id}`
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

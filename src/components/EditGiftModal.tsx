@@ -120,7 +120,7 @@ const EditGiftModal: React.FC<EditGiftModalProps> = ({ gift, isOpen, onClose }) 
                   </SelectItem>
                 ))}
                 {productTypes.length === 0 && !isLoadingProductTypes && (
-                  <SelectItem value="" disabled>No gift types available</SelectItem>
+                  <SelectItem value="no-types-available" disabled>No gift types available</SelectItem>
                 )}
               </SelectContent>
             </Select>
