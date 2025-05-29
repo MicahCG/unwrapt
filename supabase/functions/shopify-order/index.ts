@@ -7,63 +7,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Hardcoded interest to variant ID mapping
-const INTEREST_TO_PRODUCT_MAPPING: Record<string, number> = {
-  candle: 44718901371329,
-  coffee: 44718901371329,
-  books: 44718901371329,
-  skincare: 44718901371329,
-  wellness: 44718901371329,
-  technology: 44718901371329,
-  cooking: 44718901371329,
-  pets: 44718901371329,
-  travel: 44718901371329,
-  fitness: 44718901371329,
-  art: 44718901371329,
-  tea: 44718901371329,
-  music: 44718901371329,
-  gaming: 44718901371329,
-  fashion: 44718901371329,
-  'home decor': 44718901371329,
-  jewelry: 44718901371329,
-  'outdoor activities': 44718901371329,
-  sports: 44718901371329,
-};
-
-// Predefined gift types that match your products
-const AVAILABLE_GIFT_TYPES = [
-  'Candles',
-  'Coffee & Tea',
-  'Books',
-  'Skincare',
-  'Wellness',
-  'Technology',
-  'Cooking',
-  'Pet Supplies',
-  'Travel',
-  'Fitness',
-  'Art Supplies',
-  'Music',
-  'Gaming',
-  'Fashion',
-  'Home Decor',
-  'Jewelry',
-  'Outdoor',
-  'Sports'
-];
-
-interface ShopifyProduct {
-  id: string;
-  title: string;
-  handle: string;
-  product_type: string;
-  tags: string;
-  variants: Array<{
-    id: string;
-    price: string;
-    available: boolean;
-  }>;
-}
+// Single product variant ID - your Vanilla Candle
+const PRODUCT_VARIANT_ID = 44718901371329;
 
 interface ShopifyOrderRequest {
   scheduledGiftId: string;
@@ -100,7 +45,7 @@ serve(async (req) => {
 
     console.log(`Processing ${testMode ? 'TEST' : 'LIVE'} order for gift: ${scheduledGiftId}`);
 
-    // Get the scheduled gift details with recipient interests
+    // Get the scheduled gift details
     const { data: giftData, error: giftError } = await supabaseService
       .from('scheduled_gifts')
       .select(`
@@ -122,25 +67,15 @@ serve(async (req) => {
       price_range: giftData.price_range
     });
 
-    // Find the best variant ID based on interests
-    const interests = giftData.recipients?.interests || [];
-    let selectedVariantId = INTEREST_TO_PRODUCT_MAPPING['candle']; // Default fallback
-    let matchReason = 'default candle product';
-    
-    // Try to find a better match based on interests
-    for (const interest of interests) {
-      const interestLower = interest.toLowerCase();
-      if (INTEREST_TO_PRODUCT_MAPPING[interestLower]) {
-        selectedVariantId = INTEREST_TO_PRODUCT_MAPPING[interestLower];
-        matchReason = `matched interest: ${interest}`;
-        break;
-      }
-    }
+    // Use the single product variant ID for all orders
+    const selectedVariantId = PRODUCT_VARIANT_ID;
+    const matchReason = 'single product offering';
 
     console.log(`Selected variant ID: ${selectedVariantId} (${matchReason})`);
 
     // Get variant price from Shopify (optional, for logging)
     let variantPrice = "25.00"; // Default price
+    let productName = "Vanilla Candle"; // Default name
     const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
     const shopifyToken = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
     
@@ -159,10 +94,24 @@ serve(async (req) => {
         if (variantResponse.ok) {
           const { variant } = await variantResponse.json();
           variantPrice = variant.price;
-          console.log(`Retrieved variant price: $${variantPrice}`);
+          
+          // Get product name
+          const productResponse = await fetch(`${shopifyApiUrl}/products/${variant.product_id}.json`, {
+            headers: {
+              'X-Shopify-Access-Token': shopifyToken,
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (productResponse.ok) {
+            const { product } = await productResponse.json();
+            productName = product.title;
+          }
+          
+          console.log(`Retrieved product: ${productName}, price: $${variantPrice}`);
         }
       } catch (error) {
-        console.log('Could not fetch variant price, using default:', error.message);
+        console.log('Could not fetch product details, using defaults:', error.message);
       }
     }
 
@@ -197,7 +146,7 @@ serve(async (req) => {
           billing_address: recipientAddress,
           email: giftData.recipients?.email || "gift@unwrapt.com",
           phone: recipientAddress.phone || giftData.recipients?.phone,
-          note: `Gift from Unwrapt - Occasion: ${giftData.occasion}. Recipient interests: ${interests.join(', ')}. ${giftData.gift_description || ''}`,
+          note: `Gift from Unwrapt - Occasion: ${giftData.occasion}. Recipient interests: ${giftData.recipients?.interests?.join(', ') || 'none'}. ${giftData.gift_description || ''}`,
           tags: "unwrapt-gift",
           financial_status: "paid", // Since we already collected payment
         }
@@ -227,7 +176,7 @@ serve(async (req) => {
       .update({
         status: testMode ? 'test-ordered' : 'ordered',
         updated_at: new Date().toISOString(),
-        gift_description: `${giftData.gift_description || ''} | Variant ID: ${selectedVariantId} | Match: ${matchReason}${testMode ? ' | TEST MODE' : ''}`
+        gift_description: `${giftData.gift_description || ''} | Product: ${productName} | Variant ID: ${selectedVariantId}${testMode ? ' | TEST MODE' : ''}`
       })
       .eq('id', scheduledGiftId);
 
@@ -244,13 +193,14 @@ serve(async (req) => {
       shopifyOrderName: orderResult.name,
       selectedProduct: {
         variantId: selectedVariantId,
+        productName: productName,
         matchReason: matchReason
       },
       variant: {
         id: selectedVariantId,
         price: variantPrice
       },
-      interests: interests,
+      interests: giftData.recipients?.interests || [],
       trackingUrl: testMode ? null : `https://${shopifyStore}/admin/orders/${orderResult.id}`
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
