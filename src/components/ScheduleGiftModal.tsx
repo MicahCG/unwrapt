@@ -179,22 +179,22 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] bg-white border-brand-cream text-brand-charcoal">
         <DialogHeader>
-          <DialogTitle>Schedule Gift for {recipient.name}</DialogTitle>
+          <DialogTitle className="text-brand-charcoal">Schedule Gift for {recipient.name}</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="occasion">Occasion *</Label>
+            <Label htmlFor="occasion" className="text-brand-charcoal">Occasion *</Label>
             <Select 
               value={formData.occasion} 
               onValueChange={(value) => setFormData(prev => ({ ...prev, occasion: value }))}
             >
-              <SelectTrigger>
+              <SelectTrigger className="text-brand-charcoal border-brand-cream">
                 <SelectValue placeholder="Select occasion" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
                 <SelectItem value="Birthday">Birthday</SelectItem>
                 <SelectItem value="Anniversary">Anniversary</SelectItem>
                 <SelectItem value="Christmas">Christmas</SelectItem>
@@ -208,27 +208,28 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="occasion_date">Occasion Date *</Label>
+            <Label htmlFor="occasion_date" className="text-brand-charcoal">Occasion Date *</Label>
             <Input
               id="occasion_date"
               type="date"
               value={formData.occasion_date}
               onChange={(e) => setFormData(prev => ({ ...prev, occasion_date: e.target.value }))}
               required
+              className="text-brand-charcoal border-brand-cream"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="gift_type">Gift Type</Label>
+            <Label htmlFor="gift_type" className="text-brand-charcoal">Gift Type</Label>
             <Select 
               value={formData.gift_type} 
               onValueChange={(value) => setFormData(prev => ({ ...prev, gift_type: value }))}
               disabled={isLoadingProductTypes}
             >
-              <SelectTrigger>
+              <SelectTrigger className="text-brand-charcoal border-brand-cream">
                 <SelectValue placeholder={isLoadingProductTypes ? "Loading gift types..." : "Select gift type"} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
                 {productTypes.map((type: string) => (
                   <SelectItem key={type} value={type}>
                     {type}
@@ -240,22 +241,22 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
               </SelectContent>
             </Select>
             {productTypesData?.success === false && (
-              <p className="text-xs text-amber-600">
+              <p className="text-xs text-brand-charcoal/60">
                 Using fallback options - Shopify connection unavailable
               </p>
             )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="price_range">Price Range *</Label>
+            <Label htmlFor="price_range" className="text-brand-charcoal">Price Range *</Label>
             <Select 
               value={formData.price_range} 
               onValueChange={(value) => setFormData(prev => ({ ...prev, price_range: value }))}
             >
-              <SelectTrigger>
+              <SelectTrigger className="text-brand-charcoal border-brand-cream">
                 <SelectValue placeholder="Select price range" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
                 <SelectItem value="$0-$25">$0 - $25</SelectItem>
                 <SelectItem value="$25-$50">$25 - $50</SelectItem>
                 <SelectItem value="$50-$100">$50 - $100</SelectItem>
@@ -267,23 +268,25 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="gift_description">Gift Description</Label>
+            <Label htmlFor="gift_description" className="text-brand-charcoal">Gift Description</Label>
             <Textarea
               id="gift_description"
               value={formData.gift_description}
               onChange={(e) => setFormData(prev => ({ ...prev, gift_description: e.target.value }))}
               placeholder="Describe the gift or any specific preferences..."
               rows={3}
+              className="text-brand-charcoal border-brand-cream"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="delivery_date">Delivery Date (optional)</Label>
+            <Label htmlFor="delivery_date" className="text-brand-charcoal">Delivery Date (optional)</Label>
             <Input
               id="delivery_date"
               type="date"
               value={formData.delivery_date}
               onChange={(e) => setFormData(prev => ({ ...prev, delivery_date: e.target.value }))}
+              className="text-brand-charcoal border-brand-cream"
             />
             <p className="text-xs text-brand-charcoal/70">
               Leave empty to auto-schedule 3 days before occasion
@@ -292,7 +295,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
           {/* Payment Info */}
           {formData.price_range && (
-            <div className="bg-brand-gold/10 p-3 rounded-lg">
+            <div className="bg-brand-cream p-3 rounded-lg border border-brand-cream">
               <div className="flex items-center space-x-2 mb-1">
                 <CreditCard className="h-4 w-4 text-brand-charcoal" />
                 <span className="font-medium text-sm text-brand-charcoal">Payment Required</span>
@@ -304,10 +307,20 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           )}
 
           <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={onClose} 
+              disabled={isLoading}
+              className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream"
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading} className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90">
+            <Button 
+              type="submit" 
+              disabled={isLoading} 
+              className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+            >
               {isLoading ? 'Processing...' : 'Schedule & Pay for Gift'}
             </Button>
           </div>
