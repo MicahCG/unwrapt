@@ -1,379 +1,120 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Logo } from '@/components/ui/logo';
+
+import React from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import UserMenu from '@/components/auth/UserMenu';
-import AppNavigation from '@/components/AppNavigation';
-import { supabase } from '@/integrations/supabase/client';
-import { Gift, Calendar, Clock, Users, Plus, Star, TrendingUp, Settings } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import RecipientsList from './RecipientsList';
-import UpcomingGiftsManager from './UpcomingGiftsManager';
-import HolidayCarousel from './HolidayCarousel';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import UserMenu from '@/components/auth/UserMenu';
+import TestDataManager from '@/components/TestDataManager';
+import RecipientsList from '@/components/RecipientsList';
+import UpcomingGiftsManager from '@/components/UpcomingGiftsManager';
+import { Users, Gift, Clock, TrendingUp } from 'lucide-react';
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('overview');
-
-  // Listen for tab change events from navigation
-  useEffect(() => {
-    const handleTabChange = (event: CustomEvent) => {
-      setActiveTab(event.detail);
-    };
-
-    window.addEventListener('changeTab', handleTabChange as EventListener);
-    return () => {
-      window.removeEventListener('changeTab', handleTabChange as EventListener);
-    };
-  }, []);
 
   // Fetch user metrics
   const { data: metrics } = useQuery({
     queryKey: ['user-metrics', user?.id],
     queryFn: async () => {
+      if (!user?.id) return null;
+      
       const { data, error } = await supabase
         .from('user_metrics')
         .select('*')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .single();
       
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching metrics:', error);
+        return null;
+      }
+      
       return data;
     },
-    enabled: !!user
+    enabled: !!user?.id
   });
-
-  // Fetch recipients
-  const { data: recipients } = useQuery({
-    queryKey: ['recipients', user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('recipients')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user
-  });
-
-  // Fetch upcoming scheduled gifts
-  const { data: upcomingGifts } = useQuery({
-    queryKey: ['upcoming-gifts', user?.id],
-    queryFn: async () => {
-      const today = new Date();
-      const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
-      
-      const { data, error } = await supabase
-        .from('scheduled_gifts')
-        .select(`
-          *,
-          recipients (name, relationship)
-        `)
-        .eq('user_id', user?.id)
-        .gte('occasion_date', today.toISOString().split('T')[0])
-        .lte('occasion_date', nextMonth.toISOString().split('T')[0])
-        .eq('status', 'scheduled')
-        .order('occasion_date', { ascending: true });
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user
-  });
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'scheduled': return 'bg-blue-100 text-blue-800';
-      case 'ordered': return 'bg-yellow-100 text-yellow-800';
-      case 'delivered': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'recipients':
-        return <RecipientsList />;
-      case 'gifts':
-        return <UpcomingGiftsManager />;
-      default:
-        return (
-          <div className="space-y-6 max-w-full">
-            <div className="mb-6">
-              <h1 className="text-3xl font-bold text-brand-charcoal mb-2">
-                Welcome back! 👋
-              </h1>
-              <p className="text-brand-charcoal/70">
-                Here's what's happening with your gifting schedule
-              </p>
-            </div>
-
-            {/* Metrics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-6">
-              <Card className="min-w-0">
-                <CardContent className="p-4 lg:p-6">
-                  <div className="flex items-center">
-                    <Users className="h-6 w-6 lg:h-8 lg:w-8 text-brand-gold flex-shrink-0" />
-                    <div className="ml-3 lg:ml-4 min-w-0">
-                      <p className="text-xs lg:text-sm font-medium text-brand-charcoal/70 truncate">Recipients</p>
-                      <p className="text-xl lg:text-2xl font-bold text-brand-charcoal">{metrics?.total_recipients || 0}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="min-w-0">
-                <CardContent className="p-4 lg:p-6">
-                  <div className="flex items-center">
-                    <Gift className="h-6 w-6 lg:h-8 lg:w-8 text-brand-gold flex-shrink-0" />
-                    <div className="ml-3 lg:ml-4 min-w-0">
-                      <p className="text-xs lg:text-sm font-medium text-brand-charcoal/70 truncate">Scheduled Gifts</p>
-                      <p className="text-xl lg:text-2xl font-bold text-brand-charcoal">{metrics?.total_scheduled_gifts || 0}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="min-w-0">
-                <CardContent className="p-4 lg:p-6">
-                  <div className="flex items-center">
-                    <Star className="h-6 w-6 lg:h-8 lg:w-8 text-brand-gold flex-shrink-0" />
-                    <div className="ml-3 lg:ml-4 min-w-0">
-                      <p className="text-xs lg:text-sm font-medium text-brand-charcoal/70 truncate">Delivered</p>
-                      <p className="text-xl lg:text-2xl font-bold text-brand-charcoal">{metrics?.total_delivered_gifts || 0}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="min-w-0">
-                <CardContent className="p-4 lg:p-6">
-                  <div className="flex items-center">
-                    <Clock className="h-6 w-6 lg:h-8 lg:w-8 text-brand-gold flex-shrink-0" />
-                    <div className="ml-3 lg:ml-4 min-w-0">
-                      <p className="text-xs lg:text-sm font-medium text-brand-charcoal/70 truncate">Time Saved</p>
-                      <p className="text-xl lg:text-2xl font-bold text-brand-charcoal">{metrics?.estimated_time_saved || 0}h</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8">
-              {/* Upcoming Gifts Preview */}
-              <Card className="min-w-0">
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center justify-between text-brand-charcoal">
-                    <div className="flex items-center min-w-0">
-                      <Calendar className="h-4 w-4 lg:h-5 lg:w-5 mr-2 flex-shrink-0" />
-                      <span className="truncate">Upcoming Gifts</span>
-                    </div>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => setActiveTab('gifts')}
-                      className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light flex-shrink-0 ml-2"
-                    >
-                      View All
-                    </Button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {upcomingGifts && upcomingGifts.length > 0 ? (
-                    <div className="space-y-3 lg:space-y-4">
-                      {upcomingGifts.slice(0, 3).map((gift: any) => (
-                        <div key={gift.id} className="flex items-center justify-between p-3 bg-brand-cream-light rounded-lg min-w-0">
-                          <div className="min-w-0 flex-1">
-                            <p className="font-medium text-brand-charcoal truncate">{gift.recipients?.name}</p>
-                            <p className="text-sm text-brand-charcoal/70 truncate">{gift.occasion}</p>
-                          </div>
-                          <div className="text-right flex-shrink-0 ml-3">
-                            <p className="text-sm font-medium text-brand-charcoal">{formatDate(gift.occasion_date)}</p>
-                            <Badge className={getStatusColor(gift.status)}>{gift.status}</Badge>
-                          </div>
-                        </div>
-                      ))}
-                      {upcomingGifts.length > 3 && (
-                        <p className="text-center text-sm text-brand-charcoal/70 pt-2">
-                          +{upcomingGifts.length - 3} more gifts
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-center py-6 lg:py-8">
-                      <Gift className="h-10 w-10 lg:h-12 lg:w-12 text-brand-charcoal/30 mx-auto mb-4" />
-                      <p className="text-brand-charcoal/70 mb-4">No upcoming gifts scheduled</p>
-                      <Button 
-                        className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
-                        onClick={() => setActiveTab('recipients')}
-                      >
-                        Add Your First Recipient
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Recipients Preview */}
-              <Card className="min-w-0">
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center justify-between text-brand-charcoal">
-                    <div className="flex items-center min-w-0">
-                      <Users className="h-4 w-4 lg:h-5 lg:w-5 mr-2 flex-shrink-0" />
-                      <span className="truncate">Your Recipients</span>
-                    </div>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => setActiveTab('recipients')}
-                      className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light flex-shrink-0 ml-2"
-                    >
-                      <Plus className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
-                      Manage
-                    </Button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {recipients && recipients.length > 0 ? (
-                    <div className="space-y-3">
-                      {recipients.slice(0, 5).map((recipient: any) => (
-                        <div key={recipient.id} className="flex items-center justify-between p-3 bg-brand-cream-light rounded-lg min-w-0">
-                          <div className="min-w-0 flex-1">
-                            <p className="font-medium text-brand-charcoal truncate">{recipient.name}</p>
-                            <p className="text-sm text-brand-charcoal/70 truncate">{recipient.relationship}</p>
-                          </div>
-                          <div className="text-right flex-shrink-0 ml-3">
-                            {recipient.birthday && (
-                              <p className="text-xs text-brand-charcoal/70">
-                                Birthday: {formatDate(recipient.birthday)}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                      {recipients.length > 5 && (
-                        <p className="text-center text-sm text-brand-charcoal/70 pt-2">
-                          +{recipients.length - 5} more recipients
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-center py-6 lg:py-8">
-                      <Users className="h-10 w-10 lg:h-12 lg:w-12 text-brand-charcoal/30 mx-auto mb-4" />
-                      <p className="text-brand-charcoal/70 mb-4">No recipients added yet</p>
-                      <Button 
-                        className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
-                        onClick={() => setActiveTab('recipients')}
-                      >
-                        Add Your First Recipient
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Motivational Section */}
-            {recipients && recipients.length > 0 && (
-              <Card className="bg-gradient-to-r from-brand-gold/10 to-brand-cream border-brand-gold/20">
-                <CardContent className="p-4 lg:p-6">
-                  <div className="flex items-start lg:items-center">
-                    <TrendingUp className="h-6 w-6 lg:h-8 lg:w-8 text-brand-gold mr-3 lg:mr-4 flex-shrink-0 mt-1 lg:mt-0" />
-                    <div className="min-w-0">
-                      <h3 className="text-lg font-semibold text-brand-charcoal mb-2">
-                        You're doing great! 🎉
-                      </h3>
-                      <p className="text-brand-charcoal/70 text-sm lg:text-base">
-                        You've saved an estimated {metrics?.estimated_time_saved || 0} hours by automating your gift-giving. 
-                        Add more recipients to never miss another special moment!
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Holiday Carousel */}
-            <div className="max-w-full overflow-hidden">
-              <HolidayCarousel />
-            </div>
-          </div>
-        );
-    }
-  };
 
   return (
-    <div className="min-h-screen bg-brand-cream">
-      {/* Header */}
-      <div className="border-b border-brand-cream bg-white/80 backdrop-blur-sm">
-        <div className="w-full max-w-none px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center min-w-0">
-              <Logo variant="icon" size="md" className="mr-2 flex-shrink-0" />
-              <span className="font-bold text-lg text-brand-charcoal truncate">Unwrapt</span>
-            </div>
-            
-            <div className="flex items-center space-x-4 flex-shrink-0">
-              <AppNavigation />
-              {user && <UserMenu />}
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-brand-cream via-white to-brand-cream-light">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-brand-charcoal">Welcome back!</h1>
+            <p className="text-brand-charcoal/70 mt-1">Manage your thoughtful gift-giving</p>
           </div>
+          <UserMenu />
         </div>
-      </div>
 
-      {/* Navigation Tabs */}
-      <div className="border-b border-brand-cream-light bg-white">
-        <div className="w-full max-w-none px-4">
-          <div className="flex space-x-6 lg:space-x-8 overflow-x-auto">
-            <button
-              onClick={() => setActiveTab('overview')}
-              className={`py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === 'overview'
-                  ? 'border-brand-gold text-brand-charcoal'
-                  : 'border-transparent text-brand-charcoal/60 hover:text-brand-charcoal'
-              }`}
-            >
-              Overview
-            </button>
-            <button
-              onClick={() => setActiveTab('recipients')}
-              className={`py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === 'recipients'
-                  ? 'border-brand-gold text-brand-charcoal'
-                  : 'border-transparent text-brand-charcoal/60 hover:text-brand-charcoal'
-              }`}
-            >
-              Recipients
-            </button>
-            <button
-              onClick={() => setActiveTab('gifts')}
-              className={`py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === 'gifts'
-                  ? 'border-brand-gold text-brand-charcoal'
-                  : 'border-transparent text-brand-charcoal/60 hover:text-brand-charcoal'
-              }`}
-            >
-              Upcoming Gifts
-            </button>
+        {/* Development Test Data Manager */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mb-8">
+            <TestDataManager />
           </div>
-        </div>
-      </div>
+        )}
 
-      <div className="w-full max-w-none px-4 py-6 lg:py-8">
-        <div className="max-w-7xl mx-auto">
-          {renderTabContent()}
+        {/* Metrics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card className="bg-white border-brand-cream">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-brand-charcoal">Recipients</CardTitle>
+              <Users className="h-4 w-4 text-brand-gold" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-brand-charcoal">
+                {metrics?.total_recipients || 0}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white border-brand-cream">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-brand-charcoal">Scheduled Gifts</CardTitle>
+              <Clock className="h-4 w-4 text-brand-gold" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-brand-charcoal">
+                {metrics?.total_scheduled_gifts || 0}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white border-brand-cream">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-brand-charcoal">Delivered</CardTitle>
+              <Gift className="h-4 w-4 text-brand-gold" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-brand-charcoal">
+                {metrics?.total_delivered_gifts || 0}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white border-brand-cream">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-brand-charcoal">Time Saved</CardTitle>
+              <TrendingUp className="h-4 w-4 text-brand-gold" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-brand-charcoal">
+                {metrics?.estimated_time_saved || 0}
+                <span className="text-sm font-normal text-brand-charcoal/70 ml-1">min</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div>
+            <RecipientsList />
+          </div>
+          <div>
+            <UpcomingGiftsManager />
+          </div>
         </div>
       </div>
     </div>
