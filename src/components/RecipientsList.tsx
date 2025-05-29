@@ -181,7 +181,7 @@ const RecipientsList = () => {
                   
                   <Button
                     size="sm"
-                    className="w-full bg-brand-gold text-white hover:bg-brand-gold/90"
+                    className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
                     onClick={() => setSchedulingGift(recipient)}
                   >
                     <Gift className="h-4 w-4 mr-2" />

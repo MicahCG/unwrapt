@@ -47,7 +47,7 @@ const LoginPage: React.FC = () => {
                 <p className="text-sm text-yellow-800 mb-2 font-medium">Development Mode</p>
                 <Button 
                   size="sm" 
-                  className="w-full bg-yellow-600 hover:bg-yellow-700 text-white"
+                  className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
                   onClick={handleDevLogin}
                 >
                   🚀 Skip to Dashboard (Dev Only)
