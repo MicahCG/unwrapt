@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,9 +8,10 @@ import { Gift, ArrowDown } from 'lucide-react';
 
 interface RecipientStepProps {
   onNext: (data: any) => void;
+  interests?: string[];
 }
 
-const RecipientStep: React.FC<RecipientStepProps> = ({ onNext }) => {
+const RecipientStep: React.FC<RecipientStepProps> = ({ onNext, interests }) => {
   const [recipientData, setRecipientData] = useState({
     fullName: '',
     relationship: '',
@@ -209,7 +209,7 @@ const RecipientStep: React.FC<RecipientStepProps> = ({ onNext }) => {
           onClick={handleContinue}
           disabled={!isValid}
         >
-          Continue to Interests & Preferences
+          Continue to Gift Scheduling
           <ArrowDown className="h-4 w-4 ml-2" />
         </Button>
 
