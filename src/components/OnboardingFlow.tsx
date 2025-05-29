@@ -6,9 +6,9 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import UserMenu from '@/components/auth/UserMenu';
 import WelcomeStep from '@/components/onboarding/WelcomeStep';
 import CalendarStep from '@/components/onboarding/CalendarStep';
+import InterestsStep from '@/components/onboarding/InterestsStep';
 import RecipientStep from '@/components/onboarding/RecipientStep';
 import GiftScheduleStep from '@/components/onboarding/GiftScheduleStep';
-import InterestsStep from '@/components/onboarding/InterestsStep';
 import PreferencesStep from '@/components/onboarding/PreferencesStep';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -26,7 +26,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const totalSteps = 6; // Removed payment step
+  const totalSteps = 6; // Total steps remain the same
 
   const handleStepComplete = async (stepData: any) => {
     const updatedData = { ...onboardingData, ...stepData };
@@ -147,19 +147,20 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
       case 2:
         return <CalendarStep onNext={handleStepComplete} />;
       case 3:
-        return <RecipientStep onNext={handleStepComplete} />;
+        return <InterestsStep onNext={handleStepComplete} />;
       case 4:
         return (
-          <GiftScheduleStep 
+          <RecipientStep 
             onNext={handleStepComplete} 
-            recipientName={onboardingData.firstRecipient?.fullName}
+            interests={onboardingData.interests}
           />
         );
       case 5:
         return (
-          <InterestsStep 
+          <GiftScheduleStep 
             onNext={handleStepComplete} 
             recipientName={onboardingData.firstRecipient?.fullName}
+            interests={onboardingData.interests}
           />
         );
       case 6:

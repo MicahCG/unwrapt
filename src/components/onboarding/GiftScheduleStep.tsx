@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,9 +16,10 @@ import { useShopifyProductTypes } from '@/hooks/useShopifyProductTypes';
 interface GiftScheduleStepProps {
   onNext: (data: any) => void;
   recipientName?: string;
+  interests?: string[];
 }
 
-const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ onNext, recipientName }) => {
+const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ onNext, recipientName, interests = [] }) => {
   const [occasion, setOccasion] = useState('');
   const [occasionDate, setOccasionDate] = useState<Date>();
   const [giftType, setGiftType] = useState('');
@@ -27,10 +29,68 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ onNext, recipientNa
   const { toast } = useToast();
   const { data: productTypesData, isLoading: isLoadingProductTypes } = useShopifyProductTypes();
 
+  // Function to auto-select gift type based on interests
+  const getGiftTypeFromInterests = (interests: string[], productTypes: string[]) => {
+    if (!interests || interests.length === 0 || !productTypes || productTypes.length === 0) return '';
+    
+    // Create interest-to-gift-type mapping
+    const interestMappings: { [key: string]: string[] } = {
+      'coffee': ['coffee', 'beverages', 'food'],
+      'tea': ['tea', 'beverages', 'food'],
+      'wine': ['wine', 'beverages', 'alcohol'],
+      'craft beer': ['beer', 'beverages', 'alcohol'],
+      'cooking': ['kitchen', 'cooking', 'food', 'home'],
+      'baking': ['kitchen', 'baking', 'food', 'home'],
+      'fitness': ['sports', 'fitness', 'health', 'wellness'],
+      'yoga': ['sports', 'fitness', 'health', 'wellness'],
+      'reading': ['books', 'literature', 'education'],
+      'gaming': ['electronics', 'games', 'technology'],
+      'music': ['electronics', 'music', 'entertainment'],
+      'art': ['art', 'crafts', 'creative'],
+      'photography': ['electronics', 'photography', 'technology'],
+      'travel': ['travel', 'accessories', 'luggage'],
+      'gardening': ['garden', 'home', 'plants', 'outdoor'],
+      'technology': ['electronics', 'gadgets', 'technology'],
+      'fashion': ['clothing', 'fashion', 'apparel'],
+      'skincare': ['beauty', 'health', 'skincare', 'cosmetics'],
+      'jewelry': ['jewelry', 'accessories', 'fashion'],
+      'home decor': ['home', 'decor', 'furniture'],
+      'outdoor activities': ['outdoor', 'sports', 'recreation'],
+      'sports': ['sports', 'fitness', 'athletic']
+    };
+
+    // Find the best matching product type
+    for (const interest of interests) {
+      const interestLower = interest.toLowerCase();
+      const mappings = interestMappings[interestLower] || [interestLower];
+      
+      for (const mapping of mappings) {
+        const matchingType = productTypes.find(type => 
+          type.toLowerCase().includes(mapping) || mapping.includes(type.toLowerCase())
+        );
+        if (matchingType) {
+          return matchingType;
+        }
+      }
+    }
+    
+    return '';
+  };
+
   React.useEffect(() => {
     const formValid = occasion && occasionDate && giftType && priceRange;
     setIsValid(!!formValid);
   }, [occasion, occasionDate, giftType, priceRange]);
+
+  // Auto-select gift type when product types load and we have interests
+  React.useEffect(() => {
+    if (productTypesData?.productTypes && interests && interests.length > 0 && !giftType) {
+      const suggestedType = getGiftTypeFromInterests(interests, productTypesData.productTypes);
+      if (suggestedType) {
+        setGiftType(suggestedType);
+      }
+    }
+  }, [productTypesData, interests, giftType]);
 
   const getPriceRangeAmount = (range: string) => {
     switch (range) {
@@ -190,7 +250,7 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ onNext, recipientNa
           {/* Gift Type */}
           <div className="space-y-2">
             <Label htmlFor="giftType" className="text-brand-charcoal">What type of gift? *</Label>
-            <Select onValueChange={setGiftType} disabled={isLoadingProductTypes}>
+            <Select value={giftType} onValueChange={setGiftType} disabled={isLoadingProductTypes}>
               <SelectTrigger className="text-brand-charcoal border-brand-cream">
                 <SelectValue placeholder={isLoadingProductTypes ? "Loading gift types..." : "Select gift type"} />
               </SelectTrigger>
@@ -208,6 +268,11 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ onNext, recipientNa
             {productTypesData?.success === false && (
               <p className="text-xs text-brand-charcoal/60">
                 Using fallback options - Shopify connection unavailable
+              </p>
+            )}
+            {giftType && interests && interests.length > 0 && (
+              <p className="text-xs text-brand-charcoal/60">
+                ✨ Auto-selected based on interests: {interests.slice(0, 3).join(', ')}{interests.length > 3 ? '...' : ''}
               </p>
             )}
           </div>

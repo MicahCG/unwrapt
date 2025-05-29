@@ -8,16 +8,18 @@ import { Heart, ArrowDown, Plus } from 'lucide-react';
 
 interface InterestsStepProps {
   onNext: (data: any) => void;
-  recipientName?: string;
 }
 
-const InterestsStep: React.FC<InterestsStepProps> = ({ onNext, recipientName }) => {
+const InterestsStep: React.FC<InterestsStepProps> = ({ onNext }) => {
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [customInterest, setCustomInterest] = useState('');
 
-  // Restricted to only coffee and tea
+  // Expanded interests to include more categories
   const predefinedInterests = [
-    'Coffee', 'Tea'
+    'Coffee', 'Tea', 'Wine', 'Craft Beer', 'Cooking', 'Baking',
+    'Fitness', 'Yoga', 'Reading', 'Gaming', 'Music', 'Art',
+    'Photography', 'Travel', 'Gardening', 'Technology', 'Fashion',
+    'Skincare', 'Jewelry', 'Home Decor', 'Outdoor Activities', 'Sports'
   ];
 
   const toggleInterest = (interest: string) => {
@@ -29,13 +31,11 @@ const InterestsStep: React.FC<InterestsStepProps> = ({ onNext, recipientName }) 
   };
 
   const addCustomInterest = () => {
-    const trimmedInterest = customInterest.trim().toLowerCase();
+    const trimmedInterest = customInterest.trim();
     
-    // Only allow coffee or tea related custom interests
     if (trimmedInterest && 
-        (trimmedInterest.includes('coffee') || trimmedInterest.includes('tea')) &&
-        !selectedInterests.some(interest => interest.toLowerCase() === trimmedInterest)) {
-      setSelectedInterests(prev => [...prev, customInterest.trim()]);
+        !selectedInterests.some(interest => interest.toLowerCase() === trimmedInterest.toLowerCase())) {
+      setSelectedInterests(prev => [...prev, trimmedInterest]);
       setCustomInterest('');
     }
   };
@@ -55,16 +55,16 @@ const InterestsStep: React.FC<InterestsStepProps> = ({ onNext, recipientName }) 
           </div>
         </div>
         <CardTitle className="text-3xl mb-2 text-brand-charcoal">
-          What does {recipientName || 'your special person'} love?
+          What are their interests?
         </CardTitle>
         <p className="text-brand-charcoal/70">
-          Select their beverage interests so we can find the perfect gifts
+          Select interests that will help us find the perfect gifts
         </p>
       </CardHeader>
       
       <CardContent className="space-y-6">
         <div>
-          <h4 className="font-medium mb-3 text-brand-charcoal">Available interests:</h4>
+          <h4 className="font-medium mb-3 text-brand-charcoal">Popular interests:</h4>
           <div className="flex flex-wrap gap-2">
             {predefinedInterests.map((interest) => (
               <Badge
@@ -84,10 +84,10 @@ const InterestsStep: React.FC<InterestsStepProps> = ({ onNext, recipientName }) 
         </div>
 
         <div>
-          <h4 className="font-medium mb-3 text-brand-charcoal">Add coffee or tea related interest:</h4>
+          <h4 className="font-medium mb-3 text-brand-charcoal">Add custom interest:</h4>
           <div className="flex gap-2">
             <Input
-              placeholder="e.g., Espresso, Green Tea, French Roast..."
+              placeholder="e.g., Rock climbing, Pottery, Board games..."
               value={customInterest}
               onChange={(e) => setCustomInterest(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && addCustomInterest()}
@@ -100,9 +100,6 @@ const InterestsStep: React.FC<InterestsStepProps> = ({ onNext, recipientName }) 
               <Plus className="h-4 w-4" />
             </Button>
           </div>
-          <p className="text-sm text-brand-charcoal/60 mt-2">
-            Only coffee and tea related interests are allowed
-          </p>
         </div>
 
         {selectedInterests.length > 0 && (
