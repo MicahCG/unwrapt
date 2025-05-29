@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, Check, ArrowDown, AlertCircle } from 'lucide-react';
+import { Check, ArrowDown, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -217,7 +217,11 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
       <CardHeader className="text-center">
         <div className="flex justify-center mb-4">
           <div className="bg-brand-cream p-4 rounded-full">
-            <Calendar className="h-12 w-12 text-brand-charcoal" />
+            <img 
+              src="/lovable-uploads/00f39f0e-8157-4f8a-81d2-67a47dc5ebbe.png" 
+              alt="Calendar" 
+              className="h-12 w-12"
+            />
           </div>
         </div>
         <CardTitle className="text-3xl mb-2 text-brand-charcoal">Connect your calendar to never miss important dates</CardTitle>
@@ -260,7 +264,11 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
                 </>
               ) : (
                 <>
-                  <Calendar className="h-5 w-5 mr-2" />
+                  <img 
+                    src="/lovable-uploads/00f39f0e-8157-4f8a-81d2-67a47dc5ebbe.png" 
+                    alt="Calendar" 
+                    className="h-5 w-5 mr-2"
+                  />
                   Connect Google Calendar
                 </>
               )}
@@ -305,7 +313,11 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
             <div className="bg-white border border-brand-cream rounded-lg max-h-48 overflow-y-auto">
               {foundDates.map((date, index) => (
                 <div key={index} className="flex items-center p-3 border-b border-brand-cream last:border-b-0">
-                  <Calendar className="h-4 w-4 text-brand-charcoal mr-3" />
+                  <img 
+                    src="/lovable-uploads/00f39f0e-8157-4f8a-81d2-67a47dc5ebbe.png" 
+                    alt="Calendar" 
+                    className="h-4 w-4 mr-3"
+                  />
                   <span className="text-sm text-brand-charcoal">{date.summary} - {new Date(date.date).toLocaleDateString()}</span>
                 </div>
               ))}
