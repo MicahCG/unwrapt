@@ -5,11 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
-import { Edit, Trash2, Calendar, DollarSign, TestTube2 } from 'lucide-react';
+import { Edit, Trash2, Calendar, DollarSign, TestTube2, Plus } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import EditGiftModal from './EditGiftModal';
 import GiftDetailsModal from './GiftDetailsModal';
 import ShopifyTestModal from './ShopifyTestModal';
+import ScheduleGiftModal from './ScheduleGiftModal';
+import RecipientSelectionModal from './RecipientSelectionModal';
 
 const UpcomingGiftsManager = () => {
   const { user } = useAuth();
@@ -17,6 +19,8 @@ const UpcomingGiftsManager = () => {
   const [editingGift, setEditingGift] = useState(null);
   const [viewingGift, setViewingGift] = useState(null);
   const [testingGift, setTestingGift] = useState(null);
+  const [showRecipientSelection, setShowRecipientSelection] = useState(false);
+  const [selectedRecipient, setSelectedRecipient] = useState(null);
 
   // Fetch upcoming gifts
   const { data: gifts } = useQuery({
@@ -54,6 +58,11 @@ const UpcomingGiftsManager = () => {
     }
   };
 
+  const handleRecipientSelected = (recipient: any) => {
+    setSelectedRecipient(recipient);
+    setShowRecipientSelection(false);
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -74,7 +83,16 @@ const UpcomingGiftsManager = () => {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-brand-charcoal">Upcoming Gifts</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-brand-charcoal">Upcoming Gifts</h2>
+        <Button
+          className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+          onClick={() => setShowRecipientSelection(true)}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Schedule More Gifts
+        </Button>
+      </div>
 
       {gifts && gifts.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -166,6 +184,13 @@ const UpcomingGiftsManager = () => {
             <div className="text-brand-charcoal/50 mb-4">
               No upcoming gifts scheduled
             </div>
+            <Button
+              className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+              onClick={() => setShowRecipientSelection(true)}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Schedule Your First Gift
+            </Button>
           </CardContent>
         </Card>
       )}
@@ -191,6 +216,22 @@ const UpcomingGiftsManager = () => {
           gift={testingGift}
           isOpen={!!testingGift}
           onClose={() => setTestingGift(null)}
+        />
+      )}
+
+      {showRecipientSelection && (
+        <RecipientSelectionModal
+          isOpen={showRecipientSelection}
+          onClose={() => setShowRecipientSelection(false)}
+          onRecipientSelected={handleRecipientSelected}
+        />
+      )}
+
+      {selectedRecipient && (
+        <ScheduleGiftModal
+          recipient={selectedRecipient}
+          isOpen={!!selectedRecipient}
+          onClose={() => setSelectedRecipient(null)}
         />
       )}
     </div>
