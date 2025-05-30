@@ -9,6 +9,7 @@ import UserMenu from '@/components/auth/UserMenu';
 import TestDataManager from '@/components/TestDataManager';
 import RecipientsList from '@/components/RecipientsList';
 import UpcomingGiftsManager from '@/components/UpcomingGiftsManager';
+import DashboardRecipients from '@/components/DashboardRecipients';
 import { Users, Gift, Clock, TrendingUp } from 'lucide-react';
 
 const Dashboard = () => {
@@ -43,7 +44,7 @@ const Dashboard = () => {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-brand-charcoal">Welcome back!</h1>
-            <p className="text-brand-charcoal/70 mt-1">Manage your thoughtful gift-giving</p>
+            <p className="text-brand-charcoal/70 mt-1">Here's what's happening with your gifting schedule</p>
           </div>
           <UserMenu />
         </div>
@@ -101,7 +102,7 @@ const Dashboard = () => {
             <CardContent>
               <div className="text-2xl font-bold text-brand-charcoal">
                 {metrics?.estimated_time_saved || 0}
-                <span className="text-sm font-normal text-brand-charcoal/70 ml-1">min</span>
+                <span className="text-sm font-normal text-brand-charcoal/70 ml-1">h</span>
               </div>
             </CardContent>
           </Card>
@@ -110,10 +111,10 @@ const Dashboard = () => {
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div>
-            <RecipientsList />
+            <UpcomingGiftsManager />
           </div>
           <div>
-            <UpcomingGiftsManager />
+            <DashboardRecipients />
           </div>
         </div>
       </div>
