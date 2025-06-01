@@ -13,27 +13,23 @@ const SettingsOAuthCallback: React.FC = () => {
   const [hasProcessed, setHasProcessed] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
-  const maxRetries = 20; // Increased retry count
-  const retryDelay = 1000; // 1 second delay between retries
+  const maxRetries = 15;
+  const retryDelay = 500;
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
-      // Prevent multiple processing attempts
       if (hasProcessed || isProcessing) {
         console.log('📋 SettingsOAuthCallback: Already processed or processing, skipping...');
         return;
       }
 
-      console.log('📋 SettingsOAuthCallback: Component mounted and processing');
+      console.log('📋 SettingsOAuthCallback: Processing callback');
       console.log('📋 SettingsOAuthCallback: Current URL:', window.location.href);
-      console.log('📋 SettingsOAuthCallback: Search params:', window.location.search);
       console.log('📋 SettingsOAuthCallback: User from AuthProvider:', { 
         hasUser: !!user, 
         userId: user?.id,
-        email: user?.email,
         loading
       });
-      console.log('📋 SettingsOAuthCallback: Retry count:', retryCount);
       
       const code = searchParams.get('code');
       const error = searchParams.get('error');
@@ -41,11 +37,8 @@ const SettingsOAuthCallback: React.FC = () => {
 
       console.log('📋 SettingsOAuthCallback: OAuth params:', { 
         hasCode: !!code, 
-        codeLength: code?.length || 0,
         error, 
         state,
-        userFromProvider: !!user,
-        authLoading: loading,
         retryCount
       });
 
@@ -62,13 +55,13 @@ const SettingsOAuthCallback: React.FC = () => {
       }
 
       if (!code) {
-        console.log('📋 SettingsOAuthCallback: No code received, redirecting to settings...');
+        console.log('📋 SettingsOAuthCallback: No code received, redirecting...');
         setHasProcessed(true);
         navigate('/settings', { replace: true });
         return;
       }
 
-      // Wait for auth loading to complete first
+      // Wait for auth loading to complete
       if (loading) {
         console.log('📋 SettingsOAuthCallback: Auth still loading, waiting...');
         return;
@@ -77,7 +70,7 @@ const SettingsOAuthCallback: React.FC = () => {
       // Check session directly from Supabase if user isn't available from provider
       let currentUser = user;
       if (!currentUser) {
-        console.log('📋 SettingsOAuthCallback: User not available from provider, checking Supabase session directly...');
+        console.log('📋 SettingsOAuthCallback: User not available from provider, checking session...');
         try {
           const { data: { session }, error: sessionError } = await supabase.auth.getSession();
           if (sessionError) {
@@ -87,12 +80,7 @@ const SettingsOAuthCallback: React.FC = () => {
             console.log('📋 SettingsOAuthCallback: Session check result:', { 
               hasSession: !!session, 
               hasUser: !!currentUser,
-              userId: currentUser?.id,
-              sessionDetails: session ? {
-                access_token: session.access_token ? 'present' : 'missing',
-                refresh_token: session.refresh_token ? 'present' : 'missing',
-                expires_at: session.expires_at
-              } : null
+              userId: currentUser?.id
             });
           }
         } catch (sessionError) {
@@ -100,11 +88,10 @@ const SettingsOAuthCallback: React.FC = () => {
         }
       }
 
-      // If we still don't have a user, implement retry logic
+      // Retry logic if user is still not available
       if (!currentUser) {
         if (retryCount < maxRetries) {
-          console.log(`📋 SettingsOAuthCallback: No user found, waiting for auth state to update... Retry ${retryCount + 1}/${maxRetries}`);
-          // Use a longer delay and increment retry count
+          console.log(`📋 SettingsOAuthCallback: No user found, retry ${retryCount + 1}/${maxRetries}`);
           setTimeout(() => {
             setRetryCount(prev => prev + 1);
           }, retryDelay);
@@ -122,27 +109,20 @@ const SettingsOAuthCallback: React.FC = () => {
         }
       }
 
-      // We have both code and user, process the OAuth
+      // Process the OAuth callback
       setIsProcessing(true);
       setHasProcessed(true);
 
       try {
-        console.log('📋 SettingsOAuthCallback: Processing OAuth code for calendar connection with user:', currentUser.id);
+        console.log('📋 SettingsOAuthCallback: Processing OAuth code for user:', currentUser.id);
         
-        // Get the current session for authorization
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError || !session) {
           throw new Error('No active session found');
         }
 
-        console.log('📋 SettingsOAuthCallback: Session for API call:', {
-          hasAccessToken: !!session.access_token,
-          userId: session.user?.id
-        });
-
-        // Exchange code for token
-        console.log('📋 SettingsOAuthCallback: Exchanging authorization code for access token...');
+        console.log('📋 SettingsOAuthCallback: Exchanging authorization code...');
         const { data: tokenData, error: tokenError } = await supabase.functions.invoke('google-calendar', {
           body: { action: 'exchange_code', code },
           headers: {
@@ -165,7 +145,7 @@ const SettingsOAuthCallback: React.FC = () => {
           throw new Error('No access token received from Google');
         }
 
-        console.log('📋 SettingsOAuthCallback: Calendar connected successfully from settings');
+        console.log('📋 SettingsOAuthCallback: Calendar connected successfully');
         
         toast({
           title: "Calendar Connected Successfully!",
@@ -200,9 +180,6 @@ const SettingsOAuthCallback: React.FC = () => {
           {loading ? 'Loading authentication...' : 
            !user ? `Waiting for authentication... (${retryCount}/${maxRetries})` : 
            'Processing connection...'}
-        </p>
-        <p className="text-brand-charcoal/50 text-xs mt-4">
-          Check browser console for detailed logs
         </p>
       </div>
     </div>

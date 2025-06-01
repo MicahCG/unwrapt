@@ -21,13 +21,17 @@ Deno.serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''))
 
     if (!user) {
+      console.error('No user found in auth header')
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
+    console.log('User authenticated:', user.id)
+
     const { action, code, access_token, redirect_context } = await req.json()
+    console.log('Action received:', action)
 
     if (action === 'get_auth_url') {
       const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
@@ -36,6 +40,8 @@ Deno.serve(async (req) => {
       const baseRedirectUri = redirect_context === 'settings' 
         ? `${req.headers.get('origin')}/auth/callback/settings`
         : `${req.headers.get('origin')}/auth/callback/calendar`
+      
+      console.log('Generated redirect URI:', baseRedirectUri)
       
       const scope = 'https://www.googleapis.com/auth/calendar.readonly'
       
@@ -47,6 +53,7 @@ Deno.serve(async (req) => {
         `access_type=offline&` +
         `prompt=consent`
 
+      console.log('Generated auth URL for redirect_context:', redirect_context)
       return new Response(JSON.stringify({ authUrl }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
@@ -60,6 +67,7 @@ Deno.serve(async (req) => {
         : `${req.headers.get('origin')}/auth/callback/calendar`
 
       console.log('Exchange code - redirect URI:', redirectUri)
+      console.log('Exchange code - referer:', req.headers.get('referer'))
 
       // Exchange authorization code for access token
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -75,6 +83,11 @@ Deno.serve(async (req) => {
       })
 
       const tokenData = await tokenResponse.json()
+      console.log('Token exchange result:', { 
+        success: !tokenData.error,
+        hasAccessToken: !!tokenData.access_token,
+        error: tokenData.error 
+      })
 
       if (tokenData.error) {
         console.error('Token exchange error:', tokenData.error)
@@ -85,6 +98,7 @@ Deno.serve(async (req) => {
       }
 
       // Store the integration
+      console.log('Storing calendar integration for user:', user.id)
       const { error: insertError } = await supabase
         .from('calendar_integrations')
         .upsert({
@@ -105,6 +119,7 @@ Deno.serve(async (req) => {
         })
       }
 
+      console.log('Calendar integration stored successfully')
       return new Response(JSON.stringify({ success: true, access_token: tokenData.access_token }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
