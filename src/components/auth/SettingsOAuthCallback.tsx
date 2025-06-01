@@ -12,7 +12,7 @@ const SettingsOAuthCallback: React.FC = () => {
   const { user } = useAuth();
   const [hasProcessed, setHasProcessed] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 10; // Wait up to 10 seconds for user
+  const maxRetries = 15; // Wait up to 15 seconds for user
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
@@ -24,7 +24,7 @@ const SettingsOAuthCallback: React.FC = () => {
 
       console.log('Settings OAuth Callback component mounted');
       console.log('Current URL search params:', window.location.search);
-      console.log('User in callback:', user);
+      console.log('User from AuthProvider:', user);
       console.log('Retry count:', retryCount);
       
       const code = searchParams.get('code');
@@ -36,7 +36,7 @@ const SettingsOAuthCallback: React.FC = () => {
         codeLength: code?.length || 0,
         error, 
         state,
-        userExists: !!user,
+        userFromProvider: !!user,
         retryCount
       });
 
@@ -59,8 +59,25 @@ const SettingsOAuthCallback: React.FC = () => {
         return;
       }
 
-      // If we have a code but no user, wait for authentication with retry logic
-      if (!user) {
+      // Check session directly from Supabase if user isn't available from provider
+      let currentUser = user;
+      if (!currentUser) {
+        console.log('User not available from provider, checking Supabase session directly...');
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          currentUser = session?.user || null;
+          console.log('Session check result:', { 
+            hasSession: !!session, 
+            hasUser: !!currentUser,
+            userId: currentUser?.id 
+          });
+        } catch (sessionError) {
+          console.error('Error checking session:', sessionError);
+        }
+      }
+
+      // If we still don't have a user, implement retry logic
+      if (!currentUser) {
         if (retryCount < maxRetries) {
           console.log(`No user found, waiting for auth state to update... Retry ${retryCount + 1}/${maxRetries}`);
           // Increment retry count and wait 1 second before trying again
@@ -85,8 +102,9 @@ const SettingsOAuthCallback: React.FC = () => {
       setHasProcessed(true);
 
       try {
-        console.log('Processing OAuth code for calendar connection with user:', user.id);
+        console.log('Processing OAuth code for calendar connection with user:', currentUser.id);
         
+        // Get the current session for authorization
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session) {
