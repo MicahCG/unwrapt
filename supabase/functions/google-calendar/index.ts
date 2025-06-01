@@ -18,20 +18,22 @@ Deno.serve(async (req) => {
     )
 
     const authHeader = req.headers.get('Authorization')!
+    console.log('🔐 Auth header present:', !!authHeader)
+    
     const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''))
 
     if (!user) {
-      console.error('No user found in auth header')
+      console.error('❌ No user found in auth header')
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    console.log('User authenticated:', user.id)
+    console.log('✅ User authenticated:', user.id)
 
     const { action, code, access_token, redirect_context } = await req.json()
-    console.log('Action received:', action)
+    console.log('📝 Action received:', action)
 
     if (action === 'get_auth_url') {
       const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
@@ -41,7 +43,7 @@ Deno.serve(async (req) => {
         ? `${req.headers.get('origin')}/auth/callback/settings`
         : `${req.headers.get('origin')}/auth/callback/calendar`
       
-      console.log('Generated redirect URI:', baseRedirectUri)
+      console.log('🔗 Generated redirect URI:', baseRedirectUri)
       
       const scope = 'https://www.googleapis.com/auth/calendar.readonly'
       
@@ -53,7 +55,7 @@ Deno.serve(async (req) => {
         `access_type=offline&` +
         `prompt=consent`
 
-      console.log('Generated auth URL for redirect_context:', redirect_context)
+      console.log('🚀 Generated auth URL for redirect_context:', redirect_context)
       return new Response(JSON.stringify({ authUrl }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
@@ -66,8 +68,9 @@ Deno.serve(async (req) => {
         ? `${req.headers.get('origin')}/auth/callback/settings`
         : `${req.headers.get('origin')}/auth/callback/calendar`
 
-      console.log('Exchange code - redirect URI:', redirectUri)
-      console.log('Exchange code - referer:', req.headers.get('referer'))
+      console.log('🔄 Exchange code - redirect URI:', redirectUri)
+      console.log('🔄 Exchange code - referer:', req.headers.get('referer'))
+      console.log('🔄 Exchange code - user ID:', user.id)
 
       // Exchange authorization code for access token
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -83,14 +86,14 @@ Deno.serve(async (req) => {
       })
 
       const tokenData = await tokenResponse.json()
-      console.log('Token exchange result:', { 
+      console.log('💰 Token exchange result:', { 
         success: !tokenData.error,
         hasAccessToken: !!tokenData.access_token,
         error: tokenData.error 
       })
 
       if (tokenData.error) {
-        console.error('Token exchange error:', tokenData.error)
+        console.error('❌ Token exchange error:', tokenData.error)
         return new Response(JSON.stringify({ error: tokenData.error }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -98,7 +101,7 @@ Deno.serve(async (req) => {
       }
 
       // Store the integration
-      console.log('Storing calendar integration for user:', user.id)
+      console.log('💾 Storing calendar integration for user:', user.id)
       const { error: insertError } = await supabase
         .from('calendar_integrations')
         .upsert({
@@ -112,14 +115,14 @@ Deno.serve(async (req) => {
         })
 
       if (insertError) {
-        console.error('Error storing integration:', insertError)
-        return new Response(JSON.stringify({ error: 'Failed to store integration' }), {
+        console.error('❌ Error storing integration:', insertError)
+        return new Response(JSON.stringify({ error: 'Failed to store integration', details: insertError.message }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
       }
 
-      console.log('Calendar integration stored successfully')
+      console.log('✅ Calendar integration stored successfully')
       return new Response(JSON.stringify({ success: true, access_token: tokenData.access_token }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
@@ -166,7 +169,7 @@ Deno.serve(async (req) => {
     })
 
   } catch (error) {
-    console.error('Error:', error)
+    console.error('💥 Error:', error)
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

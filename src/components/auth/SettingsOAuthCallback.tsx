@@ -11,10 +11,7 @@ const SettingsOAuthCallback: React.FC = () => {
   const { toast } = useToast();
   const { user, loading } = useAuth();
   const [hasProcessed, setHasProcessed] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
-  const maxRetries = 15;
-  const retryDelay = 500;
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
@@ -25,21 +22,13 @@ const SettingsOAuthCallback: React.FC = () => {
 
       console.log('📋 SettingsOAuthCallback: Processing callback');
       console.log('📋 SettingsOAuthCallback: Current URL:', window.location.href);
-      console.log('📋 SettingsOAuthCallback: User from AuthProvider:', { 
-        hasUser: !!user, 
-        userId: user?.id,
-        loading
-      });
       
       const code = searchParams.get('code');
       const error = searchParams.get('error');
-      const state = searchParams.get('state');
 
       console.log('📋 SettingsOAuthCallback: OAuth params:', { 
         hasCode: !!code, 
-        error, 
-        state,
-        retryCount
+        error
       });
 
       if (error) {
@@ -67,62 +56,28 @@ const SettingsOAuthCallback: React.FC = () => {
         return;
       }
 
-      // Check session directly from Supabase if user isn't available from provider
-      let currentUser = user;
-      if (!currentUser) {
-        console.log('📋 SettingsOAuthCallback: User not available from provider, checking session...');
-        try {
-          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-          if (sessionError) {
-            console.error('📋 SettingsOAuthCallback: Error checking session:', sessionError);
-          } else {
-            currentUser = session?.user || null;
-            console.log('📋 SettingsOAuthCallback: Session check result:', { 
-              hasSession: !!session, 
-              hasUser: !!currentUser,
-              userId: currentUser?.id
-            });
-          }
-        } catch (sessionError) {
-          console.error('📋 SettingsOAuthCallback: Error checking session:', sessionError);
-        }
-      }
-
-      // Retry logic if user is still not available
-      if (!currentUser) {
-        if (retryCount < maxRetries) {
-          console.log(`📋 SettingsOAuthCallback: No user found, retry ${retryCount + 1}/${maxRetries}`);
-          setTimeout(() => {
-            setRetryCount(prev => prev + 1);
-          }, retryDelay);
-          return;
-        } else {
-          console.error('📋 SettingsOAuthCallback: Max retries reached, user still not available');
-          setHasProcessed(true);
-          toast({
-            title: "Authentication Required",
-            description: "Please log in again to connect your calendar.",
-            variant: "destructive"
-          });
-          navigate('/settings', { replace: true });
-          return;
-        }
-      }
-
-      // Process the OAuth callback
+      // Set processing flag immediately
       setIsProcessing(true);
-      setHasProcessed(true);
 
       try {
-        console.log('📋 SettingsOAuthCallback: Processing OAuth code for user:', currentUser.id);
+        console.log('📋 SettingsOAuthCallback: Getting current session...');
         
+        // Get session directly each time to ensure we have the most current one
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        if (sessionError || !session) {
-          throw new Error('No active session found');
+        if (sessionError) {
+          console.error('📋 SettingsOAuthCallback: Session error:', sessionError);
+          throw new Error('Failed to get current session');
         }
 
+        if (!session || !session.user) {
+          console.error('📋 SettingsOAuthCallback: No active session found');
+          throw new Error('No active session found. Please log in again.');
+        }
+
+        console.log('📋 SettingsOAuthCallback: Session found for user:', session.user.id);
         console.log('📋 SettingsOAuthCallback: Exchanging authorization code...');
+
         const { data: tokenData, error: tokenError } = await supabase.functions.invoke('google-calendar', {
           body: { action: 'exchange_code', code },
           headers: {
@@ -146,6 +101,7 @@ const SettingsOAuthCallback: React.FC = () => {
         }
 
         console.log('📋 SettingsOAuthCallback: Calendar connected successfully');
+        setHasProcessed(true);
         
         toast({
           title: "Calendar Connected Successfully!",
@@ -156,6 +112,7 @@ const SettingsOAuthCallback: React.FC = () => {
 
       } catch (error) {
         console.error('📋 SettingsOAuthCallback: Error processing OAuth callback:', error);
+        setHasProcessed(true);
         const errorMessage = error instanceof Error ? error.message : 'Failed to process calendar connection';
         toast({
           title: "Calendar Connection Failed",
@@ -169,7 +126,7 @@ const SettingsOAuthCallback: React.FC = () => {
     };
 
     handleOAuthCallback();
-  }, [navigate, searchParams, toast, user, loading, hasProcessed, retryCount, isProcessing]);
+  }, [navigate, searchParams, toast, loading, hasProcessed, isProcessing]);
 
   return (
     <div className="min-h-screen bg-brand-cream flex items-center justify-center">
@@ -178,8 +135,8 @@ const SettingsOAuthCallback: React.FC = () => {
         <p className="text-brand-charcoal">Connecting Google Calendar...</p>
         <p className="text-brand-charcoal/70 text-sm mt-2">
           {loading ? 'Loading authentication...' : 
-           !user ? `Waiting for authentication... (${retryCount}/${maxRetries})` : 
-           'Processing connection...'}
+           isProcessing ? 'Processing connection...' : 
+           'Preparing connection...'}
         </p>
       </div>
     </div>
