@@ -18,18 +18,22 @@ interface OnboardingFlowProps {
 }
 
 const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
-  const [currentStep, setCurrentStep] = useState(2); // Start at step 2 (CalendarStep)
+  const [currentStep, setCurrentStep] = useState(1); // Start at step 1 (WelcomeStep)
   const [onboardingData, setOnboardingData] = useState<any>({});
   const [isCompleting, setIsCompleting] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const totalSteps = 5; // Reduced from 6 to 5 steps
+  const totalSteps = 5;
+
+  console.log('🔧 OnboardingFlow: Rendering step', currentStep, 'for user:', user?.id);
 
   const handleStepComplete = async (stepData: any) => {
     const updatedData = { ...onboardingData, ...stepData };
     setOnboardingData(updatedData);
+
+    console.log('🔧 OnboardingFlow: Step completed:', currentStep, 'data:', stepData);
 
     if (currentStep === totalSteps) {
       // Complete onboarding and save data
@@ -120,7 +124,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   };
 
   const handleBack = () => {
-    if (currentStep > 2) {
+    if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     } else {
       onBack();
@@ -140,6 +144,8 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   }
 
   const renderStep = () => {
+    console.log('🔧 OnboardingFlow: Rendering step component for step:', currentStep);
+    
     switch (currentStep) {
       case 1:
         return <WelcomeStep onNext={handleStepComplete} />;
@@ -182,7 +188,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              {currentStep > 2 && (
+              {currentStep > 1 && (
                 <Button 
                   variant="ghost" 
                   size="sm" 
@@ -203,12 +209,12 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
               {/* Progress Indicator */}
               <div className="flex items-center space-x-2">
                 <span className="text-sm text-brand-charcoal/70">
-                  Step {currentStep - 1} of {totalSteps - 1}
+                  Step {currentStep} of {totalSteps}
                 </span>
                 <div className="w-32 bg-brand-cream-light rounded-full h-2">
                   <div 
                     className="bg-brand-charcoal h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${((currentStep - 1) / (totalSteps - 1)) * 100}%` }}
+                    style={{ width: `${(currentStep / totalSteps) * 100}%` }}
                   />
                 </div>
               </div>
