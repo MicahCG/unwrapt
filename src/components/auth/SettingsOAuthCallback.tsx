@@ -15,6 +15,7 @@ const SettingsOAuthCallback: React.FC = () => {
     const handleOAuthCallback = async () => {
       console.log('Settings OAuth Callback component mounted');
       console.log('Current URL search params:', window.location.search);
+      console.log('User in callback:', user);
       
       const code = searchParams.get('code');
       const error = searchParams.get('error');
@@ -24,7 +25,8 @@ const SettingsOAuthCallback: React.FC = () => {
         hasCode: !!code, 
         codeLength: code?.length || 0,
         error, 
-        state 
+        state,
+        userExists: !!user
       });
 
       if (error) {
@@ -38,9 +40,22 @@ const SettingsOAuthCallback: React.FC = () => {
         return;
       }
 
-      if (code && user) {
+      if (code) {
+        // Wait a bit for user to be available if not already
+        if (!user) {
+          console.log('No user found, waiting for auth...');
+          setTimeout(() => {
+            if (!user) {
+              console.log('Still no user after wait, redirecting to settings');
+              navigate('/settings', { replace: true });
+              return;
+            }
+          }, 1000);
+          return;
+        }
+
         try {
-          console.log('Processing OAuth code for calendar connection...');
+          console.log('Processing OAuth code for calendar connection with user:', user.id);
           
           const { data: { session } } = await supabase.auth.getSession();
           
@@ -92,7 +107,7 @@ const SettingsOAuthCallback: React.FC = () => {
           navigate('/settings', { replace: true });
         }
       } else {
-        console.log('No code or user, redirecting to settings...');
+        console.log('No code received, redirecting to settings...');
         navigate('/settings', { replace: true });
       }
     };

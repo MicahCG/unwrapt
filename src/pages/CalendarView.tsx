@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -58,12 +57,14 @@ const CalendarView = () => {
         throw new Error('User not authenticated');
       }
 
+      console.log('Getting session for auth headers...');
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
         throw new Error('No active session found');
       }
 
+      console.log('Calling google-calendar edge function with auth headers...');
       const { data: authData, error: authError } = await supabase.functions.invoke('google-calendar', {
         body: { action: 'get_auth_url', redirect_context: 'calendar' },
         headers: {
@@ -71,7 +72,10 @@ const CalendarView = () => {
         }
       });
 
+      console.log('Auth URL response:', { authData, authError });
+
       if (authError) {
+        console.error('Error getting auth URL:', authError);
         throw new Error(authError.message || 'Failed to get authorization URL');
       }
 
@@ -79,6 +83,7 @@ const CalendarView = () => {
         throw new Error('No authorization URL received from server');
       }
 
+      console.log('Redirecting to Google OAuth:', authData.authUrl);
       window.location.href = authData.authUrl;
       
     } catch (error) {
@@ -95,6 +100,11 @@ const CalendarView = () => {
   const refreshCalendarEvents = async () => {
     if (!calendarIntegration?.access_token) {
       console.log('No access token available for refreshing events');
+      toast({
+        title: "No Calendar Connected",
+        description: "Please connect your Google Calendar first.",
+        variant: "destructive"
+      });
       return;
     }
 
@@ -106,7 +116,7 @@ const CalendarView = () => {
         throw new Error('No active session found');
       }
 
-      console.log('Refreshing calendar events...');
+      console.log('Refreshing calendar events with token:', calendarIntegration.access_token ? 'Token exists' : 'No token');
 
       const { data: eventsData, error: eventsError } = await supabase.functions.invoke('google-calendar', {
         body: { action: 'fetch_events', access_token: calendarIntegration.access_token },
@@ -115,13 +125,15 @@ const CalendarView = () => {
         }
       });
 
+      console.log('Events fetch response:', { eventsData, eventsError });
+
       if (eventsError) {
         console.error('Error fetching events:', eventsError);
         throw new Error(eventsError.message || 'Failed to fetch calendar events');
       }
 
       const events = eventsData?.events || [];
-      console.log('Received events:', events);
+      console.log('Received events:', events.length, 'events:', events);
       setCalendarEvents(events);
 
       toast({
@@ -147,6 +159,8 @@ const CalendarView = () => {
     if (isCalendarConnected && calendarIntegration?.access_token) {
       console.log('Auto-refreshing calendar events on mount');
       refreshCalendarEvents();
+    } else {
+      console.log('Not auto-refreshing:', { isCalendarConnected, hasToken: !!calendarIntegration?.access_token });
     }
   }, [isCalendarConnected, calendarIntegration?.access_token]);
 
