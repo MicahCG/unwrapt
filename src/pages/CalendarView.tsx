@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, ArrowLeft, RefreshCw, Plus, AlertCircle, Settings } from 'lucide-react';
+import { Calendar, ArrowLeft, RefreshCw, Plus, AlertCircle, Settings, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import AppNavigation from '@/components/AppNavigation';
 
 const CalendarView = () => {
   console.log('🔥 CalendarView component is rendering - this should appear in console');
@@ -244,19 +245,21 @@ const CalendarView = () => {
   return (
     <div className="min-h-screen bg-brand-cream p-4">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-6 flex items-center justify-between">
+        {/* Enhanced Navigation Header */}
+        <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center space-x-4">
             <Button
               variant="outline"
               onClick={() => navigate('/')}
               className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
+              <Home className="h-4 w-4 mr-2" />
+              Dashboard
             </Button>
+            <AppNavigation />
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2">
             {isCalendarConnected && (
               <Button
                 variant="outline"
