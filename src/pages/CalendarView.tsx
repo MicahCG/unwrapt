@@ -16,11 +16,15 @@ const CalendarView = () => {
   const { toast } = useToast();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  console.log('CalendarView rendering with user:', user?.id);
+
   // Check for Google Calendar integration
-  const { data: calendarIntegration, refetch: refetchIntegration } = useQuery({
+  const { data: calendarIntegration, refetch: refetchIntegration, isLoading: integrationLoading } = useQuery({
     queryKey: ['calendar-integration', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
+      
+      console.log('Fetching calendar integration for user:', user.id);
       
       const { data, error } = await supabase
         .from('calendar_integrations')
@@ -34,6 +38,7 @@ const CalendarView = () => {
         return null;
       }
       
+      console.log('Calendar integration data:', data);
       return data;
     },
     enabled: !!user?.id
@@ -42,6 +47,8 @@ const CalendarView = () => {
   const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
 
   const isCalendarConnected = !!calendarIntegration;
+
+  console.log('Calendar connected:', isCalendarConnected, 'Integration:', calendarIntegration);
 
   const handleConnectCalendar = async () => {
     try {
@@ -84,7 +91,10 @@ const CalendarView = () => {
   };
 
   const refreshCalendarEvents = async () => {
-    if (!calendarIntegration?.access_token) return;
+    if (!calendarIntegration?.access_token) {
+      console.log('No access token available for refreshing events');
+      return;
+    }
 
     setIsRefreshing(true);
     try {
@@ -94,6 +104,8 @@ const CalendarView = () => {
         throw new Error('No active session found');
       }
 
+      console.log('Refreshing calendar events...');
+
       const { data: eventsData, error: eventsError } = await supabase.functions.invoke('google-calendar', {
         body: { action: 'fetch_events', access_token: calendarIntegration.access_token },
         headers: {
@@ -102,10 +114,12 @@ const CalendarView = () => {
       });
 
       if (eventsError) {
+        console.error('Error fetching events:', eventsError);
         throw new Error(eventsError.message || 'Failed to fetch calendar events');
       }
 
       const events = eventsData?.events || [];
+      console.log('Received events:', events);
       setCalendarEvents(events);
 
       toast({
@@ -129,6 +143,7 @@ const CalendarView = () => {
   // Load calendar events when integration is available
   useEffect(() => {
     if (isCalendarConnected && calendarIntegration?.access_token) {
+      console.log('Auto-refreshing calendar events on mount');
       refreshCalendarEvents();
     }
   }, [isCalendarConnected, calendarIntegration?.access_token]);
@@ -167,6 +182,40 @@ const CalendarView = () => {
     const dateB = new Date(b.date);
     return dateA.getTime() - dateB.getTime();
   });
+
+  // Show loading state while checking integration
+  if (integrationLoading) {
+    return (
+      <div className="min-h-screen bg-brand-cream p-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-6 flex items-center justify-between">
+            <Button
+              variant="outline"
+              onClick={() => navigate('/')}
+              className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center text-brand-charcoal">
+                <Calendar className="h-5 w-5 mr-2" />
+                Special Events Calendar
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal mx-auto mb-4"></div>
+                <p className="text-brand-charcoal/70">Checking calendar integration...</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-brand-cream p-4">
@@ -228,7 +277,8 @@ const CalendarView = () => {
                   No Special Events Found
                 </h3>
                 <p className="text-brand-charcoal/70 mb-6">
-                  We didn't find any birthdays, anniversaries, or special events in your calendar
+                  We didn't find any birthdays, anniversaries, or special events in your calendar.
+                  Try creating an event with keywords like "Birthday", "Anniversary", "Wedding", or including "born" in the title.
                 </p>
                 <Button
                   variant="outline"
