@@ -18,20 +18,25 @@ const SettingsOAuthCallback: React.FC = () => {
     const handleOAuthCallback = async () => {
       // Prevent multiple processing attempts
       if (hasProcessed) {
-        console.log('Already processed, skipping...');
+        console.log('📋 SettingsOAuthCallback: Already processed, skipping...');
         return;
       }
 
-      console.log('Settings OAuth Callback component mounted');
-      console.log('Current URL search params:', window.location.search);
-      console.log('User from AuthProvider:', user);
-      console.log('Retry count:', retryCount);
+      console.log('📋 SettingsOAuthCallback: Component mounted and processing');
+      console.log('📋 SettingsOAuthCallback: Current URL:', window.location.href);
+      console.log('📋 SettingsOAuthCallback: Search params:', window.location.search);
+      console.log('📋 SettingsOAuthCallback: User from AuthProvider:', { 
+        hasUser: !!user, 
+        userId: user?.id,
+        email: user?.email 
+      });
+      console.log('📋 SettingsOAuthCallback: Retry count:', retryCount);
       
       const code = searchParams.get('code');
       const error = searchParams.get('error');
       const state = searchParams.get('state');
 
-      console.log('OAuth callback received:', { 
+      console.log('📋 SettingsOAuthCallback: OAuth params:', { 
         hasCode: !!code, 
         codeLength: code?.length || 0,
         error, 
@@ -41,7 +46,7 @@ const SettingsOAuthCallback: React.FC = () => {
       });
 
       if (error) {
-        console.error('OAuth error received:', error);
+        console.error('📋 SettingsOAuthCallback: OAuth error received:', error);
         setHasProcessed(true);
         toast({
           title: "Calendar Connection Failed",
@@ -53,7 +58,7 @@ const SettingsOAuthCallback: React.FC = () => {
       }
 
       if (!code) {
-        console.log('No code received, redirecting to settings...');
+        console.log('📋 SettingsOAuthCallback: No code received, redirecting to settings...');
         setHasProcessed(true);
         navigate('/settings', { replace: true });
         return;
@@ -62,31 +67,36 @@ const SettingsOAuthCallback: React.FC = () => {
       // Check session directly from Supabase if user isn't available from provider
       let currentUser = user;
       if (!currentUser) {
-        console.log('User not available from provider, checking Supabase session directly...');
+        console.log('📋 SettingsOAuthCallback: User not available from provider, checking Supabase session directly...');
         try {
           const { data: { session } } = await supabase.auth.getSession();
           currentUser = session?.user || null;
-          console.log('Session check result:', { 
+          console.log('📋 SettingsOAuthCallback: Session check result:', { 
             hasSession: !!session, 
             hasUser: !!currentUser,
-            userId: currentUser?.id 
+            userId: currentUser?.id,
+            sessionDetails: session ? {
+              access_token: session.access_token ? 'present' : 'missing',
+              refresh_token: session.refresh_token ? 'present' : 'missing',
+              expires_at: session.expires_at
+            } : null
           });
         } catch (sessionError) {
-          console.error('Error checking session:', sessionError);
+          console.error('📋 SettingsOAuthCallback: Error checking session:', sessionError);
         }
       }
 
       // If we still don't have a user, implement retry logic
       if (!currentUser) {
         if (retryCount < maxRetries) {
-          console.log(`No user found, waiting for auth state to update... Retry ${retryCount + 1}/${maxRetries}`);
+          console.log(`📋 SettingsOAuthCallback: No user found, waiting for auth state to update... Retry ${retryCount + 1}/${maxRetries}`);
           // Increment retry count and wait 1 second before trying again
           setTimeout(() => {
             setRetryCount(prev => prev + 1);
           }, 1000);
           return;
         } else {
-          console.error('Max retries reached, user still not available');
+          console.error('📋 SettingsOAuthCallback: Max retries reached, user still not available');
           setHasProcessed(true);
           toast({
             title: "Authentication Required",
@@ -102,7 +112,7 @@ const SettingsOAuthCallback: React.FC = () => {
       setHasProcessed(true);
 
       try {
-        console.log('Processing OAuth code for calendar connection with user:', currentUser.id);
+        console.log('📋 SettingsOAuthCallback: Processing OAuth code for calendar connection with user:', currentUser.id);
         
         // Get the current session for authorization
         const { data: { session } } = await supabase.auth.getSession();
@@ -111,8 +121,13 @@ const SettingsOAuthCallback: React.FC = () => {
           throw new Error('No active session found');
         }
 
+        console.log('📋 SettingsOAuthCallback: Session for API call:', {
+          hasAccessToken: !!session.access_token,
+          userId: session.user?.id
+        });
+
         // Exchange code for token
-        console.log('Exchanging authorization code for access token...');
+        console.log('📋 SettingsOAuthCallback: Exchanging authorization code for access token...');
         const { data: tokenData, error: tokenError } = await supabase.functions.invoke('google-calendar', {
           body: { action: 'exchange_code', code },
           headers: {
@@ -120,14 +135,14 @@ const SettingsOAuthCallback: React.FC = () => {
           }
         });
 
-        console.log('Token exchange response:', { 
+        console.log('📋 SettingsOAuthCallback: Token exchange response:', { 
           success: !!tokenData, 
           hasAccessToken: !!tokenData?.access_token,
           error: tokenError 
         });
 
         if (tokenError) {
-          console.error('Token exchange error:', tokenError);
+          console.error('📋 SettingsOAuthCallback: Token exchange error:', tokenError);
           throw new Error(tokenError.message || 'Failed to exchange authorization code');
         }
 
@@ -135,7 +150,7 @@ const SettingsOAuthCallback: React.FC = () => {
           throw new Error('No access token received from Google');
         }
 
-        console.log('Calendar connected successfully from settings');
+        console.log('📋 SettingsOAuthCallback: Calendar connected successfully from settings');
         
         toast({
           title: "Calendar Connected Successfully!",
@@ -145,7 +160,7 @@ const SettingsOAuthCallback: React.FC = () => {
         navigate('/settings', { replace: true });
 
       } catch (error) {
-        console.error('Error processing OAuth callback:', error);
+        console.error('📋 SettingsOAuthCallback: Error processing OAuth callback:', error);
         const errorMessage = error instanceof Error ? error.message : 'Failed to process calendar connection';
         toast({
           title: "Calendar Connection Failed",
@@ -166,6 +181,9 @@ const SettingsOAuthCallback: React.FC = () => {
         <p className="text-brand-charcoal">Connecting Google Calendar...</p>
         <p className="text-brand-charcoal/70 text-sm mt-2">
           {!user ? `Waiting for authentication... (${retryCount}/${maxRetries})` : 'Processing connection...'}
+        </p>
+        <p className="text-brand-charcoal/50 text-xs mt-4">
+          Check browser console for detailed logs
         </p>
       </div>
     </div>

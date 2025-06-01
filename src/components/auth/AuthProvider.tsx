@@ -25,8 +25,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('🔧 AuthProvider: Setting up auth state management');
+    
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('🔧 AuthProvider: Initial session check:', { 
+        hasSession: !!session, 
+        hasUser: !!session?.user,
+        userId: session?.user?.id 
+      });
       setUser(session?.user ?? null);
       setLoading(false);
     });
@@ -34,7 +41,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔧 AuthProvider: Auth state change:', { 
+        event, 
+        hasSession: !!session, 
+        hasUser: !!session?.user,
+        userId: session?.user?.id,
+        currentPath: window.location.pathname,
+        searchParams: window.location.search 
+      });
       setUser(session?.user ?? null);
       setLoading(false);
     });
@@ -42,7 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen for fake auth events (development only)
     const handleFakeAuth = (event: CustomEvent) => {
       if (process.env.NODE_ENV === 'development') {
-        console.log('Fake auth triggered:', event.detail);
+        console.log('🔧 AuthProvider: Fake auth triggered:', event.detail);
         setUser(event.detail.user as User);
         setLoading(false);
       }
@@ -51,12 +66,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     window.addEventListener('fake-auth', handleFakeAuth as EventListener);
 
     return () => {
+      console.log('🔧 AuthProvider: Cleaning up auth listeners');
       subscription.unsubscribe();
       window.removeEventListener('fake-auth', handleFakeAuth as EventListener);
     };
   }, []);
 
+  // Log user state changes
+  useEffect(() => {
+    console.log('🔧 AuthProvider: User state updated:', { 
+      hasUser: !!user, 
+      userId: user?.id,
+      email: user?.email,
+      loading 
+    });
+  }, [user, loading]);
+
   const signInWithGoogle = async () => {
+    console.log('🔧 AuthProvider: Starting Google sign in');
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -64,11 +91,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       },
     });
     if (error) {
-      console.error('Error signing in with Google:', error);
+      console.error('🔧 AuthProvider: Error signing in with Google:', error);
     }
   };
 
   const signOut = async () => {
+    console.log('🔧 AuthProvider: Signing out');
     // Clear fake user state
     if (process.env.NODE_ENV === 'development') {
       setUser(null);
@@ -76,7 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     const { error } = await supabase.auth.signOut();
     if (error) {
-      console.error('Error signing out:', error);
+      console.error('🔧 AuthProvider: Error signing out:', error);
     }
   };
 
