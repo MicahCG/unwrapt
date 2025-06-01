@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, ArrowLeft, RefreshCw, Plus, AlertCircle } from 'lucide-react';
+import { Calendar, ArrowLeft, RefreshCw, Plus, AlertCircle, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQuery } from '@tanstack/react-query';
@@ -16,10 +16,11 @@ const CalendarView = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
 
   console.log('CalendarView rendering with user:', user?.id);
 
-  // Check for Google Calendar integration
+  // Check for Google Calendar integration with forced refetch
   const { data: calendarIntegration, refetch: refetchIntegration, isLoading: integrationLoading } = useQuery({
     queryKey: ['calendar-integration', user?.id],
     queryFn: async () => {
@@ -42,14 +43,21 @@ const CalendarView = () => {
       console.log('Calendar integration data:', data);
       return data;
     },
-    enabled: !!user?.id
+    enabled: !!user?.id,
+    staleTime: 0, // Always refetch to detect new connections
+    refetchOnMount: true
   });
-
-  const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
 
   const isCalendarConnected = !!calendarIntegration;
 
   console.log('Calendar connected:', isCalendarConnected, 'Integration:', calendarIntegration);
+
+  // Force refetch integration when component mounts
+  useEffect(() => {
+    if (user?.id) {
+      refetchIntegration();
+    }
+  }, [user?.id, refetchIntegration]);
 
   const handleConnectCalendar = async () => {
     try {
@@ -248,17 +256,27 @@ const CalendarView = () => {
             </Button>
           </div>
 
-          {isCalendarConnected && (
+          <div className="flex items-center space-x-2">
+            {isCalendarConnected && (
+              <Button
+                variant="outline"
+                onClick={refreshCalendarEvents}
+                disabled={isRefreshing}
+                className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                Refresh Events
+              </Button>
+            )}
             <Button
               variant="outline"
-              onClick={refreshCalendarEvents}
-              disabled={isRefreshing}
+              onClick={() => navigate('/settings')}
               className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light"
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-              Refresh Events
+              <Settings className="h-4 w-4 mr-2" />
+              Settings
             </Button>
-          )}
+          </div>
         </div>
 
         <Card>

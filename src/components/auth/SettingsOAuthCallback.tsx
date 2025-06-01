@@ -105,10 +105,11 @@ const SettingsOAuthCallback: React.FC = () => {
         
         toast({
           title: "Calendar Connected Successfully!",
-          description: "Your Google Calendar has been connected to your account.",
+          description: "Redirecting to your calendar view...",
         });
 
-        navigate('/settings', { replace: true });
+        // Redirect to calendar view instead of settings
+        navigate('/calendar', { replace: true });
 
       } catch (error) {
         console.error('📋 SettingsOAuthCallback: Error processing OAuth callback:', error);
