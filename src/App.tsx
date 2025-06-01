@@ -21,6 +21,8 @@ import SettingsOAuthCallback from "./components/auth/SettingsOAuthCallback";
 const queryClient = new QueryClient();
 
 function App() {
+  console.log('App component rendering - checking routes');
+  
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

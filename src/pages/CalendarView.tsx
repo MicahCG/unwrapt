@@ -11,6 +11,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 const CalendarView = () => {
+  console.log('🔥 CalendarView component is rendering - this should appear in console');
+  
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
