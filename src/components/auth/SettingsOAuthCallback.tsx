@@ -9,16 +9,18 @@ const SettingsOAuthCallback: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [hasProcessed, setHasProcessed] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 15; // Wait up to 15 seconds for user
+  const [isProcessing, setIsProcessing] = useState(false);
+  const maxRetries = 20; // Increased retry count
+  const retryDelay = 1000; // 1 second delay between retries
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
       // Prevent multiple processing attempts
-      if (hasProcessed) {
-        console.log('📋 SettingsOAuthCallback: Already processed, skipping...');
+      if (hasProcessed || isProcessing) {
+        console.log('📋 SettingsOAuthCallback: Already processed or processing, skipping...');
         return;
       }
 
@@ -28,7 +30,8 @@ const SettingsOAuthCallback: React.FC = () => {
       console.log('📋 SettingsOAuthCallback: User from AuthProvider:', { 
         hasUser: !!user, 
         userId: user?.id,
-        email: user?.email 
+        email: user?.email,
+        loading
       });
       console.log('📋 SettingsOAuthCallback: Retry count:', retryCount);
       
@@ -42,6 +45,7 @@ const SettingsOAuthCallback: React.FC = () => {
         error, 
         state,
         userFromProvider: !!user,
+        authLoading: loading,
         retryCount
       });
 
@@ -64,23 +68,33 @@ const SettingsOAuthCallback: React.FC = () => {
         return;
       }
 
+      // Wait for auth loading to complete first
+      if (loading) {
+        console.log('📋 SettingsOAuthCallback: Auth still loading, waiting...');
+        return;
+      }
+
       // Check session directly from Supabase if user isn't available from provider
       let currentUser = user;
       if (!currentUser) {
         console.log('📋 SettingsOAuthCallback: User not available from provider, checking Supabase session directly...');
         try {
-          const { data: { session } } = await supabase.auth.getSession();
-          currentUser = session?.user || null;
-          console.log('📋 SettingsOAuthCallback: Session check result:', { 
-            hasSession: !!session, 
-            hasUser: !!currentUser,
-            userId: currentUser?.id,
-            sessionDetails: session ? {
-              access_token: session.access_token ? 'present' : 'missing',
-              refresh_token: session.refresh_token ? 'present' : 'missing',
-              expires_at: session.expires_at
-            } : null
-          });
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+          if (sessionError) {
+            console.error('📋 SettingsOAuthCallback: Error checking session:', sessionError);
+          } else {
+            currentUser = session?.user || null;
+            console.log('📋 SettingsOAuthCallback: Session check result:', { 
+              hasSession: !!session, 
+              hasUser: !!currentUser,
+              userId: currentUser?.id,
+              sessionDetails: session ? {
+                access_token: session.access_token ? 'present' : 'missing',
+                refresh_token: session.refresh_token ? 'present' : 'missing',
+                expires_at: session.expires_at
+              } : null
+            });
+          }
         } catch (sessionError) {
           console.error('📋 SettingsOAuthCallback: Error checking session:', sessionError);
         }
@@ -90,10 +104,10 @@ const SettingsOAuthCallback: React.FC = () => {
       if (!currentUser) {
         if (retryCount < maxRetries) {
           console.log(`📋 SettingsOAuthCallback: No user found, waiting for auth state to update... Retry ${retryCount + 1}/${maxRetries}`);
-          // Increment retry count and wait 1 second before trying again
+          // Use a longer delay and increment retry count
           setTimeout(() => {
             setRetryCount(prev => prev + 1);
-          }, 1000);
+          }, retryDelay);
           return;
         } else {
           console.error('📋 SettingsOAuthCallback: Max retries reached, user still not available');
@@ -109,15 +123,16 @@ const SettingsOAuthCallback: React.FC = () => {
       }
 
       // We have both code and user, process the OAuth
+      setIsProcessing(true);
       setHasProcessed(true);
 
       try {
         console.log('📋 SettingsOAuthCallback: Processing OAuth code for calendar connection with user:', currentUser.id);
         
         // Get the current session for authorization
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        if (!session) {
+        if (sessionError || !session) {
           throw new Error('No active session found');
         }
 
@@ -168,11 +183,13 @@ const SettingsOAuthCallback: React.FC = () => {
           variant: "destructive"
         });
         navigate('/settings', { replace: true });
+      } finally {
+        setIsProcessing(false);
       }
     };
 
     handleOAuthCallback();
-  }, [navigate, searchParams, toast, user, hasProcessed, retryCount]);
+  }, [navigate, searchParams, toast, user, loading, hasProcessed, retryCount, isProcessing]);
 
   return (
     <div className="min-h-screen bg-brand-cream flex items-center justify-center">
@@ -180,7 +197,9 @@ const SettingsOAuthCallback: React.FC = () => {
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal mx-auto mb-4"></div>
         <p className="text-brand-charcoal">Connecting Google Calendar...</p>
         <p className="text-brand-charcoal/70 text-sm mt-2">
-          {!user ? `Waiting for authentication... (${retryCount}/${maxRetries})` : 'Processing connection...'}
+          {loading ? 'Loading authentication...' : 
+           !user ? `Waiting for authentication... (${retryCount}/${maxRetries})` : 
+           'Processing connection...'}
         </p>
         <p className="text-brand-charcoal/50 text-xs mt-4">
           Check browser console for detailed logs
