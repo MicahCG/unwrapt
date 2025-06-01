@@ -31,10 +31,11 @@ Deno.serve(async (req) => {
 
     if (action === 'get_auth_url') {
       const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
-      // Use different redirect URLs based on context
+      
+      // Use the correct redirect URL based on context
       const baseRedirectUri = redirect_context === 'settings' 
         ? `${req.headers.get('origin')}/auth/callback/settings`
-        : `${req.headers.get('origin')}/auth/callback`
+        : `${req.headers.get('origin')}/auth/callback/calendar`
       
       const scope = 'https://www.googleapis.com/auth/calendar.readonly'
       
@@ -52,10 +53,13 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'exchange_code') {
-      // Determine redirect URI based on the current context
-      const redirectUri = req.headers.get('referer')?.includes('/settings') 
+      // Determine redirect URI based on the current request path
+      const currentPath = req.headers.get('referer') || ''
+      const redirectUri = currentPath.includes('/settings') 
         ? `${req.headers.get('origin')}/auth/callback/settings`
-        : `${req.headers.get('origin')}/auth/callback`
+        : `${req.headers.get('origin')}/auth/callback/calendar`
+
+      console.log('Exchange code - redirect URI:', redirectUri)
 
       // Exchange authorization code for access token
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -73,6 +77,7 @@ Deno.serve(async (req) => {
       const tokenData = await tokenResponse.json()
 
       if (tokenData.error) {
+        console.error('Token exchange error:', tokenData.error)
         return new Response(JSON.stringify({ error: tokenData.error }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -82,12 +87,14 @@ Deno.serve(async (req) => {
       // Store the integration
       const { error: insertError } = await supabase
         .from('calendar_integrations')
-        .insert({
+        .upsert({
           user_id: user.id,
           provider: 'google',
           access_token: tokenData.access_token,
           refresh_token: tokenData.refresh_token,
           expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
+        }, {
+          onConflict: 'user_id,provider'
         })
 
       if (insertError) {

@@ -34,13 +34,11 @@ const CalendarOAuthCallback: React.FC = () => {
       const code = searchParams.get('code');
       const error = searchParams.get('error');
       const state = searchParams.get('state');
-      const redirectContext = searchParams.get('redirect_context') || 'calendar';
 
       console.log('📅 CalendarOAuthCallback: OAuth params:', { 
         hasCode: !!code, 
         error, 
         state,
-        redirectContext,
         retryCount
       });
 
@@ -52,14 +50,14 @@ const CalendarOAuthCallback: React.FC = () => {
           description: error,
           variant: "destructive"
         });
-        navigate(redirectContext === 'settings' ? '/settings' : '/calendar', { replace: true });
+        navigate('/calendar', { replace: true });
         return;
       }
 
       if (!code) {
         console.log('📅 CalendarOAuthCallback: No code received, redirecting...');
         setHasProcessed(true);
-        navigate(redirectContext === 'settings' ? '/settings' : '/calendar', { replace: true });
+        navigate('/calendar', { replace: true });
         return;
       }
 
@@ -106,7 +104,7 @@ const CalendarOAuthCallback: React.FC = () => {
             description: "Please log in again to connect your calendar.",
             variant: "destructive"
           });
-          navigate(redirectContext === 'settings' ? '/settings' : '/calendar', { replace: true });
+          navigate('/calendar', { replace: true });
           return;
         }
       }
@@ -154,7 +152,7 @@ const CalendarOAuthCallback: React.FC = () => {
           description: "Your Google Calendar has been connected to your account.",
         });
 
-        navigate(redirectContext === 'settings' ? '/settings' : '/calendar', { replace: true });
+        navigate('/calendar', { replace: true });
 
       } catch (error) {
         console.error('📅 CalendarOAuthCallback: Error processing OAuth callback:', error);
@@ -164,7 +162,7 @@ const CalendarOAuthCallback: React.FC = () => {
           description: errorMessage,
           variant: "destructive"
         });
-        navigate(redirectContext === 'settings' ? '/settings' : '/calendar', { replace: true });
+        navigate('/calendar', { replace: true });
       } finally {
         setIsProcessing(false);
       }
