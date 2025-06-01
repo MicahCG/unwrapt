@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,6 +16,7 @@ import Settings from "./pages/Settings";
 import Onboarding from "./pages/Onboarding";
 import OAuthCallback from "./components/auth/OAuthCallback";
 import SettingsOAuthCallback from "./components/auth/SettingsOAuthCallback";
+import CalendarOAuthCallback from "./components/auth/CalendarOAuthCallback";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +42,7 @@ function App() {
               <Route path="/settings" element={<Settings />} />
               <Route path="/auth/callback" element={<OAuthCallback />} />
               <Route path="/auth/callback/settings" element={<SettingsOAuthCallback />} />
+              <Route path="/auth/callback/calendar" element={<CalendarOAuthCallback />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>
