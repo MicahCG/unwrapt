@@ -11,6 +11,8 @@ const SettingsOAuthCallback: React.FC = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [hasProcessed, setHasProcessed] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 10; // Wait up to 10 seconds for user
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
@@ -23,6 +25,7 @@ const SettingsOAuthCallback: React.FC = () => {
       console.log('Settings OAuth Callback component mounted');
       console.log('Current URL search params:', window.location.search);
       console.log('User in callback:', user);
+      console.log('Retry count:', retryCount);
       
       const code = searchParams.get('code');
       const error = searchParams.get('error');
@@ -33,7 +36,8 @@ const SettingsOAuthCallback: React.FC = () => {
         codeLength: code?.length || 0,
         error, 
         state,
-        userExists: !!user
+        userExists: !!user,
+        retryCount
       });
 
       if (error) {
@@ -55,11 +59,26 @@ const SettingsOAuthCallback: React.FC = () => {
         return;
       }
 
-      // If we have a code but no user, wait for authentication
+      // If we have a code but no user, wait for authentication with retry logic
       if (!user) {
-        console.log('No user found, waiting for auth state to update...');
-        // Don't set hasProcessed here, let it retry when user becomes available
-        return;
+        if (retryCount < maxRetries) {
+          console.log(`No user found, waiting for auth state to update... Retry ${retryCount + 1}/${maxRetries}`);
+          // Increment retry count and wait 1 second before trying again
+          setTimeout(() => {
+            setRetryCount(prev => prev + 1);
+          }, 1000);
+          return;
+        } else {
+          console.error('Max retries reached, user still not available');
+          setHasProcessed(true);
+          toast({
+            title: "Authentication Required",
+            description: "Please log in again to connect your calendar.",
+            variant: "destructive"
+          });
+          navigate('/settings', { replace: true });
+          return;
+        }
       }
 
       // We have both code and user, process the OAuth
@@ -120,7 +139,7 @@ const SettingsOAuthCallback: React.FC = () => {
     };
 
     handleOAuthCallback();
-  }, [navigate, searchParams, toast, user, hasProcessed]);
+  }, [navigate, searchParams, toast, user, hasProcessed, retryCount]);
 
   return (
     <div className="min-h-screen bg-brand-cream flex items-center justify-center">
@@ -128,7 +147,7 @@ const SettingsOAuthCallback: React.FC = () => {
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal mx-auto mb-4"></div>
         <p className="text-brand-charcoal">Connecting Google Calendar...</p>
         <p className="text-brand-charcoal/70 text-sm mt-2">
-          {!user ? 'Waiting for authentication...' : 'Processing connection...'}
+          {!user ? `Waiting for authentication... (${retryCount}/${maxRetries})` : 'Processing connection...'}
         </p>
       </div>
     </div>
