@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQuery } from '@tanstack/react-query';
@@ -10,14 +9,17 @@ import Dashboard from '@/components/Dashboard';
 const Index = () => {
   const { user, loading } = useAuth();
 
-  // Check if user has completed onboarding by looking for existing recipients or profiles
+  // Check if user has completed onboarding by looking for existing recipients
   const { data: hasCompletedOnboarding, isLoading: checkingOnboarding } = useQuery({
     queryKey: ['onboarding-status', user?.id],
     queryFn: async () => {
       if (!user?.id) return false;
       
+      console.log('🔧 Index: Checking onboarding status for user:', user.id);
+      
       // For fake dev user, always return true to skip onboarding
       if (process.env.NODE_ENV === 'development' && user.id === '00000000-0000-0000-0000-000000000001') {
+        console.log('🔧 Index: Fake dev user detected, skipping onboarding');
         return true;
       }
       
@@ -32,27 +34,27 @@ const Index = () => {
         console.error('Error checking recipients:', recipientsError);
       }
       
+      console.log('🔧 Index: Recipients found:', recipients?.length || 0);
+      
       // If user has recipients, they've definitely completed onboarding
       if (recipients && recipients.length > 0) {
+        console.log('🔧 Index: User has recipients, onboarding complete');
         return true;
       }
       
-      // Also check if user has a profile (could indicate returning user)
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', user.id)
-        .single();
-      
-      if (profileError && profileError.code !== 'PGRST116') {
-        console.error('Error checking profile:', profileError);
-      }
-      
-      // If user has a profile, consider them as having completed onboarding
-      // (they might be a returning user who had an account before onboarding was implemented)
-      return !!profile;
+      // For new users with no recipients, they need onboarding
+      console.log('🔧 Index: New user detected, needs onboarding');
+      return false;
     },
     enabled: !!user?.id
+  });
+
+  console.log('🔧 Index: Render state:', { 
+    hasUser: !!user, 
+    loading, 
+    checkingOnboarding, 
+    hasCompletedOnboarding,
+    userId: user?.id 
   });
 
   if (loading || checkingOnboarding) {
@@ -64,15 +66,18 @@ const Index = () => {
   }
 
   if (!user) {
+    console.log('🔧 Index: No user, showing login page');
     return <LoginPage />;
   }
 
   // If user has completed onboarding, show Dashboard
   if (hasCompletedOnboarding) {
+    console.log('🔧 Index: User completed onboarding, showing dashboard');
     return <Dashboard />;
   }
 
   // Otherwise, show onboarding flow
+  console.log('🔧 Index: User needs onboarding, showing onboarding flow');
   return (
     <OnboardingFlow 
       onBack={() => {
