@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -5,6 +6,7 @@ import { Check, ArrowDown, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { useLocation } from 'react-router-dom';
 
 interface CalendarStepProps {
   onNext: (data: any) => void;
@@ -14,9 +16,38 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [foundDates, setFoundDates] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [hasProcessedCallback, setHasProcessedCallback] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const location = useLocation();
+
+  // Check for OAuth callback on component mount
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const code = searchParams.get('code');
+    const state = searchParams.get('state');
+    const error = searchParams.get('error');
+
+    if (error) {
+      console.error('📅 CalendarStep: OAuth error received:', error);
+      setError(error);
+      setIsConnecting(false);
+      toast({
+        title: "Calendar Connection Failed",
+        description: error,
+        variant: "destructive"
+      });
+      // Clear URL parameters
+      window.history.replaceState({}, '', window.location.pathname);
+      return;
+    }
+
+    if (code && state === 'calendar') {
+      console.log('📅 CalendarStep: Processing OAuth callback with code');
+      handleOAuthCallback(code, state);
+      // Clear URL parameters
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [location.search]);
 
   const handleGoogleConnect = async () => {
     console.log('Starting Google Calendar connection...');
@@ -37,7 +68,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
 
       console.log('Calling google-calendar edge function with auth headers...');
       const { data: authData, error: authError } = await supabase.functions.invoke('google-calendar', {
-        body: { action: 'get_auth_url' },
+        body: { action: 'get_auth_url', redirect_context: 'calendar' },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         }
@@ -70,27 +101,8 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
     }
   };
 
-  // Check for OAuth callback code from sessionStorage
-  useEffect(() => {
-    if (hasProcessedCallback) {
-      console.log('OAuth callback already processed, skipping...');
-      return;
-    }
-
-    const code = sessionStorage.getItem('google_oauth_code');
-    
-    if (code) {
-      console.log('Found OAuth code in sessionStorage, processing...', code.substring(0, 20) + '...');
-      setHasProcessedCallback(true);
-      sessionStorage.removeItem('google_oauth_code');
-      handleOAuthCallback(code);
-    } else {
-      console.log('No OAuth code found in sessionStorage');
-    }
-  }, [hasProcessedCallback]);
-
-  const handleOAuthCallback = async (code: string) => {
-    console.log('Processing OAuth callback with code length:', code.length);
+  const handleOAuthCallback = async (code: string, state: string) => {
+    console.log('Processing OAuth callback with code and state:', { codeLength: code.length, state });
     setIsConnecting(true);
     setError(null);
     
@@ -109,7 +121,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
       // Exchange code for token
       console.log('Exchanging authorization code for access token...');
       const { data: tokenData, error: tokenError } = await supabase.functions.invoke('google-calendar', {
-        body: { action: 'exchange_code', code },
+        body: { action: 'exchange_code', code, state },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         }
@@ -179,7 +191,6 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
       const errorMessage = error instanceof Error ? error.message : 'Failed to process calendar connection';
       setError(errorMessage);
       setIsConnecting(false);
-      setHasProcessedCallback(false); // Allow retry
       toast({
         title: "Calendar Connection Failed",
         description: errorMessage,
@@ -208,7 +219,6 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
     console.log('Retrying calendar connection...');
     setError(null);
     setIsConnecting(false);
-    setHasProcessedCallback(false);
     setFoundDates([]);
   };
 
