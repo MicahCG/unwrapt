@@ -7,14 +7,14 @@ const OAuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
-    console.log('OAuth Callback component mounted');
-    console.log('Current URL search params:', window.location.search);
+    console.log('🔧 OAuthCallback: Processing callback');
+    console.log('🔧 OAuthCallback: Current URL search params:', window.location.search);
     
     const code = searchParams.get('code');
     const error = searchParams.get('error');
     const state = searchParams.get('state');
 
-    console.log('OAuth callback received:', { 
+    console.log('🔧 OAuthCallback: OAuth callback received:', { 
       hasCode: !!code, 
       codeLength: code?.length || 0,
       error, 
@@ -22,7 +22,7 @@ const OAuthCallback: React.FC = () => {
     });
 
     if (error) {
-      console.error('OAuth error received:', error);
+      console.error('🔧 OAuthCallback: OAuth error received:', error);
       // Clear any existing code from sessionStorage on error
       sessionStorage.removeItem('google_oauth_code');
       navigate('/', { replace: true });
@@ -30,15 +30,20 @@ const OAuthCallback: React.FC = () => {
     }
 
     if (code) {
-      console.log('Storing OAuth code in sessionStorage and redirecting...');
-      // Store the code in sessionStorage so CalendarStep can pick it up
+      console.log('🔧 OAuthCallback: Storing OAuth code and redirecting based on state:', state);
+      
+      // Store the code in sessionStorage so the appropriate component can pick it up
       sessionStorage.setItem('google_oauth_code', code);
       
-      // Redirect back to the main app where CalendarStep will process it
-      navigate('/', { replace: true });
+      // Redirect based on state parameter
+      if (state === 'settings') {
+        navigate('/settings', { replace: true });
+      } else {
+        // Default to home for calendar connection (onboarding context)
+        navigate('/', { replace: true });
+      }
     } else {
-      console.log('No code or error received, redirecting to home...');
-      // No code or error, redirect back
+      console.log('🔧 OAuthCallback: No code or error received, redirecting to home...');
       navigate('/', { replace: true });
     }
   }, [navigate, searchParams]);

@@ -6,7 +6,6 @@ import { Check, ArrowDown, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { useLocation } from 'react-router-dom';
 
 interface CalendarStepProps {
   onNext: (data: any) => void;
@@ -18,39 +17,23 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
-  const location = useLocation();
 
-  // Check for OAuth callback on component mount
+  // Check for OAuth code on component mount (for cases where user comes back from OAuth)
   useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    const code = searchParams.get('code');
-    const state = searchParams.get('state');
-    const error = searchParams.get('error');
+    const checkForOAuthCode = () => {
+      const storedCode = sessionStorage.getItem('google_oauth_code');
+      if (storedCode) {
+        console.log('📅 CalendarStep: Found stored OAuth code, processing...');
+        handleOAuthCallback(storedCode, 'calendar');
+        sessionStorage.removeItem('google_oauth_code');
+      }
+    };
 
-    if (error) {
-      console.error('📅 CalendarStep: OAuth error received:', error);
-      setError(error);
-      setIsConnecting(false);
-      toast({
-        title: "Calendar Connection Failed",
-        description: error,
-        variant: "destructive"
-      });
-      // Clear URL parameters
-      window.history.replaceState({}, '', window.location.pathname);
-      return;
-    }
-
-    if (code && state === 'calendar') {
-      console.log('📅 CalendarStep: Processing OAuth callback with code');
-      handleOAuthCallback(code, state);
-      // Clear URL parameters
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-  }, [location.search]);
+    checkForOAuthCode();
+  }, []);
 
   const handleGoogleConnect = async () => {
-    console.log('Starting Google Calendar connection...');
+    console.log('📅 CalendarStep: Starting Google Calendar connection...');
     setIsConnecting(true);
     setError(null);
     
@@ -59,14 +42,14 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
         throw new Error('User not authenticated');
       }
 
-      console.log('Getting session for auth headers...');
+      console.log('📅 CalendarStep: Getting session for auth headers...');
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
         throw new Error('No active session found');
       }
 
-      console.log('Calling google-calendar edge function with auth headers...');
+      console.log('📅 CalendarStep: Calling google-calendar edge function...');
       const { data: authData, error: authError } = await supabase.functions.invoke('google-calendar', {
         body: { action: 'get_auth_url', redirect_context: 'calendar' },
         headers: {
@@ -74,10 +57,10 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
         }
       });
 
-      console.log('Auth URL response:', { authData, authError });
+      console.log('📅 CalendarStep: Auth URL response:', { authData, authError });
 
       if (authError) {
-        console.error('Error getting auth URL:', authError);
+        console.error('📅 CalendarStep: Error getting auth URL:', authError);
         throw new Error(authError.message || 'Failed to get authorization URL');
       }
 
@@ -85,11 +68,11 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
         throw new Error('No authorization URL received from server');
       }
 
-      console.log('Redirecting to Google OAuth:', authData.authUrl);
+      console.log('📅 CalendarStep: Redirecting to Google OAuth:', authData.authUrl);
       window.location.href = authData.authUrl;
       
     } catch (error) {
-      console.error('Error connecting to Google Calendar:', error);
+      console.error('📅 CalendarStep: Error connecting to Google Calendar:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to connect to Google Calendar';
       setError(errorMessage);
       setIsConnecting(false);
@@ -102,7 +85,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
   };
 
   const handleOAuthCallback = async (code: string, state: string) => {
-    console.log('Processing OAuth callback with code and state:', { codeLength: code.length, state });
+    console.log('📅 CalendarStep: Processing OAuth callback with code and state:', { codeLength: code.length, state });
     setIsConnecting(true);
     setError(null);
     
@@ -111,7 +94,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
         throw new Error('User not authenticated');
       }
 
-      console.log('Getting session for token exchange...');
+      console.log('📅 CalendarStep: Getting session for token exchange...');
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
@@ -119,7 +102,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
       }
 
       // Exchange code for token
-      console.log('Exchanging authorization code for access token...');
+      console.log('📅 CalendarStep: Exchanging authorization code for access token...');
       const { data: tokenData, error: tokenError } = await supabase.functions.invoke('google-calendar', {
         body: { action: 'exchange_code', code, state },
         headers: {
@@ -127,14 +110,14 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
         }
       });
 
-      console.log('Token exchange response:', { 
+      console.log('📅 CalendarStep: Token exchange response:', { 
         success: !!tokenData, 
         hasAccessToken: !!tokenData?.access_token,
         error: tokenError 
       });
 
       if (tokenError) {
-        console.error('Token exchange error:', tokenError);
+        console.error('📅 CalendarStep: Token exchange error:', tokenError);
         throw new Error(tokenError.message || 'Failed to exchange authorization code');
       }
 
@@ -143,7 +126,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
       }
 
       // Fetch calendar events
-      console.log('Fetching calendar events with access token...');
+      console.log('📅 CalendarStep: Fetching calendar events with access token...');
       const { data: eventsData, error: eventsError } = await supabase.functions.invoke('google-calendar', {
         body: { action: 'fetch_events', access_token: tokenData.access_token },
         headers: {
@@ -151,19 +134,19 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
         }
       });
 
-      console.log('Events fetch response:', { 
+      console.log('📅 CalendarStep: Events fetch response:', { 
         success: !!eventsData, 
         eventCount: eventsData?.events?.length || 0,
         error: eventsError 
       });
 
       if (eventsError) {
-        console.error('Events fetch error:', eventsError);
+        console.error('📅 CalendarStep: Events fetch error:', eventsError);
         throw new Error(eventsError.message || 'Failed to fetch calendar events');
       }
 
       const events = eventsData?.events || [];
-      console.log('Successfully fetched events:', events.length, 'events found');
+      console.log('📅 CalendarStep: Successfully fetched events:', events.length, 'events found');
       
       setFoundDates(events);
       setIsConnecting(false);
@@ -176,7 +159,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
 
       // Auto-advance to next step after showing success
       setTimeout(() => {
-        console.log('Auto-advancing to next step with calendar data:', { 
+        console.log('📅 CalendarStep: Auto-advancing to next step with calendar data:', { 
           calendarConnected: true,
           importedDates: events 
         });
@@ -187,7 +170,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
       }, 2000);
 
     } catch (error) {
-      console.error('Error processing OAuth callback:', error);
+      console.error('📅 CalendarStep: Error processing OAuth callback:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to process calendar connection';
       setError(errorMessage);
       setIsConnecting(false);
@@ -200,7 +183,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
   };
 
   const handleContinue = () => {
-    console.log('Manual continue with found dates:', foundDates.length);
+    console.log('📅 CalendarStep: Manual continue with found dates:', foundDates.length);
     onNext({ 
       calendarConnected: foundDates.length > 0,
       importedDates: foundDates 
@@ -208,7 +191,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
   };
 
   const handleSkip = () => {
-    console.log('Skipping calendar connection');
+    console.log('📅 CalendarStep: Skipping calendar connection');
     onNext({ 
       calendarConnected: false,
       importedDates: [] 
@@ -216,7 +199,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
   };
 
   const handleRetry = () => {
-    console.log('Retrying calendar connection...');
+    console.log('📅 CalendarStep: Retrying calendar connection...');
     setError(null);
     setIsConnecting(false);
     setFoundDates([]);
