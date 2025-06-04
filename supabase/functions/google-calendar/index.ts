@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
         })
       }
 
-      // Store the integration
+      // Store the integration using the corrected table structure
       console.log('💾 Storing calendar integration for user:', user.id)
       const { error: insertError } = await supabase
         .from('calendar_integrations')
