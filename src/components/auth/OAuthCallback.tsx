@@ -25,26 +25,21 @@ const OAuthCallback: React.FC = () => {
       console.error('🔧 OAuthCallback: OAuth error received:', error);
       // Clear any existing code from sessionStorage on error
       sessionStorage.removeItem('google_oauth_code');
-      navigate('/', { replace: true });
+      navigate('/onboarding', { replace: true });
       return;
     }
 
     if (code) {
-      console.log('🔧 OAuthCallback: Storing OAuth code and redirecting based on state:', state);
+      console.log('🔧 OAuthCallback: Storing OAuth code and redirecting to onboarding');
       
-      // Store the code in sessionStorage so the appropriate component can pick it up
+      // Store the code in sessionStorage so the CalendarStep can pick it up
       sessionStorage.setItem('google_oauth_code', code);
       
-      // Redirect based on state parameter
-      if (state === 'settings') {
-        navigate('/settings', { replace: true });
-      } else {
-        // Default to home for calendar connection (onboarding context)
-        navigate('/', { replace: true });
-      }
+      // Always redirect to onboarding for calendar integration
+      navigate('/onboarding', { replace: true });
     } else {
-      console.log('🔧 OAuthCallback: No code or error received, redirecting to home...');
-      navigate('/', { replace: true });
+      console.log('🔧 OAuthCallback: No code or error received, redirecting to onboarding...');
+      navigate('/onboarding', { replace: true });
     }
   }, [navigate, searchParams]);
 
@@ -53,7 +48,7 @@ const OAuthCallback: React.FC = () => {
       <div className="text-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal mx-auto mb-4"></div>
         <p className="text-brand-charcoal">Processing Google Calendar connection...</p>
-        <p className="text-brand-charcoal/70 text-sm mt-2">You'll be redirected shortly</p>
+        <p className="text-brand-charcoal/70 text-sm mt-2">You'll be redirected to onboarding shortly</p>
       </div>
     </div>
   );

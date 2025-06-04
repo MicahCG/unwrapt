@@ -1,9 +1,9 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import {
@@ -34,7 +34,6 @@ import {
   Shield,
   Download,
   Trash2,
-  Calendar,
   Phone,
   Mail,
   Lock,
@@ -45,8 +44,6 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -70,31 +67,6 @@ const Settings = () => {
   
   // Payment settings
   const [spendingLimit, setSpendingLimit] = useState([75]);
-
-  // Check for Google Calendar integration
-  const { data: calendarIntegration, refetch: refetchIntegration } = useQuery({
-    queryKey: ['calendar-integration', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-      
-      const { data, error } = await supabase
-        .from('calendar_integrations')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('provider', 'google')
-        .maybeSingle();
-      
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching calendar integration:', error);
-        return null;
-      }
-      
-      return data;
-    },
-    enabled: !!user?.id
-  });
-
-  const isCalendarConnected = !!calendarIntegration;
 
   const handleSaveProfile = () => {
     // TODO: Implement profile update
@@ -127,86 +99,6 @@ const Settings = () => {
       title: "Data export started",
       description: "You'll receive an email when your data is ready to download.",
     });
-  };
-
-  const handleConnectCalendar = async () => {
-    try {
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-
-      console.log('Getting session for auth headers...');
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        throw new Error('No active session found');
-      }
-
-      console.log('Calling google-calendar edge function with auth headers...');
-      const { data: authData, error: authError } = await supabase.functions.invoke('google-calendar', {
-        body: { action: 'get_auth_url', redirect_context: 'settings' },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        }
-      });
-
-      console.log('Auth URL response:', { authData, authError });
-
-      if (authError) {
-        console.error('Error getting auth URL:', authError);
-        throw new Error(authError.message || 'Failed to get authorization URL');
-      }
-
-      if (!authData?.authUrl) {
-        throw new Error('No authorization URL received from server');
-      }
-
-      console.log('Redirecting to Google OAuth:', authData.authUrl);
-      window.location.href = authData.authUrl;
-      
-    } catch (error) {
-      console.error('Error connecting to Google Calendar:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to connect to Google Calendar';
-      toast({
-        title: "Connection Failed",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleDisconnectCalendar = async () => {
-    try {
-      if (!user || !calendarIntegration) {
-        throw new Error('No calendar integration found');
-      }
-
-      const { error } = await supabase
-        .from('calendar_integrations')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('provider', 'google');
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      // Refetch the integration data
-      refetchIntegration();
-
-      toast({
-        title: "Google Calendar disconnected",
-        description: "Your calendar integration has been removed.",
-      });
-    } catch (error) {
-      console.error('Error disconnecting calendar:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to disconnect calendar';
-      toast({
-        title: "Disconnection Failed",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    }
   };
 
   return (
@@ -468,7 +360,7 @@ const Settings = () => {
           </CardContent>
         </Card>
 
-        {/* Privacy Section with improved calendar integration */}
+        {/* Privacy Section */}
         <Card className="border-brand-charcoal/10">
           <CardHeader>
             <CardTitle className="flex items-center text-brand-charcoal">
@@ -487,51 +379,6 @@ const Settings = () => {
                 Export My Data
               </Button>
               <p className="text-sm text-brand-charcoal/60">Download a copy of all your data</p>
-            </div>
-
-            <div className="space-y-3">
-              {isCalendarConnected ? (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start border-brand-charcoal/20"
-                    >
-                      <Calendar className="h-4 w-4 mr-2" />
-                      Disconnect Google Calendar
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Disconnect Google Calendar?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will remove access to your Google Calendar. You won't receive automatic occasion reminders from your calendar events.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleDisconnectCalendar}>
-                        Disconnect
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              ) : (
-                <Button
-                  variant="outline"
-                  onClick={handleConnectCalendar}
-                  className="w-full justify-start border-brand-charcoal/20"
-                >
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Connect Google Calendar
-                </Button>
-              )}
-              <p className="text-sm text-brand-charcoal/60">
-                {isCalendarConnected 
-                  ? "Remove calendar integration and permissions"
-                  : "Connect your Google Calendar to automatically import important dates"
-                }
-              </p>
             </div>
           </CardContent>
         </Card>

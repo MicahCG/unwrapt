@@ -32,48 +32,39 @@ Deno.serve(async (req) => {
 
     console.log('✅ User authenticated:', user.id)
 
-    const { action, code, access_token, redirect_context } = await req.json()
-    console.log('📝 Action received:', action, 'redirect_context:', redirect_context)
+    const { action, code, access_token } = await req.json()
+    console.log('📝 Action received:', action)
 
     if (action === 'get_auth_url') {
       const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
       const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/').slice(0, 3).join('/')
       
-      // Default to calendar callback, but use settings if specified
-      const baseRedirectUri = redirect_context === 'settings' 
-        ? `${origin}/auth/callback/settings`
-        : `${origin}/auth/callback/calendar`
+      // Always use the main callback for onboarding
+      const redirectUri = `${origin}/auth/callback`
       
-      console.log('🔗 Generated redirect URI:', baseRedirectUri, 'for context:', redirect_context)
+      console.log('🔗 Generated redirect URI:', redirectUri)
       
       const scope = 'https://www.googleapis.com/auth/calendar.readonly'
       
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
         `client_id=${clientId}&` +
-        `redirect_uri=${encodeURIComponent(baseRedirectUri)}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
         `scope=${encodeURIComponent(scope)}&` +
         `response_type=code&` +
         `access_type=offline&` +
-        `prompt=consent&` +
-        `state=${encodeURIComponent(redirect_context || 'calendar')}`
+        `prompt=consent`
 
-      console.log('🚀 Generated auth URL for redirect_context:', redirect_context)
+      console.log('🚀 Generated auth URL for onboarding flow')
       return new Response(JSON.stringify({ authUrl }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
     if (action === 'exchange_code') {
-      const { state } = await req.json()
       const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/').slice(0, 3).join('/')
-      
-      // Determine redirect URI based on state parameter
-      const redirectUri = state === 'settings'
-        ? `${origin}/auth/callback/settings`
-        : `${origin}/auth/callback/calendar`
+      const redirectUri = `${origin}/auth/callback`
 
       console.log('🔄 Exchange code - redirect URI:', redirectUri)
-      console.log('🔄 Exchange code - state:', state)
       console.log('🔄 Exchange code - user ID:', user.id)
 
       // Exchange authorization code for access token

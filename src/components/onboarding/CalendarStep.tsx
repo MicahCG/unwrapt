@@ -18,13 +18,13 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // Check for OAuth code on component mount (for cases where user comes back from OAuth)
+  // Check for OAuth code on component mount
   useEffect(() => {
     const checkForOAuthCode = () => {
       const storedCode = sessionStorage.getItem('google_oauth_code');
       if (storedCode) {
         console.log('📅 CalendarStep: Found stored OAuth code, processing...');
-        handleOAuthCallback(storedCode, 'calendar');
+        handleOAuthCallback(storedCode);
         sessionStorage.removeItem('google_oauth_code');
       }
     };
@@ -51,7 +51,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
 
       console.log('📅 CalendarStep: Calling google-calendar edge function...');
       const { data: authData, error: authError } = await supabase.functions.invoke('google-calendar', {
-        body: { action: 'get_auth_url', redirect_context: 'calendar' },
+        body: { action: 'get_auth_url' },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         }
@@ -84,8 +84,8 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
     }
   };
 
-  const handleOAuthCallback = async (code: string, state: string) => {
-    console.log('📅 CalendarStep: Processing OAuth callback with code and state:', { codeLength: code.length, state });
+  const handleOAuthCallback = async (code: string) => {
+    console.log('📅 CalendarStep: Processing OAuth callback with code:', { codeLength: code.length });
     setIsConnecting(true);
     setError(null);
     
@@ -104,7 +104,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
       // Exchange code for token
       console.log('📅 CalendarStep: Exchanging authorization code for access token...');
       const { data: tokenData, error: tokenError } = await supabase.functions.invoke('google-calendar', {
-        body: { action: 'exchange_code', code, state },
+        body: { action: 'exchange_code', code },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         }
