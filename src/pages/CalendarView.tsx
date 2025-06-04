@@ -1,13 +1,13 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar, ArrowLeft, Home, Settings, CalendarDays, Gift } from 'lucide-react';
+import { Calendar, Home, Settings, CalendarDays, Gift } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import AppNavigation from '@/components/AppNavigation';
+import { ResponsiveContainer, ResponsiveHeader, ResponsiveNavigation, ResponsiveActions } from '@/components/ui/responsive-container';
 
 const CalendarView = () => {
   const navigate = useNavigate();
@@ -123,120 +123,115 @@ const CalendarView = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-brand-cream p-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal"></div>
-            <span className="ml-2 text-brand-charcoal">Loading calendar events...</span>
-          </div>
+      <ResponsiveContainer>
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal"></div>
+          <span className="ml-2 text-brand-charcoal">Loading calendar events...</span>
         </div>
-      </div>
+      </ResponsiveContainer>
     );
   }
 
   return (
-    <div className="min-h-screen bg-brand-cream p-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Navigation Header */}
-        <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="outline"
-              onClick={() => navigate('/')}
-              className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light"
-            >
-              <Home className="h-4 w-4 mr-2" />
-              Dashboard
-            </Button>
-            <AppNavigation />
-          </div>
+    <ResponsiveContainer>
+      <ResponsiveHeader>
+        <ResponsiveNavigation>
+          <Button
+            variant="outline"
+            onClick={() => navigate('/')}
+            className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light w-full sm:w-auto"
+          >
+            <Home className="h-4 w-4 mr-2" />
+            Dashboard
+          </Button>
+          <AppNavigation />
+        </ResponsiveNavigation>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={() => navigate('/settings')}
-              className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light"
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              Settings
-            </Button>
-          </div>
-        </div>
+        <ResponsiveActions>
+          <Button
+            variant="outline"
+            onClick={() => navigate('/settings')}
+            className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light"
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Settings
+          </Button>
+        </ResponsiveActions>
+      </ResponsiveHeader>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center text-brand-charcoal">
-              <Calendar className="h-5 w-5 mr-2" />
-              Special Events Calendar
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!hasIntegration ? (
-              <div className="text-center py-12">
-                <Calendar className="h-16 w-16 text-brand-charcoal/30 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-brand-charcoal mb-2">
-                  No Calendar Integration Found
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="flex items-center text-brand-charcoal text-lg sm:text-xl">
+            <Calendar className="h-5 w-5 mr-2 flex-shrink-0" />
+            Special Events Calendar
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!hasIntegration ? (
+            <div className="text-center py-8 sm:py-12">
+              <Calendar className="h-12 w-12 sm:h-16 sm:w-16 text-brand-charcoal/30 mx-auto mb-4" />
+              <h3 className="text-base sm:text-lg font-semibold text-brand-charcoal mb-2">
+                No Calendar Integration Found
+              </h3>
+              <p className="text-sm sm:text-base text-brand-charcoal/70 mb-6 max-w-md mx-auto">
+                Connect your Google Calendar during onboarding to see your important dates here.
+              </p>
+              <Button
+                onClick={() => navigate('/onboarding')}
+                className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 w-full sm:w-auto"
+              >
+                Go to Onboarding
+              </Button>
+            </div>
+          ) : calendarEvents.length === 0 ? (
+            <div className="text-center py-8 sm:py-12">
+              <CalendarDays className="h-12 w-12 sm:h-16 sm:w-16 text-brand-charcoal/30 mx-auto mb-4" />
+              <h3 className="text-base sm:text-lg font-semibold text-brand-charcoal mb-2">
+                No Special Events Found
+              </h3>
+              <p className="text-sm sm:text-base text-brand-charcoal/70 max-w-md mx-auto">
+                We didn't find any birthdays, anniversaries, or special events in your Google Calendar.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <h3 className="text-base sm:text-lg font-semibold text-brand-charcoal">
+                  Found {calendarEvents.length} Special Event{calendarEvents.length !== 1 ? 's' : ''}
                 </h3>
-                <p className="text-brand-charcoal/70 mb-6">
-                  Connect your Google Calendar during onboarding to see your important dates here.
-                </p>
-                <Button
-                  onClick={() => navigate('/onboarding')}
-                  className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
-                >
-                  Go to Onboarding
-                </Button>
-              </div>
-            ) : calendarEvents.length === 0 ? (
-              <div className="text-center py-12">
-                <CalendarDays className="h-16 w-16 text-brand-charcoal/30 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-brand-charcoal mb-2">
-                  No Special Events Found
-                </h3>
-                <p className="text-brand-charcoal/70">
-                  We didn't find any birthdays, anniversaries, or special events in your Google Calendar.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-brand-charcoal">
-                    Found {calendarEvents.length} Special Event{calendarEvents.length !== 1 ? 's' : ''}
-                  </h3>
-                  <div className="text-sm text-brand-charcoal/70">
-                    Imported from Google Calendar
-                  </div>
+                <div className="text-xs sm:text-sm text-brand-charcoal/70">
+                  Imported from Google Calendar
                 </div>
-                
-                <div className="grid gap-3">
-                  {calendarEvents.map((event, index) => (
-                    <div 
-                      key={index} 
-                      className="flex items-center p-4 bg-white rounded-lg border border-brand-cream-light hover:shadow-md transition-shadow"
-                    >
-                      <div className="mr-3">
-                        {getEventIcon(event.type)}
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-medium text-brand-charcoal">
-                          {event.summary}
-                        </h4>
-                        <p className="text-sm text-brand-charcoal/70">
-                          {formatDate(event.date)}
-                        </p>
-                      </div>
-                      <div className="text-xs px-2 py-1 bg-brand-cream rounded-full text-brand-charcoal capitalize">
-                        {event.type}
-                      </div>
+              </div>
+              
+              <div className="grid gap-3">
+                {calendarEvents.map((event, index) => (
+                  <div 
+                    key={index} 
+                    className="flex items-center p-3 sm:p-4 bg-white rounded-lg border border-brand-cream-light hover:shadow-md transition-shadow"
+                  >
+                    <div className="mr-3 flex-shrink-0">
+                      {getEventIcon(event.type)}
                     </div>
-                  ))}
-                </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-brand-charcoal text-sm sm:text-base truncate">
+                        {event.summary}
+                      </h4>
+                      <p className="text-xs sm:text-sm text-brand-charcoal/70">
+                        {formatDate(event.date)}
+                      </p>
+                    </div>
+                    <div className="text-xs px-2 py-1 bg-brand-cream rounded-full text-brand-charcoal capitalize flex-shrink-0 ml-2">
+                      {event.type}
+                    </div>
+                  </div>
+                ))}
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </ResponsiveContainer>
   );
 };
 
