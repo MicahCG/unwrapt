@@ -2,8 +2,9 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BarChart3, ArrowLeft } from 'lucide-react';
+import { BarChart3, ArrowLeft, Home, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import AppNavigation from '@/components/AppNavigation';
 
 const Analytics = () => {
   const navigate = useNavigate();
@@ -11,15 +12,30 @@ const Analytics = () => {
   return (
     <div className="min-h-screen bg-brand-cream p-4">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-6 flex items-center space-x-4">
-          <Button
-            variant="outline"
-            onClick={() => navigate('/')}
-            className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
+        {/* Navigation Header */}
+        <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center space-x-4">
+            <Button
+              variant="outline"
+              onClick={() => navigate('/')}
+              className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light"
+            >
+              <Home className="h-4 w-4 mr-2" />
+              Dashboard
+            </Button>
+            <AppNavigation />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => navigate('/settings')}
+              className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Settings
+            </Button>
+          </div>
         </div>
 
         <Card>
