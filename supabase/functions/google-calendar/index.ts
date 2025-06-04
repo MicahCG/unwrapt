@@ -12,15 +12,21 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-    )
-
+    // Create supabase client with the user's auth token to respect RLS
     const authHeader = req.headers.get('Authorization')!
     console.log('🔐 Auth header present:', !!authHeader)
     
-    const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''))
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: authHeader },
+        },
+      }
+    )
+    
+    const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
       console.error('❌ No user found in auth header')
@@ -95,7 +101,7 @@ Deno.serve(async (req) => {
         })
       }
 
-      // Store the integration using the corrected table structure
+      // Store the integration using the user-authenticated supabase client (respects RLS)
       console.log('💾 Storing calendar integration for user:', user.id)
       const { error: insertError } = await supabase
         .from('calendar_integrations')
