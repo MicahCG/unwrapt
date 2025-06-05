@@ -41,18 +41,6 @@ const AppNavigation = () => {
       description: 'Setup and onboarding flow' 
     },
     { 
-      title: 'Recipients', 
-      path: '/?tab=recipients', 
-      icon: Users, 
-      description: 'Manage your gift recipients' 
-    },
-    { 
-      title: 'Upcoming Gifts', 
-      path: '/?tab=gifts', 
-      icon: Gift, 
-      description: 'View and manage scheduled gifts' 
-    },
-    { 
       title: 'Calendar View', 
       path: '/calendar', 
       icon: Calendar, 
@@ -60,7 +48,7 @@ const AppNavigation = () => {
     },
     { 
       title: 'Gift History', 
-      path: '/history', 
+      path: '/gift-history', 
       icon: Package, 
       description: 'Past gifts and deliveries' 
     },
@@ -84,7 +72,7 @@ const AppNavigation = () => {
     },
     { 
       title: 'Payment Success', 
-      path: '/payment-success', 
+      path: '/payment/success', 
       icon: CreditCard, 
       description: 'Payment confirmation page' 
     },
@@ -97,31 +85,11 @@ const AppNavigation = () => {
   ];
 
   const handleNavigate = (path: string) => {
-    if (path.includes('?tab=')) {
-      const [basePath, params] = path.split('?');
-      const searchParams = new URLSearchParams(params);
-      navigate(basePath, { replace: true });
-      // Handle tab switching for dashboard
-      if (basePath === '/') {
-        const tab = searchParams.get('tab');
-        if (tab) {
-          // Trigger tab change event or use a state management solution
-          window.dispatchEvent(new CustomEvent('changeTab', { detail: tab }));
-        }
-      }
-    } else {
-      navigate(path);
-    }
+    console.log('🔧 AppNavigation: Navigating to:', path);
+    navigate(path);
   };
 
   const isActive = (path: string) => {
-    if (path === '/') return location.pathname === '/' && !location.search;
-    if (path.includes('?tab=')) {
-      const [basePath, params] = path.split('?');
-      const searchParams = new URLSearchParams(params);
-      const tab = searchParams.get('tab');
-      return location.pathname === basePath && location.search.includes(`tab=${tab}`);
-    }
     return location.pathname === path;
   };
 

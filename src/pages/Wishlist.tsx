@@ -10,13 +10,18 @@ import { ResponsiveContainer, ResponsiveHeader, ResponsiveNavigation, Responsive
 const Wishlist = () => {
   const navigate = useNavigate();
 
+  const handleNavigation = (path: string) => {
+    console.log('🔧 Wishlist: Navigating to:', path);
+    navigate(path);
+  };
+
   return (
     <ResponsiveContainer>
       <ResponsiveHeader>
         <ResponsiveNavigation>
           <Button
             variant="outline"
-            onClick={() => navigate('/')}
+            onClick={() => handleNavigation('/')}
             className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light w-full sm:w-auto"
           >
             <Home className="h-4 w-4 mr-2" />
@@ -28,7 +33,7 @@ const Wishlist = () => {
         <ResponsiveActions>
           <Button
             variant="outline"
-            onClick={() => navigate('/settings')}
+            onClick={() => handleNavigation('/settings')}
             className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light"
           >
             <Settings className="h-4 w-4 mr-2" />

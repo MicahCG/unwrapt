@@ -42,6 +42,11 @@ const Dashboard = () => {
     enabled: !!user?.id
   });
 
+  const handleNavigation = (path: string) => {
+    console.log('🔧 Dashboard: Navigating to:', path);
+    navigate(path);
+  };
+
   return (
     <ResponsiveContainer>
       <ResponsiveHeader>
@@ -58,7 +63,7 @@ const Dashboard = () => {
         <ResponsiveActions>
           <Button
             variant="outline"
-            onClick={() => navigate('/calendar')}
+            onClick={() => handleNavigation('/calendar')}
             className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light"
           >
             <Calendar className="h-4 w-4 mr-2" />
@@ -66,7 +71,7 @@ const Dashboard = () => {
           </Button>
           <Button
             variant="outline"
-            onClick={() => navigate('/settings')}
+            onClick={() => handleNavigation('/settings')}
             className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light"
           >
             <Settings className="h-4 w-4 mr-2" />

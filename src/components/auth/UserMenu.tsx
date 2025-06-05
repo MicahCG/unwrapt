@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -20,7 +21,13 @@ const UserMenu: React.FC = () => {
   const userInitial = user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || 'U';
 
   const handleSettingsClick = () => {
+    console.log('🔧 UserMenu: Navigating to settings');
     navigate('/settings');
+  };
+
+  const handleSignOut = async () => {
+    console.log('🔧 UserMenu: Signing out');
+    await signOut();
   };
 
   return (
@@ -61,7 +68,7 @@ const UserMenu: React.FC = () => {
           <span>Settings</span>
         </DropdownMenuItem>
         <DropdownMenuItem 
-          onClick={signOut}
+          onClick={handleSignOut}
           className="text-brand-charcoal hover:bg-brand-cream hover:text-brand-charcoal cursor-pointer"
         >
           <LogOut className="mr-2 h-4 w-4" />

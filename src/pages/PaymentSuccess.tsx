@@ -52,6 +52,7 @@ const PaymentSuccess = () => {
   };
 
   const handleGoToDashboard = () => {
+    console.log('🔧 PaymentSuccess: Navigating to dashboard');
     navigate('/');
   };
 

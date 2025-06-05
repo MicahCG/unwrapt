@@ -9,9 +9,14 @@ import OnboardingFlow from '@/components/OnboardingFlow';
 const Onboarding = () => {
   const navigate = useNavigate();
 
+  const handleBackToDashboard = () => {
+    console.log('🔧 Onboarding: Navigating back to dashboard');
+    navigate('/');
+  };
+
   return (
     <div className="min-h-screen bg-brand-cream">
-      <OnboardingFlow onBack={() => navigate('/')} />
+      <OnboardingFlow onBack={handleBackToDashboard} />
     </div>
   );
 };
