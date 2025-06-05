@@ -10,12 +10,8 @@ const OAuthCallback: React.FC = () => {
     console.log('🔧 OAuthCallback: Processing callback');
     console.log('🔧 OAuthCallback: Current URL:', window.location.href);
     
-    // Clean up any hash in the URL immediately
-    if (window.location.hash && window.location.hash !== '#') {
-      const cleanUrl = window.location.origin + window.location.pathname + window.location.search;
-      console.log('🔧 OAuthCallback: Cleaning hash from URL:', window.location.href, '->', cleanUrl);
-      window.history.replaceState(null, '', cleanUrl);
-    }
+    // Don't clean up the URL here - let Supabase handle the OAuth flow
+    // The hash fragment contains the access token that Supabase needs
     
     const code = searchParams.get('code');
     const error = searchParams.get('error');
@@ -25,7 +21,8 @@ const OAuthCallback: React.FC = () => {
       hasCode: !!code, 
       codeLength: code?.length || 0,
       error, 
-      state 
+      state,
+      hasHashFragment: !!window.location.hash 
     });
 
     if (error) {
@@ -33,6 +30,16 @@ const OAuthCallback: React.FC = () => {
       // Clear any existing code from sessionStorage on error
       sessionStorage.removeItem('google_oauth_code');
       navigate('/', { replace: true });
+      return;
+    }
+
+    // For hash-based OAuth flows (like implicit grant), let Supabase handle it
+    if (window.location.hash && window.location.hash.includes('access_token')) {
+      console.log('🔧 OAuthCallback: Hash-based OAuth flow detected, letting Supabase handle');
+      // Just redirect to home and let AuthProvider handle the token
+      setTimeout(() => {
+        navigate('/', { replace: true });
+      }, 1000); // Give Supabase time to process the token
       return;
     }
 

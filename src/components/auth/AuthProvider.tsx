@@ -53,11 +53,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(session?.user ?? null);
       setLoading(false);
       
-      // Clean up any hash-based URLs after auth state changes
-      if (window.location.hash && window.location.hash !== '#') {
-        const cleanPath = window.location.pathname + window.location.search;
-        console.log('🔧 AuthProvider: Cleaning URL after auth change:', window.location.href, '->', cleanPath);
-        window.history.replaceState(null, '', cleanPath);
+      // Clean up URL only after successful authentication and only if safe to do so
+      if (event === 'SIGNED_IN' && window.location.hash && window.location.hash.includes('access_token')) {
+        console.log('🔧 AuthProvider: Cleaning OAuth hash after successful sign in');
+        // Use setTimeout to avoid history manipulation errors
+        setTimeout(() => {
+          try {
+            const cleanPath = window.location.pathname + window.location.search;
+            window.history.replaceState(null, '', cleanPath);
+          } catch (error) {
+            console.error('🔧 AuthProvider: Error cleaning URL after auth:', error);
+          }
+        }, 100);
       }
     });
 
