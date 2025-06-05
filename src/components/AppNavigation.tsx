@@ -35,12 +35,6 @@ const AppNavigation = () => {
       description: 'Main dashboard overview' 
     },
     { 
-      title: 'Onboarding', 
-      path: '/onboarding', 
-      icon: UserPlus, 
-      description: 'Setup and onboarding flow' 
-    },
-    { 
       title: 'Calendar View', 
       path: '/calendar', 
       icon: Calendar, 
@@ -71,16 +65,22 @@ const AppNavigation = () => {
       description: 'Alerts and reminders' 
     },
     { 
-      title: 'Payment Success', 
-      path: '/payment/success', 
-      icon: CreditCard, 
-      description: 'Payment confirmation page' 
-    },
-    { 
       title: 'Settings', 
       path: '/settings', 
       icon: Settings, 
       description: 'Account and preferences' 
+    },
+    { 
+      title: 'Onboarding', 
+      path: '/onboarding', 
+      icon: UserPlus, 
+      description: 'Setup and onboarding flow' 
+    },
+    { 
+      title: 'Payment Success', 
+      path: '/payment/success', 
+      icon: CreditCard, 
+      description: 'Payment confirmation page' 
     }
   ];
 
@@ -108,7 +108,7 @@ const AppNavigation = () => {
                 
                 return (
                   <Button
-                    key={item.path}
+                    key={`${item.path}-${item.title}`}
                     variant="ghost"
                     className={`justify-start h-auto p-3 ${
                       active 
