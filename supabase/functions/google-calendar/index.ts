@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
       const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
       const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/').slice(0, 3).join('/')
       
-      // Always use the main callback for onboarding
+      // Use the main callback for onboarding - restore previous working behavior
       const redirectUri = `${origin}/auth/callback`
       
       console.log('🔗 Generated redirect URI:', redirectUri)

@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
-// Improved URL cleanup to handle OAuth callbacks safely
+// Simple URL cleanup - restore previous working behavior
 const cleanupUrl = () => {
   const currentUrl = window.location.href;
   const hasAccessToken = currentUrl.includes('access_token=');
@@ -15,7 +15,7 @@ const cleanupUrl = () => {
     return;
   }
   
-  // Handle hash-based URLs (but not OAuth tokens)
+  // Handle hash-based URLs (but not OAuth tokens) 
   if (window.location.hash && window.location.hash !== '#' && !hasAccessToken) {
     const hashPath = window.location.hash.slice(1);
     
