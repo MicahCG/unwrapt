@@ -3,11 +3,11 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
-// Clear any hash from the URL on initial load
-if (window.location.hash) {
-  const hash = window.location.hash.slice(1);
-  const cleanPath = hash || '/';
-  window.history.replaceState(null, '', cleanPath);
+// Ensure we're using clean URLs by removing any hash fragments
+if (window.location.hash && window.location.hash !== '#') {
+  const hashPath = window.location.hash.slice(1);
+  const newUrl = window.location.origin + hashPath;
+  window.history.replaceState(null, '', newUrl);
 }
 
 createRoot(document.getElementById("root")!).render(<App />);

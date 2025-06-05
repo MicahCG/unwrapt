@@ -26,7 +26,7 @@ function App() {
         <AuthProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter basename="/">
+          <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/calendar" element={<CalendarView />} />
