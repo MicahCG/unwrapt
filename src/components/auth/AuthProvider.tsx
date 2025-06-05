@@ -52,6 +52,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      // Clean up any hash-based URLs after auth state changes
+      if (window.location.hash && window.location.hash !== '#') {
+        const cleanPath = window.location.pathname + window.location.search;
+        console.log('🔧 AuthProvider: Cleaning URL after auth change:', window.location.href, '->', cleanPath);
+        window.history.replaceState(null, '', cleanPath);
+      }
     });
 
     // Listen for fake auth events (development only)
@@ -87,7 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: `${window.location.origin}/`,
       },
     });
     if (error) {

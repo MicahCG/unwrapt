@@ -8,7 +8,14 @@ const OAuthCallback: React.FC = () => {
 
   useEffect(() => {
     console.log('🔧 OAuthCallback: Processing callback');
-    console.log('🔧 OAuthCallback: Current URL search params:', window.location.search);
+    console.log('🔧 OAuthCallback: Current URL:', window.location.href);
+    
+    // Clean up any hash in the URL immediately
+    if (window.location.hash && window.location.hash !== '#') {
+      const cleanUrl = window.location.origin + window.location.pathname + window.location.search;
+      console.log('🔧 OAuthCallback: Cleaning hash from URL:', window.location.href, '->', cleanUrl);
+      window.history.replaceState(null, '', cleanUrl);
+    }
     
     const code = searchParams.get('code');
     const error = searchParams.get('error');
@@ -25,21 +32,21 @@ const OAuthCallback: React.FC = () => {
       console.error('🔧 OAuthCallback: OAuth error received:', error);
       // Clear any existing code from sessionStorage on error
       sessionStorage.removeItem('google_oauth_code');
-      navigate('/onboarding', { replace: true });
+      navigate('/', { replace: true });
       return;
     }
 
     if (code) {
-      console.log('🔧 OAuthCallback: Storing OAuth code and redirecting to onboarding');
+      console.log('🔧 OAuthCallback: Storing OAuth code and redirecting to dashboard');
       
-      // Store the code in sessionStorage so the CalendarStep can pick it up
+      // Store the code in sessionStorage so it can be picked up if needed
       sessionStorage.setItem('google_oauth_code', code);
       
-      // Always redirect to onboarding for calendar integration
-      navigate('/onboarding', { replace: true });
+      // Navigate to dashboard using React Router
+      navigate('/', { replace: true });
     } else {
-      console.log('🔧 OAuthCallback: No code or error received, redirecting to onboarding...');
-      navigate('/onboarding', { replace: true });
+      console.log('🔧 OAuthCallback: No code or error received, redirecting to dashboard...');
+      navigate('/', { replace: true });
     }
   }, [navigate, searchParams]);
 
@@ -47,8 +54,8 @@ const OAuthCallback: React.FC = () => {
     <div className="min-h-screen bg-brand-cream flex items-center justify-center">
       <div className="text-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal mx-auto mb-4"></div>
-        <p className="text-brand-charcoal">Processing Google Calendar connection...</p>
-        <p className="text-brand-charcoal/70 text-sm mt-2">You'll be redirected to onboarding shortly</p>
+        <p className="text-brand-charcoal">Processing authentication...</p>
+        <p className="text-brand-charcoal/70 text-sm mt-2">Redirecting you to the dashboard</p>
       </div>
     </div>
   );
