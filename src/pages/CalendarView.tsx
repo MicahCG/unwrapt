@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,13 +21,16 @@ const CalendarView = () => {
   useEffect(() => {
     const fetchCalendarData = async () => {
       if (!user) {
+        console.log('📅 CalendarView: No user found, skipping calendar data fetch');
         setLoading(false);
         return;
       }
 
       try {
+        console.log('📅 CalendarView: Starting calendar data fetch for user:', user.id);
+
         // Check if user has a calendar integration
-        console.log('📅 Checking for calendar integration...');
+        console.log('📅 CalendarView: Checking for calendar integration...');
         const { data: integration, error: integrationError } = await supabase
           .from('calendar_integrations')
           .select('*')
@@ -35,27 +39,47 @@ const CalendarView = () => {
           .maybeSingle();
 
         if (integrationError) {
-          console.error('📅 Error checking integration:', integrationError);
+          console.error('📅 CalendarView: Error checking integration:', integrationError);
+          toast({
+            title: "Error",
+            description: "Failed to check calendar integration status.",
+            variant: "destructive"
+          });
           setLoading(false);
           return;
         }
 
         if (!integration) {
-          console.log('📅 No calendar integration found');
+          console.log('📅 CalendarView: No calendar integration found');
           setHasIntegration(false);
           setLoading(false);
           return;
         }
 
-        console.log('📅 Calendar integration found, fetching events...');
+        console.log('📅 CalendarView: Calendar integration found:', { 
+          provider: integration.provider,
+          hasAccessToken: !!integration.access_token,
+          expiresAt: integration.expires_at
+        });
         setHasIntegration(true);
 
-        // Fetch events using the stored access token
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          throw new Error('No active session');
+        // Get current session for authentication
+        console.log('📅 CalendarView: Getting current session...');
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('📅 CalendarView: Session error:', sessionError);
+          throw new Error('Failed to get authentication session');
         }
 
+        if (!session) {
+          console.error('📅 CalendarView: No active session found');
+          throw new Error('No active session found. Please log in again.');
+        }
+
+        console.log('📅 CalendarView: Session found, fetching events with access token...');
+        
+        // Fetch events using the stored access token
         const { data: eventsData, error: eventsError } = await supabase.functions.invoke('google-calendar', {
           body: { 
             action: 'fetch_events', 
@@ -66,26 +90,43 @@ const CalendarView = () => {
           }
         });
 
+        console.log('📅 CalendarView: Events fetch response:', { 
+          success: !eventsError, 
+          eventCount: eventsData?.events?.length || 0,
+          error: eventsError 
+        });
+
         if (eventsError) {
-          console.error('📅 Error fetching events:', eventsError);
-          toast({
-            title: "Error Fetching Events",
-            description: "Could not fetch calendar events. Please try reconnecting your calendar.",
-            variant: "destructive"
-          });
+          console.error('📅 CalendarView: Error fetching events:', eventsError);
+          
+          // Check if it's an authentication error
+          if (eventsError.message?.includes('401') || eventsError.message?.includes('Unauthorized')) {
+            toast({
+              title: "Authentication Error",
+              description: "Your calendar connection has expired. Please reconnect your calendar in the onboarding flow.",
+              variant: "destructive"
+            });
+          } else {
+            toast({
+              title: "Error Fetching Events",
+              description: "Could not fetch calendar events. Please try reconnecting your calendar.",
+              variant: "destructive"
+            });
+          }
           setLoading(false);
           return;
         }
 
         const events = eventsData?.events || [];
-        console.log('📅 Fetched events:', events.length);
+        console.log('📅 CalendarView: Successfully fetched events:', events.length, 'events found');
         setCalendarEvents(events);
 
       } catch (error) {
-        console.error('📅 Error in fetchCalendarData:', error);
+        console.error('📅 CalendarView: Error in fetchCalendarData:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load calendar data';
         toast({
           title: "Error",
-          description: "Failed to load calendar data.",
+          description: errorMessage,
           variant: "destructive"
         });
       } finally {
