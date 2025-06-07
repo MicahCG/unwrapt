@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/logo';
@@ -7,7 +6,6 @@ import UserMenu from '@/components/auth/UserMenu';
 import WelcomeStep from '@/components/onboarding/WelcomeStep';
 import CalendarStep from '@/components/onboarding/CalendarStep';
 import InterestsStep from '@/components/onboarding/InterestsStep';
-import RecipientStep from '@/components/onboarding/RecipientStep';
 import GiftScheduleStep from '@/components/onboarding/GiftScheduleStep';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -25,7 +23,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const totalSteps = 5;
+  const totalSteps = 4; // Reduced from 5 to 4 (removed RecipientStep)
 
   console.log('🔧 OnboardingFlow: Rendering step', currentStep, 'for user:', user?.id);
 
@@ -41,18 +39,21 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
       try {
         console.log('Completing onboarding with data:', updatedData);
 
-        // Save recipient first
-        if (updatedData.firstRecipient) {
-          const { data: recipientData, error: recipientError } = await supabase
+        // Create recipient from calendar person if we have one
+        let recipientData = null;
+        if (updatedData.selectedPersonForGift) {
+          const { data: newRecipient, error: recipientError } = await supabase
             .from('recipients')
             .insert({
               user_id: user?.id,
-              name: updatedData.firstRecipient.fullName,
-              relationship: updatedData.firstRecipient.relationship,
-              email: updatedData.firstRecipient.email,
-              phone: updatedData.firstRecipient.phone,
-              address: updatedData.firstRecipient.address,
-              interests: updatedData.interests || []
+              name: updatedData.selectedPersonForGift.personName,
+              email: null, // Will be added later when user manages recipients
+              phone: null,
+              address: null, // Will be added later
+              interests: updatedData.interests || [],
+              // Store calendar info for future reference
+              birthday: updatedData.selectedPersonForGift.type === 'birthday' ? updatedData.selectedPersonForGift.date : null,
+              anniversary: updatedData.selectedPersonForGift.type === 'anniversary' ? updatedData.selectedPersonForGift.date : null,
             })
             .select()
             .single();
@@ -62,29 +63,30 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
             throw new Error('Failed to save recipient');
           }
 
-          console.log('Recipient saved successfully:', recipientData);
+          recipientData = newRecipient;
+          console.log('Recipient created from calendar data:', recipientData);
+        }
 
-          // Save first scheduled gift if provided
-          if (updatedData.firstGift && recipientData) {
-            const { error: giftError } = await supabase
-              .from('scheduled_gifts')
-              .insert({
-                user_id: user?.id,
-                recipient_id: recipientData.id,
-                occasion: updatedData.firstGift.occasion,
-                occasion_date: updatedData.firstGift.occasionDate,
-                gift_type: updatedData.firstGift.giftType,
-                price_range: updatedData.firstGift.priceRange,
-                status: 'scheduled'
-              });
+        // Save scheduled gift if we have gift data and a recipient
+        if (updatedData.firstGift && recipientData) {
+          const { error: giftError } = await supabase
+            .from('scheduled_gifts')
+            .insert({
+              user_id: user?.id,
+              recipient_id: recipientData.id,
+              occasion: updatedData.firstGift.occasion,
+              occasion_date: updatedData.firstGift.occasionDate,
+              gift_type: updatedData.firstGift.giftType,
+              price_range: updatedData.firstGift.priceRange,
+              status: 'scheduled'
+            });
 
-            if (giftError) {
-              console.error('Error saving scheduled gift:', giftError);
-              throw new Error('Failed to save scheduled gift');
-            }
-
-            console.log('Scheduled gift saved successfully');
+          if (giftError) {
+            console.error('Error saving scheduled gift:', giftError);
+            throw new Error('Failed to save scheduled gift');
           }
+
+          console.log('Scheduled gift saved successfully');
         }
 
         // Calculate and save initial metrics
@@ -98,13 +100,12 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
 
         toast({
           title: "Welcome to Unwrapt!",
-          description: "Your onboarding is complete. Let's start making gift-giving effortless!",
+          description: `Your gift for ${updatedData.selectedPersonForGift?.personName} has been scheduled! Let's start making gift-giving effortless!`,
         });
 
         console.log('Onboarding completed successfully');
 
         // Small delay to ensure toast is visible, then redirect will happen automatically
-        // due to the query invalidation triggering a re-render in Index.tsx
         setTimeout(() => {
           setIsCompleting(false);
         }, 1000);
@@ -152,20 +153,19 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
       case 2:
         return <CalendarStep onNext={handleStepComplete} />;
       case 3:
-        return <InterestsStep onNext={handleStepComplete} />;
-      case 4:
         return (
-          <RecipientStep 
+          <InterestsStep 
             onNext={handleStepComplete} 
-            interests={onboardingData.interests}
+            importedDates={onboardingData.importedDates || []}
           />
         );
-      case 5:
+      case 4:
         return (
           <GiftScheduleStep 
             onNext={handleStepComplete} 
-            recipientName={onboardingData.firstRecipient?.fullName}
+            recipientName={onboardingData.selectedPersonForGift?.personName}
             interests={onboardingData.interests}
+            selectedPersonForGift={onboardingData.selectedPersonForGift}
           />
         );
       default:
