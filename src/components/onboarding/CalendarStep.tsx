@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -84,6 +83,37 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
     }
   };
 
+  const extractPersonFromEvent = (eventSummary: string) => {
+    // Extract person's name from event summary
+    // Common patterns: "John's Birthday", "John Doe Birthday", "Birthday - John", etc.
+    const summary = eventSummary.toLowerCase();
+    let personName = '';
+    
+    if (summary.includes("'s birthday")) {
+      personName = eventSummary.split("'s")[0].trim();
+    } else if (summary.includes("'s anniversary")) {
+      personName = eventSummary.split("'s")[0].trim();
+    } else if (summary.includes(" birthday")) {
+      personName = eventSummary.replace(/birthday/i, '').trim();
+    } else if (summary.includes(" anniversary")) {
+      personName = eventSummary.replace(/anniversary/i, '').trim();
+    } else if (summary.includes("birthday -")) {
+      personName = eventSummary.split("birthday -")[1].trim();
+    } else if (summary.includes("anniversary -")) {
+      personName = eventSummary.split("anniversary -")[1].trim();
+    } else {
+      // Fallback: try to extract any name-like pattern
+      const words = eventSummary.split(' ');
+      personName = words.find(word => 
+        word.length > 2 && 
+        word[0] === word[0].toUpperCase() &&
+        !['Birthday', 'Anniversary', 'The', 'And', 'Or'].includes(word)
+      ) || '';
+    }
+    
+    return personName;
+  };
+
   const handleOAuthCallback = async (code: string) => {
     console.log('📅 CalendarStep: Processing OAuth callback with code:', { codeLength: code.length });
     setIsConnecting(true);
@@ -146,26 +176,33 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
       }
 
       const events = eventsData?.events || [];
-      console.log('📅 CalendarStep: Successfully fetched events:', events.length, 'events found');
       
-      setFoundDates(events);
+      // Enhanced event processing to extract person names
+      const processedEvents = events.map((event: any) => ({
+        ...event,
+        personName: extractPersonFromEvent(event.summary)
+      }));
+      
+      console.log('📅 CalendarStep: Successfully fetched and processed events:', processedEvents.length, 'events found');
+      
+      setFoundDates(processedEvents);
       setIsConnecting(false);
 
       // Show success toast
       toast({
         title: "Calendar Connected Successfully!",
-        description: `Found ${events.length} important dates from your calendar.`,
+        description: `Found ${processedEvents.length} important dates from your calendar.`,
       });
 
       // Auto-advance to next step after showing success
       setTimeout(() => {
         console.log('📅 CalendarStep: Auto-advancing to next step with calendar data:', { 
           calendarConnected: true,
-          importedDates: events 
+          importedDates: processedEvents 
         });
         onNext({ 
           calendarConnected: true,
-          importedDates: events 
+          importedDates: processedEvents 
         });
       }, 2000);
 
@@ -311,7 +348,15 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
                     alt="Calendar" 
                     className="h-4 w-4 mr-3"
                   />
-                  <span className="text-sm text-brand-charcoal">{date.summary} - {new Date(date.date).toLocaleDateString()}</span>
+                  <div className="flex-1">
+                    <span className="text-sm text-brand-charcoal font-medium">{date.summary}</span>
+                    {date.personName && (
+                      <span className="text-xs text-brand-charcoal/60 ml-2">({date.personName})</span>
+                    )}
+                    <div className="text-xs text-brand-charcoal/50">
+                      {new Date(date.date).toLocaleDateString()}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
