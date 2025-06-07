@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/logo';
@@ -140,7 +141,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
         </div>
       </div>
     );
-  };
+  }
 
   const renderStep = () => {
     console.log('🔧 OnboardingFlow: Rendering step component for step:', currentStep);
@@ -151,27 +152,20 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
       case 2:
         return <CalendarStep onNext={handleStepComplete} />;
       case 3:
-        return (
-          <InterestsStep 
-            onNext={handleStepComplete} 
-            importedDates={onboardingData.importedDates || []}
-          />
-        );
+        return <InterestsStep onNext={handleStepComplete} />;
       case 4:
         return (
           <RecipientStep 
             onNext={handleStepComplete} 
             interests={onboardingData.interests}
-            selectedPersonForGift={onboardingData.selectedPersonForGift}
           />
         );
       case 5:
         return (
           <GiftScheduleStep 
             onNext={handleStepComplete} 
-            recipientName={onboardingData.firstRecipient?.fullName || onboardingData.selectedPersonForGift?.personName}
+            recipientName={onboardingData.firstRecipient?.fullName}
             interests={onboardingData.interests}
-            selectedPersonForGift={onboardingData.selectedPersonForGift}
           />
         );
       default:
