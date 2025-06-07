@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -146,3 +147,142 @@ const RecipientStep: React.FC<RecipientStepProps> = ({ onNext, interests, select
                 <SelectItem value="mom">Mom</SelectItem>
                 <SelectItem value="dad">Dad</SelectItem>
                 <SelectItem value="partner">Partner/Spouse</SelectItem>
+                <SelectItem value="sibling">Sibling</SelectItem>
+                <SelectItem value="friend">Friend</SelectItem>
+                <SelectItem value="colleague">Colleague</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Email */}
+          <div className="space-y-2">
+            <Label htmlFor="email">Email *</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="Enter their email address"
+              value={recipientData.email}
+              onChange={(e) => handleInputChange('email', e.target.value)}
+              required
+            />
+          </div>
+
+          {/* Phone */}
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone</Label>
+            <Input
+              id="phone"
+              type="tel"
+              placeholder="Enter their phone number"
+              value={recipientData.phone}
+              onChange={(e) => handleInputChange('phone', e.target.value)}
+            />
+          </div>
+
+          {/* Birthday */}
+          <div className="space-y-2">
+            <Label htmlFor="birthday">Birthday</Label>
+            <Input
+              id="birthday"
+              type="date"
+              value={recipientData.birthday}
+              onChange={(e) => handleInputChange('birthday', e.target.value)}
+            />
+          </div>
+
+          {/* Anniversary */}
+          <div className="space-y-2">
+            <Label htmlFor="anniversary">Anniversary</Label>
+            <Input
+              id="anniversary"
+              type="date"
+              value={recipientData.anniversary}
+              onChange={(e) => handleInputChange('anniversary', e.target.value)}
+            />
+          </div>
+
+          {/* Address Section */}
+          <div className="space-y-4 pt-4 border-t">
+            <h4 className="font-medium text-brand-charcoal">Shipping Address</h4>
+            
+            <div className="space-y-2">
+              <Label htmlFor="street">Street Address *</Label>
+              <Input
+                id="street"
+                placeholder="Enter street address"
+                value={recipientData.address.street}
+                onChange={(e) => handleAddressChange('street', e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="city">City *</Label>
+                <Input
+                  id="city"
+                  placeholder="Enter city"
+                  value={recipientData.address.city}
+                  onChange={(e) => handleAddressChange('city', e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="state">State *</Label>
+                <Input
+                  id="state"
+                  placeholder="Enter state"
+                  value={recipientData.address.state}
+                  onChange={(e) => handleAddressChange('state', e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="zipCode">ZIP Code *</Label>
+                <Input
+                  id="zipCode"
+                  placeholder="Enter ZIP code"
+                  value={recipientData.address.zipCode}
+                  onChange={(e) => handleAddressChange('zipCode', e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="country">Country</Label>
+                <Select value={recipientData.address.country} onValueChange={(value) => handleAddressChange('country', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="United States">United States</SelectItem>
+                    <SelectItem value="Canada">Canada</SelectItem>
+                    <SelectItem value="United Kingdom">United Kingdom</SelectItem>
+                    <SelectItem value="Australia">Australia</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Button 
+          size="lg" 
+          className="w-full text-lg py-6 bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+          onClick={handleContinue}
+          disabled={!isValid}
+        >
+          Continue
+          <ArrowDown className="h-4 w-4 ml-2" />
+        </Button>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default RecipientStep;
