@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/logo';
 import { useAuth } from '@/components/auth/AuthProvider';
 import UserMenu from '@/components/auth/UserMenu';
-import WelcomeStep from '@/components/onboarding/WelcomeStep';
 import CalendarStep from '@/components/onboarding/CalendarStep';
 import InterestsStep from '@/components/onboarding/InterestsStep';
 import GiftScheduleStep from '@/components/onboarding/GiftScheduleStep';
@@ -16,14 +15,14 @@ interface OnboardingFlowProps {
 }
 
 const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
-  const [currentStep, setCurrentStep] = useState(1); // Start at step 1 (WelcomeStep)
+  const [currentStep, setCurrentStep] = useState(1); // Start at step 1 (CalendarStep)
   const [onboardingData, setOnboardingData] = useState<any>({});
   const [isCompleting, setIsCompleting] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const totalSteps = 4; // Reduced from 5 to 4 (removed RecipientStep)
+  const totalSteps = 3; // Reduced from 4 to 3 (removed WelcomeStep)
 
   console.log('🔧 OnboardingFlow: Rendering step', currentStep, 'for user:', user?.id);
 
@@ -100,7 +99,9 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
 
         toast({
           title: "Welcome to Unwrapt!",
-          description: `Your gift for ${updatedData.selectedPersonForGift?.personName} has been scheduled! Let's start making gift-giving effortless!`,
+          description: updatedData.selectedPersonForGift?.personName 
+            ? `Your gift for ${updatedData.selectedPersonForGift.personName} has been scheduled! Let's start making gift-giving effortless!`
+            : "Your onboarding is complete. Let's start making gift-giving effortless!",
         });
 
         console.log('Onboarding completed successfully');
@@ -149,17 +150,15 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
     
     switch (currentStep) {
       case 1:
-        return <WelcomeStep onNext={handleStepComplete} />;
-      case 2:
         return <CalendarStep onNext={handleStepComplete} />;
-      case 3:
+      case 2:
         return (
           <InterestsStep 
             onNext={handleStepComplete} 
             importedDates={onboardingData.importedDates || []}
           />
         );
-      case 4:
+      case 3:
         return (
           <GiftScheduleStep 
             onNext={handleStepComplete} 
@@ -178,6 +177,19 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
             <Button onClick={handleBack} className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90">Go Back</Button>
           </div>
         );
+    }
+  };
+
+  const getStepTitle = () => {
+    switch (currentStep) {
+      case 1:
+        return "Connect Your Calendar";
+      case 2:
+        return "Select Interests";
+      case 3:
+        return "Schedule Gift";
+      default:
+        return `Step ${currentStep}`;
     }
   };
 
@@ -209,7 +221,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
               {/* Progress Indicator */}
               <div className="flex items-center space-x-2">
                 <span className="text-sm text-brand-charcoal/70">
-                  Step {currentStep} of {totalSteps}
+                  {getStepTitle()} ({currentStep} of {totalSteps})
                 </span>
                 <div className="w-32 bg-brand-cream-light rounded-full h-2">
                   <div 
