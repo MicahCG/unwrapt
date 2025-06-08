@@ -1,9 +1,38 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+// Helper function to extract person names
+function extractPersonFromEvent(eventSummary: string) {
+  const summary = eventSummary.toLowerCase();
+  let personName = '';
+  
+  if (summary.includes("'s birthday")) {
+    personName = eventSummary.split("'s")[0].trim();
+  } else if (summary.includes("'s anniversary")) {
+    personName = eventSummary.split("'s")[0].trim();
+  } else if (summary.includes(" birthday")) {
+    personName = eventSummary.replace(/birthday/i, '').trim();
+  } else if (summary.includes(" anniversary")) {
+    personName = eventSummary.replace(/anniversary/i, '').trim();
+  } else if (summary.includes("birthday -")) {
+    personName = eventSummary.split("birthday -")[1].trim();
+  } else if (summary.includes("anniversary -")) {
+    personName = eventSummary.split("anniversary -")[1].trim();
+  } else {
+    // Fallback: try to extract any name-like pattern
+    const words = eventSummary.split(' ');
+    personName = words.find(word => 
+      word.length > 2 && 
+      word[0] === word[0].toUpperCase() &&
+      !['Birthday', 'Anniversary', 'The', 'And', 'Or'].includes(word)
+    ) || '';
+  }
+  
+  return personName;
 }
 
 Deno.serve(async (req) => {
@@ -45,7 +74,6 @@ Deno.serve(async (req) => {
       const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
       const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/').slice(0, 3).join('/')
       
-      // Use the main callback for onboarding - restore previous working behavior
       const redirectUri = `${origin}/auth/callback`
       
       console.log('🔗 Generated redirect URI:', redirectUri)
@@ -130,7 +158,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'fetch_events') {
-      // Fetch calendar events
+      // Original onboarding flow - fetch limited events for single person selection
       const calendarResponse = await fetch(
         'https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=' + 
         new Date().toISOString() + '&maxResults=100&singleEvents=true&orderBy=startTime',
@@ -148,7 +176,7 @@ Deno.serve(async (req) => {
         })
       }
 
-      // Filter for birthdays and anniversaries
+      // Filter for birthdays and anniversaries only (onboarding focus)
       const importantDates = calendarData.items?.filter((event: any) => {
         const summary = event.summary?.toLowerCase() || ''
         return summary.includes('birthday') || summary.includes('anniversary') || 
@@ -156,10 +184,121 @@ Deno.serve(async (req) => {
       }).map((event: any) => ({
         summary: event.summary,
         date: event.start?.date || event.start?.dateTime,
-        type: event.summary?.toLowerCase().includes('anniversary') ? 'anniversary' : 'birthday'
+        type: event.summary?.toLowerCase().includes('anniversary') ? 'anniversary' : 'birthday',
+        personName: extractPersonFromEvent(event.summary)
       })) || []
 
       return new Response(JSON.stringify({ events: importantDates }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    if (action === 'fetch_dashboard_events') {
+      // NEW: Dashboard flow - fetch comprehensive events for multiple people
+      const calendarResponse = await fetch(
+        'https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=' + 
+        new Date().toISOString() + 
+        '&timeMax=' + 
+        new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString() + // Next 12 months
+        '&maxResults=250&singleEvents=true&orderBy=startTime',
+        {
+          headers: { 'Authorization': `Bearer ${access_token}` }
+        }
+      )
+
+      const calendarData = await calendarResponse.json()
+
+      if (calendarData.error) {
+        return new Response(JSON.stringify({ error: calendarData.error }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      // Expanded filtering for dashboard - include more gift-worthy occasions
+      const giftWorthyEvents = calendarData.items?.filter((event: any) => {
+        const summary = event.summary?.toLowerCase() || ''
+        const description = event.description?.toLowerCase() || ''
+        
+        // Original important dates
+        const isImportantDate = summary.includes('birthday') || 
+                               summary.includes('anniversary') || 
+                               summary.includes('born') || 
+                               summary.includes('wedding')
+        
+        // Holiday occasions
+        const isHoliday = summary.includes('christmas') ||
+                         summary.includes('valentine') ||
+                         summary.includes('mother\'s day') ||
+                         summary.includes('father\'s day') ||
+                         summary.includes('thanksgiving') ||
+                         summary.includes('easter') ||
+                         summary.includes('halloween') ||
+                         summary.includes('new year')
+        
+        // Achievement/milestone events
+        const isMilestone = summary.includes('graduation') ||
+                           summary.includes('promotion') ||
+                           summary.includes('retirement') ||
+                           summary.includes('new job') ||
+                           summary.includes('achievement')
+        
+        // Personal events
+        const isPersonalEvent = summary.includes('housewarming') ||
+                               summary.includes('baby shower') ||
+                               summary.includes('engagement') ||
+                               summary.includes('farewell') ||
+                               summary.includes('going away')
+        
+        // Just because occasions (user-created gift reminders)
+        const isGiftReminder = summary.includes('gift') ||
+                              summary.includes('present') ||
+                              summary.includes('surprise') ||
+                              description.includes('gift') ||
+                              description.includes('present')
+        
+        return isImportantDate || isHoliday || isMilestone || isPersonalEvent || isGiftReminder
+      }).map((event: any) => {
+        const summary = event.summary?.toLowerCase() || ''
+        
+        // Determine event category
+        let category = 'other'
+        let type = 'special event'
+        
+        if (summary.includes('birthday') || summary.includes('born')) {
+          category = 'birthday'
+          type = 'birthday'
+        } else if (summary.includes('anniversary') || summary.includes('wedding')) {
+          category = 'anniversary'
+          type = 'anniversary'
+        } else if (summary.includes('christmas') || summary.includes('valentine') || 
+                   summary.includes('mother\'s day') || summary.includes('father\'s day') ||
+                   summary.includes('thanksgiving') || summary.includes('easter') ||
+                   summary.includes('halloween') || summary.includes('new year')) {
+          category = 'holiday'
+          type = 'holiday'
+        } else if (summary.includes('graduation') || summary.includes('promotion') ||
+                   summary.includes('retirement') || summary.includes('achievement')) {
+          category = 'milestone'
+          type = 'milestone'
+        } else if (summary.includes('gift') || summary.includes('present')) {
+          category = 'gift-reminder'
+          type = 'gift reminder'
+        }
+        
+        return {
+          summary: event.summary,
+          date: event.start?.date || event.start?.dateTime,
+          type: type,
+          category: category,
+          description: event.description || null,
+          // Extract person name for birthday/anniversary events
+          personName: (category === 'birthday' || category === 'anniversary') ? 
+                      extractPersonFromEvent(event.summary) : null
+        }
+      }) || []
+
+      return new Response(JSON.stringify({ events: giftWorthyEvents }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
