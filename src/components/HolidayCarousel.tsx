@@ -52,7 +52,7 @@ const holidays: Holiday[] = [
     description: "Spread the love",
     icon: Heart,
     color: "text-brand-gold",
-    giftType: "Candles",
+    giftType: "Vanilla Candle",
     priceRange: "$25-$50"
   },
   {
@@ -62,7 +62,7 @@ const holidays: Holiday[] = [
     description: "Ho ho ho-ly amazing gifts",
     icon: TreePine,
     color: "text-brand-gold",
-    giftType: "Candles",
+    giftType: "Vanilla Candle",
     priceRange: "$50-$100"
   },
   {
@@ -72,7 +72,7 @@ const holidays: Holiday[] = [
     description: "Spook-tacular surprises",
     icon: Ghost,
     color: "text-brand-gold",
-    giftType: "Candles",
+    giftType: "Vanilla Candle",
     priceRange: "$25-$50"
   },
   {
@@ -92,7 +92,7 @@ const holidays: Holiday[] = [
     description: "Give thanks with gifts",
     icon: Star,
     color: "text-brand-gold",
-    giftType: "Candles",
+    giftType: "Vanilla Candle",
     priceRange: "$50-$100"
   },
   {
@@ -112,7 +112,7 @@ const holidays: Holiday[] = [
     description: "Start the year right",
     icon: Sparkles,
     color: "text-brand-gold",
-    giftType: "Candles",
+    giftType: "Vanilla Candle",
     priceRange: "$50-$100"
   },
   {
@@ -142,7 +142,7 @@ const holidays: Holiday[] = [
     description: "Celebrate their achievement",
     icon: Star,
     color: "text-brand-gold",
-    giftType: "Candles",
+    giftType: "Bath & Body",
     priceRange: "$50-$100"
   }
 ];

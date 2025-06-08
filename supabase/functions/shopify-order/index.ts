@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -10,7 +9,8 @@ const corsHeaders = {
 // Available product variants
 const PRODUCT_VARIANTS = {
   VANILLA_CANDLE: 50924986532159,
-  COFFEE: 50924986663231
+  COFFEE: 50924986663231,
+  THIRD_PRODUCT: 51013162041663
 };
 
 interface ShopifyOrderRequest {
@@ -83,6 +83,9 @@ serve(async (req) => {
       } else if (giftData.gift_type.toLowerCase().includes('candle') || giftData.gift_type.toLowerCase().includes('vanilla')) {
         selectedVariantId = PRODUCT_VARIANTS.VANILLA_CANDLE;
         matchReason = 'gift type: candle/vanilla';
+      } else if (giftData.gift_type.toLowerCase().includes('bath') || giftData.gift_type.toLowerCase().includes('body')) {
+        selectedVariantId = PRODUCT_VARIANTS.THIRD_PRODUCT;
+        matchReason = 'gift type: bath & body';
       }
     }
 
@@ -99,6 +102,18 @@ serve(async (req) => {
         selectedVariantId = PRODUCT_VARIANTS.COFFEE;
         matchReason = `recipient interests: ${interests.filter((i: string) => 
           i.includes('coffee') || i.includes('caffeine') || i.includes('espresso') || i.includes('latte')
+        ).join(', ')}`;
+      } else if (interests.some((interest: string) => 
+        interest.includes('bath') || 
+        interest.includes('body') || 
+        interest.includes('skincare') || 
+        interest.includes('spa') ||
+        interest.includes('wellness')
+      )) {
+        selectedVariantId = PRODUCT_VARIANTS.THIRD_PRODUCT;
+        matchReason = `recipient interests: ${interests.filter((i: string) => 
+          i.includes('bath') || i.includes('body') || i.includes('skincare') || 
+          i.includes('spa') || i.includes('wellness')
         ).join(', ')}`;
       } else if (interests.some((interest: string) => 
         interest.includes('candle') || 
@@ -119,7 +134,9 @@ serve(async (req) => {
 
     // Get variant details from Shopify
     let variantPrice = "25.00"; // Default price
-    let productName = selectedVariantId === PRODUCT_VARIANTS.COFFEE ? "Coffee" : "Vanilla Candle"; // Default names
+    let productName = selectedVariantId === PRODUCT_VARIANTS.COFFEE ? "Coffee" : 
+                     selectedVariantId === PRODUCT_VARIANTS.THIRD_PRODUCT ? "Bath & Body" : 
+                     "Vanilla Candle"; // Default names
     const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
     const shopifyToken = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
     

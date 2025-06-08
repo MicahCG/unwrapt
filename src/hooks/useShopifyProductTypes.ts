@@ -4,7 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 
 const PRODUCT_VARIANTS = {
   VANILLA_CANDLE: 50924986532159,
-  COFFEE: 50924986663231
+  COFFEE: 50924986663231,
+  THIRD_PRODUCT: 51013162041663
 };
 
 export const useShopifyProductTypes = () => {
@@ -12,13 +13,16 @@ export const useShopifyProductTypes = () => {
     queryKey: ['shopify-product-types'],
     queryFn: async () => {
       try {
-        // Fetch both products from Shopify
+        // Fetch all three products from Shopify
         const productRequests = await Promise.allSettled([
           supabase.functions.invoke('shopify-product', {
             body: { variantId: PRODUCT_VARIANTS.VANILLA_CANDLE }
           }),
           supabase.functions.invoke('shopify-product', {
             body: { variantId: PRODUCT_VARIANTS.COFFEE }
+          }),
+          supabase.functions.invoke('shopify-product', {
+            body: { variantId: PRODUCT_VARIANTS.THIRD_PRODUCT }
           })
         ]);
 
@@ -38,6 +42,13 @@ export const useShopifyProductTypes = () => {
           productTypes.push('Coffee'); // Fallback
         }
 
+        // Process third product
+        if (productRequests[2].status === 'fulfilled' && productRequests[2].value.data?.success) {
+          productTypes.push(productRequests[2].value.data.productName);
+        } else {
+          productTypes.push('Bath & Body'); // Fallback
+        }
+
         return {
           success: true,
           productTypes: productTypes
@@ -47,7 +58,7 @@ export const useShopifyProductTypes = () => {
         // Fallback to default options
         return {
           success: true,
-          productTypes: ['Vanilla Candle', 'Coffee']
+          productTypes: ['Vanilla Candle', 'Coffee', 'Bath & Body']
         };
       }
     },
