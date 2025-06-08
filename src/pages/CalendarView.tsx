@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Home, Settings, CalendarDays, Gift, Check, Plus, User } from 'lucide-react';
+import { Calendar, Home, Settings, CalendarDays, Gift, Check, User, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,6 +37,7 @@ const CalendarView = () => {
   const [scheduledGifts, setScheduledGifts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasIntegration, setHasIntegration] = useState(false);
+  const [autoAddingRecipients, setAutoAddingRecipients] = useState(false);
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -132,9 +133,14 @@ const CalendarView = () => {
           }
         });
 
-        setCalendarPeople(Array.from(peopleMap.values()).sort((a, b) => 
+        const calendarPeopleArray = Array.from(peopleMap.values()).sort((a, b) => 
           new Date(a.nextEvent!.date).getTime() - new Date(b.nextEvent!.date).getTime()
-        ));
+        );
+
+        setCalendarPeople(calendarPeopleArray);
+
+        // AUTO-ADD: Automatically add all calendar people as recipients
+        await autoAddAllCalendarPeople(calendarPeopleArray, existingRecipients);
 
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -151,45 +157,71 @@ const CalendarView = () => {
     fetchAllData();
   }, [user, toast]);
 
-  const handleAddAsRecipient = async (person: CalendarPerson) => {
+  const autoAddAllCalendarPeople = async (calendarPeopleArray: CalendarPerson[], existingRecipients: any[]) => {
+    // Find people who aren't already recipients
+    const peopleToAdd = calendarPeopleArray.filter(person => !person.isRecipient);
+    
+    if (peopleToAdd.length === 0) {
+      return; // Everyone is already a recipient
+    }
+
+    console.log(`🎁 Auto-adding ${peopleToAdd.length} calendar people as recipients...`);
+    setAutoAddingRecipients(true);
+
     try {
-      const { data: newRecipient, error } = await supabase
+      // Batch insert all new recipients
+      const newRecipients = peopleToAdd.map(person => ({
+        user_id: user?.id,
+        name: person.name,
+        interests: [],
+        // Auto-fill birthday/anniversary from calendar
+        birthday: person.events.find(e => e.category === 'birthday')?.date,
+        anniversary: person.events.find(e => e.category === 'anniversary')?.date,
+        // Note that this was auto-imported from calendar
+        notes: 'Auto-imported from Google Calendar'
+      }));
+
+      const { data: insertedRecipients, error } = await supabase
         .from('recipients')
-        .insert({
-          user_id: user?.id,
-          name: person.name,
-          interests: [],
-          // Auto-fill birthday/anniversary from calendar
-          birthday: person.events.find(e => e.category === 'birthday')?.date,
-          anniversary: person.events.find(e => e.category === 'anniversary')?.date,
-        })
-        .select()
-        .single();
+        .insert(newRecipients)
+        .select();
 
       if (error) throw error;
 
-      // Update local state
+      // Update local state to reflect new recipients
+      setRecipients(prev => [...prev, ...insertedRecipients]);
+      
+      // Update calendar people to mark them as recipients
       setCalendarPeople(prev => 
-        prev.map(p => p.id === person.id ? {
-          ...p, 
-          isRecipient: true, 
-          recipientId: newRecipient.id 
-        } : p)
+        prev.map(person => {
+          const newRecipient = insertedRecipients.find(r => 
+            r.name.toLowerCase().trim() === person.name.toLowerCase().trim()
+          );
+          if (newRecipient) {
+            return {
+              ...person,
+              isRecipient: true,
+              recipientId: newRecipient.id
+            };
+          }
+          return person;
+        })
       );
 
-      setRecipients(prev => [...prev, newRecipient]);
-
       toast({
-        title: "Success!",
-        description: `${person.name} has been added as a recipient`,
+        title: "Recipients Added!",
+        description: `Added ${peopleToAdd.length} people from your calendar as recipients. You can now schedule gifts for them!`,
       });
 
     } catch (error) {
+      console.error('Error auto-adding recipients:', error);
       toast({
-        title: "Error",
-        description: "Failed to add recipient",
+        title: "Auto-Add Failed",
+        description: "Failed to add some calendar people as recipients. You can add them manually.",
         variant: "destructive"
       });
+    } finally {
+      setAutoAddingRecipients(false);
     }
   };
 
@@ -230,7 +262,7 @@ const CalendarView = () => {
     if (person.isRecipient) {
       return { status: 'recipient', color: 'bg-blue-100 text-blue-800', icon: User };
     }
-    return { status: 'new', color: 'bg-gray-100 text-gray-800', icon: Plus };
+    return { status: 'processing', color: 'bg-yellow-100 text-yellow-800', icon: Clock };
   };
 
   if (loading) {
@@ -275,10 +307,13 @@ const CalendarView = () => {
         <CardHeader>
           <CardTitle className="flex items-center text-brand-charcoal text-lg sm:text-xl">
             <Calendar className="h-5 w-5 mr-2 flex-shrink-0" />
-            Gift Opportunities from Your Calendar
+            Your Recipients from Calendar
           </CardTitle>
           <p className="text-sm text-brand-charcoal/70">
-            People from your calendar events - easily add them as recipients and schedule gifts
+            {autoAddingRecipients 
+              ? "Adding people from your calendar as recipients..."
+              : "People from your calendar - now you can schedule gifts for them!"
+            }
           </p>
         </CardHeader>
         <CardContent>
@@ -289,7 +324,7 @@ const CalendarView = () => {
                 No Calendar Integration Found
               </h3>
               <p className="text-sm sm:text-base text-brand-charcoal/70 mb-6 max-w-md mx-auto">
-                Connect your Google Calendar to discover gift opportunities for people in your life.
+                Connect your Google Calendar to automatically discover people and add them as recipients.
               </p>
               <Button
                 onClick={() => navigate('/onboarding')}
@@ -302,7 +337,7 @@ const CalendarView = () => {
             <div className="text-center py-8 sm:py-12">
               <CalendarDays className="h-12 w-12 sm:h-16 sm:w-16 text-brand-charcoal/30 mx-auto mb-4" />
               <h3 className="text-base sm:text-lg font-semibold text-brand-charcoal mb-2">
-                No Gift Opportunities Found
+                No People Found in Calendar
               </h3>
               <p className="text-sm sm:text-base text-brand-charcoal/70 max-w-md mx-auto">
                 We didn't find any people with birthdays, anniversaries, or special events in your calendar.
@@ -312,7 +347,7 @@ const CalendarView = () => {
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <h3 className="text-base sm:text-lg font-semibold text-brand-charcoal">
-                  Found {calendarPeople.length} people with upcoming events
+                  {calendarPeople.length} people from your calendar
                 </h3>
                 <div className="flex flex-wrap gap-2 text-xs">
                   <Badge className="bg-green-100 text-green-800">
@@ -321,12 +356,14 @@ const CalendarView = () => {
                   </Badge>
                   <Badge className="bg-blue-100 text-blue-800">
                     <User className="h-3 w-3 mr-1" />
-                    Recipient Added
+                    Recipient Ready
                   </Badge>
-                  <Badge className="bg-gray-100 text-gray-800">
-                    <Plus className="h-3 w-3 mr-1" />
-                    New Opportunity
-                  </Badge>
+                  {autoAddingRecipients && (
+                    <Badge className="bg-yellow-100 text-yellow-800">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Adding Recipients...
+                    </Badge>
+                  )}
                 </div>
               </div>
               
@@ -355,6 +392,11 @@ const CalendarView = () => {
                               Gift Scheduled
                             </Badge>
                           )}
+                          {person.isRecipient && !person.hasScheduledGifts && (
+                            <Badge className="bg-blue-100 text-blue-800 text-xs">
+                              Ready for Gifts
+                            </Badge>
+                          )}
                         </div>
                         
                         <p className="text-xs sm:text-sm text-brand-charcoal/70">
@@ -369,17 +411,7 @@ const CalendarView = () => {
                       </div>
                       
                       <div className="flex flex-col gap-2 ml-4">
-                        {!person.isRecipient ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleAddAsRecipient(person)}
-                            className="text-xs border-brand-charcoal text-brand-charcoal hover:bg-brand-cream"
-                          >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Add Recipient
-                          </Button>
-                        ) : (
+                        {person.isRecipient ? (
                           <Button
                             size="sm"
                             onClick={() => handleScheduleGift(person)}
@@ -398,6 +430,11 @@ const CalendarView = () => {
                               </>
                             )}
                           </Button>
+                        ) : (
+                          <div className="text-xs text-brand-charcoal/60 text-center">
+                            <Clock className="h-3 w-3 mx-auto mb-1" />
+                            Adding...
+                          </div>
                         )}
                       </div>
                     </div>
@@ -407,7 +444,7 @@ const CalendarView = () => {
               
               <div className="mt-6 p-4 bg-brand-cream/50 rounded-lg">
                 <p className="text-sm text-brand-charcoal/80 text-center">
-                  💡 <strong>Pro tip:</strong> Add people as recipients to store their shipping details and interests for even better gift recommendations!
+                  ✨ <strong>Smart Auto-Import:</strong> We automatically added people from your calendar as recipients. Now you can easily schedule gifts for their upcoming events!
                 </p>
               </div>
             </div>
