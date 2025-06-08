@@ -42,8 +42,16 @@ Deno.serve(async (req) => {
 
   try {
     // Create supabase client with the user's auth token to respect RLS
-    const authHeader = req.headers.get('Authorization')!
+    const authHeader = req.headers.get('Authorization')
     console.log('🔐 Auth header present:', !!authHeader)
+    
+    if (!authHeader) {
+      console.error('❌ No Authorization header found')
+      return new Response(JSON.stringify({ error: 'No Authorization header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
