@@ -7,8 +7,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Single product variant ID - your Vanilla Candle
-const PRODUCT_VARIANT_ID = 44718901371329;
+// Available product variants
+const PRODUCT_VARIANTS = {
+  VANILLA_CANDLE: 50924986532159,
+  COFFEE: 50924986663231
+};
 
 interface ShopifyOrderRequest {
   scheduledGiftId: string;
@@ -64,18 +67,59 @@ serve(async (req) => {
       id: giftData.id,
       recipient: giftData.recipients?.name,
       interests: giftData.recipients?.interests,
-      price_range: giftData.price_range
+      price_range: giftData.price_range,
+      gift_type: giftData.gift_type
     });
 
-    // Use the single product variant ID for all orders
-    const selectedVariantId = PRODUCT_VARIANT_ID;
-    const matchReason = 'single product offering';
+    // Select product variant based on gift type or interests
+    let selectedVariantId = PRODUCT_VARIANTS.VANILLA_CANDLE; // Default
+    let matchReason = 'default vanilla candle';
+
+    // Check if gift type is specified
+    if (giftData.gift_type) {
+      if (giftData.gift_type.toLowerCase().includes('coffee')) {
+        selectedVariantId = PRODUCT_VARIANTS.COFFEE;
+        matchReason = 'gift type: coffee';
+      } else if (giftData.gift_type.toLowerCase().includes('candle') || giftData.gift_type.toLowerCase().includes('vanilla')) {
+        selectedVariantId = PRODUCT_VARIANTS.VANILLA_CANDLE;
+        matchReason = 'gift type: candle/vanilla';
+      }
+    }
+
+    // Check recipient interests if no specific gift type match
+    if (selectedVariantId === PRODUCT_VARIANTS.VANILLA_CANDLE && giftData.recipients?.interests) {
+      const interests = giftData.recipients.interests.map((i: string) => i.toLowerCase());
+      
+      if (interests.some((interest: string) => 
+        interest.includes('coffee') || 
+        interest.includes('caffeine') || 
+        interest.includes('espresso') || 
+        interest.includes('latte')
+      )) {
+        selectedVariantId = PRODUCT_VARIANTS.COFFEE;
+        matchReason = `recipient interests: ${interests.filter((i: string) => 
+          i.includes('coffee') || i.includes('caffeine') || i.includes('espresso') || i.includes('latte')
+        ).join(', ')}`;
+      } else if (interests.some((interest: string) => 
+        interest.includes('candle') || 
+        interest.includes('vanilla') || 
+        interest.includes('scent') || 
+        interest.includes('aromatherapy') ||
+        interest.includes('relaxation')
+      )) {
+        selectedVariantId = PRODUCT_VARIANTS.VANILLA_CANDLE;
+        matchReason = `recipient interests: ${interests.filter((i: string) => 
+          i.includes('candle') || i.includes('vanilla') || i.includes('scent') || 
+          i.includes('aromatherapy') || i.includes('relaxation')
+        ).join(', ')}`;
+      }
+    }
 
     console.log(`Selected variant ID: ${selectedVariantId} (${matchReason})`);
 
-    // Get variant price from Shopify (optional, for logging)
+    // Get variant details from Shopify
     let variantPrice = "25.00"; // Default price
-    let productName = "Vanilla Candle"; // Default name
+    let productName = selectedVariantId === PRODUCT_VARIANTS.COFFEE ? "Coffee" : "Vanilla Candle"; // Default names
     const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
     const shopifyToken = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
     
@@ -146,7 +190,7 @@ serve(async (req) => {
           billing_address: recipientAddress,
           email: giftData.recipients?.email || "gift@unwrapt.com",
           phone: recipientAddress.phone || giftData.recipients?.phone,
-          note: `Gift from Unwrapt - Occasion: ${giftData.occasion}. Recipient interests: ${giftData.recipients?.interests?.join(', ') || 'none'}. ${giftData.gift_description || ''}`,
+          note: `Gift from Unwrapt - Occasion: ${giftData.occasion}. Recipient interests: ${giftData.recipients?.interests?.join(', ') || 'none'}. Selected product: ${productName}. Match reason: ${matchReason}. ${giftData.gift_description || ''}`,
           tags: "unwrapt-gift",
           financial_status: "paid", // Since we already collected payment
         }
@@ -176,7 +220,7 @@ serve(async (req) => {
       .update({
         status: testMode ? 'test-ordered' : 'ordered',
         updated_at: new Date().toISOString(),
-        gift_description: `${giftData.gift_description || ''} | Product: ${productName} | Variant ID: ${selectedVariantId}${testMode ? ' | TEST MODE' : ''}`
+        gift_description: `${giftData.gift_description || ''} | Product: ${productName} | Variant ID: ${selectedVariantId} | Match: ${matchReason}${testMode ? ' | TEST MODE' : ''}`
       })
       .eq('id', scheduledGiftId);
 
