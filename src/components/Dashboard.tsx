@@ -11,6 +11,7 @@ import TestDataManager from '@/components/TestDataManager';
 import RecipientsList from '@/components/RecipientsList';
 import UpcomingGiftsManager from '@/components/UpcomingGiftsManager';
 import DashboardRecipients from '@/components/DashboardRecipients';
+import HolidayCarousel from '@/components/HolidayCarousel';
 import AppNavigation from '@/components/AppNavigation';
 import { ResponsiveContainer, ResponsiveHeader, ResponsiveNavigation, ResponsiveActions } from '@/components/ui/responsive-container';
 import { Users, Gift, Clock, TrendingUp, Calendar, Settings } from 'lucide-react';
@@ -87,6 +88,11 @@ const Dashboard = () => {
           <TestDataManager />
         </div>
       )}
+
+      {/* Holiday Carousel */}
+      <div className="mb-8">
+        <HolidayCarousel />
+      </div>
 
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">

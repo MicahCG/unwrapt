@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -10,6 +10,8 @@ import {
   CarouselPrevious,
 } from '@/components/ui/carousel';
 import { Calendar, Gift, Heart, Star, Sparkles, TreePine, Ghost, Clover } from 'lucide-react';
+import RecipientSelectionModal from './RecipientSelectionModal';
+import ScheduleGiftModal from './ScheduleGiftModal';
 
 interface Holiday {
   name: string;
@@ -18,6 +20,8 @@ interface Holiday {
   description: string;
   icon: React.ComponentType<any>;
   color: string;
+  giftType?: string;
+  priceRange?: string;
 }
 
 const holidays: Holiday[] = [
@@ -27,7 +31,9 @@ const holidays: Holiday[] = [
     callToAction: "Give Mom something that says 'thanks for not selling me to the circus'",
     description: "Show Mom some love",
     icon: Heart,
-    color: "text-brand-gold"
+    color: "text-brand-gold",
+    giftType: "Bath & Body",
+    priceRange: "$50-$100"
   },
   {
     name: "Father's Day",
@@ -35,7 +41,9 @@ const holidays: Holiday[] = [
     callToAction: "Get Dad something better than another tie he'll never wear",
     description: "Dad deserves the best",
     icon: Star,
-    color: "text-brand-gold"
+    color: "text-brand-gold",
+    giftType: "Coffee",
+    priceRange: "$25-$50"
   },
   {
     name: "Valentine's Day",
@@ -43,7 +51,9 @@ const holidays: Holiday[] = [
     callToAction: "Love is in the air... and on your calendar",
     description: "Spread the love",
     icon: Heart,
-    color: "text-brand-gold"
+    color: "text-brand-gold",
+    giftType: "Candles",
+    priceRange: "$25-$50"
   },
   {
     name: "Christmas",
@@ -51,7 +61,9 @@ const holidays: Holiday[] = [
     callToAction: "Get on the nice list with the perfect gift",
     description: "Ho ho ho-ly amazing gifts",
     icon: TreePine,
-    color: "text-brand-gold"
+    color: "text-brand-gold",
+    giftType: "Candles",
+    priceRange: "$50-$100"
   },
   {
     name: "Halloween",
@@ -59,7 +71,9 @@ const holidays: Holiday[] = [
     callToAction: "No tricks, just treats... and great gifts",
     description: "Spook-tacular surprises",
     icon: Ghost,
-    color: "text-brand-gold"
+    color: "text-brand-gold",
+    giftType: "Candles",
+    priceRange: "$25-$50"
   },
   {
     name: "Easter",
@@ -67,7 +81,9 @@ const holidays: Holiday[] = [
     callToAction: "Some bunny is going to love this",
     description: "Hop into gift-giving",
     icon: Sparkles,
-    color: "text-brand-gold"
+    color: "text-brand-gold",
+    giftType: "Bath & Body",
+    priceRange: "$25-$50"
   },
   {
     name: "Thanksgiving",
@@ -75,7 +91,9 @@ const holidays: Holiday[] = [
     callToAction: "Turkey's temporary, great gifts are forever",
     description: "Give thanks with gifts",
     icon: Star,
-    color: "text-brand-gold"
+    color: "text-brand-gold",
+    giftType: "Candles",
+    priceRange: "$50-$100"
   },
   {
     name: "Fourth of July",
@@ -83,7 +101,9 @@ const holidays: Holiday[] = [
     callToAction: "Declare independence from boring gifts",
     description: "Celebrate freedom and friendship",
     icon: Star,
-    color: "text-brand-gold"
+    color: "text-brand-gold",
+    giftType: "Bath & Body",
+    priceRange: "$25-$50"
   },
   {
     name: "New Year's",
@@ -91,7 +111,9 @@ const holidays: Holiday[] = [
     callToAction: "Resolution: be an amazing gift-giver",
     description: "Start the year right",
     icon: Sparkles,
-    color: "text-brand-gold"
+    color: "text-brand-gold",
+    giftType: "Candles",
+    priceRange: "$50-$100"
   },
   {
     name: "St. Patrick's Day",
@@ -99,7 +121,9 @@ const holidays: Holiday[] = [
     callToAction: "Make them feel lucky with the perfect gift",
     description: "Lucky gifts for lucky people",
     icon: Clover,
-    color: "text-brand-gold"
+    color: "text-brand-gold",
+    giftType: "Coffee",
+    priceRange: "$25-$50"
   },
   {
     name: "Back to School",
@@ -107,7 +131,9 @@ const holidays: Holiday[] = [
     callToAction: "School supplies are basic - be brilliant instead",
     description: "Smart gifts for smart cookies",
     icon: Star,
-    color: "text-brand-gold"
+    color: "text-brand-gold",
+    giftType: "Coffee",
+    priceRange: "$25-$50"
   },
   {
     name: "Graduation Season",
@@ -115,19 +141,31 @@ const holidays: Holiday[] = [
     callToAction: "Give them something smarter than student loans",
     description: "Celebrate their achievement",
     icon: Star,
-    color: "text-brand-gold"
+    color: "text-brand-gold",
+    giftType: "Candles",
+    priceRange: "$50-$100"
   }
 ];
 
 const HolidayCarousel: React.FC = () => {
+  const [showRecipientSelection, setShowRecipientSelection] = useState(false);
+  const [selectedHoliday, setSelectedHoliday] = useState<Holiday | null>(null);
+  const [selectedRecipient, setSelectedRecipient] = useState(null);
+
   const handleScheduleGift = (holiday: Holiday) => {
     console.log(`Scheduling gift for ${holiday.name}`);
-    // TODO: Implement gift scheduling modal
+    setSelectedHoliday(holiday);
+    setShowRecipientSelection(true);
   };
 
-  const handleAddRecipient = (holiday: Holiday) => {
-    console.log(`Adding recipient for ${holiday.name}`);
-    // TODO: Implement add recipient modal
+  const handleRecipientSelected = (recipient: any) => {
+    setSelectedRecipient(recipient);
+    setShowRecipientSelection(false);
+  };
+
+  const handleCloseScheduleModal = () => {
+    setSelectedRecipient(null);
+    setSelectedHoliday(null);
   };
 
   // Filter holidays to show only upcoming ones for the current year
@@ -220,15 +258,7 @@ const HolidayCarousel: React.FC = () => {
                           className="w-full bg-brand-charcoal text-white hover:bg-brand-charcoal/90 transition-colors h-9"
                         >
                           <Gift className="h-4 w-4 mr-2" />
-                          Schedule Gift
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleAddRecipient(holiday)}
-                          className="w-full border-brand-charcoal/20 text-brand-charcoal hover:bg-brand-cream/50 transition-colors h-9"
-                        >
-                          Add Recipient
+                          Choose Person & Schedule Gift
                         </Button>
                       </div>
                     </div>
@@ -241,7 +271,58 @@ const HolidayCarousel: React.FC = () => {
         <CarouselPrevious className="hidden md:flex -left-4 border-brand-charcoal/10 text-brand-charcoal hover:bg-brand-cream/50" />
         <CarouselNext className="hidden md:flex -right-4 border-brand-charcoal/10 text-brand-charcoal hover:bg-brand-cream/50" />
       </Carousel>
+
+      {/* Recipient Selection Modal */}
+      {showRecipientSelection && selectedHoliday && (
+        <RecipientSelectionModal
+          isOpen={showRecipientSelection}
+          onClose={() => {
+            setShowRecipientSelection(false);
+            setSelectedHoliday(null);
+          }}
+          onRecipientSelected={handleRecipientSelected}
+        />
+      )}
+
+      {/* Schedule Gift Modal with Holiday Prepopulation */}
+      {selectedRecipient && selectedHoliday && (
+        <HolidayScheduleGiftModal
+          recipient={selectedRecipient}
+          holiday={selectedHoliday}
+          isOpen={!!selectedRecipient}
+          onClose={handleCloseScheduleModal}
+        />
+      )}
     </div>
+  );
+};
+
+// Create a wrapper component for ScheduleGiftModal that prepopulates holiday data
+const HolidayScheduleGiftModal: React.FC<{
+  recipient: any;
+  holiday: Holiday;
+  isOpen: boolean;
+  onClose: () => void;
+}> = ({ recipient, holiday, isOpen, onClose }) => {
+  const [formData, setFormData] = React.useState({
+    occasion: holiday.name,
+    occasion_date: holiday.date.replace(', 2025', ', ' + new Date().getFullYear()),
+    gift_type: holiday.giftType || '',
+    price_range: holiday.priceRange || '',
+    gift_description: `Perfect ${holiday.name.toLowerCase()} gift`,
+    delivery_date: ''
+  });
+
+  // Use the existing ScheduleGiftModal but with prepopulated data
+  return (
+    <ScheduleGiftModal
+      recipient={{
+        ...recipient,
+        _holidayPreset: formData
+      }}
+      isOpen={isOpen}
+      onClose={onClose}
+    />
   );
 };
 

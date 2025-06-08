@@ -67,12 +67,17 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
   React.useEffect(() => {
     if (isOpen) {
-      const defaultOccasion = getDefaultOccasionDate();
-      setFormData(prev => ({
-        ...prev,
-        occasion: defaultOccasion.occasion,
-        occasion_date: defaultOccasion.date
-      }));
+      // Check if this is a holiday preset
+      if (recipient._holidayPreset) {
+        setFormData(recipient._holidayPreset);
+      } else {
+        const defaultOccasion = getDefaultOccasionDate();
+        setFormData(prev => ({
+          ...prev,
+          occasion: defaultOccasion.occasion,
+          occasion_date: defaultOccasion.date
+        }));
+      }
     }
   }, [isOpen, recipient]);
 
