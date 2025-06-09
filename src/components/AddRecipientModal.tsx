@@ -31,6 +31,23 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
   });
   const [isLoading, setIsLoading] = useState(false);
 
+  const sendNotificationEmail = async (recipientName: string) => {
+    try {
+      await supabase.functions.invoke('send-notification-email', {
+        body: {
+          type: 'recipient_added',
+          userEmail: user?.email,
+          userName: user?.user_metadata?.full_name || user?.email?.split('@')[0],
+          recipientName: recipientName
+        }
+      });
+      console.log('Notification email sent for new recipient');
+    } catch (error) {
+      console.error('Failed to send notification email:', error);
+      // Don't throw error - email failure shouldn't block recipient creation
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user?.id) return;
@@ -58,13 +75,16 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
 
       if (error) throw error;
 
+      // Send notification email
+      await sendNotificationEmail(formData.name);
+
       // Refresh the recipients list
       queryClient.invalidateQueries({ queryKey: ['recipients'] });
       queryClient.invalidateQueries({ queryKey: ['user-metrics'] });
       
       toast({
         title: "Success",
-        description: "Recipient added successfully!",
+        description: "Recipient added successfully! You'll receive an email confirmation.",
       });
 
       // Reset form and close modal

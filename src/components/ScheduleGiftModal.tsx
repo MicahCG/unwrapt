@@ -97,6 +97,29 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     return range;
   };
 
+  const sendGiftNotificationEmail = async (giftDetails: any) => {
+    try {
+      await supabase.functions.invoke('send-notification-email', {
+        body: {
+          type: 'gift_scheduled',
+          userEmail: user?.email,
+          userName: user?.user_metadata?.full_name || user?.email?.split('@')[0],
+          recipientName: recipient.name,
+          giftDetails: {
+            occasion: giftDetails.occasion,
+            occasionDate: giftDetails.occasion_date,
+            giftType: giftDetails.gift_type,
+            priceRange: giftDetails.price_range
+          }
+        }
+      });
+      console.log('Gift notification email sent');
+    } catch (error) {
+      console.error('Failed to send gift notification email:', error);
+      // Don't throw error - email failure shouldn't block gift scheduling
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -145,12 +168,15 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
       if (paymentError) throw paymentError;
 
       if (paymentData?.url) {
+        // Send notification email
+        await sendGiftNotificationEmail(formData);
+
         // Open Stripe checkout in a new tab
         window.open(paymentData.url, '_blank');
         
         toast({
           title: "Payment Required",
-          description: "Please complete payment in the new tab to finalize your gift scheduling.",
+          description: "Please complete payment in the new tab to finalize your gift scheduling. You'll receive an email confirmation.",
         });
 
         // Refresh queries
