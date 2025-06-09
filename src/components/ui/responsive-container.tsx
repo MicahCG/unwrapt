@@ -11,7 +11,7 @@ export const ResponsiveContainer = ({ children, className }: ResponsiveContainer
   return (
     <div className={cn(
       "min-h-screen bg-brand-cream",
-      "px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8",
+      "px-3 sm:px-4 lg:px-6 xl:px-8 py-3 sm:py-4 lg:py-6 xl:py-8",
       className
     )}>
       <div className="max-w-7xl mx-auto w-full">
@@ -25,8 +25,8 @@ export const ResponsiveHeader = ({ children, className }: ResponsiveContainerPro
   return (
     <div className={cn(
       "mb-4 sm:mb-6 lg:mb-8",
-      "flex flex-col gap-4",
-      "sm:flex-row sm:items-center sm:justify-between",
+      "flex flex-col gap-3 sm:gap-4",
+      "lg:flex-row lg:items-start lg:justify-between",
       className
     )}>
       {children}
@@ -36,7 +36,7 @@ export const ResponsiveHeader = ({ children, className }: ResponsiveContainerPro
 
 export const ResponsiveNavigation = ({ children }: { children: React.ReactNode }) => {
   return (
-    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+    <div className="flex flex-col gap-3 sm:gap-4 w-full lg:flex-1">
       {children}
     </div>
   );
@@ -44,7 +44,7 @@ export const ResponsiveNavigation = ({ children }: { children: React.ReactNode }
 
 export const ResponsiveActions = ({ children }: { children: React.ReactNode }) => {
   return (
-    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full lg:w-auto lg:flex-shrink-0">
       {children}
     </div>
   );

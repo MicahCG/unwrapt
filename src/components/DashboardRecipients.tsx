@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -68,16 +67,16 @@ const DashboardRecipients = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6 w-full">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center space-x-2">
-          <Users className="h-5 w-5 text-brand-charcoal" />
-          <h2 className="text-xl font-semibold text-brand-charcoal">Your Recipients</h2>
+          <Users className="h-4 w-4 sm:h-5 sm:w-5 text-brand-charcoal" />
+          <h2 className="text-lg sm:text-xl font-semibold text-brand-charcoal">Your Recipients</h2>
         </div>
         <Button 
           variant="outline"
           size="sm"
-          className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream"
+          className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream w-full sm:w-auto"
           onClick={() => setShowAddModal(true)}
         >
           <Plus className="h-4 w-4 mr-2" />
@@ -86,30 +85,30 @@ const DashboardRecipients = () => {
       </div>
 
       {recipients && recipients.length > 0 ? (
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {recipients.map((recipient: any) => {
             const nextOccasion = getNextOccasion(recipient);
             
             return (
-              <Card key={recipient.id} className="bg-white border-brand-cream hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3">
+              <Card key={recipient.id} className="bg-white border-brand-cream hover:shadow-md transition-shadow w-full">
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0 w-full sm:w-auto">
+                      <div className="flex flex-col space-y-2">
                         <div>
-                          <h3 className="font-medium text-brand-charcoal">{recipient.name}</h3>
-                          <div className="flex items-center space-x-2 mt-1">
+                          <h3 className="font-medium text-brand-charcoal text-sm sm:text-base truncate">{recipient.name}</h3>
+                          <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 mt-1">
                             {recipient.relationship && (
                               <Badge 
                                 variant="secondary" 
-                                className="text-xs bg-brand-cream text-brand-charcoal border-brand-cream"
+                                className="text-xs bg-brand-cream text-brand-charcoal border-brand-cream w-fit"
                               >
                                 {recipient.relationship}
                               </Badge>
                             )}
                             {nextOccasion && (
                               <div className="flex items-center text-xs text-brand-charcoal/70">
-                                <Calendar className="h-3 w-3 mr-1" />
+                                <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
                                 <span className="font-medium">{nextOccasion.type}:</span>
                                 <span className="ml-1">{formatDate(nextOccasion.date.toISOString())}</span>
                               </div>
@@ -120,11 +119,11 @@ const DashboardRecipients = () => {
                     </div>
                     <Button
                       size="sm"
-                      className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+                      className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 w-full sm:w-auto flex-shrink-0"
                       onClick={() => setSchedulingGift(recipient)}
                     >
-                      <Gift className="h-4 w-4 mr-2" />
-                      Schedule Gift
+                      <Gift className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                      <span className="text-xs sm:text-sm">Schedule Gift</span>
                     </Button>
                   </div>
                 </CardContent>
@@ -133,13 +132,13 @@ const DashboardRecipients = () => {
           })}
         </div>
       ) : (
-        <Card className="bg-white border-brand-cream">
-          <CardContent className="py-8 text-center">
-            <div className="text-brand-charcoal/50 mb-4">
+        <Card className="bg-white border-brand-cream w-full">
+          <CardContent className="py-6 sm:py-8 text-center px-4 sm:px-6">
+            <div className="text-brand-charcoal/50 mb-4 text-sm sm:text-base">
               No recipients added yet
             </div>
             <Button 
-              className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+              className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 w-full sm:w-auto"
               onClick={() => setShowAddModal(true)}
             >
               Add Your First Recipient

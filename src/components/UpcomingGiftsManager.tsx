@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -82,86 +81,94 @@ const UpcomingGiftsManager = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-brand-charcoal">Upcoming Gifts</h2>
+    <div className="space-y-4 sm:space-y-6 w-full">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <h2 className="text-xl sm:text-2xl font-bold text-brand-charcoal">Upcoming Gifts</h2>
         <Button
-          className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+          className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 w-full sm:w-auto"
           onClick={() => setShowRecipientSelection(true)}
         >
           <Plus className="h-4 w-4 mr-2" />
-          Schedule More Gifts
+          <span className="sm:hidden">Schedule Gifts</span>
+          <span className="hidden sm:inline">Schedule More Gifts</span>
         </Button>
       </div>
 
       {gifts && gifts.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-4 sm:gap-6">
           {gifts.map((gift: any) => (
-            <Card key={gift.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-lg text-brand-charcoal">
+            <Card key={gift.id} className="hover:shadow-lg transition-shadow w-full">
+              <CardHeader className="pb-3 px-4 sm:px-6">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-base sm:text-lg text-brand-charcoal truncate">
                       {gift.recipients?.name}
                     </CardTitle>
-                    <Badge className={`mt-1 ${getStatusColor(gift.status)}`}>
+                    <Badge className={`mt-1 text-xs ${getStatusColor(gift.status)}`}>
                       {gift.status}
                     </Badge>
                   </div>
-                  <div className="flex space-x-1">
+                  <div className="flex space-x-1 flex-shrink-0">
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => setTestingGift(gift)}
                       title="Test Shopify Integration"
+                      className="h-8 w-8 p-0"
                     >
-                      <TestTube2 className="h-4 w-4" />
+                      <TestTube2 className="h-3 w-3" />
                     </Button>
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => setEditingGift(gift)}
+                      className="h-8 w-8 p-0"
                     >
-                      <Edit className="h-4 w-4" />
+                      <Edit className="h-3 w-3" />
                     </Button>
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => handleDeleteGift(gift.id)}
-                      className="text-red-600 hover:text-red-700"
+                      className="text-red-600 hover:text-red-700 h-8 w-8 p-0"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
               </CardHeader>
               
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-3 px-4 sm:px-6">
                 <div className="space-y-2">
-                  <p className="font-medium text-brand-charcoal">{gift.occasion}</p>
+                  <p className="font-medium text-brand-charcoal text-sm sm:text-base">{gift.occasion}</p>
                   {gift.gift_type && (
-                    <p className="text-sm text-brand-charcoal/70">{gift.gift_type}</p>
+                    <p className="text-xs sm:text-sm text-brand-charcoal/70">{gift.gift_type}</p>
                   )}
                 </div>
 
                 {gift.recipients?.interests && gift.recipients.interests.length > 0 && (
                   <div className="flex flex-wrap gap-1">
-                    {gift.recipients.interests.map((interest: string, index: number) => (
+                    {gift.recipients.interests.slice(0, 3).map((interest: string, index: number) => (
                       <Badge key={index} variant="outline" className="text-xs">
                         {interest}
                       </Badge>
                     ))}
+                    {gift.recipients.interests.length > 3 && (
+                      <Badge variant="outline" className="text-xs">
+                        +{gift.recipients.interests.length - 3}
+                      </Badge>
+                    )}
                   </div>
                 )}
 
-                <div className="flex items-center justify-between pt-2">
-                  <div className="flex items-center text-sm text-brand-charcoal/70">
-                    <Calendar className="h-4 w-4 mr-1" />
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-2">
+                  <div className="flex items-center text-xs sm:text-sm text-brand-charcoal/70">
+                    <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                     {formatDate(gift.occasion_date)}
                   </div>
                   {gift.price_range && (
-                    <div className="flex items-center text-sm text-brand-charcoal/70">
-                      <DollarSign className="h-4 w-4 mr-1" />
+                    <div className="flex items-center text-xs sm:text-sm text-brand-charcoal/70">
+                      <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                       {gift.price_range}
                     </div>
                   )}
@@ -169,7 +176,7 @@ const UpcomingGiftsManager = () => {
 
                 <Button
                   size="sm"
-                  className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+                  className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 text-xs sm:text-sm"
                   onClick={() => setViewingGift(gift)}
                 >
                   View Details
@@ -179,13 +186,13 @@ const UpcomingGiftsManager = () => {
           ))}
         </div>
       ) : (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <div className="text-brand-charcoal/50 mb-4">
+        <Card className="w-full">
+          <CardContent className="py-8 sm:py-12 text-center px-4 sm:px-6">
+            <div className="text-brand-charcoal/50 mb-4 text-sm sm:text-base">
               No upcoming gifts scheduled
             </div>
             <Button
-              className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+              className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 w-full sm:w-auto"
               onClick={() => setShowRecipientSelection(true)}
             >
               <Plus className="h-4 w-4 mr-2" />
