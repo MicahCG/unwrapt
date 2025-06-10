@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -13,9 +14,10 @@ import { useToast } from '@/components/ui/use-toast';
 interface AddRecipientModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onRecipientAdded?: () => void;
 }
 
-const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }) => {
+const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose, onRecipientAdded }) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -98,6 +100,11 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
         notes: ''
       });
       onClose();
+
+      // Call the onRecipientAdded callback if provided
+      if (onRecipientAdded) {
+        onRecipientAdded();
+      }
     } catch (error) {
       console.error('Error adding recipient:', error);
       toast({
