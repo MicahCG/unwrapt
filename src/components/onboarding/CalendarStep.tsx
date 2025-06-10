@@ -297,9 +297,9 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
               />
             </div>
           </div>
-          <CardTitle className="text-3xl mb-2 text-brand-charcoal">Connect your calendar to never miss important dates</CardTitle>
+          <CardTitle className="text-3xl mb-2 text-brand-charcoal">Sync to Never Miss Important Dates</CardTitle>
           <p className="text-brand-charcoal/70">
-            We'll automatically find birthdays, anniversaries, and holidays from your Google Calendar
+            We'll help you schedule birthdays, anniversaries, and holidays.
           </p>
         </CardHeader>
         
@@ -389,13 +389,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
               </Button>
 
               <div className="bg-white p-4 rounded-lg border border-brand-cream">
-                <h4 className="font-medium mb-2 text-brand-charcoal">What we'll find:</h4>
-                <ul className="space-y-1 text-sm text-brand-charcoal/70">
-                  <li>• Birthdays from your contacts</li>
-                  <li>• Anniversary dates</li>
-                  <li>• Holiday reminders</li>
-                  <li>• Custom recurring events</li>
-                </ul>
+                <h4 className="font-medium mb-2 text-brand-charcoal">We take your privacy seriously and only identify events that help with your gift giving.</h4>
               </div>
 
               <div className="text-center pt-4">
