@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
-import { Gift, Calendar, Plus, Users, Clock } from 'lucide-react';
+import { Gift, Calendar, Plus, Users, Clock, ListExpand, ListCollapse } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import ScheduleGiftModal from './ScheduleGiftModal';
 import AddRecipientModal from './AddRecipientModal';
@@ -14,6 +14,7 @@ const DashboardRecipients = () => {
   const { user } = useAuth();
   const [schedulingGift, setSchedulingGift] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showAllRecipients, setShowAllRecipients] = useState(false);
 
   // Fetch recipients sorted by next upcoming event
   const { data: recipients } = useQuery({
@@ -68,7 +69,7 @@ const DashboardRecipients = () => {
         if (!a.daysUntilNext) return 1;
         if (!b.daysUntilNext) return -1;
         return a.daysUntilNext - b.daysUntilNext;
-      }).slice(0, 6); // Show only first 6 on dashboard
+      });
     },
     enabled: !!user
   });
@@ -85,6 +86,10 @@ const DashboardRecipients = () => {
     if (daysUntil === 1) return `${eventType} tomorrow`;
     return `${eventType} in ${daysUntil} days`;
   };
+
+  // Determine which recipients to show based on state
+  const displayedRecipients = recipients ? (showAllRecipients ? recipients : recipients.slice(0, 6)) : [];
+  const hasMoreThanSix = recipients && recipients.length > 6;
 
   return (
     <div className="space-y-4 sm:space-y-6 w-full">
@@ -106,53 +111,78 @@ const DashboardRecipients = () => {
 
       {recipients && recipients.length > 0 ? (
         <div className="space-y-3 sm:space-y-4">
-          {recipients.map((recipient: any) => (
-            <Card key={recipient.id} className="bg-white border-brand-cream hover:shadow-md transition-shadow w-full">
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div className="flex-1 min-w-0 w-full sm:w-auto">
-                    <div className="flex flex-col space-y-2">
-                      <div>
-                        <h3 className="font-medium text-brand-charcoal text-sm sm:text-base truncate">{recipient.name}</h3>
-                        <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 mt-1">
-                          {recipient.relationship && (
-                            <Badge 
-                              variant="secondary" 
-                              className="text-xs bg-brand-cream text-brand-charcoal border-brand-cream w-fit"
-                            >
-                              {recipient.relationship}
-                            </Badge>
-                          )}
-                          {recipient.nextOccasion && (
-                            <div className="flex items-center text-xs">
-                              <Clock className="h-3 w-3 mr-1 flex-shrink-0 text-brand-gold" />
-                              <span className="font-medium text-brand-gold">
-                                {getDaysUntilText(recipient.daysUntilNext, recipient.nextOccasion.type)}
-                              </span>
-                            </div>
-                          )}
-                          {recipient.nextOccasion && (
-                            <div className="flex items-center text-xs text-brand-charcoal/70">
-                              <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
-                              <span>{formatDate(recipient.nextOccasion.date.toISOString())}</span>
-                            </div>
-                          )}
+          <div className="space-y-3 sm:space-y-4">
+            {displayedRecipients.map((recipient: any) => (
+              <Card key={recipient.id} className="bg-white border-brand-cream hover:shadow-md transition-shadow w-full">
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0 w-full sm:w-auto">
+                      <div className="flex flex-col space-y-2">
+                        <div>
+                          <h3 className="font-medium text-brand-charcoal text-sm sm:text-base truncate">{recipient.name}</h3>
+                          <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 mt-1">
+                            {recipient.relationship && (
+                              <Badge 
+                                variant="secondary" 
+                                className="text-xs bg-brand-cream text-brand-charcoal border-brand-cream w-fit"
+                              >
+                                {recipient.relationship}
+                              </Badge>
+                            )}
+                            {recipient.nextOccasion && (
+                              <div className="flex items-center text-xs">
+                                <Clock className="h-3 w-3 mr-1 flex-shrink-0 text-brand-gold" />
+                                <span className="font-medium text-brand-gold">
+                                  {getDaysUntilText(recipient.daysUntilNext, recipient.nextOccasion.type)}
+                                </span>
+                              </div>
+                            )}
+                            {recipient.nextOccasion && (
+                              <div className="flex items-center text-xs text-brand-charcoal/70">
+                                <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
+                                <span>{formatDate(recipient.nextOccasion.date.toISOString())}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
+                    <Button
+                      size="sm"
+                      className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 w-full sm:w-auto flex-shrink-0"
+                      onClick={() => setSchedulingGift(recipient)}
+                    >
+                      <Gift className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                      <span className="text-xs sm:text-sm">Schedule Gift</span>
+                    </Button>
                   </div>
-                  <Button
-                    size="sm"
-                    className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 w-full sm:w-auto flex-shrink-0"
-                    onClick={() => setSchedulingGift(recipient)}
-                  >
-                    <Gift className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                    <span className="text-xs sm:text-sm">Schedule Gift</span>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {hasMoreThanSix && (
+            <div className="flex justify-center pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream"
+                onClick={() => setShowAllRecipients(!showAllRecipients)}
+              >
+                {showAllRecipients ? (
+                  <>
+                    <ListCollapse className="h-4 w-4 mr-2" />
+                    Collapse
+                  </>
+                ) : (
+                  <>
+                    <ListExpand className="h-4 w-4 mr-2" />
+                    Show All ({recipients.length})
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </div>
       ) : (
         <Card className="bg-white border-brand-cream w-full">
