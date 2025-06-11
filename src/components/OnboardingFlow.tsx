@@ -219,7 +219,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
         return (
           <InterestsStep 
             onNext={handleStepComplete} 
-            importedDates={onboardingData.importedDates || []}
+            selectedPersonForGift={onboardingData.selectedPersonForGift}
           />
         );
       case 3:
