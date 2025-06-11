@@ -5,12 +5,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Gift, ArrowDown, CreditCard } from 'lucide-react';
+import { CalendarIcon, Gift, ArrowDown, CreditCard, Package, Heart } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useShopifyProductTypes } from '@/hooks/useShopifyProductTypes';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 interface GiftScheduleStepProps {
   onNext: (data: any) => void;
@@ -33,6 +34,7 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const { toast } = useToast();
   const { data: productTypesData, isLoading: isLoadingProductTypes } = useShopifyProductTypes();
+  const { user } = useAuth();
 
   // Pre-populate form based on calendar data
   useEffect(() => {
@@ -115,6 +117,26 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
     setIsValid(!!formValid);
   }, [occasion, occasionDate, giftType, priceRange]);
 
+  // Gift preview helper functions
+  const getGiftImage = (giftType: string) => {
+    const imageMap = {
+      'wine': 'https://images.unsplash.com/photo-1482938289607-e9573fc25ebb?w=400&h=300&fit=crop',
+      'tea': 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=400&h=300&fit=crop',
+      'coffee': 'https://images.unsplash.com/photo-1581090464777-f3220bbe1b8b?w=400&h=300&fit=crop',
+      'sweet treats': 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=400&h=300&fit=crop',
+      'self care': 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?w=400&h=300&fit=crop'
+    };
+    return imageMap[giftType.toLowerCase()] || 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop';
+  };
+
+  const getGiftDescription = (giftType: string, recipientName: string) => {
+    return `We'll curate premium ${giftType.toLowerCase()} perfect for ${recipientName}'s interests`;
+  };
+
+  const getSenderName = () => {
+    return user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Someone special';
+  };
+
   const getPriceRangeAmount = (range: string) => {
     switch (range) {
       case 'under-25': return 2500; // $25 in cents
@@ -136,6 +158,21 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
       case '200-500': return '$200-$500';
       case 'over-500': return 'over $500';
       default: return range;
+    }
+  };
+
+  const formatOccasion = (occasion: string) => {
+    switch (occasion) {
+      case 'birthday': return 'Birthday';
+      case 'anniversary': return 'Anniversary';
+      case 'valentine': return "Valentine's Day";
+      case 'christmas': return 'Christmas';
+      case 'mothers-day': return "Mother's Day";
+      case 'fathers-day': return "Father's Day";
+      case 'graduation': return 'Graduation';
+      case 'just-because': return 'Just Because';
+      case 'other': return 'Other';
+      default: return occasion;
     }
   };
 
@@ -211,6 +248,9 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
       year: 'numeric'
     });
   };
+
+  // Show gift preview if both gift type and price range are selected
+  const showGiftPreview = giftType && priceRange;
 
   return (
     <Card className="animate-fadeInUp">
@@ -334,6 +374,58 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
           </div>
         </div>
 
+        {/* Gift Preview Section */}
+        {showGiftPreview && (
+          <Card className="bg-brand-cream/30 border-brand-cream">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2 mb-3">
+                <Package className="h-4 w-4 text-brand-charcoal" />
+                <span className="font-medium text-sm text-brand-charcoal">Gift Preview</span>
+              </div>
+              <div className="flex space-x-3">
+                <img
+                  src={getGiftImage(giftType)}
+                  alt={`${giftType} gift`}
+                  className="w-20 h-20 object-cover rounded-lg"
+                />
+                <div className="flex-1">
+                  <p className="text-sm text-brand-charcoal font-medium mb-1">
+                    {giftType}
+                  </p>
+                  <p className="text-xs text-brand-charcoal/70">
+                    {getGiftDescription(giftType, recipientName || 'your recipient')}
+                  </p>
+                  <p className="text-xs text-brand-gold font-medium mt-1">
+                    Price Range: {formatPriceRange(priceRange)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Note Preview Section */}
+        {giftType && (
+          <Card className="bg-gradient-to-br from-brand-cream/20 to-brand-cream/40 border-brand-cream">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2 mb-3">
+                <Heart className="h-4 w-4 text-brand-charcoal" />
+                <span className="font-medium text-sm text-brand-charcoal">Note Preview</span>
+              </div>
+              <div className="bg-white p-3 rounded border border-brand-cream/50 shadow-sm">
+                <p className="text-sm text-brand-charcoal mb-3 leading-relaxed">
+                  {getSenderName()} was thinking about you on your special day and decided to send you some {giftType.toLowerCase()}. We hope you enjoy!
+                </p>
+                <div className="border-t pt-2 mt-2">
+                  <p className="text-xs text-brand-charcoal/60 italic">
+                    This gift was curated and sent through Unwrapt - Making thoughtfulness effortless ✨ unwrapt.io
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Payment Info */}
         {isValid && (
           <div className="bg-brand-cream p-4 rounded-lg border border-brand-cream">
@@ -347,17 +439,21 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
           </div>
         )}
 
-        {/* Pre-populated Summary */}
+        {/* Enhanced Gift Summary */}
         {selectedPersonForGift && isValid && (
           <div className="bg-brand-gold/10 p-4 rounded-lg border border-brand-gold/20">
-            <h4 className="font-medium text-brand-charcoal mb-2">🎁 Gift Summary</h4>
-            <ul className="text-sm text-brand-charcoal/80 space-y-1">
-              <li>• **Recipient:** {recipientName}</li>
-              <li>• **Occasion:** {occasion} on {occasionDate ? format(occasionDate, "MMM d, yyyy") : 'TBD'}</li>
-              <li>• **Gift Type:** {giftType}</li>
-              <li>• **Budget:** {formatPriceRange(priceRange)}</li>
-              <li>• **Based on interests:** {interests.slice(0, 3).join(', ')}{interests.length > 3 ? '...' : ''}</li>
-            </ul>
+            <h4 className="font-medium text-brand-charcoal mb-3">🎁 Gift Summary</h4>
+            <div className="text-sm text-brand-charcoal/80 leading-relaxed">
+              <p className="mb-2">
+                You're gifting <span className="font-medium text-brand-charcoal">{recipientName}</span> on their <span className="font-medium text-brand-charcoal">{formatOccasion(occasion)}</span> 
+                {occasionDate && <span> ({format(occasionDate, "MMM d, yyyy")})</span>} with <span className="font-medium text-brand-charcoal">{giftType}</span> for <span className="font-medium text-brand-charcoal">{formatPriceRange(priceRange)}</span> because you want to show you care.
+              </p>
+              {interests.length > 0 && (
+                <p className="text-xs text-brand-charcoal/60 mt-2">
+                  Based on their interests: {interests.slice(0, 3).join(', ')}{interests.length > 3 ? '...' : ''}
+                </p>
+              )}
+            </div>
           </div>
         )}
 
