@@ -90,7 +90,7 @@ const LoginPage: React.FC = () => {
             </Button>
             
             <p className="text-center text-sm text-brand-charcoal/60">
-              No subscriptions. A gift from us.
+              Join 1,000+ people who never forget to show they care
             </p>
           </div>
         </CardContent>
