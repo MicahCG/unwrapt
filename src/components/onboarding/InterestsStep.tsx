@@ -3,8 +3,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Heart, ArrowDown, Plus, Calendar } from 'lucide-react';
+import { Heart, ArrowDown } from 'lucide-react';
 
 interface InterestsStepProps {
   onNext: (data: any) => void;
@@ -13,7 +12,6 @@ interface InterestsStepProps {
 
 const InterestsStep: React.FC<InterestsStepProps> = ({ onNext, selectedPersonForGift }) => {
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
-  const [customInterest, setCustomInterest] = useState('');
 
   // Updated interests to include the 5 specified options
   const predefinedInterests = [
@@ -26,16 +24,6 @@ const InterestsStep: React.FC<InterestsStepProps> = ({ onNext, selectedPersonFor
         ? prev.filter(i => i !== interest)
         : [...prev, interest]
     );
-  };
-
-  const addCustomInterest = () => {
-    const trimmedInterest = customInterest.trim();
-    
-    if (trimmedInterest && 
-        !selectedInterests.some(interest => interest.toLowerCase() === trimmedInterest.toLowerCase())) {
-      setSelectedInterests(prev => [...prev, trimmedInterest]);
-      setCustomInterest('');
-    }
   };
 
   const handleContinue = () => {
@@ -75,7 +63,7 @@ const InterestsStep: React.FC<InterestsStepProps> = ({ onNext, selectedPersonFor
       
       <CardContent className="space-y-6">
         <div>
-          <h4 className="font-medium mb-3 text-brand-charcoal">Popular interests:</h4>
+          <h4 className="font-medium mb-3 text-brand-charcoal">Select interests:</h4>
           <div className="flex flex-wrap gap-2">
             {predefinedInterests.map((interest) => (
               <Badge
@@ -91,25 +79,6 @@ const InterestsStep: React.FC<InterestsStepProps> = ({ onNext, selectedPersonFor
                 {interest}
               </Badge>
             ))}
-          </div>
-        </div>
-
-        <div>
-          <h4 className="font-medium mb-3 text-brand-charcoal">Add custom interest:</h4>
-          <div className="flex gap-2">
-            <Input
-              placeholder="e.g., Rock climbing, Pottery, Board games..."
-              value={customInterest}
-              onChange={(e) => setCustomInterest(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && addCustomInterest()}
-            />
-            <Button 
-              variant="outline" 
-              onClick={addCustomInterest}
-              className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
           </div>
         </div>
 

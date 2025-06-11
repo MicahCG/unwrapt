@@ -1,9 +1,11 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/logo';
 import { useAuth } from '@/components/auth/AuthProvider';
 import UserMenu from '@/components/auth/UserMenu';
 import CalendarStep from '@/components/onboarding/CalendarStep';
+import RecipientStep from '@/components/onboarding/RecipientStep';
 import InterestsStep from '@/components/onboarding/InterestsStep';
 import GiftScheduleStep from '@/components/onboarding/GiftScheduleStep';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,14 +17,17 @@ interface OnboardingFlowProps {
 }
 
 const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
-  const [currentStep, setCurrentStep] = useState(1); // Start at step 1 (CalendarStep)
+  const [currentStep, setCurrentStep] = useState(1);
   const [onboardingData, setOnboardingData] = useState<any>({});
   const [isCompleting, setIsCompleting] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const totalSteps = 3; // Reduced from 4 to 3 (removed WelcomeStep)
+  // Dynamic total steps based on whether manual dates were chosen
+  const getTotalSteps = () => {
+    return onboardingData.manualDatesChosen ? 4 : 3; // Add RecipientStep if manual dates chosen
+  };
 
   console.log('🔧 OnboardingFlow: Rendering step', currentStep, 'for user:', user?.id);
 
@@ -83,6 +88,8 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
 
     console.log('🔧 OnboardingFlow: Step completed:', currentStep, 'data:', stepData);
 
+    const totalSteps = getTotalSteps();
+
     if (currentStep === totalSteps) {
       // Complete onboarding and save data
       setIsCompleting(true);
@@ -95,9 +102,34 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
           allRecipients = await createRecipientsFromCalendarData(updatedData.importedDates);
         }
 
-        // Create recipient from manual selection if no calendar data
+        // Create recipient from manual entry or selection
         let selectedRecipient = null;
-        if (updatedData.selectedPersonForGift && !allRecipients.find(r => r.name === updatedData.selectedPersonForGift.personName)) {
+        if (updatedData.firstRecipient) {
+          // Manual recipient entry
+          const { data: newRecipient, error: recipientError } = await supabase
+            .from('recipients')
+            .insert({
+              user_id: user?.id,
+              name: updatedData.firstRecipient.fullName,
+              email: updatedData.firstRecipient.email,
+              phone: updatedData.firstRecipient.phone,
+              address: JSON.stringify(updatedData.firstRecipient.address),
+              interests: updatedData.interests || [],
+              birthday: updatedData.firstRecipient.birthday || null,
+              anniversary: updatedData.firstRecipient.anniversary || null,
+              relationship: updatedData.firstRecipient.relationship,
+            })
+            .select()
+            .single();
+
+          if (recipientError) {
+            console.error('Error saving manual recipient:', recipientError);
+          } else {
+            selectedRecipient = newRecipient;
+            allRecipients.push(newRecipient);
+          }
+        } else if (updatedData.selectedPersonForGift && !allRecipients.find(r => r.name === updatedData.selectedPersonForGift.personName)) {
+          // Calendar-based recipient selection
           const { data: newRecipient, error: recipientError } = await supabase
             .from('recipients')
             .insert({
@@ -157,7 +189,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
         await queryClient.invalidateQueries({ queryKey: ['user-metrics', user?.id] });
 
         const recipientCount = allRecipients.length;
-        const selectedName = updatedData.selectedPersonForGift?.personName;
+        const selectedName = updatedData.selectedPersonForGift?.personName || updatedData.firstRecipient?.fullName;
 
         toast({
           title: "Welcome to Unwrapt!",
@@ -212,50 +244,103 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   const renderStep = () => {
     console.log('🔧 OnboardingFlow: Rendering step component for step:', currentStep);
     
-    switch (currentStep) {
-      case 1:
-        return <CalendarStep onNext={handleStepComplete} />;
-      case 2:
-        return (
-          <InterestsStep 
-            onNext={handleStepComplete} 
-            selectedPersonForGift={onboardingData.selectedPersonForGift}
-          />
-        );
-      case 3:
-        return (
-          <GiftScheduleStep 
-            onNext={handleStepComplete} 
-            recipientName={onboardingData.selectedPersonForGift?.personName}
-            interests={onboardingData.interests}
-            selectedPersonForGift={onboardingData.selectedPersonForGift}
-          />
-        );
-      default:
-        return (
-          <div className="text-center py-8">
-            <h3 className="text-2xl font-bold mb-4 text-brand-charcoal">Step {currentStep} - Coming Soon!</h3>
-            <p className="text-brand-charcoal/70 mb-6">
-              This step is still being built. Check back soon!
-            </p>
-            <Button onClick={handleBack} className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90">Go Back</Button>
-          </div>
-        );
+    // Adjust step numbers based on whether manual dates were chosen
+    if (onboardingData.manualDatesChosen) {
+      switch (currentStep) {
+        case 1:
+          return <CalendarStep onNext={handleStepComplete} />;
+        case 2:
+          return <RecipientStep onNext={handleStepComplete} />;
+        case 3:
+          return (
+            <InterestsStep 
+              onNext={handleStepComplete} 
+              selectedPersonForGift={onboardingData.firstRecipient ? { personName: onboardingData.firstRecipient?.fullName } : null}
+            />
+          );
+        case 4:
+          return (
+            <GiftScheduleStep 
+              onNext={handleStepComplete} 
+              recipientName={onboardingData.firstRecipient?.fullName}
+              interests={onboardingData.interests}
+              selectedPersonForGift={onboardingData.firstRecipient ? { personName: onboardingData.firstRecipient?.fullName } : null}
+            />
+          );
+        default:
+          return (
+            <div className="text-center py-8">
+              <h3 className="text-2xl font-bold mb-4 text-brand-charcoal">Step {currentStep} - Coming Soon!</h3>
+              <p className="text-brand-charcoal/70 mb-6">
+                This step is still being built. Check back soon!
+              </p>
+              <Button onClick={handleBack} className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90">Go Back</Button>
+            </div>
+          );
+      }
+    } else {
+      switch (currentStep) {
+        case 1:
+          return <CalendarStep onNext={handleStepComplete} />;
+        case 2:
+          return (
+            <InterestsStep 
+              onNext={handleStepComplete} 
+              selectedPersonForGift={onboardingData.selectedPersonForGift}
+            />
+          );
+        case 3:
+          return (
+            <GiftScheduleStep 
+              onNext={handleStepComplete} 
+              recipientName={onboardingData.selectedPersonForGift?.personName}
+              interests={onboardingData.interests}
+              selectedPersonForGift={onboardingData.selectedPersonForGift}
+            />
+          );
+        default:
+          return (
+            <div className="text-center py-8">
+              <h3 className="text-2xl font-bold mb-4 text-brand-charcoal">Step {currentStep} - Coming Soon!</h3>
+              <p className="text-brand-charcoal/70 mb-6">
+                This step is still being built. Check back soon!
+              </p>
+              <Button onClick={handleBack} className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90">Go Back</Button>
+            </div>
+          );
+      }
     }
   };
 
   const getStepTitle = () => {
-    switch (currentStep) {
-      case 1:
-        return "Connect Your Calendar";
-      case 2:
-        return "Select Interests";
-      case 3:
-        return "Schedule Gift";
-      default:
-        return `Step ${currentStep}`;
+    if (onboardingData.manualDatesChosen) {
+      switch (currentStep) {
+        case 1:
+          return "Connect Your Calendar";
+        case 2:
+          return "Add Recipient";
+        case 3:
+          return "Select Interests";
+        case 4:
+          return "Schedule Gift";
+        default:
+          return `Step ${currentStep}`;
+      }
+    } else {
+      switch (currentStep) {
+        case 1:
+          return "Connect Your Calendar";
+        case 2:
+          return "Select Interests";
+        case 3:
+          return "Schedule Gift";
+        default:
+          return `Step ${currentStep}`;
+      }
     }
   };
+
+  const totalSteps = getTotalSteps();
 
   return (
     <div className="min-h-screen bg-brand-cream">
