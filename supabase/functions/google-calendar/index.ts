@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -10,16 +11,18 @@ function extractPersonFromEvent(eventSummary: string) {
   const summary = eventSummary.toLowerCase();
   let personName = '';
   
-  if (summary.includes("'s birthday")) {
-    personName = eventSummary.split("'s")[0].trim();
+  if (summary.includes("'s birthday") || summary.includes("'s bday")) {
+    const splitChar = summary.includes("'s birthday") ? "'s birthday" : "'s bday";
+    personName = eventSummary.split(splitChar)[0].trim();
   } else if (summary.includes("'s anniversary")) {
     personName = eventSummary.split("'s")[0].trim();
-  } else if (summary.includes(" birthday")) {
-    personName = eventSummary.replace(/birthday/i, '').trim();
+  } else if (summary.includes(" birthday") || summary.includes(" bday")) {
+    personName = eventSummary.replace(/birthday|bday/i, '').trim();
   } else if (summary.includes(" anniversary")) {
     personName = eventSummary.replace(/anniversary/i, '').trim();
-  } else if (summary.includes("birthday -")) {
-    personName = eventSummary.split("birthday -")[1].trim();
+  } else if (summary.includes("birthday -") || summary.includes("bday -")) {
+    const splitStr = summary.includes("birthday -") ? "birthday -" : "bday -";
+    personName = eventSummary.split(splitStr)[1].trim();
   } else if (summary.includes("anniversary -")) {
     personName = eventSummary.split("anniversary -")[1].trim();
   } else {
@@ -28,7 +31,7 @@ function extractPersonFromEvent(eventSummary: string) {
     personName = words.find(word => 
       word.length > 2 && 
       word[0] === word[0].toUpperCase() &&
-      !['Birthday', 'Anniversary', 'The', 'And', 'Or'].includes(word)
+      !['Birthday', 'Bday', 'Anniversary', 'The', 'And', 'Or'].includes(word)
     ) || '';
   }
   
@@ -187,7 +190,7 @@ Deno.serve(async (req) => {
       // Filter for birthdays and anniversaries only (onboarding focus)
       const importantDates = calendarData.items?.filter((event: any) => {
         const summary = event.summary?.toLowerCase() || ''
-        return summary.includes('birthday') || summary.includes('anniversary') || 
+        return summary.includes('birthday') || summary.includes('bday') || summary.includes('anniversary') || 
                summary.includes('born') || summary.includes('wedding')
       }).map((event: any) => ({
         summary: event.summary,
@@ -228,8 +231,9 @@ Deno.serve(async (req) => {
         const summary = event.summary?.toLowerCase() || ''
         const description = event.description?.toLowerCase() || ''
         
-        // Original important dates
+        // Original important dates (now includes bday)
         const isImportantDate = summary.includes('birthday') || 
+                               summary.includes('bday') ||
                                summary.includes('anniversary') || 
                                summary.includes('born') || 
                                summary.includes('wedding')
@@ -273,7 +277,7 @@ Deno.serve(async (req) => {
         let category = 'other'
         let type = 'special event'
         
-        if (summary.includes('birthday') || summary.includes('born')) {
+        if (summary.includes('birthday') || summary.includes('bday') || summary.includes('born')) {
           category = 'birthday'
           type = 'birthday'
         } else if (summary.includes('anniversary') || summary.includes('wedding')) {
@@ -300,7 +304,7 @@ Deno.serve(async (req) => {
           type: type,
           category: category,
           description: event.description || null,
-          // Extract person name for birthday/anniversary events
+          // Extract person name for birthday/anniversary events (now includes bday)
           personName: (category === 'birthday' || category === 'anniversary') ? 
                       extractPersonFromEvent(event.summary) : null
         }

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -92,16 +93,18 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
     const summary = eventSummary.toLowerCase();
     let personName = '';
     
-    if (summary.includes("'s birthday")) {
-      personName = eventSummary.split("'s")[0].trim();
+    if (summary.includes("'s birthday") || summary.includes("'s bday")) {
+      const splitChar = summary.includes("'s birthday") ? "'s birthday" : "'s bday";
+      personName = eventSummary.split(splitChar)[0].trim();
     } else if (summary.includes("'s anniversary")) {
       personName = eventSummary.split("'s")[0].trim();
-    } else if (summary.includes(" birthday")) {
-      personName = eventSummary.replace(/birthday/i, '').trim();
+    } else if (summary.includes(" birthday") || summary.includes(" bday")) {
+      personName = eventSummary.replace(/birthday|bday/i, '').trim();
     } else if (summary.includes(" anniversary")) {
       personName = eventSummary.replace(/anniversary/i, '').trim();
-    } else if (summary.includes("birthday -")) {
-      personName = eventSummary.split("birthday -")[1].trim();
+    } else if (summary.includes("birthday -") || summary.includes("bday -")) {
+      const splitStr = summary.includes("birthday -") ? "birthday -" : "bday -";
+      personName = eventSummary.split(splitStr)[1].trim();
     } else if (summary.includes("anniversary -")) {
       personName = eventSummary.split("anniversary -")[1].trim();
     } else {
@@ -110,7 +113,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
       personName = words.find(word => 
         word.length > 2 && 
         word[0] === word[0].toUpperCase() &&
-        !['Birthday', 'Anniversary', 'The', 'And', 'Or'].includes(word)
+        !['Birthday', 'Bday', 'Anniversary', 'The', 'And', 'Or'].includes(word)
       ) || '';
     }
     
