@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -5,11 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { CreditCard } from 'lucide-react';
+import { CreditCard, Package, Heart } from 'lucide-react';
 import { useShopifyProductTypes } from '@/hooks/useShopifyProductTypes';
 
 interface ScheduleGiftModalProps {
@@ -95,6 +97,26 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
   const formatPriceRange = (range: string) => {
     return range;
+  };
+
+  // Gift preview helper functions
+  const getGiftImage = (giftType: string) => {
+    const imageMap = {
+      'wine': 'https://images.unsplash.com/photo-1482938289607-e9573fc25ebb?w=400&h=300&fit=crop',
+      'tea': 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=400&h=300&fit=crop',
+      'coffee': 'https://images.unsplash.com/photo-1581090464777-f3220bbe1b8b?w=400&h=300&fit=crop',
+      'sweet treats': 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=400&h=300&fit=crop',
+      'self care': 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?w=400&h=300&fit=crop'
+    };
+    return imageMap[giftType.toLowerCase()] || 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop';
+  };
+
+  const getGiftDescription = (giftType: string, recipientName: string) => {
+    return `We'll curate premium ${giftType.toLowerCase()} perfect for ${recipientName}'s interests`;
+  };
+
+  const getSenderName = () => {
+    return user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Someone special';
   };
 
   const sendGiftNotificationEmail = async (giftDetails: any) => {
@@ -208,9 +230,12 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   // Get product types from Shopify or use fallback
   const productTypes = productTypesData?.productTypes || [];
 
+  // Show gift preview if both gift type and price range are selected
+  const showGiftPreview = formData.gift_type && formData.price_range;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] bg-white border-brand-cream text-brand-charcoal">
+      <DialogContent className="sm:max-w-[500px] bg-white border-brand-cream text-brand-charcoal max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-brand-charcoal">Schedule Gift for {recipient.name}</DialogTitle>
         </DialogHeader>
@@ -297,6 +322,58 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
               </SelectContent>
             </Select>
           </div>
+
+          {/* Gift Preview Section */}
+          {showGiftPreview && (
+            <Card className="bg-brand-cream/30 border-brand-cream">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2 mb-3">
+                  <Package className="h-4 w-4 text-brand-charcoal" />
+                  <span className="font-medium text-sm text-brand-charcoal">Gift Preview</span>
+                </div>
+                <div className="flex space-x-3">
+                  <img
+                    src={getGiftImage(formData.gift_type)}
+                    alt={`${formData.gift_type} gift`}
+                    className="w-20 h-20 object-cover rounded-lg"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm text-brand-charcoal font-medium mb-1">
+                      {formData.gift_type}
+                    </p>
+                    <p className="text-xs text-brand-charcoal/70">
+                      {getGiftDescription(formData.gift_type, recipient.name)}
+                    </p>
+                    <p className="text-xs text-brand-gold font-medium mt-1">
+                      Price Range: {formData.price_range}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Note Preview Section */}
+          {formData.gift_type && (
+            <Card className="bg-gradient-to-br from-brand-cream/20 to-brand-cream/40 border-brand-cream">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2 mb-3">
+                  <Heart className="h-4 w-4 text-brand-charcoal" />
+                  <span className="font-medium text-sm text-brand-charcoal">Note Preview</span>
+                </div>
+                <div className="bg-white p-3 rounded border border-brand-cream/50 shadow-sm">
+                  <p className="text-sm text-brand-charcoal mb-3 leading-relaxed">
+                    {getSenderName()} was thinking about you on your special day and decided to send you some {formData.gift_type.toLowerCase()}. We hope you enjoy!
+                  </p>
+                  <div className="border-t pt-2 mt-2">
+                    <p className="text-xs text-brand-charcoal/60 italic">
+                      This gift was curated and sent through Unwrapt - Making thoughtfulness effortless ✨ unwrapt.io
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="gift_description" className="text-brand-charcoal">Gift Description</Label>
