@@ -342,10 +342,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
               />
             </div>
           </div>
-          <CardTitle className="text-3xl mb-2 text-brand-charcoal">Never Miss a Birthday or Anniversary</CardTitle>
-          <p className="text-brand-charcoal/70">
-            Sync to automate your gift giving.
-          </p>
+          <CardTitle className="text-3xl mb-2 text-brand-charcoal">Never Miss Another Birthday or Event</CardTitle>
         </CardHeader>
         
         <CardContent className="space-y-6">
