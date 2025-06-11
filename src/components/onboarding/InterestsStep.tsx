@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,9 +15,9 @@ const InterestsStep: React.FC<InterestsStepProps> = ({ onNext, selectedPersonFor
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [customInterest, setCustomInterest] = useState('');
 
-  // Updated interests to only include the 4 specified options
+  // Updated interests to include the 5 specified options
   const predefinedInterests = [
-    'Coffee', 'Tea', 'Wine', 'Sweet Treats'
+    'Coffee', 'Tea', 'Wine', 'Sweet Treats', 'Self Care'
   ];
 
   const toggleInterest = (interest: string) => {
