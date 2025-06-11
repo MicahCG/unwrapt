@@ -493,7 +493,8 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
               </Button>
 
               <div className="bg-white p-4 rounded-lg border border-brand-cream">
-                <h4 className="font-medium mb-2 text-brand-charcoal">We only scan for birthdays and anniversaries. We never access your emails or meeting details.</h4>
+                <p className="font-medium mb-2 text-brand-charcoal">We only scan for birthdays and anniversaries.</p>
+               <p className="font-medium mb-2 text-brand-charcoal">We never access your emails or meeting details.</p>
               </div>
 
               <div className="text-center pt-4">
