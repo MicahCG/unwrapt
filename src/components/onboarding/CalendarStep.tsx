@@ -215,7 +215,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
             calendarConnected: true,
             importedDates: processedEvents 
           });
-        }, 2000);
+        }, 6000);
       }
 
     } catch (error) {
@@ -413,8 +413,8 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
                 </div>
                 
                 <div>
-                  <h3 className="text-xl font-semibold mb-2 text-brand-charcoal">Great! We found {foundDates.length} important dates</h3>
-                  <p className="text-brand-charcoal/70">Here's what we imported from your calendar:</p>
+                  <h3 className="text-xl font-semibold mb-2 text-brand-charcoal">Great! We found {foundDates.length} dates</h3>
+                  <p className="text-brand-charcoal/70">Here's what we imported:</p>
                 </div>
               </div>
 
