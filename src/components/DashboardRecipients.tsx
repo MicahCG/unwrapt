@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
-import { Gift, Calendar, Plus, Users, Clock, ListExpand, ListCollapse } from 'lucide-react';
+import { Gift, Calendar, Plus, Users, Clock, ListEnd, ChevronUp } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import ScheduleGiftModal from './ScheduleGiftModal';
 import AddRecipientModal from './AddRecipientModal';
@@ -171,12 +171,12 @@ const DashboardRecipients = () => {
               >
                 {showAllRecipients ? (
                   <>
-                    <ListCollapse className="h-4 w-4 mr-2" />
+                    <ChevronUp className="h-4 w-4 mr-2" />
                     Collapse
                   </>
                 ) : (
                   <>
-                    <ListExpand className="h-4 w-4 mr-2" />
+                    <ListEnd className="h-4 w-4 mr-2" />
                     Show All ({recipients.length})
                   </>
                 )}
