@@ -342,9 +342,9 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
               />
             </div>
           </div>
-          <CardTitle className="text-3xl mb-2 text-brand-charcoal">Sync to Never Miss Important Dates</CardTitle>
+          <CardTitle className="text-3xl mb-2 text-brand-charcoal">Never Miss a Birthday or Anniversary</CardTitle>
           <p className="text-brand-charcoal/70">
-            We'll help you schedule birthdays, anniversaries, and holidays.
+            Sync to automate your gift giving.
           </p>
         </CardHeader>
         
@@ -493,7 +493,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
               </Button>
 
               <div className="bg-white p-4 rounded-lg border border-brand-cream">
-                <h4 className="font-medium mb-2 text-brand-charcoal">We take your privacy seriously and only identify events that help with your gift giving.</h4>
+                <h4 className="font-medium mb-2 text-brand-charcoal">We only scan for birthdays and anniversaries. We never access your emails or meeting details.</h4>
               </div>
 
               <div className="text-center pt-4">
