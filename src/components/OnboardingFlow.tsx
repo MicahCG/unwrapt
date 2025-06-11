@@ -26,6 +26,57 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
 
   console.log('🔧 OnboardingFlow: Rendering step', currentStep, 'for user:', user?.id);
 
+  const createRecipientsFromCalendarData = async (importedDates: any[]) => {
+    if (!importedDates || importedDates.length === 0) return [];
+
+    console.log('📅 OnboardingFlow: Creating recipients from calendar data:', importedDates.length, 'events');
+
+    const recipients = [];
+    const seenNames = new Set();
+
+    for (const event of importedDates) {
+      if (!event.personName || seenNames.has(event.personName.toLowerCase())) {
+        continue; // Skip if no name or already processed
+      }
+
+      seenNames.add(event.personName.toLowerCase());
+
+      try {
+        const recipientData = {
+          user_id: user?.id,
+          name: event.personName,
+          email: null,
+          phone: null,
+          address: null,
+          interests: onboardingData.interests || [],
+          birthday: event.type === 'birthday' ? event.date : null,
+          anniversary: event.type === 'anniversary' ? event.date : null,
+          relationship: null, // User can add this later
+          notes: `Imported from Google Calendar (${event.summary})`
+        };
+
+        const { data: newRecipient, error: recipientError } = await supabase
+          .from('recipients')
+          .insert(recipientData)
+          .select()
+          .single();
+
+        if (recipientError) {
+          console.error('Error creating recipient for', event.personName, ':', recipientError);
+          continue;
+        }
+
+        recipients.push(newRecipient);
+        console.log('✅ Created recipient:', newRecipient.name);
+      } catch (error) {
+        console.error('Error processing event for', event.personName, ':', error);
+      }
+    }
+
+    console.log('📅 OnboardingFlow: Successfully created', recipients.length, 'recipients from calendar');
+    return recipients;
+  };
+
   const handleStepComplete = async (stepData: any) => {
     const updatedData = { ...onboardingData, ...stepData };
     setOnboardingData(updatedData);
@@ -38,19 +89,24 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
       try {
         console.log('Completing onboarding with data:', updatedData);
 
-        // Create recipient from calendar person if we have one
-        let recipientData = null;
-        if (updatedData.selectedPersonForGift) {
+        // Create recipients from ALL calendar data (not just selected one)
+        let allRecipients = [];
+        if (updatedData.importedDates && updatedData.importedDates.length > 0) {
+          allRecipients = await createRecipientsFromCalendarData(updatedData.importedDates);
+        }
+
+        // Create recipient from manual selection if no calendar data
+        let selectedRecipient = null;
+        if (updatedData.selectedPersonForGift && !allRecipients.find(r => r.name === updatedData.selectedPersonForGift.personName)) {
           const { data: newRecipient, error: recipientError } = await supabase
             .from('recipients')
             .insert({
               user_id: user?.id,
               name: updatedData.selectedPersonForGift.personName,
-              email: null, // Will be added later when user manages recipients
+              email: null,
               phone: null,
-              address: null, // Will be added later
+              address: null,
               interests: updatedData.interests || [],
-              // Store calendar info for future reference
               birthday: updatedData.selectedPersonForGift.type === 'birthday' ? updatedData.selectedPersonForGift.date : null,
               anniversary: updatedData.selectedPersonForGift.type === 'anniversary' ? updatedData.selectedPersonForGift.date : null,
             })
@@ -58,21 +114,22 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
             .single();
 
           if (recipientError) {
-            console.error('Error saving recipient:', recipientError);
-            throw new Error('Failed to save recipient');
+            console.error('Error saving selected recipient:', recipientError);
+          } else {
+            selectedRecipient = newRecipient;
+            allRecipients.push(newRecipient);
           }
-
-          recipientData = newRecipient;
-          console.log('Recipient created from calendar data:', recipientData);
+        } else if (updatedData.selectedPersonForGift) {
+          selectedRecipient = allRecipients.find(r => r.name === updatedData.selectedPersonForGift.personName);
         }
 
         // Save scheduled gift if we have gift data and a recipient
-        if (updatedData.firstGift && recipientData) {
+        if (updatedData.firstGift && selectedRecipient) {
           const { error: giftError } = await supabase
             .from('scheduled_gifts')
             .insert({
               user_id: user?.id,
-              recipient_id: recipientData.id,
+              recipient_id: selectedRecipient.id,
               occasion: updatedData.firstGift.occasion,
               occasion_date: updatedData.firstGift.occasionDate,
               gift_type: updatedData.firstGift.giftType,
@@ -94,13 +151,20 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
           await supabase.rpc('calculate_user_metrics', { user_uuid: user.id });
         }
 
-        // Invalidate the onboarding status query to trigger a refresh
+        // Invalidate queries to refresh dashboard
         await queryClient.invalidateQueries({ queryKey: ['onboarding-status', user?.id] });
+        await queryClient.invalidateQueries({ queryKey: ['recipients', user?.id] });
+        await queryClient.invalidateQueries({ queryKey: ['user-metrics', user?.id] });
+
+        const recipientCount = allRecipients.length;
+        const selectedName = updatedData.selectedPersonForGift?.personName;
 
         toast({
           title: "Welcome to Unwrapt!",
-          description: updatedData.selectedPersonForGift?.personName 
-            ? `Your gift for ${updatedData.selectedPersonForGift.personName} has been scheduled! Let's start making gift-giving effortless!`
+          description: recipientCount > 0 
+            ? `${recipientCount} recipients added to your dashboard! ${selectedName ? `Your gift for ${selectedName} has been scheduled.` : ''}`
+            : selectedName 
+            ? `Your gift for ${selectedName} has been scheduled!`
             : "Your onboarding is complete. Let's start making gift-giving effortless!",
         });
 

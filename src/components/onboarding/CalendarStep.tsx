@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Check, ArrowDown, AlertCircle, UserPlus } from 'lucide-react';
+import { Check, ArrowDown, AlertCircle, UserPlus, Calendar, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -12,9 +11,20 @@ interface CalendarStepProps {
   onNext: (data: any) => void;
 }
 
+interface CalendarEvent {
+  summary: string;
+  date: string;
+  type: string;
+  personName: string;
+  daysUntil?: number;
+  nextOccurrenceDate?: string;
+}
+
 const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
   const [isConnecting, setIsConnecting] = useState(false);
-  const [foundDates, setFoundDates] = useState<any[]>([]);
+  const [foundDates, setFoundDates] = useState<CalendarEvent[]>([]);
+  const [upcomingDates, setUpcomingDates] = useState<CalendarEvent[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showManualAdd, setShowManualAdd] = useState(false);
   const [showAddRecipientModal, setShowAddRecipientModal] = useState(false);
@@ -34,6 +44,71 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
 
     checkForOAuthCode();
   }, []);
+
+  // Calculate days until and sort upcoming events
+  useEffect(() => {
+    if (foundDates.length > 0) {
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      
+      const eventsWithDaysUntil = foundDates.map(event => {
+        const eventDate = new Date(event.date);
+        let nextOccurrence = new Date(currentYear, eventDate.getMonth(), eventDate.getDate());
+        
+        // If the date has passed this year, move to next year
+        if (nextOccurrence < today) {
+          nextOccurrence.setFullYear(currentYear + 1);
+        }
+        
+        const timeDiff = nextOccurrence.getTime() - today.getTime();
+        const daysUntil = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        
+        return {
+          ...event,
+          daysUntil,
+          nextOccurrenceDate: nextOccurrence.toISOString()
+        };
+      });
+      
+      // Sort by days until (closest first) and take top 3
+      const sortedEvents = eventsWithDaysUntil
+        .sort((a, b) => a.daysUntil! - b.daysUntil!)
+        .slice(0, 3);
+      
+      setUpcomingDates(sortedEvents);
+    }
+  }, [foundDates]);
+
+  const extractPersonFromEvent = (eventSummary: string) => {
+    const summary = eventSummary.toLowerCase();
+    let personName = '';
+    
+    if (summary.includes("'s birthday") || summary.includes("'s bday")) {
+      const splitChar = summary.includes("'s birthday") ? "'s birthday" : "'s bday";
+      personName = eventSummary.split(splitChar)[0].trim();
+    } else if (summary.includes("'s anniversary")) {
+      personName = eventSummary.split("'s")[0].trim();
+    } else if (summary.includes(" birthday") || summary.includes(" bday")) {
+      personName = eventSummary.replace(/birthday|bday/i, '').trim();
+    } else if (summary.includes(" anniversary")) {
+      personName = eventSummary.replace(/anniversary/i, '').trim();
+    } else if (summary.includes("birthday -") || summary.includes("bday -")) {
+      const splitStr = summary.includes("birthday -") ? "birthday -" : "bday -";
+      personName = eventSummary.split(splitStr)[1].trim();
+    } else if (summary.includes("anniversary -")) {
+      personName = eventSummary.split("anniversary -")[1].trim();
+    } else {
+      // Fallback: try to extract any name-like pattern
+      const words = eventSummary.split(' ');
+      personName = words.find(word => 
+        word.length > 2 && 
+        word[0] === word[0].toUpperCase() &&
+        !['Birthday', 'Bday', 'Anniversary', 'The', 'And', 'Or'].includes(word)
+      ) || '';
+    }
+    
+    return personName;
+  };
 
   const handleGoogleConnect = async () => {
     console.log('📅 CalendarStep: Starting Google Calendar connection...');
@@ -85,39 +160,6 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
         variant: "destructive"
       });
     }
-  };
-
-  const extractPersonFromEvent = (eventSummary: string) => {
-    // Extract person's name from event summary
-    // Common patterns: "John's Birthday", "John Doe Birthday", "Birthday - John", etc.
-    const summary = eventSummary.toLowerCase();
-    let personName = '';
-    
-    if (summary.includes("'s birthday") || summary.includes("'s bday")) {
-      const splitChar = summary.includes("'s birthday") ? "'s birthday" : "'s bday";
-      personName = eventSummary.split(splitChar)[0].trim();
-    } else if (summary.includes("'s anniversary")) {
-      personName = eventSummary.split("'s")[0].trim();
-    } else if (summary.includes(" birthday") || summary.includes(" bday")) {
-      personName = eventSummary.replace(/birthday|bday/i, '').trim();
-    } else if (summary.includes(" anniversary")) {
-      personName = eventSummary.replace(/anniversary/i, '').trim();
-    } else if (summary.includes("birthday -") || summary.includes("bday -")) {
-      const splitStr = summary.includes("birthday -") ? "birthday -" : "bday -";
-      personName = eventSummary.split(splitStr)[1].trim();
-    } else if (summary.includes("anniversary -")) {
-      personName = eventSummary.split("anniversary -")[1].trim();
-    } else {
-      // Fallback: try to extract any name-like pattern
-      const words = eventSummary.split(' ');
-      personName = words.find(word => 
-        word.length > 2 && 
-        word[0] === word[0].toUpperCase() &&
-        !['Birthday', 'Bday', 'Anniversary', 'The', 'And', 'Or'].includes(word)
-      ) || '';
-    }
-    
-    return personName;
   };
 
   const handleOAuthCallback = async (code: string) => {
@@ -182,43 +224,22 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
       }
 
       const events = eventsData?.events || [];
+      console.log('📅 CalendarStep: Successfully fetched and processed events:', events.length, 'events found');
       
-      // Enhanced event processing to extract person names
-      const processedEvents = events.map((event: any) => ({
-        ...event,
-        personName: extractPersonFromEvent(event.summary)
-      }));
-      
-      console.log('📅 CalendarStep: Successfully fetched and processed events:', processedEvents.length, 'events found');
-      
-      setFoundDates(processedEvents);
+      setFoundDates(events);
       setIsConnecting(false);
 
-      if (processedEvents.length === 0) {
-        // No dates found, show manual add option
+      if (events.length === 0) {
         setShowManualAdd(true);
         toast({
           title: "Calendar Connected Successfully!",
           description: "No important dates found in your calendar. Let's add your first recipient manually.",
         });
       } else {
-        // Show success toast for found dates
         toast({
           title: "Calendar Connected Successfully!",
-          description: `Found ${processedEvents.length} important dates from your calendar.`,
+          description: `Found ${events.length} important dates from your calendar.`,
         });
-
-        // Auto-advance to next step after showing success
-        setTimeout(() => {
-          console.log('📅 CalendarStep: Auto-advancing to next step with calendar data:', { 
-            calendarConnected: true,
-            importedDates: processedEvents 
-          });
-          onNext({ 
-            calendarConnected: true,
-            importedDates: processedEvents 
-          });
-        }, 6000);
       }
 
     } catch (error) {
@@ -234,11 +255,18 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
     }
   };
 
-  const handleContinue = () => {
-    console.log('📅 CalendarStep: Manual continue with found dates:', foundDates.length);
+  const handleEventSelect = (event: CalendarEvent) => {
+    setSelectedEvent(event);
+  };
+
+  const handleContinueWithSelection = () => {
+    if (!selectedEvent) return;
+    
+    console.log('📅 CalendarStep: Continuing with selected event:', selectedEvent);
     onNext({ 
-      calendarConnected: foundDates.length > 0,
-      importedDates: foundDates 
+      calendarConnected: true,
+      importedDates: foundDates, // Store ALL found dates
+      selectedPersonForGift: selectedEvent // Store selected person for onboarding
     });
   };
 
@@ -255,6 +283,8 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
     setError(null);
     setIsConnecting(false);
     setFoundDates([]);
+    setUpcomingDates([]);
+    setSelectedEvent(null);
     setShowManualAdd(false);
   };
 
@@ -269,7 +299,6 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
       description: "Great! You've added your first recipient. Let's continue with the setup.",
     });
     
-    // Continue to next step with calendar connected but no imported dates
     setTimeout(() => {
       onNext({ 
         calendarConnected: true,
@@ -285,6 +314,19 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
       calendarConnected: true,
       importedDates: [] 
     });
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const getDaysUntilText = (daysUntil: number) => {
+    if (daysUntil === 0) return "Today!";
+    if (daysUntil === 1) return "Tomorrow";
+    return `${daysUntil} days`;
   };
 
   return (
@@ -359,10 +401,69 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
                   Continue Without Adding Recipients
                 </Button>
               </div>
+            </>
+          ) : upcomingDates.length > 0 ? (
+            <>
+              <div className="text-center space-y-4">
+                <div className="flex justify-center">
+                  <div className="bg-brand-cream p-3 rounded-full">
+                    <Check className="h-8 w-8 text-brand-charcoal" />
+                  </div>
+                </div>
+                
+                <div>
+                  <h3 className="text-xl font-semibold mb-2 text-brand-charcoal">Great! We found {foundDates.length} important dates</h3>
+                  <p className="text-brand-charcoal/70">Select someone to schedule your first gift for:</p>
+                </div>
+              </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-blue-700 text-sm">
-                  <strong>Tip:</strong> You can always add more recipients later from your dashboard. Starting with one person will help you get familiar with the gift scheduling process!
+              <div className="space-y-3">
+                {upcomingDates.map((event, index) => (
+                  <Card 
+                    key={index} 
+                    className={`cursor-pointer transition-all border-2 hover:shadow-md ${
+                      selectedEvent?.personName === event.personName 
+                        ? 'border-brand-charcoal bg-brand-cream/20' 
+                        : 'border-brand-cream hover:border-brand-charcoal/30'
+                    }`}
+                    onClick={() => handleEventSelect(event)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-brand-charcoal text-lg">{event.personName}</h4>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <Calendar className="h-4 w-4 text-brand-charcoal/60" />
+                            <span className="text-sm text-brand-charcoal/70 capitalize">{event.type}</span>
+                            <span className="text-sm text-brand-charcoal/70">• {formatDate(event.date)}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Clock className="h-4 w-4 text-brand-gold" />
+                          <span className="text-sm font-medium text-brand-charcoal">
+                            {getDaysUntilText(event.daysUntil!)}
+                          </span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {selectedEvent && (
+                <Button 
+                  size="lg" 
+                  className="w-full text-lg py-6 bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+                  onClick={handleContinueWithSelection}
+                >
+                  Continue with {selectedEvent.personName}
+                  <ArrowDown className="h-4 w-4 ml-2" />
+                </Button>
+              )}
+
+              <div className="text-center">
+                <p className="text-sm text-brand-charcoal/60 mb-2">
+                  We'll automatically add all {foundDates.length} people to your dashboard after onboarding
                 </p>
               </div>
             </>
@@ -406,52 +507,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
                 </Button>
               </div>
             </>
-          ) : (
-            <>
-              <div className="text-center space-y-4">
-                <div className="flex justify-center">
-                  <div className="bg-brand-cream p-3 rounded-full">
-                    <Check className="h-8 w-8 text-brand-charcoal" />
-                  </div>
-                </div>
-                
-                <div>
-                  <h3 className="text-xl font-semibold mb-2 text-brand-charcoal">Great! We found {foundDates.length} dates</h3>
-                  <p className="text-brand-charcoal/70">Here's what we imported:</p>
-                </div>
-              </div>
-
-              <div className="bg-white border border-brand-cream rounded-lg max-h-48 overflow-y-auto">
-                {foundDates.map((date, index) => (
-                  <div key={index} className="flex items-center p-3 border-b border-brand-cream last:border-b-0">
-                    <img 
-                      src="/lovable-uploads/00f39f0e-8157-4f8a-81d2-67a47dc5ebbe.png" 
-                      alt="Calendar" 
-                      className="h-4 w-4 mr-3"
-                    />
-                    <div className="flex-1">
-                      <span className="text-sm text-brand-charcoal font-medium">{date.summary}</span>
-                      {date.personName && (
-                        <span className="text-xs text-brand-charcoal/60 ml-2">({date.personName})</span>
-                      )}
-                      <div className="text-xs text-brand-charcoal/50">
-                        {new Date(date.date).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <Button 
-                size="lg" 
-                className="w-full text-lg py-6 bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
-                onClick={handleContinue}
-              >
-                Continue with {foundDates.length} dates
-                <ArrowDown className="h-4 w-4 ml-2" />
-              </Button>
-            </>
-          )}
+          ) : null}
         </CardContent>
       </Card>
 

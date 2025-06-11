@@ -1,10 +1,11 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
-import { Gift, Calendar, Plus, Users } from 'lucide-react';
+import { Gift, Calendar, Plus, Users, Clock } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import ScheduleGiftModal from './ScheduleGiftModal';
 import AddRecipientModal from './AddRecipientModal';
@@ -14,7 +15,7 @@ const DashboardRecipients = () => {
   const [schedulingGift, setSchedulingGift] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
 
-  // Fetch recipients
+  // Fetch recipients sorted by next upcoming event
   const { data: recipients } = useQuery({
     queryKey: ['recipients', user?.id],
     queryFn: async () => {
@@ -22,11 +23,52 @@ const DashboardRecipients = () => {
         .from('recipients')
         .select('*')
         .eq('user_id', user?.id)
-        .order('created_at', { ascending: false })
-        .limit(6); // Show only first 6 on dashboard
+        .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return data;
+
+      // Sort recipients by their next upcoming event
+      const today = new Date();
+      const currentYear = today.getFullYear();
+
+      const recipientsWithNextEvent = data.map(recipient => {
+        const occasions = [];
+        
+        if (recipient.birthday) {
+          const birthday = new Date(recipient.birthday);
+          let thisYearBirthday = new Date(currentYear, birthday.getMonth(), birthday.getDate());
+          if (thisYearBirthday < today) {
+            thisYearBirthday.setFullYear(currentYear + 1);
+          }
+          occasions.push({ type: 'Birthday', date: thisYearBirthday });
+        }
+        
+        if (recipient.anniversary) {
+          const anniversary = new Date(recipient.anniversary);
+          let thisYearAnniversary = new Date(currentYear, anniversary.getMonth(), anniversary.getDate());
+          if (thisYearAnniversary < today) {
+            thisYearAnniversary.setFullYear(currentYear + 1);
+          }
+          occasions.push({ type: 'Anniversary', date: thisYearAnniversary });
+        }
+        
+        occasions.sort((a, b) => a.date.getTime() - b.date.getTime());
+        const nextOccasion = occasions[0];
+
+        return {
+          ...recipient,
+          nextOccasion,
+          daysUntilNext: nextOccasion ? Math.ceil((nextOccasion.date.getTime() - today.getTime()) / (1000 * 3600 * 24)) : null
+        };
+      });
+
+      // Sort by days until next event (soonest first), recipients without events go to end
+      return recipientsWithNextEvent.sort((a, b) => {
+        if (!a.daysUntilNext && !b.daysUntilNext) return 0;
+        if (!a.daysUntilNext) return 1;
+        if (!b.daysUntilNext) return -1;
+        return a.daysUntilNext - b.daysUntilNext;
+      }).slice(0, 6); // Show only first 6 on dashboard
     },
     enabled: !!user
   });
@@ -38,32 +80,10 @@ const DashboardRecipients = () => {
     });
   };
 
-  const getNextOccasion = (recipient: any) => {
-    const today = new Date();
-    const currentYear = today.getFullYear();
-    
-    const occasions = [];
-    
-    if (recipient.birthday) {
-      const birthday = new Date(recipient.birthday);
-      const thisYearBirthday = new Date(currentYear, birthday.getMonth(), birthday.getDate());
-      if (thisYearBirthday < today) {
-        thisYearBirthday.setFullYear(currentYear + 1);
-      }
-      occasions.push({ type: 'Birthday', date: thisYearBirthday });
-    }
-    
-    if (recipient.anniversary) {
-      const anniversary = new Date(recipient.anniversary);
-      const thisYearAnniversary = new Date(currentYear, anniversary.getMonth(), anniversary.getDate());
-      if (thisYearAnniversary < today) {
-        thisYearAnniversary.setFullYear(currentYear + 1);
-      }
-      occasions.push({ type: 'Anniversary', date: thisYearAnniversary });
-    }
-    
-    occasions.sort((a, b) => a.date.getTime() - b.date.getTime());
-    return occasions[0];
+  const getDaysUntilText = (daysUntil: number, eventType: string) => {
+    if (daysUntil === 0) return `${eventType} today!`;
+    if (daysUntil === 1) return `${eventType} tomorrow`;
+    return `${eventType} in ${daysUntil} days`;
   };
 
   return (
@@ -86,50 +106,53 @@ const DashboardRecipients = () => {
 
       {recipients && recipients.length > 0 ? (
         <div className="space-y-3 sm:space-y-4">
-          {recipients.map((recipient: any) => {
-            const nextOccasion = getNextOccasion(recipient);
-            
-            return (
-              <Card key={recipient.id} className="bg-white border-brand-cream hover:shadow-md transition-shadow w-full">
-                <CardContent className="p-3 sm:p-4">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div className="flex-1 min-w-0 w-full sm:w-auto">
-                      <div className="flex flex-col space-y-2">
-                        <div>
-                          <h3 className="font-medium text-brand-charcoal text-sm sm:text-base truncate">{recipient.name}</h3>
-                          <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 mt-1">
-                            {recipient.relationship && (
-                              <Badge 
-                                variant="secondary" 
-                                className="text-xs bg-brand-cream text-brand-charcoal border-brand-cream w-fit"
-                              >
-                                {recipient.relationship}
-                              </Badge>
-                            )}
-                            {nextOccasion && (
-                              <div className="flex items-center text-xs text-brand-charcoal/70">
-                                <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
-                                <span className="font-medium">{nextOccasion.type}:</span>
-                                <span className="ml-1">{formatDate(nextOccasion.date.toISOString())}</span>
-                              </div>
-                            )}
-                          </div>
+          {recipients.map((recipient: any) => (
+            <Card key={recipient.id} className="bg-white border-brand-cream hover:shadow-md transition-shadow w-full">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex-1 min-w-0 w-full sm:w-auto">
+                    <div className="flex flex-col space-y-2">
+                      <div>
+                        <h3 className="font-medium text-brand-charcoal text-sm sm:text-base truncate">{recipient.name}</h3>
+                        <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 mt-1">
+                          {recipient.relationship && (
+                            <Badge 
+                              variant="secondary" 
+                              className="text-xs bg-brand-cream text-brand-charcoal border-brand-cream w-fit"
+                            >
+                              {recipient.relationship}
+                            </Badge>
+                          )}
+                          {recipient.nextOccasion && (
+                            <div className="flex items-center text-xs">
+                              <Clock className="h-3 w-3 mr-1 flex-shrink-0 text-brand-gold" />
+                              <span className="font-medium text-brand-gold">
+                                {getDaysUntilText(recipient.daysUntilNext, recipient.nextOccasion.type)}
+                              </span>
+                            </div>
+                          )}
+                          {recipient.nextOccasion && (
+                            <div className="flex items-center text-xs text-brand-charcoal/70">
+                              <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
+                              <span>{formatDate(recipient.nextOccasion.date.toISOString())}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
-                    <Button
-                      size="sm"
-                      className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 w-full sm:w-auto flex-shrink-0"
-                      onClick={() => setSchedulingGift(recipient)}
-                    >
-                      <Gift className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                      <span className="text-xs sm:text-sm">Schedule Gift</span>
-                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                  <Button
+                    size="sm"
+                    className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 w-full sm:w-auto flex-shrink-0"
+                    onClick={() => setSchedulingGift(recipient)}
+                  >
+                    <Gift className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                    <span className="text-xs sm:text-sm">Schedule Gift</span>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       ) : (
         <Card className="bg-white border-brand-cream w-full">
