@@ -231,11 +231,19 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
       setIsConnecting(false);
 
       if (events.length === 0) {
-        setShowManualAdd(true);
         toast({
           title: "Calendar Connected Successfully!",
-          description: "No important dates found in your calendar. Let's add your first recipient manually.",
+          description: "No important dates found in your calendar. Let's add your first recipient.",
         });
+        
+        // Proceed directly to recipient entry screen instead of showing modal
+        setTimeout(() => {
+          onNext({ 
+            calendarConnected: true,
+            importedDates: [],
+            noRecipientsFound: true
+          });
+        }, 1500);
       } else {
         toast({
           title: "Calendar Connected Successfully!",
@@ -286,10 +294,9 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
     setShowAddRecipientModal(true);
   };
 
-  const handleRecipientAdded = (recipientData: any) => {
-    console.log('📅 CalendarStep: Recipient added:', recipientData);
+  const handleRecipientAdded = () => {
+    console.log('📅 CalendarStep: Recipient added via modal');
     setShowAddRecipientModal(false);
-    setManuallyAddedRecipient(recipientData);
     
     toast({
       title: "Recipient Added!",
@@ -297,16 +304,11 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
     });
     
     setTimeout(() => {
-      // Pass recipient data directly to skip the recipient entry step
+      // Go directly to recipient entry screen for manual flow
       onNext({ 
         calendarConnected: true,
         importedDates: [],
-        manualRecipientData: {
-          fullName: recipientData.name,
-          relationship: recipientData.relationship,
-          birthday: recipientData.birthday,
-          anniversary: recipientData.anniversary
-        }
+        manualRecipientAdded: true
       });
     }, 1500);
   };
