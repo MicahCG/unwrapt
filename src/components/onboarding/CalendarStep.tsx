@@ -287,6 +287,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
   };
 
   const handleRecipientAdded = (recipientData: any) => {
+    console.log('📅 CalendarStep: Recipient added:', recipientData);
     setShowAddRecipientModal(false);
     setManuallyAddedRecipient(recipientData);
     
