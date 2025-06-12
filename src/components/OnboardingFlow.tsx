@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/logo';
@@ -24,9 +23,14 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Dynamic total steps based on whether manual recipient was added or no recipients found
+  // Dynamic total steps based on flow path
   const getTotalSteps = () => {
-    return (onboardingData.manualRecipientAdded || onboardingData.noRecipientsFound) ? 4 : 3;
+    // For manual recipient entry: Calendar -> Recipient -> Gift Schedule (3 steps)
+    if (onboardingData.manualRecipientAdded || onboardingData.noRecipientsFound) {
+      return 3;
+    }
+    // For calendar-based flow: Calendar -> Interests -> Gift Schedule (3 steps)
+    return 3;
   };
 
   console.log('🔧 OnboardingFlow: Rendering step', currentStep, 'for user:', user?.id);
@@ -244,10 +248,10 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   const renderStep = () => {
     console.log('🔧 OnboardingFlow: Rendering step component for step:', currentStep);
     
-    // Check if we need to show recipient step for manual entry or no recipients found
-    const needsRecipientStep = onboardingData.manualRecipientAdded || onboardingData.noRecipientsFound;
+    // Check if we need manual recipient entry flow
+    const isManualRecipientFlow = onboardingData.manualRecipientAdded || onboardingData.noRecipientsFound;
     
-    if (needsRecipientStep) {
+    if (isManualRecipientFlow) {
       switch (currentStep) {
         case 1:
           return <CalendarStep onNext={handleStepComplete} />;
@@ -260,17 +264,10 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
           );
         case 3:
           return (
-            <InterestsStep 
-              onNext={handleStepComplete} 
-              selectedPersonForGift={onboardingData.firstRecipient ? { personName: onboardingData.firstRecipient?.fullName } : null}
-            />
-          );
-        case 4:
-          return (
             <GiftScheduleStep 
               onNext={handleStepComplete} 
               recipientName={onboardingData.firstRecipient?.fullName}
-              interests={onboardingData.interests}
+              interests={[]} // No interests for manual flow - skip interests step
               selectedPersonForGift={onboardingData.firstRecipient ? { personName: onboardingData.firstRecipient?.fullName } : null}
             />
           );
@@ -286,6 +283,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
           );
       }
     } else {
+      // Regular calendar-based flow
       switch (currentStep) {
         case 1:
           return <CalendarStep onNext={handleStepComplete} />;
@@ -320,17 +318,15 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   };
 
   const getStepTitle = () => {
-    const needsRecipientStep = onboardingData.manualRecipientAdded || onboardingData.noRecipientsFound;
+    const isManualRecipientFlow = onboardingData.manualRecipientAdded || onboardingData.noRecipientsFound;
     
-    if (needsRecipientStep) {
+    if (isManualRecipientFlow) {
       switch (currentStep) {
         case 1:
           return "Connect Your Calendar";
         case 2:
           return "Add Recipient";
         case 3:
-          return "Select Interests";
-        case 4:
           return "Schedule Gift";
         default:
           return `Step ${currentStep}`;
