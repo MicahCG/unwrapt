@@ -24,9 +24,9 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Dynamic total steps based on whether manual dates were chosen or no recipients found
+  // Dynamic total steps based on whether manual recipient was added or no recipients found
   const getTotalSteps = () => {
-    return (onboardingData.manualDatesChosen || onboardingData.noRecipientsFound) ? 4 : 3;
+    return (onboardingData.manualRecipientAdded || onboardingData.noRecipientsFound) ? 4 : 3;
   };
 
   console.log('🔧 OnboardingFlow: Rendering step', currentStep, 'for user:', user?.id);
@@ -245,7 +245,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
     console.log('🔧 OnboardingFlow: Rendering step component for step:', currentStep);
     
     // Check if we need to show recipient step for manual entry or no recipients found
-    const needsRecipientStep = onboardingData.manualDatesChosen || onboardingData.noRecipientsFound;
+    const needsRecipientStep = onboardingData.manualRecipientAdded || onboardingData.noRecipientsFound;
     
     if (needsRecipientStep) {
       switch (currentStep) {
@@ -320,7 +320,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   };
 
   const getStepTitle = () => {
-    const needsRecipientStep = onboardingData.manualDatesChosen || onboardingData.noRecipientsFound;
+    const needsRecipientStep = onboardingData.manualRecipientAdded || onboardingData.noRecipientsFound;
     
     if (needsRecipientStep) {
       switch (currentStep) {

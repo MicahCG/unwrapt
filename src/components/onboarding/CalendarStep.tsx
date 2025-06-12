@@ -270,14 +270,6 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
     });
   };
 
-  const handleSkip = () => {
-    console.log('📅 CalendarStep: Skipping calendar connection');
-    onNext({ 
-      calendarConnected: false,
-      importedDates: [] 
-    });
-  };
-
   const handleRetry = () => {
     console.log('📅 CalendarStep: Retrying calendar connection...');
     setError(null);
@@ -312,7 +304,8 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
     console.log('📅 CalendarStep: Continuing without calendar dates');
     onNext({ 
       calendarConnected: true,
-      importedDates: [] 
+      importedDates: [],
+      noRecipientsFound: true
     });
   };
 
@@ -492,17 +485,6 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
               <div className="bg-white p-4 rounded-lg border border-brand-cream">
                 <p className="font-medium mb-2 text-brand-charcoal">We only scan for birthdays and anniversaries.</p>
                <p className="font-medium mb-2 text-brand-charcoal">We never access your emails or meeting details.</p>
-              </div>
-
-              <div className="text-center pt-4">
-                <Button 
-                  variant="ghost" 
-                  onClick={handleSkip} 
-                  className="text-brand-charcoal hover:bg-brand-cream" 
-                  disabled={isConnecting}
-                >
-                  I'll add dates manually
-                </Button>
               </div>
             </>
           ) : null}
