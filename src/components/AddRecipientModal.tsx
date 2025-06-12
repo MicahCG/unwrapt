@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient } from '@tanstack/react-query';
@@ -25,11 +24,8 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose, 
   const [formData, setFormData] = useState({
     name: '',
     relationship: '',
-    email: '',
-    phone: '',
     birthday: '',
-    interests: '',
-    notes: ''
+    interests: ''
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -68,11 +64,11 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose, 
           user_id: user.id,
           name: formData.name,
           relationship: formData.relationship || null,
-          email: formData.email || null,
-          phone: formData.phone || null,
+          email: null,
+          phone: null,
           birthday: formData.birthday || null,
           interests: interestsArray.length > 0 ? interestsArray : null,
-          notes: formData.notes || null
+          notes: null
         });
 
       if (error) throw error;
@@ -93,11 +89,8 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose, 
       setFormData({
         name: '',
         relationship: '',
-        email: '',
-        phone: '',
         birthday: '',
-        interests: '',
-        notes: ''
+        interests: ''
       });
       onClose();
 
@@ -165,43 +158,16 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose, 
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-brand-charcoal">
-              Email
+            <Label htmlFor="birthday" className="text-brand-charcoal">
+              Birthday
             </Label>
             <Input
-              id="email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+              id="birthday"
+              type="date"
+              value={formData.birthday}
+              onChange={(e) => setFormData(prev => ({ ...prev, birthday: e.target.value }))}
               className="text-brand-charcoal border-brand-cream"
             />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="phone" className="text-brand-charcoal">
-              Phone
-            </Label>
-            <Input
-              id="phone"
-              value={formData.phone}
-              onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-              className="text-brand-charcoal border-brand-cream"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="birthday" className="text-brand-charcoal">
-                Birthday
-              </Label>
-              <Input
-                id="birthday"
-                type="date"
-                value={formData.birthday}
-                onChange={(e) => setFormData(prev => ({ ...prev, birthday: e.target.value }))}
-                className="text-brand-charcoal border-brand-cream"
-              />
-            </div>
           </div>
 
           <div className="space-y-2">
@@ -213,19 +179,6 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose, 
               placeholder="Enter interests separated by commas"
               value={formData.interests}
               onChange={(e) => setFormData(prev => ({ ...prev, interests: e.target.value }))}
-              className="text-brand-charcoal border-brand-cream"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="notes" className="text-brand-charcoal">
-              Notes
-            </Label>
-            <Textarea
-              id="notes"
-              placeholder="Any additional notes about this recipient"
-              value={formData.notes}
-              onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
               className="text-brand-charcoal border-brand-cream"
             />
           </div>
