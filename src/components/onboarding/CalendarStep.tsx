@@ -28,6 +28,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
   const [error, setError] = useState<string | null>(null);
   const [showManualAdd, setShowManualAdd] = useState(false);
   const [showAddRecipientModal, setShowAddRecipientModal] = useState(false);
+  const [manuallyAddedRecipient, setManuallyAddedRecipient] = useState<any>(null);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -278,24 +279,33 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
     setUpcomingDates([]);
     setSelectedEvent(null);
     setShowManualAdd(false);
+    setManuallyAddedRecipient(null);
   };
 
   const handleManualAdd = () => {
     setShowAddRecipientModal(true);
   };
 
-  const handleRecipientAdded = () => {
+  const handleRecipientAdded = (recipientData: any) => {
     setShowAddRecipientModal(false);
+    setManuallyAddedRecipient(recipientData);
+    
     toast({
       title: "Recipient Added!",
-      description: "Great! You've added your first recipient. Let's continue with the setup.",
+      description: "Great! You've added your first recipient. Let's schedule a gift for them.",
     });
     
     setTimeout(() => {
+      // Pass recipient data directly to skip the recipient entry step
       onNext({ 
         calendarConnected: true,
         importedDates: [],
-        manualRecipientAdded: true
+        manualRecipientData: {
+          fullName: recipientData.name,
+          relationship: recipientData.relationship,
+          birthday: recipientData.birthday,
+          anniversary: recipientData.anniversary
+        }
       });
     }, 1500);
   };
@@ -357,7 +367,22 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
             </div>
           )}
 
-          {showManualAdd ? (
+          {manuallyAddedRecipient ? (
+            <div className="text-center space-y-4">
+              <div className="flex justify-center">
+                <div className="bg-brand-cream p-3 rounded-full">
+                  <Check className="h-8 w-8 text-brand-charcoal" />
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="text-xl font-semibold mb-2 text-brand-charcoal">Perfect!</h3>
+                <p className="text-brand-charcoal/70">
+                  {manuallyAddedRecipient.name} has been added. Let's schedule your first gift for them!
+                </p>
+              </div>
+            </div>
+          ) : showManualAdd ? (
             <>
               <div className="text-center space-y-4">
                 <div className="flex justify-center">
