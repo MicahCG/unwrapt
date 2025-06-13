@@ -39,35 +39,81 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
 
   console.log('🔧 OnboardingFlow: Rendering step', currentStep, 'for user:', user?.id);
 
-  // ... keep existing code (createRecipientsFromCalendarData function)
-
   const createRecipientsFromCalendarData = async (importedDates: any[]) => {
     if (!importedDates || importedDates.length === 0) return [];
 
     console.log('📅 OnboardingFlow: Creating recipients from calendar data:', importedDates.length, 'events');
 
-    const recipients = [];
-    const seenNames = new Set();
-
-    for (const event of importedDates) {
-      if (!event.personName || seenNames.has(event.personName.toLowerCase())) {
-        continue; // Skip if no name or already processed
+    // Group events by person name first (like the sync button does)
+    const peopleMap = new Map<string, any>();
+    
+    importedDates.forEach((event: any) => {
+      if (event.personName) {
+        const personKey = event.personName.toLowerCase().trim();
+        
+        if (!peopleMap.has(personKey)) {
+          peopleMap.set(personKey, {
+            name: event.personName,
+            birthday: event.type === 'birthday' ? event.date : null,
+            anniversary: event.type === 'anniversary' ? event.date : null,
+            events: [event]
+          });
+        } else {
+          const person = peopleMap.get(personKey)!;
+          if (event.type === 'birthday' && !person.birthday) {
+            person.birthday = event.date;
+          }
+          if (event.type === 'anniversary' && !person.anniversary) {
+            person.anniversary = event.date;
+          }
+          person.events.push(event);
+        }
       }
+    });
 
-      seenNames.add(event.personName.toLowerCase());
+    const calendarPeople = Array.from(peopleMap.values());
+    console.log('👥 OnboardingFlow: Found unique people in calendar:', calendarPeople.length);
 
+    // Get existing recipients to avoid duplicates
+    const { data: existingRecipients } = await supabase
+      .from('recipients')
+      .select('name, birthday, anniversary')
+      .eq('user_id', user?.id);
+
+    // Filter out people who are already recipients
+    const newPeople = calendarPeople.filter(person => {
+      const isDuplicate = existingRecipients?.some(existing => {
+        const nameMatch = existing.name.toLowerCase().trim() === person.name.toLowerCase().trim();
+        const birthdayMatch = existing.birthday === person.birthday;
+        const anniversaryMatch = existing.anniversary === person.anniversary;
+        
+        // Consider it a duplicate if name matches and at least one date matches
+        return nameMatch && (birthdayMatch || anniversaryMatch);
+      });
+      
+      return !isDuplicate;
+    });
+
+    if (newPeople.length === 0) {
+      console.log('📅 OnboardingFlow: All people already exist as recipients');
+      return [];
+    }
+
+    const recipients = [];
+
+    for (const person of newPeople) {
       try {
         const recipientData = {
           user_id: user?.id,
-          name: event.personName,
+          name: person.name,
           email: null,
           phone: null,
           address: null,
           interests: onboardingData.interests || [],
-          birthday: event.type === 'birthday' ? event.date : null,
-          anniversary: event.type === 'anniversary' ? event.date : null,
+          birthday: person.birthday,
+          anniversary: person.anniversary,
           relationship: null, // User can add this later
-          notes: `Imported from Google Calendar (${event.summary})`
+          notes: `Imported from Google Calendar during onboarding`
         };
 
         const { data: newRecipient, error: recipientError } = await supabase
@@ -77,14 +123,14 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
           .single();
 
         if (recipientError) {
-          console.error('Error creating recipient for', event.personName, ':', recipientError);
+          console.error('Error creating recipient for', person.name, ':', recipientError);
           continue;
         }
 
         recipients.push(newRecipient);
-        console.log('✅ Created recipient:', newRecipient.name);
+        console.log('✅ Created recipient:', newRecipient.name, 'with birthday:', newRecipient.birthday, 'anniversary:', newRecipient.anniversary);
       } catch (error) {
-        console.error('Error processing event for', event.personName, ':', error);
+        console.error('Error processing person', person.name, ':', error);
       }
     }
 
