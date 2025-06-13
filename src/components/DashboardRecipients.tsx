@@ -9,6 +9,7 @@ import { Gift, Calendar, Plus, Users, Clock, ChevronDown, ChevronUp } from 'luci
 import { useQuery } from '@tanstack/react-query';
 import ScheduleGiftModal from './ScheduleGiftModal';
 import AddRecipientModal from './AddRecipientModal';
+import CalendarSyncButton from './CalendarSyncButton';
 
 const DashboardRecipients = () => {
   const { user } = useAuth();
@@ -98,15 +99,18 @@ const DashboardRecipients = () => {
           <Users className="h-4 w-4 sm:h-5 sm:w-5 text-brand-charcoal" />
           <h2 className="text-lg sm:text-xl font-semibold text-brand-charcoal">Your Recipients</h2>
         </div>
-        <Button 
-          variant="outline"
-          size="sm"
-          className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream w-full sm:w-auto"
-          onClick={() => setShowAddModal(true)}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Manage
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <CalendarSyncButton />
+          <Button 
+            variant="outline"
+            size="sm"
+            className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream w-full sm:w-auto"
+            onClick={() => setShowAddModal(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Manage
+          </Button>
+        </div>
       </div>
 
       {recipients && recipients.length > 0 ? (
