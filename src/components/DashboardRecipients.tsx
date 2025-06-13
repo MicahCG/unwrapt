@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
-import { Gift, Calendar, Plus, Users, Clock, ListEnd, ChevronUp } from 'lucide-react';
+import { Gift, Calendar, Plus, Users, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import ScheduleGiftModal from './ScheduleGiftModal';
 import AddRecipientModal from './AddRecipientModal';
@@ -88,8 +88,8 @@ const DashboardRecipients = () => {
   };
 
   // Determine which recipients to show based on state
-  const displayedRecipients = recipients ? (showAllRecipients ? recipients : recipients.slice(0, 6)) : [];
-  const hasMoreThanSix = recipients && recipients.length > 6;
+  const displayedRecipients = recipients ? (showAllRecipients ? recipients : recipients.slice(0, 5)) : [];
+  const hasMoreThanFive = recipients && recipients.length > 5;
 
   return (
     <div className="space-y-4 sm:space-y-6 w-full">
@@ -161,7 +161,7 @@ const DashboardRecipients = () => {
             ))}
           </div>
 
-          {hasMoreThanSix && (
+          {hasMoreThanFive && (
             <div className="flex justify-center pt-2">
               <Button
                 variant="outline"
@@ -176,8 +176,8 @@ const DashboardRecipients = () => {
                   </>
                 ) : (
                   <>
-                    <ListEnd className="h-4 w-4 mr-2" />
-                    Show All ({recipients.length})
+                    <ChevronDown className="h-4 w-4 mr-2" />
+                    View More ({recipients.length - 5} more)
                   </>
                 )}
               </Button>
