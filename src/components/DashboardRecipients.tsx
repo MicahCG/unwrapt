@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -135,8 +134,8 @@ const DashboardRecipients = () => {
                             )}
                             {recipient.nextOccasion && (
                               <div className="flex items-center text-xs">
-                                <Clock className="h-3 w-3 mr-1 flex-shrink-0 text-brand-gold" />
-                                <span className="font-medium text-brand-gold">
+                                <Clock className="h-3 w-3 mr-1 flex-shrink-0 text-brand-charcoal" />
+                                <span className="font-medium text-brand-charcoal">
                                   {getDaysUntilText(recipient.daysUntilNext, recipient.nextOccasion.type)}
                                 </span>
                               </div>

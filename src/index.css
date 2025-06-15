@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -22,7 +23,7 @@
     --muted: 248 246 241; /* Lighter cream */
     --muted-foreground: 107 107 107; /* Medium gray */
 
-    --accent: 245 242 237; /* Updated to match light brown/tan */
+    --accent: 245 242 237; /* Brand cream instead of yellow */
     --accent-foreground: 74 74 74;
 
     --destructive: 220 38 38;
@@ -57,7 +58,7 @@
     --secondary-foreground: 245 242 237;
     --muted: 68 64 60;
     --muted-foreground: 163 163 163;
-    --accent: 245 242 237;
+    --accent: 245 242 237; /* Brand cream instead of yellow */
     --accent-foreground: 41 37 36;
     --destructive: 220 38 38;
     --destructive-foreground: 245 242 237;
@@ -84,6 +85,34 @@
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+}
+
+/* Override any remaining yellow colors */
+.bg-yellow-300,
+.bg-yellow-400,
+.bg-yellow-500,
+.bg-lime-300,
+.bg-lime-400,
+.bg-lime-500 {
+  background-color: hsl(var(--accent)) !important;
+}
+
+.text-yellow-300,
+.text-yellow-400,
+.text-yellow-500,
+.text-lime-300,
+.text-lime-400,
+.text-lime-500 {
+  color: hsl(var(--accent-foreground)) !important;
+}
+
+.border-yellow-300,
+.border-yellow-400,
+.border-yellow-500,
+.border-lime-300,
+.border-lime-400,
+.border-lime-500 {
+  border-color: hsl(var(--border)) !important;
 }
 
 /* Custom animations for smooth interactions */

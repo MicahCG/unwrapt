@@ -101,7 +101,7 @@ const Dashboard = () => {
         <Card className="bg-white border-brand-cream">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
             <CardTitle className="text-xs sm:text-sm font-medium text-brand-charcoal">Recipients</CardTitle>
-            <Users className="h-3 w-3 sm:h-4 sm:w-4 text-brand-gold" />
+            <Users className="h-3 w-3 sm:h-4 sm:w-4 text-brand-charcoal" />
           </CardHeader>
           <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
             <div className="text-lg sm:text-2xl font-bold text-brand-charcoal">
@@ -113,7 +113,7 @@ const Dashboard = () => {
         <Card className="bg-white border-brand-cream">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
             <CardTitle className="text-xs sm:text-sm font-medium text-brand-charcoal">Scheduled</CardTitle>
-            <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-brand-gold" />
+            <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-brand-charcoal" />
           </CardHeader>
           <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
             <div className="text-lg sm:text-2xl font-bold text-brand-charcoal">
@@ -125,7 +125,7 @@ const Dashboard = () => {
         <Card className="bg-white border-brand-cream">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
             <CardTitle className="text-xs sm:text-sm font-medium text-brand-charcoal">Delivered</CardTitle>
-            <Gift className="h-3 w-3 sm:h-4 sm:w-4 text-brand-gold" />
+            <Gift className="h-3 w-3 sm:h-4 sm:w-4 text-brand-charcoal" />
           </CardHeader>
           <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
             <div className="text-lg sm:text-2xl font-bold text-brand-charcoal">
@@ -137,7 +137,7 @@ const Dashboard = () => {
         <Card className="bg-white border-brand-cream">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
             <CardTitle className="text-xs sm:text-sm font-medium text-brand-charcoal">Time Saved</CardTitle>
-            <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-brand-gold" />
+            <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-brand-charcoal" />
           </CardHeader>
           <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
             <div className="text-lg sm:text-2xl font-bold text-brand-charcoal">
