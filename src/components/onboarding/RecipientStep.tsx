@@ -11,7 +11,7 @@ interface RecipientStepProps {
   interests?: string[];
   selectedPersonForGift?: any;
   isManualEntry?: boolean;
-  requireShippingAddress?: boolean; // New prop to force showing address fields
+  requireShippingAddress?: boolean;
 }
 
 const RecipientStep: React.FC<RecipientStepProps> = ({ 
@@ -28,13 +28,11 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
     phone: '',
     birthday: '',
     anniversary: '',
-    address: {
-      street: '',
-      city: '',
-      state: '',
-      zipCode: '',
-      country: 'United States'
-    }
+    street: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    country: 'United States'
   });
 
   const [isValid, setIsValid] = useState(false);
@@ -58,15 +56,6 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
     validateForm(updatedData);
   };
 
-  const handleAddressChange = (field: string, value: string) => {
-    const updatedData = {
-      ...recipientData,
-      address: { ...recipientData.address, [field]: value }
-    };
-    setRecipientData(updatedData);
-    validateForm(updatedData);
-  };
-
   const validateForm = (data: typeof recipientData) => {
     // Basic validation: always require name and relationship
     const hasBasicInfo = Boolean(data.fullName && data.relationship);
@@ -74,10 +63,10 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
     // Address validation: required if we need shipping or if not in manual entry mode
     const needsAddress = requireShippingAddress || !isManualEntry;
     const hasCompleteAddress = needsAddress ? Boolean(
-      data.address.street &&
-      data.address.city &&
-      data.address.state &&
-      data.address.zipCode
+      data.street &&
+      data.city &&
+      data.state &&
+      data.zipCode
     ) : true;
     
     // Email validation: required if not in manual entry mode
@@ -260,8 +249,8 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
                 <Input
                   id="street"
                   placeholder="Enter street address"
-                  value={recipientData.address.street}
-                  onChange={(e) => handleAddressChange('street', e.target.value)}
+                  value={recipientData.street}
+                  onChange={(e) => handleInputChange('street', e.target.value)}
                   required
                 />
               </div>
@@ -272,8 +261,8 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
                   <Input
                     id="city"
                     placeholder="Enter city"
-                    value={recipientData.address.city}
-                    onChange={(e) => handleAddressChange('city', e.target.value)}
+                    value={recipientData.city}
+                    onChange={(e) => handleInputChange('city', e.target.value)}
                     required
                   />
                 </div>
@@ -283,8 +272,8 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
                   <Input
                     id="state"
                     placeholder="Enter state"
-                    value={recipientData.address.state}
-                    onChange={(e) => handleAddressChange('state', e.target.value)}
+                    value={recipientData.state}
+                    onChange={(e) => handleInputChange('state', e.target.value)}
                     required
                   />
                 </div>
@@ -296,15 +285,15 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
                   <Input
                     id="zipCode"
                     placeholder="Enter ZIP code"
-                    value={recipientData.address.zipCode}
-                    onChange={(e) => handleAddressChange('zipCode', e.target.value)}
+                    value={recipientData.zipCode}
+                    onChange={(e) => handleInputChange('zipCode', e.target.value)}
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="country">Country</Label>
-                  <Select value={recipientData.address.country} onValueChange={(value) => handleAddressChange('country', value)}>
+                  <Select value={recipientData.country} onValueChange={(value) => handleInputChange('country', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select country" />
                     </SelectTrigger>

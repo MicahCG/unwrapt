@@ -121,6 +121,8 @@ export type Database = {
           address: Json | null
           anniversary: string | null
           birthday: string | null
+          city: string | null
+          country: string | null
           created_at: string
           email: string | null
           id: string
@@ -129,13 +131,18 @@ export type Database = {
           notes: string | null
           phone: string | null
           relationship: string | null
+          state: string | null
+          street: string | null
           updated_at: string
           user_id: string
+          zip_code: string | null
         }
         Insert: {
           address?: Json | null
           anniversary?: string | null
           birthday?: string | null
+          city?: string | null
+          country?: string | null
           created_at?: string
           email?: string | null
           id?: string
@@ -144,13 +151,18 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           relationship?: string | null
+          state?: string | null
+          street?: string | null
           updated_at?: string
           user_id: string
+          zip_code?: string | null
         }
         Update: {
           address?: Json | null
           anniversary?: string | null
           birthday?: string | null
+          city?: string | null
+          country?: string | null
           created_at?: string
           email?: string | null
           id?: string
@@ -159,8 +171,11 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           relationship?: string | null
+          state?: string | null
+          street?: string | null
           updated_at?: string
           user_id?: string
+          zip_code?: string | null
         }
         Relationships: []
       }

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -20,7 +21,12 @@ const EditRecipientModal: React.FC<EditRecipientModalProps> = ({ recipient, isOp
     email: recipient?.email || '',
     phone: recipient?.phone || '',
     birthday: recipient?.birthday || '',
-    anniversary: recipient?.anniversary || ''
+    anniversary: recipient?.anniversary || '',
+    street: recipient?.street || '',
+    city: recipient?.city || '',
+    state: recipient?.state || '',
+    zipCode: recipient?.zip_code || '',
+    country: recipient?.country || 'United States'
   });
   const [isLoading, setIsLoading] = useState(false);
   const queryClient = useQueryClient();
@@ -39,6 +45,11 @@ const EditRecipientModal: React.FC<EditRecipientModalProps> = ({ recipient, isOp
           phone: formData.phone,
           birthday: formData.birthday || null,
           anniversary: formData.anniversary || null,
+          street: formData.street,
+          city: formData.city,
+          state: formData.state,
+          zip_code: formData.zipCode,
+          country: formData.country,
           updated_at: new Date().toISOString()
         })
         .eq('id', recipient.id);
@@ -57,7 +68,7 @@ const EditRecipientModal: React.FC<EditRecipientModalProps> = ({ recipient, isOp
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Recipient</DialogTitle>
         </DialogHeader>
@@ -132,6 +143,73 @@ const EditRecipientModal: React.FC<EditRecipientModalProps> = ({ recipient, isOp
                 value={formData.anniversary}
                 onChange={(e) => setFormData(prev => ({ ...prev, anniversary: e.target.value }))}
               />
+            </div>
+          </div>
+
+          {/* Address Section */}
+          <div className="space-y-4 pt-4 border-t">
+            <h4 className="font-medium">Address</h4>
+            
+            <div className="space-y-2">
+              <Label htmlFor="street">Street Address</Label>
+              <Input
+                id="street"
+                placeholder="Enter street address"
+                value={formData.street}
+                onChange={(e) => setFormData(prev => ({ ...prev, street: e.target.value }))}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="city">City</Label>
+                <Input
+                  id="city"
+                  placeholder="Enter city"
+                  value={formData.city}
+                  onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="state">State</Label>
+                <Input
+                  id="state"
+                  placeholder="Enter state"
+                  value={formData.state}
+                  onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="zipCode">ZIP Code</Label>
+                <Input
+                  id="zipCode"
+                  placeholder="Enter ZIP code"
+                  value={formData.zipCode}
+                  onChange={(e) => setFormData(prev => ({ ...prev, zipCode: e.target.value }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="country">Country</Label>
+                <Select 
+                  value={formData.country} 
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, country: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="United States">United States</SelectItem>
+                    <SelectItem value="Canada">Canada</SelectItem>
+                    <SelectItem value="United Kingdom">United Kingdom</SelectItem>
+                    <SelectItem value="Australia">Australia</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 

@@ -30,7 +30,7 @@ serve(async (req) => {
       .from('scheduled_gifts')
       .select(`
         *,
-        recipients (name, email, phone, address)
+        recipients (name, email, phone, street, city, state, zip_code, country)
       `)
       .eq('id', scheduledGiftId)
       .eq('payment_status', 'paid')
@@ -41,8 +41,8 @@ serve(async (req) => {
     }
 
     // Prepare recipient address from stored data
-    const recipientAddress = giftData.recipients?.address;
-    if (!recipientAddress) {
+    const recipient = giftData.recipients;
+    if (!recipient || !recipient.street) {
       throw new Error("Recipient address not found");
     }
 
@@ -56,14 +56,14 @@ serve(async (req) => {
       body: JSON.stringify({
         scheduledGiftId,
         recipientAddress: {
-          first_name: giftData.recipients.name.split(' ')[0] || 'Gift',
-          last_name: giftData.recipients.name.split(' ').slice(1).join(' ') || 'Recipient',
-          address1: recipientAddress.street || '',
-          city: recipientAddress.city || '',
-          province: recipientAddress.state || '',
-          country: recipientAddress.country || 'US',
-          zip: recipientAddress.zipCode || '',
-          phone: giftData.recipients.phone || '',
+          first_name: recipient.name.split(' ')[0] || 'Gift',
+          last_name: recipient.name.split(' ').slice(1).join(' ') || 'Recipient',
+          address1: recipient.street || '',
+          city: recipient.city || '',
+          province: recipient.state || '',
+          country: recipient.country || 'US',
+          zip: recipient.zip_code || '',
+          phone: recipient.phone || '',
         }
       })
     });
