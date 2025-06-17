@@ -5,20 +5,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Gift, Calendar } from 'lucide-react';
+import { Gift, Calendar, MapPin } from 'lucide-react';
 
 interface RecipientStepProps {
   onNext: (data: any) => void;
   interests?: string[];
   selectedPersonForGift?: any;
-  isManualEntry?: boolean; // New prop to indicate manual entry mode
+  isManualEntry?: boolean;
+  requireShippingAddress?: boolean; // New prop to force showing address fields
 }
 
 const RecipientStep: React.FC<RecipientStepProps> = ({ 
   onNext, 
   interests, 
   selectedPersonForGift,
-  isManualEntry = false 
+  isManualEntry = false,
+  requireShippingAddress = false
 }) => {
   const [recipientData, setRecipientData] = useState({
     fullName: '',
@@ -54,18 +56,7 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
   const handleInputChange = (field: string, value: string) => {
     const updatedData = { ...recipientData, [field]: value };
     setRecipientData(updatedData);
-    
-    // For manual entry mode, only require name and relationship
-    const isFormValid = isManualEntry 
-      ? updatedData.fullName && updatedData.relationship
-      : updatedData.fullName && 
-        updatedData.relationship && 
-        updatedData.email && 
-        updatedData.address.street &&
-        updatedData.address.city &&
-        updatedData.address.state &&
-        updatedData.address.zipCode;
-    setIsValid(!!isFormValid);
+    validateForm(updatedData);
   };
 
   const handleAddressChange = (field: string, value: string) => {
@@ -74,18 +65,27 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
       address: { ...recipientData.address, [field]: value }
     };
     setRecipientData(updatedData);
+    validateForm(updatedData);
+  };
+
+  const validateForm = (data: typeof recipientData) => {
+    // Basic validation: always require name and relationship
+    const hasBasicInfo = data.fullName && data.relationship;
     
-    // For manual entry mode, only require name and relationship
-    const isFormValid = isManualEntry 
-      ? updatedData.fullName && updatedData.relationship
-      : updatedData.fullName && 
-        updatedData.relationship && 
-        updatedData.email && 
-        updatedData.address.street &&
-        updatedData.address.city &&
-        updatedData.address.state &&
-        updatedData.address.zipCode;
-    setIsValid(!!isFormValid);
+    // Address validation: required if we need shipping or if not in manual entry mode
+    const needsAddress = requireShippingAddress || !isManualEntry;
+    const hasCompleteAddress = needsAddress ? (
+      data.address.street &&
+      data.address.city &&
+      data.address.state &&
+      data.address.zipCode
+    ) : true;
+    
+    // Email validation: required if not in manual entry mode
+    const needsEmail = !isManualEntry;
+    const hasEmail = needsEmail ? data.email : true;
+    
+    setIsValid(hasBasicInfo && hasCompleteAddress && hasEmail);
   };
 
   const handleContinue = () => {
@@ -116,11 +116,18 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
     if (selectedPersonForGift) {
       return `We'll need their shipping address to send the perfect gift`;
     }
+    if (requireShippingAddress) {
+      return "We need their shipping address to deliver your gift";
+    }
     if (isManualEntry) {
       return "Tell us about the person you'd like to send a gift to";
     }
     return "We'll help you make them feel special with thoughtful, perfectly timed gifts";
   };
+
+  // Determine if we should show optional fields
+  const showOptionalFields = !isManualEntry || requireShippingAddress;
+  const showAddressFields = !isManualEntry || requireShippingAddress;
 
   return (
     <Card className="animate-fadeInUp">
@@ -141,6 +148,14 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
             <div className="flex items-center justify-center text-sm text-brand-charcoal">
               <Calendar className="h-4 w-4 mr-2" />
               {selectedPersonForGift.type} on {formatDate(selectedPersonForGift.date)}
+            </div>
+          </div>
+        )}
+        {requireShippingAddress && (
+          <div className="bg-blue-50 p-3 rounded-lg mt-4 border border-blue-200">
+            <div className="flex items-center justify-center text-sm text-blue-800">
+              <MapPin className="h-4 w-4 mr-2" />
+              Shipping address required for gift delivery
             </div>
           </div>
         )}
@@ -180,19 +195,19 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
             </Select>
           </div>
 
-          {/* Show additional fields only if not in manual entry mode */}
-          {!isManualEntry && (
+          {/* Show email and other fields if not in basic manual entry mode */}
+          {showOptionalFields && (
             <>
               {/* Email */}
               <div className="space-y-2">
-                <Label htmlFor="email">Email *</Label>
+                <Label htmlFor="email">Email {!isManualEntry ? '*' : ''}</Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="Enter their email"
                   value={recipientData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
-                  required
+                  required={!isManualEntry}
                 />
               </div>
 
@@ -229,79 +244,84 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
                   onChange={(e) => handleInputChange('anniversary', e.target.value)}
                 />
               </div>
+            </>
+          )}
 
-              {/* Address Section */}
-              <div className="space-y-4 pt-4 border-t">
-                <h3 className="text-lg font-medium text-brand-charcoal">Shipping Address</h3>
-                
+          {/* Address Section - show if needed */}
+          {showAddressFields && (
+            <div className="space-y-4 pt-4 border-t">
+              <h3 className="text-lg font-medium text-brand-charcoal flex items-center">
+                <MapPin className="h-5 w-5 mr-2" />
+                Shipping Address *
+              </h3>
+              
+              <div className="space-y-2">
+                <Label htmlFor="street">Street Address *</Label>
+                <Input
+                  id="street"
+                  placeholder="Enter street address"
+                  value={recipientData.address.street}
+                  onChange={(e) => handleAddressChange('street', e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="street">Street Address *</Label>
+                  <Label htmlFor="city">City *</Label>
                   <Input
-                    id="street"
-                    placeholder="Enter street address"
-                    value={recipientData.address.street}
-                    onChange={(e) => handleAddressChange('street', e.target.value)}
+                    id="city"
+                    placeholder="Enter city"
+                    value={recipientData.address.city}
+                    onChange={(e) => handleAddressChange('city', e.target.value)}
                     required
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="city">City *</Label>
-                    <Input
-                      id="city"
-                      placeholder="Enter city"
-                      value={recipientData.address.city}
-                      onChange={(e) => handleAddressChange('city', e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="state">State *</Label>
-                    <Input
-                      id="state"
-                      placeholder="Enter state"
-                      value={recipientData.address.state}
-                      onChange={(e) => handleAddressChange('state', e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="zipCode">ZIP Code *</Label>
-                    <Input
-                      id="zipCode"
-                      placeholder="Enter ZIP code"
-                      value={recipientData.address.zipCode}
-                      onChange={(e) => handleAddressChange('zipCode', e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="country">Country</Label>
-                    <Select onValueChange={(value) => handleAddressChange('country', value)} defaultValue="United States">
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select country" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="United States">United States</SelectItem>
-                        <SelectItem value="Canada">Canada</SelectItem>
-                        <SelectItem value="United Kingdom">United Kingdom</SelectItem>
-                        <SelectItem value="Australia">Australia</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="state">State *</Label>
+                  <Input
+                    id="state"
+                    placeholder="Enter state"
+                    value={recipientData.address.state}
+                    onChange={(e) => handleAddressChange('state', e.target.value)}
+                    required
+                  />
                 </div>
               </div>
-            </>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="zipCode">ZIP Code *</Label>
+                  <Input
+                    id="zipCode"
+                    placeholder="Enter ZIP code"
+                    value={recipientData.address.zipCode}
+                    onChange={(e) => handleAddressChange('zipCode', e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="country">Country</Label>
+                  <Select onValueChange={(value) => handleAddressChange('country', value)} defaultValue="United States">
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select country" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="United States">United States</SelectItem>
+                      <SelectItem value="Canada">Canada</SelectItem>
+                      <SelectItem value="United Kingdom">United Kingdom</SelectItem>
+                      <SelectItem value="Australia">Australia</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
           )}
 
-          {/* Manual entry mode note */}
-          {isManualEntry && (
+          {/* Manual entry mode note - only show if truly minimal */}
+          {isManualEntry && !requireShippingAddress && (
             <div className="bg-brand-cream/30 p-4 rounded-lg">
               <p className="text-sm text-brand-charcoal/70">
                 You can add more details like contact info and address later in your dashboard.
