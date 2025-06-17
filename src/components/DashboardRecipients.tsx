@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -168,6 +169,25 @@ const DashboardRecipients = () => {
 
   return (
     <div className="space-y-4 sm:space-y-6 w-full">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center space-x-2">
+          <Users className="h-4 w-4 sm:h-5 sm:w-5 text-brand-charcoal" />
+          <h2 className="text-lg sm:text-xl font-semibold text-brand-charcoal">Your Recipients</h2>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <CalendarSyncButton />
+          <Button 
+            variant="outline"
+            size="sm"
+            className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream w-full sm:w-auto"
+            onClick={() => setShowAddModal(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Manage
+          </Button>
+        </div>
+      </div>
+
       {/* Gift Coverage Progress Bar */}
       {giftCoverage && giftCoverage.totalRecipients > 0 && (
         <Card className="bg-white border-brand-cream">
@@ -200,25 +220,6 @@ const DashboardRecipients = () => {
           </CardContent>
         </Card>
       )}
-
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center space-x-2">
-          <Users className="h-4 w-4 sm:h-5 sm:w-5 text-brand-charcoal" />
-          <h2 className="text-lg sm:text-xl font-semibold text-brand-charcoal">Your Recipients</h2>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <CalendarSyncButton />
-          <Button 
-            variant="outline"
-            size="sm"
-            className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream w-full sm:w-auto"
-            onClick={() => setShowAddModal(true)}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Manage
-          </Button>
-        </div>
-      </div>
 
       {recipients && recipients.length > 0 ? (
         <div className="space-y-3 sm:space-y-4">
