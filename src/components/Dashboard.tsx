@@ -1,26 +1,21 @@
-
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import UserMenu from '@/components/auth/UserMenu';
 import TestDataManager from '@/components/TestDataManager';
-import RecipientsList from '@/components/RecipientsList';
 import UpcomingGiftsManager from '@/components/UpcomingGiftsManager';
 import DashboardRecipients from '@/components/DashboardRecipients';
 import HolidayCarousel from '@/components/HolidayCarousel';
 import AppNavigation from '@/components/AppNavigation';
 import { ResponsiveContainer, ResponsiveHeader, ResponsiveNavigation, ResponsiveActions } from '@/components/ui/responsive-container';
-import { Users, Gift, Clock, TrendingUp, Calendar, Settings } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Users, Gift, Clock, TrendingUp } from 'lucide-react';
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
 
   // Fetch user metrics
   const { data: metrics } = useQuery({
@@ -84,11 +79,6 @@ const Dashboard = () => {
     enabled: !!user?.id
   });
 
-  const handleNavigation = (path: string) => {
-    console.log('🔧 Dashboard: Navigating to:', path);
-    navigate(path);
-  };
-
   const progressPercentage = giftCoverage?.totalRecipients > 0 
     ? (giftCoverage.recipientsWithGifts / giftCoverage.totalRecipients) * 100 
     : 0;
@@ -109,22 +99,6 @@ const Dashboard = () => {
         </ResponsiveNavigation>
 
         <ResponsiveActions>
-          <Button
-            variant="outline"
-            onClick={() => handleNavigation('/calendar')}
-            className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light w-full sm:w-auto"
-          >
-            <Calendar className="h-4 w-4 mr-2" />
-            Calendar
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => handleNavigation('/settings')}
-            className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light w-full sm:w-auto"
-          >
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
-          </Button>
           <UserMenu />
         </ResponsiveActions>
       </ResponsiveHeader>
