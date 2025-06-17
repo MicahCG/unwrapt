@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle, Gift } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import ConfettiAnimation from '@/components/ConfettiAnimation';
 
 const PaymentSuccess = () => {
   const [searchParams] = useSearchParams();
@@ -13,6 +14,7 @@ const PaymentSuccess = () => {
   const { toast } = useToast();
   const [isVerifying, setIsVerifying] = useState(true);
   const [verificationComplete, setVerificationComplete] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
 
   useEffect(() => {
     const sessionId = searchParams.get('session_id');
@@ -34,6 +36,7 @@ const PaymentSuccess = () => {
 
       if (data?.paymentStatus === 'paid') {
         setVerificationComplete(true);
+        setShowConfetti(true);
         toast({
           title: "Payment Successful!",
           description: "Your gift has been scheduled and payment confirmed.",
@@ -72,47 +75,50 @@ const PaymentSuccess = () => {
   }
 
   return (
-    <div className="min-h-screen bg-brand-cream flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="bg-green-100 p-4 rounded-full">
-              {verificationComplete ? (
-                <CheckCircle className="h-12 w-12 text-green-600" />
-              ) : (
-                <Gift className="h-12 w-12 text-brand-gold" />
-              )}
+    <>
+      <ConfettiAnimation isActive={showConfetti} duration={4000} />
+      <div className="min-h-screen bg-brand-cream flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <div className="bg-green-100 p-4 rounded-full">
+                {verificationComplete ? (
+                  <CheckCircle className="h-12 w-12 text-green-600" />
+                ) : (
+                  <Gift className="h-12 w-12 text-brand-gold" />
+                )}
+              </div>
             </div>
-          </div>
-          <CardTitle className="text-2xl text-brand-charcoal">
-            {verificationComplete ? 'Payment Successful!' : 'Thank You!'}
-          </CardTitle>
-        </CardHeader>
-        
-        <CardContent className="space-y-4 text-center">
-          <p className="text-brand-charcoal/70">
-            {verificationComplete 
-              ? 'Your gift has been scheduled and your payment has been confirmed. We\'ll take care of everything from here!'
-              : 'Thank you for your payment. We\'re processing your order now.'
-            }
-          </p>
+            <CardTitle className="text-2xl text-brand-charcoal">
+              {verificationComplete ? 'Payment Successful!' : 'Thank You!'}
+            </CardTitle>
+          </CardHeader>
           
-          <div className="bg-brand-gold/10 p-4 rounded-lg">
-            <p className="text-sm text-brand-charcoal">
-              🎁 We'll curate the perfect gift and handle delivery at just the right time
+          <CardContent className="space-y-4 text-center">
+            <p className="text-brand-charcoal/70">
+              {verificationComplete 
+                ? 'Your gift has been scheduled and your payment has been confirmed. We\'ll take care of everything from here!'
+                : 'Thank you for your payment. We\'re processing your order now.'
+              }
             </p>
-          </div>
+            
+            <div className="bg-brand-gold/10 p-4 rounded-lg">
+              <p className="text-sm text-brand-charcoal">
+                🎁 We'll curate the perfect gift and handle delivery at just the right time
+              </p>
+            </div>
 
-          <Button 
-            size="lg" 
-            className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
-            onClick={handleGoToDashboard}
-          >
-            Go to Dashboard
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
+            <Button 
+              size="lg" 
+              className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+              onClick={handleGoToDashboard}
+            >
+              Go to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </>
   );
 };
 
