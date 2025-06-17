@@ -38,11 +38,11 @@ const Dashboard = () => {
 
       {/* Main Content */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 sm:gap-8 mb-6 sm:mb-8">
-        <div className="w-full">
-          <UpcomingGiftsManager />
-        </div>
-        <div className="w-full">
+        <div className="w-full order-1 xl:order-1">
           <DashboardRecipients />
+        </div>
+        <div className="w-full order-2 xl:order-2">
+          <UpcomingGiftsManager />
         </div>
       </div>
 
