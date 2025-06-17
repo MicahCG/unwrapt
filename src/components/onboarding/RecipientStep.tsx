@@ -69,11 +69,11 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
 
   const validateForm = (data: typeof recipientData) => {
     // Basic validation: always require name and relationship
-    const hasBasicInfo = data.fullName && data.relationship;
+    const hasBasicInfo = Boolean(data.fullName && data.relationship);
     
     // Address validation: required if we need shipping or if not in manual entry mode
     const needsAddress = requireShippingAddress || !isManualEntry;
-    const hasCompleteAddress = needsAddress ? (
+    const hasCompleteAddress = needsAddress ? Boolean(
       data.address.street &&
       data.address.city &&
       data.address.state &&
@@ -82,7 +82,7 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
     
     // Email validation: required if not in manual entry mode
     const needsEmail = !isManualEntry;
-    const hasEmail = needsEmail ? data.email : true;
+    const hasEmail = needsEmail ? Boolean(data.email) : true;
     
     const isFormValid = hasBasicInfo && hasCompleteAddress && hasEmail;
     setIsValid(isFormValid);
