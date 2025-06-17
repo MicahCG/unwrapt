@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import UserMenu from '@/components/auth/UserMenu';
 import TestDataManager from '@/components/TestDataManager';
 import RecipientsList from '@/components/RecipientsList';
@@ -43,10 +44,54 @@ const Dashboard = () => {
     enabled: !!user?.id
   });
 
+  // Fetch gift coverage data for progress bar
+  const { data: giftCoverage } = useQuery({
+    queryKey: ['gift-coverage', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return { totalRecipients: 0, recipientsWithGifts: 0 };
+      
+      // Get total recipients
+      const { data: recipients, error: recipientsError } = await supabase
+        .from('recipients')
+        .select('id')
+        .eq('user_id', user.id);
+      
+      if (recipientsError) {
+        console.error('Error fetching recipients:', recipientsError);
+        return { totalRecipients: 0, recipientsWithGifts: 0 };
+      }
+      
+      // Get recipients with scheduled gifts
+      const { data: giftsData, error: giftsError } = await supabase
+        .from('scheduled_gifts')
+        .select('recipient_id')
+        .eq('user_id', user.id)
+        .eq('status', 'scheduled');
+      
+      if (giftsError) {
+        console.error('Error fetching scheduled gifts:', giftsError);
+        return { totalRecipients: recipients?.length || 0, recipientsWithGifts: 0 };
+      }
+      
+      // Count unique recipients with gifts
+      const uniqueRecipientIds = new Set(giftsData?.map(gift => gift.recipient_id) || []);
+      
+      return {
+        totalRecipients: recipients?.length || 0,
+        recipientsWithGifts: uniqueRecipientIds.size
+      };
+    },
+    enabled: !!user?.id
+  });
+
   const handleNavigation = (path: string) => {
     console.log('🔧 Dashboard: Navigating to:', path);
     navigate(path);
   };
+
+  const progressPercentage = giftCoverage?.totalRecipients > 0 
+    ? (giftCoverage.recipientsWithGifts / giftCoverage.totalRecipients) * 100 
+    : 0;
 
   return (
     <ResponsiveContainer>
@@ -83,6 +128,41 @@ const Dashboard = () => {
           <UserMenu />
         </ResponsiveActions>
       </ResponsiveHeader>
+
+      {/* Gift Coverage Progress Bar */}
+      {giftCoverage && giftCoverage.totalRecipients > 0 && (
+        <div className="mb-6 sm:mb-8">
+          <Card className="bg-white border-brand-cream">
+            <CardContent className="p-4 sm:p-6">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm sm:text-base font-semibold text-brand-charcoal">Gift Scheduling Progress</h3>
+                    <p className="text-xs sm:text-sm text-brand-charcoal/70">
+                      {giftCoverage.recipientsWithGifts} out of {giftCoverage.totalRecipients} recipients have scheduled gifts
+                    </p>
+                  </div>
+                  <Badge 
+                    variant={progressPercentage === 100 ? "default" : "secondary"}
+                    className={progressPercentage === 100 ? "bg-green-100 text-green-800" : "bg-brand-cream text-brand-charcoal"}
+                  >
+                    {Math.round(progressPercentage)}%
+                  </Badge>
+                </div>
+                <Progress 
+                  value={progressPercentage} 
+                  className="h-2 sm:h-3"
+                />
+                {progressPercentage < 100 && (
+                  <p className="text-xs text-brand-charcoal/60">
+                    Schedule gifts for {giftCoverage.totalRecipients - giftCoverage.recipientsWithGifts} more recipient{giftCoverage.totalRecipients - giftCoverage.recipientsWithGifts !== 1 ? 's' : ''} to complete your planning!
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Development Test Data Manager */}
       {process.env.NODE_ENV === 'development' && (
