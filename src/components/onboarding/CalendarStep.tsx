@@ -1,530 +1,436 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Check, ArrowDown, AlertCircle, UserPlus, Calendar, Clock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { format } from 'date-fns';
+import { useToast } from "@/hooks/use-toast";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
+import { CheckCircledIcon, CircleIcon } from '@radix-ui/react-icons';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/components/auth/AuthProvider';
-import AddRecipientModal from '@/components/AddRecipientModal';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import AddRecipientModal from '../AddRecipientModal';
 
 interface CalendarStepProps {
   onNext: (data: any) => void;
+  onSkip: () => void;
 }
 
 interface CalendarEvent {
-  summary: string;
-  date: string;
-  type: string;
+  id: string;
   personName: string;
-  daysUntil?: number;
-  nextOccurrenceDate?: string;
+  date: Date;
+  type: 'birthday' | 'anniversary';
 }
 
-const CalendarStep: React.FC<CalendarStepProps> = ({ onNext }) => {
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [foundDates, setFoundDates] = useState<CalendarEvent[]>([]);
-  const [upcomingDates, setUpcomingDates] = useState<CalendarEvent[]>([]);
+const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
+  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [showManualAdd, setShowManualAdd] = useState(false);
-  const [showAddRecipientModal, setShowAddRecipientModal] = useState(false);
-  const [manuallyAddedRecipient, setManuallyAddedRecipient] = useState<any>(null);
+  const [isAddingEvent, setIsAddingEvent] = useState(false);
+  const [newEventName, setNewEventName] = useState('');
+  const [newEventDate, setNewEventDate] = useState<Date | undefined>(new Date());
+  const [newEventAnniversaryDate, setNewEventAnniversaryDate] = useState<Date | undefined>(new Date());
+  const [newEventBirthdayDate, setNewEventBirthdayDate] = useState<Date | undefined>(new Date());
+  const [newEventNameError, setNewEventNameError] = useState('');
+  const [selectedEventType, setSelectedEventType] = useState<'birthday' | 'anniversary'>('birthday');
+  const [showManualModal, setShowManualModal] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
-  // Check for OAuth code on component mount
+  // Fetch calendar events from Supabase
+  const { data: calendarEvents, error: calendarError, isLoading: calendarLoading } = useQuery({
+    queryKey: ['calendar-events', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+
+      const { data, error } = await supabase
+        .from('calendar_events')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error("Error fetching calendar events:", error);
+        throw error;
+      }
+
+      // Convert date strings to Date objects
+      const eventsWithDateObjects = data.map(event => ({
+        ...event,
+        date: new Date(event.date),
+      }));
+
+      return eventsWithDateObjects;
+    },
+    enabled: !!user?.id,
+  });
+
   useEffect(() => {
-    const checkForOAuthCode = () => {
-      const storedCode = sessionStorage.getItem('google_oauth_code');
-      if (storedCode) {
-        console.log('📅 CalendarStep: Found stored OAuth code, processing...');
-        handleOAuthCallback(storedCode);
-        sessionStorage.removeItem('google_oauth_code');
-      }
-    };
+    if (calendarEvents) {
+      setEvents(calendarEvents);
+    }
+  }, [calendarEvents]);
 
-    checkForOAuthCode();
-  }, []);
-
-  // Calculate days until and sort upcoming events
   useEffect(() => {
-    if (foundDates.length > 0) {
-      const today = new Date();
-      const currentYear = today.getFullYear();
-      
-      const eventsWithDaysUntil = foundDates.map(event => {
-        const eventDate = new Date(event.date);
-        let nextOccurrence = new Date(currentYear, eventDate.getMonth(), eventDate.getDate());
-        
-        // If the date has passed this year, move to next year
-        if (nextOccurrence < today) {
-          nextOccurrence.setFullYear(currentYear + 1);
-        }
-        
-        const timeDiff = nextOccurrence.getTime() - today.getTime();
-        const daysUntil = Math.ceil(timeDiff / (1000 * 3600 * 24));
-        
-        return {
-          ...event,
-          daysUntil,
-          nextOccurrenceDate: nextOccurrence.toISOString()
-        };
+    if (date) {
+      const eventsForDate = events.filter(event => {
+        return event.date.toDateString() === date.toDateString();
       });
-      
-      // Sort by days until (closest first) and take top 3
-      const sortedEvents = eventsWithDaysUntil
-        .sort((a, b) => a.daysUntil! - b.daysUntil!)
-        .slice(0, 3);
-      
-      setUpcomingDates(sortedEvents);
-    }
-  }, [foundDates]);
-
-  const extractPersonFromEvent = (eventSummary: string) => {
-    const summary = eventSummary.toLowerCase();
-    let personName = '';
-    
-    if (summary.includes("'s birthday") || summary.includes("'s bday")) {
-      const splitChar = summary.includes("'s birthday") ? "'s birthday" : "'s bday";
-      personName = eventSummary.split(splitChar)[0].trim();
-    } else if (summary.includes("'s anniversary")) {
-      personName = eventSummary.split("'s")[0].trim();
-    } else if (summary.includes(" birthday") || summary.includes(" bday")) {
-      personName = eventSummary.replace(/birthday|bday/i, '').trim();
-    } else if (summary.includes(" anniversary")) {
-      personName = eventSummary.replace(/anniversary/i, '').trim();
-    } else if (summary.includes("birthday -") || summary.includes("bday -")) {
-      const splitStr = summary.includes("birthday -") ? "birthday -" : "bday -";
-      personName = eventSummary.split(splitStr)[1].trim();
-    } else if (summary.includes("anniversary -")) {
-      personName = eventSummary.split("anniversary -")[1].trim();
-    } else {
-      // Fallback: try to extract any name-like pattern
-      const words = eventSummary.split(' ');
-      personName = words.find(word => 
-        word.length > 2 && 
-        word[0] === word[0].toUpperCase() &&
-        !['Birthday', 'Bday', 'Anniversary', 'The', 'And', 'Or'].includes(word)
-      ) || '';
-    }
-    
-    return personName;
-  };
-
-  const handleGoogleConnect = async () => {
-    console.log('📅 CalendarStep: Starting Google Calendar connection...');
-    setIsConnecting(true);
-    setError(null);
-    
-    try {
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-
-      console.log('📅 CalendarStep: Getting session for auth headers...');
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        throw new Error('No active session found');
-      }
-
-      console.log('📅 CalendarStep: Calling google-calendar edge function...');
-      const { data: authData, error: authError } = await supabase.functions.invoke('google-calendar', {
-        body: { action: 'get_auth_url' },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        }
-      });
-
-      console.log('📅 CalendarStep: Auth URL response:', { authData, authError });
-
-      if (authError) {
-        console.error('📅 CalendarStep: Error getting auth URL:', authError);
-        throw new Error(authError.message || 'Failed to get authorization URL');
-      }
-
-      if (!authData?.authUrl) {
-        throw new Error('No authorization URL received from server');
-      }
-
-      console.log('📅 CalendarStep: Redirecting to Google OAuth:', authData.authUrl);
-      window.location.href = authData.authUrl;
-      
-    } catch (error) {
-      console.error('📅 CalendarStep: Error connecting to Google Calendar:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to connect to Google Calendar';
-      setError(errorMessage);
-      setIsConnecting(false);
-      toast({
-        title: "Connection Failed",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleOAuthCallback = async (code: string) => {
-    console.log('📅 CalendarStep: Processing OAuth callback with code:', { codeLength: code.length });
-    setIsConnecting(true);
-    setError(null);
-    
-    try {
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-
-      console.log('📅 CalendarStep: Getting session for token exchange...');
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        throw new Error('No active session found');
-      }
-
-      // Exchange code for token
-      console.log('📅 CalendarStep: Exchanging authorization code for access token...');
-      const { data: tokenData, error: tokenError } = await supabase.functions.invoke('google-calendar', {
-        body: { action: 'exchange_code', code },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        }
-      });
-
-      console.log('📅 CalendarStep: Token exchange response:', { 
-        success: !!tokenData, 
-        hasAccessToken: !!tokenData?.access_token,
-        error: tokenError 
-      });
-
-      if (tokenError) {
-        console.error('📅 CalendarStep: Token exchange error:', tokenError);
-        throw new Error(tokenError.message || 'Failed to exchange authorization code');
-      }
-
-      if (!tokenData?.access_token) {
-        throw new Error('No access token received from Google');
-      }
-
-      // Fetch calendar events
-      console.log('📅 CalendarStep: Fetching calendar events with access token...');
-      const { data: eventsData, error: eventsError } = await supabase.functions.invoke('google-calendar', {
-        body: { action: 'fetch_events', access_token: tokenData.access_token },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        }
-      });
-
-      console.log('📅 CalendarStep: Events fetch response:', { 
-        success: !!eventsData, 
-        eventCount: eventsData?.events?.length || 0,
-        error: eventsError 
-      });
-
-      if (eventsError) {
-        console.error('📅 CalendarStep: Events fetch error:', eventsError);
-        throw new Error(eventsError.message || 'Failed to fetch calendar events');
-      }
-
-      const events = eventsData?.events || [];
-      console.log('📅 CalendarStep: Successfully fetched and processed events:', events.length, 'events found');
-      
-      setFoundDates(events);
-      setIsConnecting(false);
-
-      if (events.length === 0) {
-        toast({
-          title: "Calendar Connected Successfully!",
-          description: "No important dates found in your calendar. Let's add your first recipient.",
-        });
-        
-        // Proceed directly to recipient entry screen instead of showing modal
-        setTimeout(() => {
-          onNext({ 
-            calendarConnected: true,
-            importedDates: [],
-            noRecipientsFound: true
-          });
-        }, 1500);
+      if (eventsForDate.length > 0) {
+        setSelectedEvent(eventsForDate[0]);
       } else {
-        toast({
-          title: "Calendar Connected Successfully!",
-          description: `Found ${events.length} important dates from your calendar.`,
-        });
+        setSelectedEvent(null);
       }
+    }
+  }, [date, events]);
 
-    } catch (error) {
-      console.error('📅 CalendarStep: Error processing OAuth callback:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to process calendar connection';
-      setError(errorMessage);
-      setIsConnecting(false);
+  const handleDateSelect = (newDate: Date | undefined) => {
+    setDate(newDate);
+    if (newDate) {
+      const eventsForDate = events.filter(event => {
+        return event.date.toDateString() === newDate.toDateString();
+      });
+      if (eventsForDate.length > 0) {
+        setSelectedEvent(eventsForDate[0]);
+      } else {
+        setSelectedEvent(null);
+      }
+    }
+  };
+
+  const handleNext = () => {
+    if (selectedEvent) {
+      onNext({ selectedPersonForGift: selectedEvent });
+    } else {
       toast({
-        title: "Calendar Connection Failed",
-        description: errorMessage,
-        variant: "destructive"
+        title: "No event selected",
+        description: "Please select an event or skip this step.",
       });
     }
   };
 
-  const handleEventSelect = (event: CalendarEvent) => {
-    setSelectedEvent(event);
+  const handleAddEvent = () => {
+    setIsAddingEvent(true);
+    setNewEventName('');
+    setNewEventDate(new Date());
+    setNewEventAnniversaryDate(new Date());
+    setNewEventBirthdayDate(new Date());
+    setNewEventNameError('');
   };
 
-  const handleContinueWithSelection = () => {
-    if (!selectedEvent) return;
-    
-    console.log('📅 CalendarStep: Continuing with selected event:', selectedEvent);
-    onNext({ 
-      calendarConnected: true,
-      importedDates: foundDates, // Store ALL found dates
-      selectedPersonForGift: selectedEvent // Store selected person for onboarding
-    });
-  };
+  const handleSaveEvent = async () => {
+    if (!newEventName.trim()) {
+      setNewEventNameError('Event name is required.');
+      return;
+    }
 
-  const handleRetry = () => {
-    console.log('📅 CalendarStep: Retrying calendar connection...');
-    setError(null);
-    setIsConnecting(false);
-    setFoundDates([]);
-    setUpcomingDates([]);
-    setSelectedEvent(null);
-    setShowManualAdd(false);
-    setManuallyAddedRecipient(null);
-  };
+    let selectedDate;
+    if (selectedEventType === 'birthday') {
+      selectedDate = newEventBirthdayDate;
+    } else {
+      selectedDate = newEventAnniversaryDate;
+    }
 
-  const handleManualAdd = () => {
-    setShowAddRecipientModal(true);
-  };
-
-  const handleRecipientAdded = () => {
-    console.log('📅 CalendarStep: Recipient added via modal');
-    setShowAddRecipientModal(false);
-    
-    toast({
-      title: "Recipient Added!",
-      description: "Great! You've added your first recipient. Let's schedule a gift for them.",
-    });
-    
-    setTimeout(() => {
-      // Go directly to recipient entry screen for manual flow
-      onNext({ 
-        calendarConnected: true,
-        importedDates: [],
-        manualRecipientAdded: true
+    if (!selectedDate) {
+      toast({
+        title: "Error",
+        description: "Please select a date for the event.",
+        variant: "destructive"
       });
-    }, 1500);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('calendar_events')
+        .insert([
+          {
+            user_id: user?.id,
+            personName: newEventName,
+            date: selectedDate.toISOString(),
+            type: selectedEventType,
+          },
+        ]);
+
+      if (error) {
+        console.error("Error saving event:", error);
+        toast({
+          title: "Error",
+          description: "Failed to save event. Please try again.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Optimistically update the local state
+      const newEvent = {
+        id: data[0].id, // Assuming the insert returns the new event with an ID
+        personName: newEventName,
+        date: selectedDate,
+        type: selectedEventType,
+      };
+
+      setEvents(prevEvents => [...prevEvents, newEvent]);
+
+      // If the selected date matches the new event date, select the new event
+      if (date && selectedDate.toDateString() === date.toDateString()) {
+        setSelectedEvent(newEvent);
+      }
+
+      toast({
+        title: "Success",
+        description: "Event saved successfully!",
+      });
+    } catch (error) {
+      console.error("Error saving event:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save event. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsAddingEvent(false);
+    }
   };
 
-  const handleContinueWithoutDates = () => {
-    console.log('📅 CalendarStep: Continuing without calendar dates');
-    onNext({ 
-      calendarConnected: true,
-      importedDates: [],
-      noRecipientsFound: true
-    });
+  const handleCancelAddEvent = () => {
+    setIsAddingEvent(false);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric'
-    });
+  const handleEventTypeChange = (type: 'birthday' | 'anniversary') => {
+    setSelectedEventType(type);
   };
 
-  const getDaysUntilText = (daysUntil: number) => {
-    if (daysUntil === 0) return "Today!";
-    if (daysUntil === 1) return "Tomorrow";
-    return `${daysUntil} days`;
+  const EventTypeSelector = () => {
+    return (
+      <div className="flex items-center space-x-2">
+        <Label htmlFor="birthday" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+          Birthday
+        </Label>
+        <Input
+          type="radio"
+          id="birthday"
+          name="eventType"
+          value="birthday"
+          checked={selectedEventType === 'birthday'}
+          onChange={() => handleEventTypeChange('birthday')}
+          className="h-4 w-4 border-brand-charcoal text-brand-charcoal focus:ring-brand-charcoal"
+        />
+
+        <Label htmlFor="anniversary" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+          Anniversary
+        </Label>
+        <Input
+          type="radio"
+          id="anniversary"
+          name="eventType"
+          value="anniversary"
+          checked={selectedEventType === 'anniversary'}
+          onChange={() => handleEventTypeChange('anniversary')}
+          className="h-4 w-4 border-brand-charcoal text-brand-charcoal focus:ring-brand-charcoal"
+        />
+      </div>
+    );
   };
 
   return (
-    <>
-      <Card className="animate-fadeInUp border-brand-cream shadow-lg bg-white">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="bg-brand-cream p-4 rounded-full">
-              <img 
-                src="/lovable-uploads/00f39f0e-8157-4f8a-81d2-67a47dc5ebbe.png" 
-                alt="Calendar" 
-                className="h-12 w-12"
-              />
-            </div>
+    <Card className="animate-fadeInUp">
+      <CardHeader className="text-center">
+        <div className="flex justify-center mb-4">
+          <div className="bg-brand-charcoal/10 p-4 rounded-full">
+            <CalendarIcon className="h-12 w-12 text-brand-charcoal" />
           </div>
-          <CardTitle className="text-3xl mb-2 text-brand-charcoal">Never Miss Another Birthday or Event</CardTitle>
-        </CardHeader>
-        
-        <CardContent className="space-y-6">
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-3">
-              <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
-              <div className="flex-1">
-                <p className="text-red-700 font-medium">Connection Error</p>
-                <p className="text-red-600 text-sm">{error}</p>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleRetry}
-                className="text-red-700 border-red-200 hover:bg-red-50"
+        </div>
+        <CardTitle className="text-3xl mb-2">
+          When is their special day?
+        </CardTitle>
+        <p className="text-muted-foreground">
+          Select a date to find the perfect gift.
+        </p>
+      </CardHeader>
+      <CardContent className="grid gap-6">
+        <div className="flex justify-center w-full">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={"outline"}
+                className={cn(
+                  "w-[240px] justify-start text-left font-normal",
+                  !date && "text-muted-foreground"
+                )}
               >
-                Retry
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {date ? format(date, "PPP") : <span>Pick a date</span>}
               </Button>
-            </div>
-          )}
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="center" side="bottom">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={handleDateSelect}
+                disabled={(date) =>
+                  date > new Date()
+                }
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
 
-          {manuallyAddedRecipient ? (
-            <div className="text-center space-y-4">
-              <div className="flex justify-center">
-                <div className="bg-brand-cream p-3 rounded-full">
-                  <Check className="h-8 w-8 text-brand-charcoal" />
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="text-xl font-semibold mb-2 text-brand-charcoal">Perfect!</h3>
-                <p className="text-brand-charcoal/70">
-                  {manuallyAddedRecipient.name} has been added. Let's schedule your first gift for them!
-                </p>
-              </div>
-            </div>
-          ) : showManualAdd ? (
-            <>
-              <div className="text-center space-y-4">
-                <div className="flex justify-center">
-                  <div className="bg-brand-cream p-3 rounded-full">
-                    <Check className="h-8 w-8 text-brand-charcoal" />
-                  </div>
-                </div>
-                
-                <div>
-                  <h3 className="text-xl font-semibold mb-2 text-brand-charcoal">Calendar Connected!</h3>
-                  <p className="text-brand-charcoal/70">We didn't find any important dates in your calendar, but that's okay! Let's add your first recipient manually.</p>
-                </div>
-              </div>
+        {selectedEvent ? (
+          <div className="border rounded-md p-4">
+            <h3 className="text-lg font-semibold">{selectedEvent.personName}</h3>
+            <p className="text-sm text-muted-foreground">
+              {selectedEvent.type === 'birthday' ? 'Birthday' : 'Anniversary'} on {format(selectedEvent.date, "PPP")}
+            </p>
+          </div>
+        ) : (
+          <div className="border rounded-md p-4 text-center text-muted-foreground">
+            No event selected for this date.
+          </div>
+        )}
 
-              <div className="space-y-3">
-                <Button 
-                  size="lg" 
-                  className="w-full text-lg py-6 bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
-                  onClick={handleManualAdd}
-                >
-                  <UserPlus className="h-5 w-5 mr-2" />
-                  Add Your First Recipient
-                </Button>
+        <div className="flex justify-between">
+          <Button variant="secondary" onClick={onSkip}>Skip</Button>
+          <Button onClick={handleNext}>Continue</Button>
+        </div>
 
-                <Button 
-                  variant="outline"
-                  size="lg" 
-                  className="w-full text-lg py-6 border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light"
-                  onClick={handleContinueWithoutDates}
-                >
-                  Continue Without Adding Recipients
-                </Button>
+        <Dialog open={isAddingEvent} onOpenChange={setIsAddingEvent}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="w-full" onClick={handleAddEvent}>
+              Add Event
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Add New Event</DialogTitle>
+              <DialogDescription>
+                Add a new birthday or anniversary to your calendar.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">
+                  Event Name
+                </Label>
+                <Input
+                  type="text"
+                  id="name"
+                  value={newEventName}
+                  onChange={(e) => setNewEventName(e.target.value)}
+                  className="col-span-3"
+                />
               </div>
-            </>
-          ) : upcomingDates.length > 0 ? (
-            <>
-              <div className="text-center space-y-4">
-                <div className="flex justify-center">
-                  <div className="bg-brand-cream p-3 rounded-full">
-                    <Check className="h-8 w-8 text-brand-charcoal" />
-                  </div>
-                </div>
-                
-                <div>
-                  <h3 className="text-xl font-semibold mb-2 text-brand-charcoal">Great! We found {foundDates.length} important dates</h3>
-                  <p className="text-brand-charcoal/70">Select someone to schedule your first gift for:</p>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {upcomingDates.map((event, index) => (
-                  <Card 
-                    key={index} 
-                    className={`cursor-pointer transition-all border-2 hover:shadow-md ${
-                      selectedEvent?.personName === event.personName 
-                        ? 'border-brand-charcoal bg-brand-cream/20' 
-                        : 'border-brand-cream hover:border-brand-charcoal/30'
-                    }`}
-                    onClick={() => handleEventSelect(event)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-brand-charcoal text-lg">{event.personName}</h4>
-                          <div className="flex items-center space-x-2 mt-1">
-                            <Calendar className="h-4 w-4 text-brand-charcoal/60" />
-                            <span className="text-sm text-brand-charcoal/70 capitalize">{event.type}</span>
-                            <span className="text-sm text-brand-charcoal/70">• {formatDate(event.date)}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Clock className="h-4 w-4 text-brand-gold" />
-                          <span className="text-sm font-medium text-brand-charcoal">
-                            {getDaysUntilText(event.daysUntil!)}
-                          </span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-              {selectedEvent && (
-                <Button 
-                  size="lg" 
-                  className="w-full text-lg py-6 bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
-                  onClick={handleContinueWithSelection}
-                >
-                  Continue with {selectedEvent.personName}
-                  <ArrowDown className="h-4 w-4 ml-2" />
-                </Button>
+              {newEventNameError && (
+                <div className="text-red-500 text-sm">{newEventNameError}</div>
               )}
 
-              <div className="text-center">
-                <p className="text-sm text-brand-charcoal/60 mb-2">
-                  We'll automatically add all {foundDates.length} people to your dashboard after onboarding
-                </p>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="event-type" className="text-right">
+                  Event Type
+                </Label>
+                <div className="col-span-3">
+                  <EventTypeSelector />
+                </div>
               </div>
-            </>
-          ) : !foundDates.length ? (
-            <>
-              <Button 
-                size="lg" 
-                className="w-full text-lg py-6 bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
-                onClick={handleGoogleConnect}
-                disabled={isConnecting}
-              >
-                {isConnecting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-brand-cream mr-2"></div>
-                    Connecting to Google Calendar...
-                  </>
-                ) : (
-                  <>
-                    <img 
-                      src="/lovable-uploads/00f39f0e-8157-4f8a-81d2-67a47dc5ebbe.png" 
-                      alt="Calendar" 
-                      className="h-5 w-5 mr-2"
-                    />
-                    Connect Google Calendar
-                  </>
-                )}
+
+              {selectedEventType === 'birthday' ? (
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="birthday-date" className="text-right">
+                    Birthday Date
+                  </Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-[240px] justify-start text-left font-normal",
+                          !newEventBirthdayDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {newEventBirthdayDate ? format(newEventBirthdayDate, "PPP") : <span>Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="center" side="bottom">
+                      <Calendar
+                        mode="single"
+                        selected={newEventBirthdayDate}
+                        onSelect={setNewEventBirthdayDate}
+                        disabled={(date) =>
+                          date > new Date()
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              ) : (
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="anniversary-date" className="text-right">
+                    Anniversary Date
+                  </Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-[240px] justify-start text-left font-normal",
+                          !newEventAnniversaryDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {newEventAnniversaryDate ? format(newEventAnniversaryDate, "PPP") : <span>Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="center" side="bottom">
+                      <Calendar
+                        mode="single"
+                        selected={newEventAnniversaryDate}
+                        onSelect={setNewEventAnniversaryDate}
+                        disabled={(date) =>
+                          date > new Date()
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button type="button" variant="secondary" onClick={handleCancelAddEvent}>
+                Cancel
               </Button>
+              <Button type="submit" onClick={handleSaveEvent}>
+                Save
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
-              <div className="bg-white p-4 rounded-lg border border-brand-cream">
-                <p className="font-medium mb-2 text-brand-charcoal">We only scan for birthdays and anniversaries.</p>
-               <p className="font-medium mb-2 text-brand-charcoal">We never access your emails or meeting details.</p>
-              </div>
-            </>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      <AddRecipientModal
-        isOpen={showAddRecipientModal}
-        onClose={() => setShowAddRecipientModal(false)}
-        onRecipientAdded={handleRecipientAdded}
-      />
-    </>
+        <Button variant="outline" className="w-full" onClick={() => setShowManualModal(true)}>
+          Enter Manually
+        </Button>
+      </CardContent>
+      
+      {showManualModal && (
+        <AddRecipientModal
+          isOpen={showManualModal}
+          onClose={() => {
+            setShowManualModal(false);
+            queryClient.invalidateQueries({ queryKey: ['recipients'] });
+          }}
+        />
+      )}
+    </Card>
   );
 };
 

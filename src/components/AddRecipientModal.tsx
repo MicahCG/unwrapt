@@ -57,6 +57,8 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
     setIsLoading(true);
 
     try {
+      console.log('🔧 AddRecipientModal: Submitting recipient data:', formData);
+      
       const { error } = await supabase
         .from('recipients')
         .insert({
@@ -74,7 +76,12 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
           country: formData.country
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('🔧 AddRecipientModal: Database error:', error);
+        throw error;
+      }
+
+      console.log('🔧 AddRecipientModal: Recipient added successfully');
 
       toast({
         title: "Success",
@@ -101,7 +108,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
       
       onClose();
     } catch (error) {
-      console.error('Error adding recipient:', error);
+      console.error('🔧 AddRecipientModal: Error adding recipient:', error);
       toast({
         title: "Error",
         description: "There was a problem adding the recipient. Please try again.",

@@ -178,7 +178,7 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
           {/* Relationship */}
           <div className="space-y-2">
             <Label htmlFor="relationship">Relationship *</Label>
-            <Select onValueChange={(value) => handleInputChange('relationship', value)}>
+            <Select value={recipientData.relationship} onValueChange={(value) => handleInputChange('relationship', value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select relationship" />
               </SelectTrigger>
@@ -304,7 +304,7 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
 
                 <div className="space-y-2">
                   <Label htmlFor="country">Country</Label>
-                  <Select onValueChange={(value) => handleAddressChange('country', value)} defaultValue="United States">
+                  <Select value={recipientData.address.country} onValueChange={(value) => handleAddressChange('country', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select country" />
                     </SelectTrigger>
