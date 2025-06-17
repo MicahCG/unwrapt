@@ -29,10 +29,15 @@ const ConfettiAnimation: React.FC<ConfettiAnimationProps> = ({
   const confettiPieces = Array.from({ length: 50 }, (_, i) => (
     <div
       key={i}
-      className="confetti-piece"
+      className="absolute w-3 h-3 opacity-100 animate-bounce"
       style={{
         left: `${Math.random() * 100}%`,
+        top: '-10px',
         animationDelay: `${Math.random() * 3}s`,
+        animationDuration: `${3 + Math.random() * 2}s`,
+        animationName: 'confettiFall',
+        animationTimingFunction: 'linear',
+        animationIterationCount: 'infinite',
         backgroundColor: [
           '#F4D03F', // gold
           '#52C41A', // green
@@ -41,47 +46,30 @@ const ConfettiAnimation: React.FC<ConfettiAnimationProps> = ({
           '#722ED1', // purple
           '#FA8C16', // orange
         ][Math.floor(Math.random() * 6)],
-        animationDuration: `${3 + Math.random() * 2}s`,
       }}
     />
   ));
 
   return (
-    <div className="confetti-container fixed inset-0 pointer-events-none z-50 overflow-hidden">
-      {confettiPieces}
-      <style jsx>{`
-        .confetti-container {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          pointer-events: none;
-          overflow: hidden;
-          z-index: 9999;
-        }
-        
-        .confetti-piece {
-          position: absolute;
-          width: 10px;
-          height: 10px;
-          top: -10px;
-          opacity: 1;
-          animation: confetti-fall linear infinite;
-        }
-        
-        @keyframes confetti-fall {
-          0% {
-            transform: translateY(-100vh) rotate(0deg);
-            opacity: 1;
+    <>
+      <style>
+        {`
+          @keyframes confettiFall {
+            0% {
+              transform: translateY(-100vh) rotate(0deg);
+              opacity: 1;
+            }
+            100% {
+              transform: translateY(100vh) rotate(720deg);
+              opacity: 0;
+            }
           }
-          100% {
-            transform: translateY(100vh) rotate(720deg);
-            opacity: 0;
-          }
-        }
-      `}</style>
-    </div>
+        `}
+      </style>
+      <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+        {confettiPieces}
+      </div>
+    </>
   );
 };
 
