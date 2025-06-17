@@ -36,19 +36,19 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Holiday Carousel */}
-      <div className="mb-6 sm:mb-8">
-        <HolidayCarousel />
-      </div>
-
       {/* Main Content */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 sm:gap-8">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 sm:gap-8 mb-6 sm:mb-8">
         <div className="w-full">
           <UpcomingGiftsManager />
         </div>
         <div className="w-full">
           <DashboardRecipients />
         </div>
+      </div>
+
+      {/* Holiday Carousel */}
+      <div className="mb-6 sm:mb-8">
+        <HolidayCarousel />
       </div>
     </ResponsiveContainer>
   );
