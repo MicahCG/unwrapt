@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/logo';
@@ -303,6 +304,17 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
     }
   };
 
+  const handleSkip = () => {
+    console.log('🔧 OnboardingFlow: Skipping step:', currentStep);
+    // Skip to next step or complete onboarding
+    const totalSteps = getTotalSteps();
+    if (currentStep === totalSteps) {
+      handleStepComplete({});
+    } else {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
   const handleBack = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
@@ -336,7 +348,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
       // Shortened flow: Calendar -> Gift Schedule (2 steps)
       switch (currentStep) {
         case 1:
-          return <CalendarStep onNext={handleStepComplete} />;
+          return <CalendarStep onNext={handleStepComplete} onSkip={handleSkip} />;
         case 2:
           return (
             <GiftScheduleStep 
@@ -361,7 +373,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
       // Regular manual flow: Calendar -> Recipient -> Gift Schedule (3 steps)
       switch (currentStep) {
         case 1:
-          return <CalendarStep onNext={handleStepComplete} />;
+          return <CalendarStep onNext={handleStepComplete} onSkip={handleSkip} />;
         case 2:
           return (
             <RecipientStep 
@@ -393,7 +405,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
       // Regular calendar-based flow: Calendar -> Interests -> Gift Schedule (3 steps)
       switch (currentStep) {
         case 1:
-          return <CalendarStep onNext={handleStepComplete} />;
+          return <CalendarStep onNext={handleStepComplete} onSkip={handleSkip} />;
         case 2:
           return (
             <InterestsStep 

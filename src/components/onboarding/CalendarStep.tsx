@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,12 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { format } from 'date-fns';
 import { useToast } from "@/hooks/use-toast";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
-import { CheckCircledIcon, CircleIcon } from '@radix-ui/react-icons';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import AddRecipientModal from '../AddRecipientModal';
 
 interface CalendarStepProps {
@@ -45,39 +43,9 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Fetch calendar events from Supabase
-  const { data: calendarEvents, error: calendarError, isLoading: calendarLoading } = useQuery({
-    queryKey: ['calendar-events', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-
-      const { data, error } = await supabase
-        .from('calendar_events')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (error) {
-        console.error("Error fetching calendar events:", error);
-        throw error;
-      }
-
-      // Convert date strings to Date objects
-      const eventsWithDateObjects = data.map(event => ({
-        ...event,
-        date: new Date(event.date),
-      }));
-
-      return eventsWithDateObjects;
-    },
-    enabled: !!user?.id,
-  });
-
-  useEffect(() => {
-    if (calendarEvents) {
-      setEvents(calendarEvents);
-    }
-  }, [calendarEvents]);
-
+  // For now, we'll use local state for events since the calendar_events table doesn't exist
+  // This can be updated when the proper calendar integration is implemented
+  
   useEffect(() => {
     if (date) {
       const eventsForDate = events.filter(event => {
@@ -148,30 +116,10 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('calendar_events')
-        .insert([
-          {
-            user_id: user?.id,
-            personName: newEventName,
-            date: selectedDate.toISOString(),
-            type: selectedEventType,
-          },
-        ]);
-
-      if (error) {
-        console.error("Error saving event:", error);
-        toast({
-          title: "Error",
-          description: "Failed to save event. Please try again.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Optimistically update the local state
-      const newEvent = {
-        id: data[0].id, // Assuming the insert returns the new event with an ID
+      // For now, just add to local state
+      // TODO: Replace with actual database storage when calendar_events table is created
+      const newEvent: CalendarEvent = {
+        id: Date.now().toString(), // Temporary ID generation
         personName: newEventName,
         date: selectedDate,
         type: selectedEventType,
@@ -210,32 +158,30 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
 
   const EventTypeSelector = () => {
     return (
-      <div className="flex items-center space-x-2">
-        <Label htmlFor="birthday" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-          Birthday
-        </Label>
-        <Input
-          type="radio"
-          id="birthday"
-          name="eventType"
-          value="birthday"
-          checked={selectedEventType === 'birthday'}
-          onChange={() => handleEventTypeChange('birthday')}
-          className="h-4 w-4 border-brand-charcoal text-brand-charcoal focus:ring-brand-charcoal"
-        />
+      <div className="flex items-center space-x-4">
+        <label className="flex items-center space-x-2">
+          <input
+            type="radio"
+            name="eventType"
+            value="birthday"
+            checked={selectedEventType === 'birthday'}
+            onChange={() => handleEventTypeChange('birthday')}
+            className="h-4 w-4"
+          />
+          <span className="text-sm font-medium">Birthday</span>
+        </label>
 
-        <Label htmlFor="anniversary" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-          Anniversary
-        </Label>
-        <Input
-          type="radio"
-          id="anniversary"
-          name="eventType"
-          value="anniversary"
-          checked={selectedEventType === 'anniversary'}
-          onChange={() => handleEventTypeChange('anniversary')}
-          className="h-4 w-4 border-brand-charcoal text-brand-charcoal focus:ring-brand-charcoal"
-        />
+        <label className="flex items-center space-x-2">
+          <input
+            type="radio"
+            name="eventType"
+            value="anniversary"
+            checked={selectedEventType === 'anniversary'}
+            onChange={() => handleEventTypeChange('anniversary')}
+            className="h-4 w-4"
+          />
+          <span className="text-sm font-medium">Anniversary</span>
+        </label>
       </div>
     );
   };

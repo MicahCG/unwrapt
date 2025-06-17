@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -85,7 +84,8 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
     const needsEmail = !isManualEntry;
     const hasEmail = needsEmail ? data.email : true;
     
-    setIsValid(hasBasicInfo && hasCompleteAddress && hasEmail);
+    const isFormValid = hasBasicInfo && hasCompleteAddress && hasEmail;
+    setIsValid(isFormValid);
   };
 
   const handleContinue = () => {
