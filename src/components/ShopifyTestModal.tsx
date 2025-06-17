@@ -26,10 +26,13 @@ const ShopifyTestModal: React.FC<ShopifyTestModalProps> = ({ gift, isOpen, onClo
     const errors = [];
     
     if (!gift.recipients?.name) errors.push('Recipient name is missing');
-    if (!gift.recipients?.address?.street) errors.push('Recipient street address is missing');
-    if (!gift.recipients?.address?.city) errors.push('Recipient city is missing');
-    if (!gift.recipients?.address?.state) errors.push('Recipient state is missing');
-    if (!gift.recipients?.address?.zipCode) errors.push('Recipient ZIP code is missing');
+    
+    // Updated validation to check individual address columns instead of JSONB
+    if (!gift.recipients?.street) errors.push('Recipient street address is missing');
+    if (!gift.recipients?.city) errors.push('Recipient city is missing');
+    if (!gift.recipients?.state) errors.push('Recipient state is missing');
+    if (!gift.recipients?.zip_code) errors.push('Recipient ZIP code is missing');
+    
     if (!gift.price_range) errors.push('Price range is not set');
     
     return errors;
@@ -54,15 +57,15 @@ const ShopifyTestModal: React.FC<ShopifyTestModalProps> = ({ gift, isOpen, onClo
     setCurrentStep('payment');
 
     try {
-      // Prepare recipient address
+      // Prepare recipient address using individual columns
       const testAddress = {
         first_name: gift.recipients?.name?.split(' ')[0] || 'Test',
         last_name: gift.recipients?.name?.split(' ').slice(1).join(' ') || 'User',
-        address1: gift.recipients?.address?.street || '123 Test Street',
-        city: gift.recipients?.address?.city || 'Test City',
-        province: gift.recipients?.address?.state || 'CA',
-        country: gift.recipients?.address?.country || 'US',
-        zip: gift.recipients?.address?.zipCode || '12345',
+        address1: gift.recipients?.street || '123 Test Street',
+        city: gift.recipients?.city || 'Test City',
+        province: gift.recipients?.state || 'CA',
+        country: gift.recipients?.country || 'US',
+        zip: gift.recipients?.zip_code || '12345',
         phone: gift.recipients?.phone || '555-123-4567'
       };
 
@@ -145,11 +148,11 @@ const ShopifyTestModal: React.FC<ShopifyTestModalProps> = ({ gift, isOpen, onClo
               <div className="space-y-2">
                 <p><strong>Address:</strong></p>
                 <div className="text-xs bg-white p-2 rounded border">
-                  {gift.recipients?.address ? (
+                  {gift.recipients?.street ? (
                     <>
-                      <div>{gift.recipients.address.street}</div>
-                      <div>{gift.recipients.address.city}, {gift.recipients.address.state} {gift.recipients.address.zipCode}</div>
-                      <div>{gift.recipients.address.country || 'US'}</div>
+                      <div>{gift.recipients.street}</div>
+                      <div>{gift.recipients.city}, {gift.recipients.state} {gift.recipients.zip_code}</div>
+                      <div>{gift.recipients.country || 'US'}</div>
                     </>
                   ) : (
                     <span className="text-red-600">No address set</span>
