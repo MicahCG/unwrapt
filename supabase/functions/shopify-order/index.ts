@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -48,19 +49,29 @@ serve(async (req) => {
 
     console.log(`Processing ${testMode ? 'TEST' : 'LIVE'} order for gift: ${scheduledGiftId}`);
 
-    // Get the scheduled gift details
-    const { data: giftData, error: giftError } = await supabaseService
+    // Get the scheduled gift details - for test mode, don't require payment confirmation
+    const giftQuery = supabaseService
       .from('scheduled_gifts')
       .select(`
         *,
-        recipients (name, email, phone, address, interests)
+        recipients (name, email, phone, street, city, state, zip_code, country, interests)
       `)
-      .eq('id', scheduledGiftId)
-      .eq('payment_status', 'paid')
-      .single();
+      .eq('id', scheduledGiftId);
+
+    // Only require payment confirmation for live orders
+    if (!testMode) {
+      giftQuery.eq('payment_status', 'paid');
+    }
+
+    const { data: giftData, error: giftError } = await giftQuery.single();
 
     if (giftError || !giftData) {
-      throw new Error("Gift not found or payment not confirmed");
+      console.error('Gift query error:', giftError);
+      if (testMode) {
+        throw new Error("Gift not found - please ensure the gift exists and try again");
+      } else {
+        throw new Error("Gift not found or payment not confirmed");
+      }
     }
 
     console.log(`Gift data:`, {
@@ -68,7 +79,9 @@ serve(async (req) => {
       recipient: giftData.recipients?.name,
       interests: giftData.recipients?.interests,
       price_range: giftData.price_range,
-      gift_type: giftData.gift_type
+      gift_type: giftData.gift_type,
+      payment_status: giftData.payment_status,
+      testMode
     });
 
     // Select product variant based on gift type or interests
