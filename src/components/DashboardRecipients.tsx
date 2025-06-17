@@ -1,8 +1,8 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { Gift, Calendar, Plus, Users, Clock, ChevronDown, ChevronUp, Check } from 'lucide-react';
@@ -105,6 +105,50 @@ const DashboardRecipients = () => {
     enabled: !!user
   });
 
+  // Fetch gift coverage data for progress bar
+  const { data: giftCoverage } = useQuery({
+    queryKey: ['gift-coverage', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return { totalRecipients: 0, recipientsWithGifts: 0 };
+      
+      // Get total recipients
+      const { data: recipients, error: recipientsError } = await supabase
+        .from('recipients')
+        .select('id')
+        .eq('user_id', user.id);
+      
+      if (recipientsError) {
+        console.error('Error fetching recipients:', recipientsError);
+        return { totalRecipients: 0, recipientsWithGifts: 0 };
+      }
+      
+      // Get recipients with scheduled gifts
+      const { data: giftsData, error: giftsError } = await supabase
+        .from('scheduled_gifts')
+        .select('recipient_id')
+        .eq('user_id', user.id)
+        .eq('status', 'scheduled');
+      
+      if (giftsError) {
+        console.error('Error fetching scheduled gifts:', giftsError);
+        return { totalRecipients: recipients?.length || 0, recipientsWithGifts: 0 };
+      }
+      
+      // Count unique recipients with gifts
+      const uniqueRecipientIds = new Set(giftsData?.map(gift => gift.recipient_id) || []);
+      
+      return {
+        totalRecipients: recipients?.length || 0,
+        recipientsWithGifts: uniqueRecipientIds.size
+      };
+    },
+    enabled: !!user?.id
+  });
+
+  const progressPercentage = giftCoverage?.totalRecipients > 0 
+    ? (giftCoverage.recipientsWithGifts / giftCoverage.totalRecipients) * 100 
+    : 0;
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -124,6 +168,39 @@ const DashboardRecipients = () => {
 
   return (
     <div className="space-y-4 sm:space-y-6 w-full">
+      {/* Gift Coverage Progress Bar */}
+      {giftCoverage && giftCoverage.totalRecipients > 0 && (
+        <Card className="bg-white border-brand-cream">
+          <CardContent className="p-4 sm:p-6">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm sm:text-base font-semibold text-brand-charcoal">Gift Scheduling Progress</h3>
+                  <p className="text-xs sm:text-sm text-brand-charcoal/70">
+                    {giftCoverage.recipientsWithGifts} out of {giftCoverage.totalRecipients} recipients have scheduled gifts
+                  </p>
+                </div>
+                <Badge 
+                  variant={progressPercentage === 100 ? "default" : "secondary"}
+                  className={progressPercentage === 100 ? "bg-green-100 text-green-800" : "bg-brand-cream text-brand-charcoal"}
+                >
+                  {Math.round(progressPercentage)}%
+                </Badge>
+              </div>
+              <Progress 
+                value={progressPercentage} 
+                className="h-2 sm:h-3"
+              />
+              {progressPercentage < 100 && (
+                <p className="text-xs text-brand-charcoal/60">
+                  Schedule gifts for {giftCoverage.totalRecipients - giftCoverage.recipientsWithGifts} more recipient{giftCoverage.totalRecipients - giftCoverage.recipientsWithGifts !== 1 ? 's' : ''} to complete your planning!
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center space-x-2">
           <Users className="h-4 w-4 sm:h-5 sm:w-5 text-brand-charcoal" />
