@@ -29,7 +29,7 @@ const UpcomingGiftsManager = () => {
         .from('scheduled_gifts')
         .select(`
           *,
-          recipients (name, email, interests)
+          recipients (name, email, interests, street, city, state, zip_code, country, phone)
         `)
         .eq('user_id', user?.id)
         .eq('status', 'scheduled')
