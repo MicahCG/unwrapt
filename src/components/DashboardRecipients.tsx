@@ -1,38 +1,55 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
-import { Gift, Calendar, Plus, Users, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { Gift, Calendar, Plus, Users, Clock, ChevronDown, ChevronUp, Check } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import ScheduleGiftModal from './ScheduleGiftModal';
 import AddRecipientModal from './AddRecipientModal';
 import CalendarSyncButton from './CalendarSyncButton';
+import GiftDetailsModal from './GiftDetailsModal';
 
 const DashboardRecipients = () => {
   const { user } = useAuth();
   const [schedulingGift, setSchedulingGift] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAllRecipients, setShowAllRecipients] = useState(false);
+  const [viewingGift, setViewingGift] = useState(null);
 
-  // Fetch recipients sorted by next upcoming event
+  // Fetch recipients with scheduled gifts sorted by priority
   const { data: recipients } = useQuery({
     queryKey: ['recipients', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('recipients')
-        .select('*')
+        .select(`
+          *,
+          scheduled_gifts:scheduled_gifts(
+            id,
+            occasion,
+            occasion_date,
+            gift_type,
+            gift_description,
+            price_range,
+            status,
+            payment_status,
+            created_at,
+            updated_at
+          )
+        `)
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
 
-      // Sort recipients by their next upcoming event
+      // Process recipients with their next events and sort
       const today = new Date();
       const currentYear = today.getFullYear();
 
-      const recipientsWithNextEvent = data.map(recipient => {
+      const recipientsWithData = data.map(recipient => {
         const occasions = [];
         
         if (recipient.birthday) {
@@ -56,16 +73,30 @@ const DashboardRecipients = () => {
         occasions.sort((a, b) => a.date.getTime() - b.date.getTime());
         const nextOccasion = occasions[0];
 
+        const hasScheduledGifts = recipient.scheduled_gifts && recipient.scheduled_gifts.length > 0;
+        const nextScheduledGift = hasScheduledGifts ? 
+          recipient.scheduled_gifts
+            .filter(gift => new Date(gift.occasion_date) >= today)
+            .sort((a, b) => new Date(a.occasion_date).getTime() - new Date(b.occasion_date).getTime())[0] 
+          : null;
+
         return {
           ...recipient,
           nextOccasion,
+          hasScheduledGifts,
+          nextScheduledGift,
           daysUntilNext: nextOccasion ? Math.ceil((nextOccasion.date.getTime() - today.getTime()) / (1000 * 3600 * 24)) : null
         };
       });
 
-      // Sort by days until next event (soonest first), recipients without events go to end
-      return recipientsWithNextEvent.sort((a, b) => {
-        if (!a.daysUntilNext && !b.daysUntilNext) return 0;
+      // Sort: recipients without scheduled gifts first, then those with gifts, by urgency within each group
+      return recipientsWithData.sort((a, b) => {
+        // Primary sort: no scheduled gifts first
+        if (!a.hasScheduledGifts && b.hasScheduledGifts) return -1;
+        if (a.hasScheduledGifts && !b.hasScheduledGifts) return 1;
+        
+        // Secondary sort: by urgency/days until next event
+        if (!a.daysUntilNext && !b.daysUntilNext) return a.name.localeCompare(b.name);
         if (!a.daysUntilNext) return 1;
         if (!b.daysUntilNext) return -1;
         return a.daysUntilNext - b.daysUntilNext;
@@ -116,13 +147,28 @@ const DashboardRecipients = () => {
         <div className="space-y-3 sm:space-y-4">
           <div className="space-y-3 sm:space-y-4">
             {displayedRecipients.map((recipient: any) => (
-              <Card key={recipient.id} className="bg-white border-brand-cream hover:shadow-md transition-shadow w-full">
+              <Card 
+                key={recipient.id} 
+                className={`border-brand-cream hover:shadow-md transition-shadow w-full ${
+                  recipient.hasScheduledGifts ? 'bg-gray-50' : 'bg-white'
+                }`}
+              >
                 <CardContent className="p-3 sm:p-4">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <div className="flex-1 min-w-0 w-full sm:w-auto">
                       <div className="flex flex-col space-y-2">
                         <div>
-                          <h3 className="font-medium text-brand-charcoal text-sm sm:text-base truncate">{recipient.name}</h3>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-medium text-brand-charcoal text-sm sm:text-base truncate">
+                              {recipient.name}
+                            </h3>
+                            {recipient.hasScheduledGifts && (
+                              <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">
+                                <Check className="h-3 w-3 mr-1" />
+                                Scheduled
+                              </Badge>
+                            )}
+                          </div>
                           <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 mt-1">
                             {recipient.relationship && (
                               <Badge 
@@ -132,32 +178,51 @@ const DashboardRecipients = () => {
                                 {recipient.relationship}
                               </Badge>
                             )}
-                            {recipient.nextOccasion && (
+                            {recipient.nextScheduledGift ? (
                               <div className="flex items-center text-xs">
                                 <Clock className="h-3 w-3 mr-1 flex-shrink-0 text-brand-charcoal" />
-                                <span className="font-medium text-brand-charcoal">
-                                  {getDaysUntilText(recipient.daysUntilNext, recipient.nextOccasion.type)}
+                                <span className="font-medium text-gray-500">
+                                  Next gift: {formatDate(recipient.nextScheduledGift.occasion_date)}
                                 </span>
                               </div>
-                            )}
-                            {recipient.nextOccasion && (
-                              <div className="flex items-center text-xs text-brand-charcoal/70">
-                                <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
-                                <span>{formatDate(recipient.nextOccasion.date.toISOString())}</span>
-                              </div>
+                            ) : recipient.nextOccasion && (
+                              <>
+                                <div className="flex items-center text-xs">
+                                  <Clock className="h-3 w-3 mr-1 flex-shrink-0 text-brand-charcoal" />
+                                  <span className="font-medium text-brand-charcoal">
+                                    {getDaysUntilText(recipient.daysUntilNext, recipient.nextOccasion.type)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center text-xs text-brand-charcoal/70">
+                                  <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
+                                  <span>{formatDate(recipient.nextOccasion.date.toISOString())}</span>
+                                </div>
+                              </>
                             )}
                           </div>
                         </div>
                       </div>
                     </div>
-                    <Button
-                      size="sm"
-                      className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 w-full sm:w-auto flex-shrink-0"
-                      onClick={() => setSchedulingGift(recipient)}
-                    >
-                      <Gift className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                      <span className="text-xs sm:text-sm">Schedule Gift</span>
-                    </Button>
+                    {recipient.hasScheduledGifts && recipient.nextScheduledGift ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream w-full sm:w-auto flex-shrink-0"
+                        onClick={() => setViewingGift(recipient.nextScheduledGift)}
+                      >
+                        <Gift className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                        <span className="text-xs sm:text-sm">View Gift</span>
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 w-full sm:w-auto flex-shrink-0"
+                        onClick={() => setSchedulingGift(recipient)}
+                      >
+                        <Gift className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                        <span className="text-xs sm:text-sm">Schedule Gift</span>
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -208,6 +273,14 @@ const DashboardRecipients = () => {
           recipient={schedulingGift}
           isOpen={!!schedulingGift}
           onClose={() => setSchedulingGift(null)}
+        />
+      )}
+
+      {viewingGift && (
+        <GiftDetailsModal
+          gift={viewingGift}
+          isOpen={!!viewingGift}
+          onClose={() => setViewingGift(null)}
         />
       )}
 
