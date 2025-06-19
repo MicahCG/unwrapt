@@ -138,7 +138,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px] bg-white border-brand-cream text-brand-charcoal max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[500px] bg-white text-brand-charcoal max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-brand-charcoal">Add New Recipient</DialogTitle>
         </DialogHeader>
@@ -154,17 +154,17 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
                 required
-                className="text-brand-charcoal border-brand-cream"
+                className="text-brand-charcoal"
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="relationship" className="text-brand-charcoal">Relationship *</Label>
               <Select value={formData.relationship} onValueChange={(value) => handleInputChange('relationship', value)}>
-                <SelectTrigger className="text-brand-charcoal border-brand-cream">
+                <SelectTrigger className="text-brand-charcoal">
                   <SelectValue placeholder="Select relationship" />
                 </SelectTrigger>
-                <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
+                <SelectContent className="bg-white text-brand-charcoal">
                   <SelectItem value="mom">Mom</SelectItem>
                   <SelectItem value="dad">Dad</SelectItem>
                   <SelectItem value="partner">Partner/Spouse</SelectItem>
@@ -186,7 +186,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
                 value={formData.email}
                 onChange={(e) => handleInputChange('email', e.target.value)}
                 required
-                className="text-brand-charcoal border-brand-cream"
+                className="text-brand-charcoal"
               />
             </div>
 
@@ -198,7 +198,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
                 placeholder="Enter their phone number"
                 value={formData.phone}
                 onChange={(e) => handleInputChange('phone', e.target.value)}
-                className="text-brand-charcoal border-brand-cream"
+                className="text-brand-charcoal"
               />
             </div>
 
@@ -210,7 +210,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
                   type="date"
                   value={formData.birthday}
                   onChange={(e) => handleInputChange('birthday', e.target.value)}
-                  className="text-brand-charcoal border-brand-cream"
+                  className="text-brand-charcoal"
                 />
               </div>
 
@@ -221,7 +221,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
                   type="date"
                   value={formData.anniversary}
                   onChange={(e) => handleInputChange('anniversary', e.target.value)}
-                  className="text-brand-charcoal border-brand-cream"
+                  className="text-brand-charcoal"
                 />
               </div>
             </div>
@@ -242,7 +242,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
                 value={formData.street}
                 onChange={(e) => handleInputChange('street', e.target.value)}
                 required
-                className="text-brand-charcoal border-brand-cream"
+                className="text-brand-charcoal"
               />
             </div>
 
@@ -255,7 +255,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
                   value={formData.city}
                   onChange={(e) => handleInputChange('city', e.target.value)}
                   required
-                  className="text-brand-charcoal border-brand-cream"
+                  className="text-brand-charcoal"
                 />
               </div>
 
@@ -267,7 +267,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
                   value={formData.state}
                   onChange={(e) => handleInputChange('state', e.target.value)}
                   required
-                  className="text-brand-charcoal border-brand-cream"
+                  className="text-brand-charcoal"
                 />
               </div>
             </div>
@@ -281,17 +281,17 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
                   value={formData.zipCode}
                   onChange={(e) => handleInputChange('zipCode', e.target.value)}
                   required
-                  className="text-brand-charcoal border-brand-cream"
+                  className="text-brand-charcoal"
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="country" className="text-brand-charcoal">Country</Label>
                 <Select value={formData.country} onValueChange={(value) => handleInputChange('country', value)}>
-                  <SelectTrigger className="text-brand-charcoal border-brand-cream">
+                  <SelectTrigger className="text-brand-charcoal">
                     <SelectValue placeholder="Select country" />
                   </SelectTrigger>
-                  <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
+                  <SelectContent className="bg-white text-brand-charcoal">
                     <SelectItem value="United States">United States</SelectItem>
                     <SelectItem value="Canada">Canada</SelectItem>
                     <SelectItem value="United Kingdom">United Kingdom</SelectItem>

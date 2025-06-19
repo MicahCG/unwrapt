@@ -75,7 +75,7 @@ const RecipientSelectionModal: React.FC<RecipientSelectionModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] bg-white border-brand-cream text-brand-charcoal">
+      <DialogContent className="sm:max-w-[600px] bg-white text-brand-charcoal">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2 text-brand-charcoal">
             <Users className="h-5 w-5" />
@@ -91,7 +91,7 @@ const RecipientSelectionModal: React.FC<RecipientSelectionModalProps> = ({
               return (
                 <Card 
                   key={recipient.id} 
-                  className="cursor-pointer hover:shadow-md transition-shadow border-brand-cream"
+                  className="cursor-pointer hover:shadow-md transition-shadow"
                   onClick={() => onRecipientSelected(recipient)}
                 >
                   <CardContent className="p-4">
@@ -104,7 +104,7 @@ const RecipientSelectionModal: React.FC<RecipientSelectionModalProps> = ({
                               {recipient.relationship && (
                                 <Badge 
                                   variant="secondary" 
-                                  className="text-xs bg-brand-cream text-brand-charcoal border-brand-cream"
+                                  className="text-xs bg-brand-cream text-brand-charcoal"
                                 >
                                   {recipient.relationship}
                                 </Badge>
