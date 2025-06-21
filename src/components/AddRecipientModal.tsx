@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -137,7 +138,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px] bg-white text-brand-charcoal max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[500px] bg-white max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New Recipient</DialogTitle>
         </DialogHeader>
@@ -162,7 +163,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
                 <SelectTrigger>
                   <SelectValue placeholder="Select relationship" />
                 </SelectTrigger>
-                <SelectContent className="bg-white text-brand-charcoal">
+                <SelectContent className="bg-white">
                   <SelectItem value="mom">Mom</SelectItem>
                   <SelectItem value="dad">Dad</SelectItem>
                   <SelectItem value="partner">Partner/Spouse</SelectItem>
@@ -223,7 +224,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
 
           {/* Shipping Address Section */}
           <div className="space-y-4 pt-4 border-t">
-            <h3 className="text-lg font-medium text-brand-charcoal flex items-center">
+            <h3 className="text-lg font-medium flex items-center">
               <MapPin className="h-5 w-5 mr-2" />
               Shipping Address *
             </h3>
@@ -281,7 +282,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
                   <SelectTrigger>
                     <SelectValue placeholder="Select country" />
                   </SelectTrigger>
-                  <SelectContent className="bg-white text-brand-charcoal">
+                  <SelectContent className="bg-white">
                     <SelectItem value="United States">United States</SelectItem>
                     <SelectItem value="Canada">Canada</SelectItem>
                     <SelectItem value="United Kingdom">United Kingdom</SelectItem>
@@ -317,3 +318,4 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
 };
 
 export default AddRecipientModal;
+

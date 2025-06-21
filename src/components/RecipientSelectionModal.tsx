@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -74,7 +75,7 @@ const RecipientSelectionModal: React.FC<RecipientSelectionModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] bg-white text-brand-charcoal">
+      <DialogContent className="sm:max-w-[600px] bg-white">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             <Users className="h-5 w-5" />
@@ -98,12 +99,12 @@ const RecipientSelectionModal: React.FC<RecipientSelectionModalProps> = ({
                       <div className="flex-1">
                         <div className="flex items-center space-x-3">
                           <div>
-                            <h3 className="font-medium text-brand-charcoal">{recipient.name}</h3>
+                            <h3 className="font-medium">{recipient.name}</h3>
                             <div className="flex items-center space-x-2 mt-1">
                               {recipient.relationship && (
                                 <Badge 
                                   variant="secondary" 
-                                  className="text-xs bg-brand-cream text-brand-charcoal"
+                                  className="text-xs bg-brand-cream"
                                 >
                                   {recipient.relationship}
                                 </Badge>
@@ -157,3 +158,4 @@ const RecipientSelectionModal: React.FC<RecipientSelectionModalProps> = ({
 };
 
 export default RecipientSelectionModal;
+
