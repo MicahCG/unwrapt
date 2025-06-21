@@ -5,11 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { MapPin } from 'lucide-react';
+import { MapPin, Heart } from 'lucide-react';
 
 interface AddRecipientModalProps {
   isOpen: boolean;
@@ -24,8 +25,6 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
   const [formData, setFormData] = useState({
     name: '',
     relationship: '',
-    email: '',
-    phone: '',
     birthday: '',
     anniversary: '',
     street: '',
@@ -34,10 +33,24 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
     zipCode: '',
     country: 'United States'
   });
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Same interests as in onboarding
+  const predefinedInterests = [
+    'Coffee', 'Tea', 'Wine', 'Sweet Treats', 'Self Care'
+  ];
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const toggleInterest = (interest: string) => {
+    setSelectedInterests(prev => 
+      prev.includes(interest) 
+        ? prev.filter(i => i !== interest)
+        : [...prev, interest]
+    );
   };
 
   const isFormValid = () => {
@@ -64,15 +77,14 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
           user_id: user?.id,
           name: formData.name,
           relationship: formData.relationship,
-          email: formData.email || null,
-          phone: formData.phone || null,
           birthday: formData.birthday || null,
           anniversary: formData.anniversary || null,
           street: formData.street,
           city: formData.city,
           state: formData.state,
           zip_code: formData.zipCode,
-          country: formData.country
+          country: formData.country,
+          interests: selectedInterests.length > 0 ? selectedInterests : null
         });
 
       if (error) {
@@ -91,8 +103,6 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
       setFormData({
         name: '',
         relationship: '',
-        email: '',
-        phone: '',
         birthday: '',
         anniversary: '',
         street: '',
@@ -101,6 +111,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
         zipCode: '',
         country: 'United States'
       });
+      setSelectedInterests([]);
 
       // Refresh recipients list
       queryClient.invalidateQueries({ queryKey: ['recipients'] });
@@ -122,8 +133,6 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
     setFormData({
       name: '',
       relationship: '',
-      email: '',
-      phone: '',
       birthday: '',
       anniversary: '',
       street: '',
@@ -132,6 +141,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
       zipCode: '',
       country: 'United States'
     });
+    setSelectedInterests([]);
     onClose();
   };
 
@@ -175,28 +185,6 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="Enter their email"
-                value={formData.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
-              <Input
-                id="phone"
-                type="tel"
-                placeholder="Enter their phone number"
-                value={formData.phone}
-                onChange={(e) => handleInputChange('phone', e.target.value)}
-              />
-            </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="birthday">Birthday</Label>
@@ -218,6 +206,50 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
                 />
               </div>
             </div>
+          </div>
+
+          {/* Interests Section */}
+          <div className="space-y-4 pt-4 border-t">
+            <h3 className="text-lg font-medium flex items-center">
+              <Heart className="h-5 w-5 mr-2" />
+              Interests
+            </h3>
+            
+            <div>
+              <h4 className="font-medium mb-3 text-brand-charcoal">Select interests:</h4>
+              <div className="flex flex-wrap gap-2">
+                {predefinedInterests.map((interest) => (
+                  <Badge
+                    key={interest}
+                    variant={selectedInterests.includes(interest) ? "default" : "outline"}
+                    className={`cursor-pointer transition-colors ${
+                      selectedInterests.includes(interest)
+                        ? 'bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90'
+                        : 'border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light'
+                    }`}
+                    onClick={() => toggleInterest(interest)}
+                  >
+                    {interest}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            {selectedInterests.length > 0 && (
+              <div className="bg-brand-cream-light p-4 rounded-lg">
+                <h4 className="font-medium mb-2 text-brand-charcoal">Selected interests:</h4>
+                <div className="flex flex-wrap gap-2">
+                  {selectedInterests.map((interest) => (
+                    <Badge
+                      key={interest}
+                      className="bg-brand-charcoal text-brand-cream"
+                    >
+                      {interest}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Shipping Address Section */}
