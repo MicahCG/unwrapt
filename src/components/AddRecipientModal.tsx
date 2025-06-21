@@ -43,7 +43,6 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
   const isFormValid = () => {
     return formData.name && 
            formData.relationship && 
-           formData.email && 
            formData.street && 
            formData.city && 
            formData.state && 
@@ -65,7 +64,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
           user_id: user?.id,
           name: formData.name,
           relationship: formData.relationship,
-          email: formData.email,
+          email: formData.email || null,
           phone: formData.phone || null,
           birthday: formData.birthday || null,
           anniversary: formData.anniversary || null,
@@ -138,7 +137,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px] bg-white max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New Recipient</DialogTitle>
         </DialogHeader>
@@ -163,7 +162,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
                 <SelectTrigger>
                   <SelectValue placeholder="Select relationship" />
                 </SelectTrigger>
-                <SelectContent className="bg-white">
+                <SelectContent>
                   <SelectItem value="mom">Mom</SelectItem>
                   <SelectItem value="dad">Dad</SelectItem>
                   <SelectItem value="partner">Partner/Spouse</SelectItem>
@@ -177,14 +176,13 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email *</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
                 placeholder="Enter their email"
                 value={formData.email}
                 onChange={(e) => handleInputChange('email', e.target.value)}
-                required
               />
             </div>
 
@@ -282,7 +280,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
                   <SelectTrigger>
                     <SelectValue placeholder="Select country" />
                   </SelectTrigger>
-                  <SelectContent className="bg-white">
+                  <SelectContent>
                     <SelectItem value="United States">United States</SelectItem>
                     <SelectItem value="Canada">Canada</SelectItem>
                     <SelectItem value="United Kingdom">United Kingdom</SelectItem>
@@ -299,14 +297,12 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
               variant="outline" 
               onClick={handleClose} 
               disabled={isLoading}
-              className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream"
             >
               Cancel
             </Button>
             <Button 
               type="submit" 
               disabled={isLoading || !isFormValid()} 
-              className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
             >
               {isLoading ? 'Adding...' : 'Add Recipient'}
             </Button>
@@ -318,4 +314,3 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
 };
 
 export default AddRecipientModal;
-
