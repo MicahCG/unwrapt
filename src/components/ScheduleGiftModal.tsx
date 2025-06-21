@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -31,7 +30,6 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     occasion_date: '',
     gift_type: '',
     price_range: '',
-    gift_description: '',
     delivery_date: ''
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -161,7 +159,6 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           occasion_date: formData.occasion_date,
           gift_type: formData.gift_type,
           price_range: formData.price_range,
-          gift_description: formData.gift_description,
           delivery_date: deliveryDate,
           status: 'scheduled',
           payment_status: 'unpaid'
@@ -211,7 +208,6 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           occasion_date: '',
           gift_type: '',
           price_range: '',
-          gift_description: '',
           delivery_date: ''
         });
       }
@@ -374,18 +370,6 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
               </CardContent>
             </Card>
           )}
-
-          <div className="space-y-2">
-            <Label htmlFor="gift_description" className="text-brand-charcoal">Gift Description</Label>
-            <Textarea
-              id="gift_description"
-              value={formData.gift_description}
-              onChange={(e) => setFormData(prev => ({ ...prev, gift_description: e.target.value }))}
-              placeholder="Describe the gift or any specific preferences..."
-              rows={3}
-              className="text-brand-charcoal border-brand-cream"
-            />
-          </div>
 
           <div className="space-y-2">
             <Label htmlFor="delivery_date" className="text-brand-charcoal">Delivery Date (optional)</Label>
