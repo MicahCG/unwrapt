@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -77,7 +76,7 @@ const RecipientSelectionModal: React.FC<RecipientSelectionModalProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px] bg-white text-brand-charcoal">
         <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2 text-brand-charcoal">
+          <DialogTitle className="flex items-center space-x-2">
             <Users className="h-5 w-5" />
             <span>Select a Recipient</span>
           </DialogTitle>

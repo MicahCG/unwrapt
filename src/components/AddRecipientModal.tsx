@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -140,28 +139,27 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[500px] bg-white text-brand-charcoal max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-brand-charcoal">Add New Recipient</DialogTitle>
+          <DialogTitle>Add New Recipient</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Basic Information */}
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-brand-charcoal">Full Name *</Label>
+              <Label htmlFor="name">Full Name *</Label>
               <Input
                 id="name"
                 placeholder="Enter their full name"
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
                 required
-                className="text-brand-charcoal"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="relationship" className="text-brand-charcoal">Relationship *</Label>
+              <Label htmlFor="relationship">Relationship *</Label>
               <Select value={formData.relationship} onValueChange={(value) => handleInputChange('relationship', value)}>
-                <SelectTrigger className="text-brand-charcoal">
+                <SelectTrigger>
                   <SelectValue placeholder="Select relationship" />
                 </SelectTrigger>
                 <SelectContent className="bg-white text-brand-charcoal">
@@ -178,7 +176,7 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-brand-charcoal">Email *</Label>
+              <Label htmlFor="email">Email *</Label>
               <Input
                 id="email"
                 type="email"
@@ -186,42 +184,38 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
                 value={formData.email}
                 onChange={(e) => handleInputChange('email', e.target.value)}
                 required
-                className="text-brand-charcoal"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone" className="text-brand-charcoal">Phone</Label>
+              <Label htmlFor="phone">Phone</Label>
               <Input
                 id="phone"
                 type="tel"
                 placeholder="Enter their phone number"
                 value={formData.phone}
                 onChange={(e) => handleInputChange('phone', e.target.value)}
-                className="text-brand-charcoal"
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="birthday" className="text-brand-charcoal">Birthday</Label>
+                <Label htmlFor="birthday">Birthday</Label>
                 <Input
                   id="birthday"
                   type="date"
                   value={formData.birthday}
                   onChange={(e) => handleInputChange('birthday', e.target.value)}
-                  className="text-brand-charcoal"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="anniversary" className="text-brand-charcoal">Anniversary</Label>
+                <Label htmlFor="anniversary">Anniversary</Label>
                 <Input
                   id="anniversary"
                   type="date"
                   value={formData.anniversary}
                   onChange={(e) => handleInputChange('anniversary', e.target.value)}
-                  className="text-brand-charcoal"
                 />
               </div>
             </div>
@@ -235,60 +229,56 @@ const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ isOpen, onClose }
             </h3>
             
             <div className="space-y-2">
-              <Label htmlFor="street" className="text-brand-charcoal">Street Address *</Label>
+              <Label htmlFor="street">Street Address *</Label>
               <Input
                 id="street"
                 placeholder="Enter street address"
                 value={formData.street}
                 onChange={(e) => handleInputChange('street', e.target.value)}
                 required
-                className="text-brand-charcoal"
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="city" className="text-brand-charcoal">City *</Label>
+                <Label htmlFor="city">City *</Label>
                 <Input
                   id="city"
                   placeholder="Enter city"
                   value={formData.city}
                   onChange={(e) => handleInputChange('city', e.target.value)}
                   required
-                  className="text-brand-charcoal"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="state" className="text-brand-charcoal">State *</Label>
+                <Label htmlFor="state">State *</Label>
                 <Input
                   id="state"
                   placeholder="Enter state"
                   value={formData.state}
                   onChange={(e) => handleInputChange('state', e.target.value)}
                   required
-                  className="text-brand-charcoal"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="zipCode" className="text-brand-charcoal">ZIP Code *</Label>
+                <Label htmlFor="zipCode">ZIP Code *</Label>
                 <Input
                   id="zipCode"
                   placeholder="Enter ZIP code"
                   value={formData.zipCode}
                   onChange={(e) => handleInputChange('zipCode', e.target.value)}
                   required
-                  className="text-brand-charcoal"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="country" className="text-brand-charcoal">Country</Label>
+                <Label htmlFor="country">Country</Label>
                 <Select value={formData.country} onValueChange={(value) => handleInputChange('country', value)}>
-                  <SelectTrigger className="text-brand-charcoal">
+                  <SelectTrigger>
                     <SelectValue placeholder="Select country" />
                   </SelectTrigger>
                   <SelectContent className="bg-white text-brand-charcoal">
