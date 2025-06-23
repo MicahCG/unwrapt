@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ const DashboardRecipients = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [selectedRecipient, setSelectedRecipient] = useState(null);
+  const [schedulingGift, setSchedulingGift] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAllRecipients, setShowAllRecipients] = useState(false);
   const [viewingGift, setViewingGift] = useState(null);
