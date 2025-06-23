@@ -1,13 +1,15 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useShopifyProductTypes } from '@/hooks/useShopifyProductTypes';
+import { Package, Calendar, DollarSign } from 'lucide-react';
 
 interface EditGiftModalProps {
   gift: any;
@@ -22,11 +24,25 @@ const EditGiftModal: React.FC<EditGiftModalProps> = ({ gift, isOpen, onClose }) 
     occasion: gift?.occasion || '',
     occasion_date: gift?.occasion_date || '',
     gift_type: gift?.gift_type || '',
-    price_range: gift?.price_range || '',
-    gift_description: gift?.gift_description || '',
-    delivery_date: gift?.delivery_date || ''
+    price_range: gift?.price_range || ''
   });
   const [isLoading, setIsLoading] = useState(false);
+
+  // Gift preview helper functions
+  const getGiftImage = (giftType: string) => {
+    const imageMap = {
+      'wine': 'https://images.unsplash.com/photo-1482938289607-e9573fc25ebb?w=400&h=300&fit=crop',
+      'tea': 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=400&h=300&fit=crop',
+      'coffee': 'https://images.unsplash.com/photo-1581090464777-f3220bbe1b8b?w=400&h=300&fit=crop',
+      'sweet treats': 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=400&h=300&fit=crop',
+      'self care': 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?w=400&h=300&fit=crop'
+    };
+    return imageMap[giftType.toLowerCase()] || 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop';
+  };
+
+  const getGiftDescription = (giftType: string, recipientName: string) => {
+    return `We'll curate premium ${giftType.toLowerCase()} perfect for ${recipientName}'s interests`;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,8 +56,6 @@ const EditGiftModal: React.FC<EditGiftModalProps> = ({ gift, isOpen, onClose }) 
           occasion_date: formData.occasion_date,
           gift_type: formData.gift_type,
           price_range: formData.price_range,
-          gift_description: formData.gift_description,
-          delivery_date: formData.delivery_date || null,
           updated_at: new Date().toISOString()
         })
         .eq('id', gift.id);
@@ -58,24 +72,73 @@ const EditGiftModal: React.FC<EditGiftModalProps> = ({ gift, isOpen, onClose }) 
     }
   };
 
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
   // Get product types from Shopify or use fallback
   const productTypes = productTypesData?.productTypes || [];
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] bg-white border-brand-cream text-brand-charcoal">
+      <DialogContent className="sm:max-w-[500px] bg-white border-brand-cream text-brand-charcoal max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-brand-charcoal">Edit Gift for {gift.recipients?.name}</DialogTitle>
+          <DialogTitle className="text-brand-charcoal text-xl">Edit Gift for {gift.recipients?.name}</DialogTitle>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Gift Preview Section - Made more prominent */}
+        {formData.gift_type && (
+          <Card className="bg-gradient-to-br from-brand-cream/20 to-brand-cream/40 border-brand-cream mb-6">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-2 mb-4">
+                <Package className="h-5 w-5 text-brand-charcoal" />
+                <span className="font-semibold text-brand-charcoal">Your Scheduled Gift</span>
+              </div>
+              <div className="flex space-x-4">
+                <img
+                  src={getGiftImage(formData.gift_type)}
+                  alt={`${formData.gift_type} gift`}
+                  className="w-24 h-24 object-cover rounded-lg shadow-sm"
+                />
+                <div className="flex-1">
+                  <h3 className="text-lg font-medium text-brand-charcoal mb-2">
+                    {formData.gift_type}
+                  </h3>
+                  <p className="text-sm text-brand-charcoal/70 mb-3">
+                    {getGiftDescription(formData.gift_type, gift.recipients?.name)}
+                  </p>
+                  
+                  <div className="flex flex-wrap gap-3 text-sm">
+                    <div className="flex items-center text-brand-charcoal/80">
+                      <Calendar className="h-4 w-4 mr-1" />
+                      {formatDate(formData.occasion_date)}
+                    </div>
+                    {formData.price_range && (
+                      <div className="flex items-center text-brand-gold font-medium">
+                        <DollarSign className="h-4 w-4 mr-1" />
+                        {formData.price_range}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="occasion" className="text-brand-charcoal">Occasion *</Label>
+            <Label htmlFor="occasion" className="text-brand-charcoal font-medium">Occasion</Label>
             <Select 
               value={formData.occasion} 
               onValueChange={(value) => setFormData(prev => ({ ...prev, occasion: value }))}
             >
-              <SelectTrigger className="text-brand-charcoal border-brand-cream">
+              <SelectTrigger className="text-brand-charcoal border-brand-cream h-11">
                 <SelectValue placeholder="Select occasion" />
               </SelectTrigger>
               <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
@@ -92,25 +155,25 @@ const EditGiftModal: React.FC<EditGiftModalProps> = ({ gift, isOpen, onClose }) 
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="occasion_date" className="text-brand-charcoal">Occasion Date *</Label>
+            <Label htmlFor="occasion_date" className="text-brand-charcoal font-medium">Occasion Date</Label>
             <Input
               id="occasion_date"
               type="date"
               value={formData.occasion_date}
               onChange={(e) => setFormData(prev => ({ ...prev, occasion_date: e.target.value }))}
               required
-              className="text-brand-charcoal border-brand-cream"
+              className="text-brand-charcoal border-brand-cream h-11"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="gift_type" className="text-brand-charcoal">Gift Type</Label>
+            <Label htmlFor="gift_type" className="text-brand-charcoal font-medium">Gift Type</Label>
             <Select 
               value={formData.gift_type} 
               onValueChange={(value) => setFormData(prev => ({ ...prev, gift_type: value }))}
               disabled={isLoadingProductTypes}
             >
-              <SelectTrigger className="text-brand-charcoal border-brand-cream">
+              <SelectTrigger className="text-brand-charcoal border-brand-cream h-11">
                 <SelectValue placeholder={isLoadingProductTypes ? "Loading gift types..." : "Select gift type"} />
               </SelectTrigger>
               <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
@@ -132,12 +195,12 @@ const EditGiftModal: React.FC<EditGiftModalProps> = ({ gift, isOpen, onClose }) 
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="price_range" className="text-brand-charcoal">Price Range</Label>
+            <Label htmlFor="price_range" className="text-brand-charcoal font-medium">Price Range</Label>
             <Select 
               value={formData.price_range} 
               onValueChange={(value) => setFormData(prev => ({ ...prev, price_range: value }))}
             >
-              <SelectTrigger className="text-brand-charcoal border-brand-cream">
+              <SelectTrigger className="text-brand-charcoal border-brand-cream h-11">
                 <SelectValue placeholder="Select price range" />
               </SelectTrigger>
               <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
@@ -151,43 +214,27 @@ const EditGiftModal: React.FC<EditGiftModalProps> = ({ gift, isOpen, onClose }) 
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="gift_description" className="text-brand-charcoal">Gift Description</Label>
-            <Textarea
-              id="gift_description"
-              value={formData.gift_description}
-              onChange={(e) => setFormData(prev => ({ ...prev, gift_description: e.target.value }))}
-              placeholder="Describe the gift or any specific preferences..."
-              rows={3}
-              className="text-brand-charcoal border-brand-cream"
-            />
+          {/* Delivery Info */}
+          <div className="bg-brand-cream/50 p-4 rounded-lg border border-brand-cream">
+            <p className="text-sm text-brand-charcoal/80">
+              📦 Deliveries are sent 3 days before occasion
+            </p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="delivery_date" className="text-brand-charcoal">Delivery Date</Label>
-            <Input
-              id="delivery_date"
-              type="date"
-              value={formData.delivery_date}
-              onChange={(e) => setFormData(prev => ({ ...prev, delivery_date: e.target.value }))}
-              className="text-brand-charcoal border-brand-cream"
-            />
-          </div>
-
-          <div className="flex justify-end space-x-2 pt-4">
+          <div className="flex justify-end space-x-3 pt-6">
             <Button 
               type="button" 
               variant="outline" 
               onClick={onClose} 
               disabled={isLoading}
-              className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream"
+              className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream px-6"
             >
               Cancel
             </Button>
             <Button 
               type="submit" 
               disabled={isLoading} 
-              className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+              className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 px-6"
             >
               {isLoading ? 'Saving...' : 'Save Changes'}
             </Button>
