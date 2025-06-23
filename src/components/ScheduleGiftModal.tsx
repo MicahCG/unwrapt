@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -259,9 +258,6 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   // Get product types from Shopify or use fallback
   const productTypes = productTypesData?.productTypes || [];
 
-  // Show gift preview if gift type is selected
-  const showGiftPreview = formData.gift_type;
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px] bg-white border-brand-cream text-brand-charcoal max-h-[90vh] overflow-y-auto">
@@ -331,6 +327,60 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
               </p>
             )}
           </div>
+
+          {/* Gift Preview Section - Moved right after gift type */}
+          {formData.gift_type && (
+            <Card className="bg-brand-cream/30 border-brand-cream">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2 mb-3">
+                  <Package className="h-4 w-4 text-brand-charcoal" />
+                  <span className="font-medium text-sm text-brand-charcoal">Gift Preview</span>
+                </div>
+                <div className="flex space-x-3">
+                  <img
+                    src={getGiftImage(formData.gift_type)}
+                    alt={`${formData.gift_type} gift`}
+                    className="w-20 h-20 object-cover rounded-lg"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm text-brand-charcoal font-medium mb-1">
+                      {formData.gift_type}
+                    </p>
+                    <p className="text-xs text-brand-charcoal/70">
+                      {getGiftDescription(formData.gift_type, recipient.name)}
+                    </p>
+                    {formData.price_range && (
+                      <p className="text-xs text-brand-gold font-medium mt-1">
+                        Price Range: {formData.price_range}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Note Preview Section - Moved right after gift preview */}
+          {formData.gift_type && (
+            <Card className="bg-gradient-to-br from-brand-cream/20 to-brand-cream/40 border-brand-cream">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2 mb-3">
+                  <Heart className="h-4 w-4 text-brand-charcoal" />
+                  <span className="font-medium text-sm text-brand-charcoal">Note Preview</span>
+                </div>
+                <div className="bg-white p-3 rounded border border-brand-cream/50 shadow-sm">
+                  <p className="text-sm text-brand-charcoal mb-3 leading-relaxed">
+                    {getSenderName()} was thinking about you on your special day and decided to send you some {formData.gift_type.toLowerCase()}. We hope you enjoy!
+                  </p>
+                  <div className="border-t pt-2 mt-2">
+                    <p className="text-xs text-brand-charcoal/60 italic">
+                      This gift was curated and sent through Unwrapt - Making thoughtfulness effortless ✨ unwrapt.io
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="price_range" className="text-brand-charcoal">Price Range *</Label>
@@ -427,60 +477,6 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
               </div>
             </div>
           </div>
-
-          {/* Gift Preview Section */}
-          {showGiftPreview && (
-            <Card className="bg-brand-cream/30 border-brand-cream">
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2 mb-3">
-                  <Package className="h-4 w-4 text-brand-charcoal" />
-                  <span className="font-medium text-sm text-brand-charcoal">Gift Preview</span>
-                </div>
-                <div className="flex space-x-3">
-                  <img
-                    src={getGiftImage(formData.gift_type)}
-                    alt={`${formData.gift_type} gift`}
-                    className="w-20 h-20 object-cover rounded-lg"
-                  />
-                  <div className="flex-1">
-                    <p className="text-sm text-brand-charcoal font-medium mb-1">
-                      {formData.gift_type}
-                    </p>
-                    <p className="text-xs text-brand-charcoal/70">
-                      {getGiftDescription(formData.gift_type, recipient.name)}
-                    </p>
-                    {formData.price_range && (
-                      <p className="text-xs text-brand-gold font-medium mt-1">
-                        Price Range: {formData.price_range}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Note Preview Section */}
-          {formData.gift_type && (
-            <Card className="bg-gradient-to-br from-brand-cream/20 to-brand-cream/40 border-brand-cream">
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2 mb-3">
-                  <Heart className="h-4 w-4 text-brand-charcoal" />
-                  <span className="font-medium text-sm text-brand-charcoal">Note Preview</span>
-                </div>
-                <div className="bg-white p-3 rounded border border-brand-cream/50 shadow-sm">
-                  <p className="text-sm text-brand-charcoal mb-3 leading-relaxed">
-                    {getSenderName()} was thinking about you on your special day and decided to send you some {formData.gift_type.toLowerCase()}. We hope you enjoy!
-                  </p>
-                  <div className="border-t pt-2 mt-2">
-                    <p className="text-xs text-brand-charcoal/60 italic">
-                      This gift was curated and sent through Unwrapt - Making thoughtfulness effortless ✨ unwrapt.io
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Delivery Info */}
           <div className="bg-brand-cream/50 p-3 rounded-lg border border-brand-cream">
