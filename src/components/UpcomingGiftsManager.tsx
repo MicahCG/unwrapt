@@ -1,10 +1,11 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
-import { Edit, Trash2, Calendar, DollarSign, TestTube2, Plus } from 'lucide-react';
+import { Edit, Calendar, DollarSign, TestTube2, Plus } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import EditGiftModal from './EditGiftModal';
 import GiftDetailsModal from './GiftDetailsModal';
@@ -126,14 +127,6 @@ const UpcomingGiftsManager = () => {
                     >
                       <Edit className="h-3 w-3" />
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleDeleteGift(gift.id)}
-                      className="text-red-600 hover:text-red-700 h-8 w-8 p-0"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
                   </div>
                 </div>
               </CardHeader>
@@ -207,6 +200,7 @@ const UpcomingGiftsManager = () => {
           gift={editingGift}
           isOpen={!!editingGift}
           onClose={() => setEditingGift(null)}
+          onDelete={handleDeleteGift}
         />
       )}
 

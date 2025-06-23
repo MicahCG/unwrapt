@@ -9,15 +9,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useShopifyProductTypes } from '@/hooks/useShopifyProductTypes';
-import { Package, Calendar, DollarSign } from 'lucide-react';
+import { Package, Calendar, DollarSign, Trash2 } from 'lucide-react';
 
 interface EditGiftModalProps {
   gift: any;
   isOpen: boolean;
   onClose: () => void;
+  onDelete: (giftId: string) => void;
 }
 
-const EditGiftModal: React.FC<EditGiftModalProps> = ({ gift, isOpen, onClose }) => {
+const EditGiftModal: React.FC<EditGiftModalProps> = ({ gift, isOpen, onClose, onDelete }) => {
   const queryClient = useQueryClient();
   const { data: productTypesData, isLoading: isLoadingProductTypes } = useShopifyProductTypes();
   const [formData, setFormData] = useState({
@@ -27,6 +28,7 @@ const EditGiftModal: React.FC<EditGiftModalProps> = ({ gift, isOpen, onClose }) 
     price_range: gift?.price_range || ''
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Gift preview helper functions
   const getGiftImage = (giftType: string) => {
@@ -69,6 +71,18 @@ const EditGiftModal: React.FC<EditGiftModalProps> = ({ gift, isOpen, onClose }) 
       console.error('Error updating gift:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await onDelete(gift.id);
+      onClose();
+    } catch (error) {
+      console.error('Error deleting gift:', error);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -221,23 +235,36 @@ const EditGiftModal: React.FC<EditGiftModalProps> = ({ gift, isOpen, onClose }) 
             </p>
           </div>
 
-          <div className="flex justify-end space-x-3 pt-6">
+          <div className="flex justify-between items-center space-x-3 pt-6">
             <Button 
               type="button" 
               variant="outline" 
-              onClick={onClose} 
-              disabled={isLoading}
-              className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream px-6"
+              onClick={handleDelete}
+              disabled={isDeleting || isLoading}
+              className="border-red-500 text-red-600 hover:bg-red-50 px-4"
             >
-              Cancel
+              <Trash2 className="h-4 w-4 mr-2" />
+              {isDeleting ? 'Deleting...' : 'Delete Gift'}
             </Button>
-            <Button 
-              type="submit" 
-              disabled={isLoading} 
-              className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 px-6"
-            >
-              {isLoading ? 'Saving...' : 'Save Changes'}
-            </Button>
+            
+            <div className="flex space-x-2">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={onClose} 
+                disabled={isLoading || isDeleting}
+                className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream px-6"
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={isLoading || isDeleting} 
+                className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 px-6"
+              >
+                {isLoading ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
           </div>
         </form>
       </DialogContent>
