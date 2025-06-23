@@ -78,6 +78,23 @@ const RecipientsList = () => {
     }
   };
 
+  const handleDeleteGift = async (giftId: string) => {
+    try {
+      const { error } = await supabase
+        .from('scheduled_gifts')
+        .delete()
+        .eq('id', giftId);
+
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['recipients'] });
+      queryClient.invalidateQueries({ queryKey: ['upcoming-gifts'] });
+      queryClient.invalidateQueries({ queryKey: ['user-metrics'] });
+    } catch (error) {
+      console.error('Error deleting gift:', error);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -301,6 +318,7 @@ const RecipientsList = () => {
           gift={viewingGift}
           isOpen={!!viewingGift}
           onClose={() => setViewingGift(null)}
+          onDelete={handleDeleteGift}
         />
       )}
 
