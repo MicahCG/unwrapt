@@ -25,7 +25,12 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
   const [recipientData, setRecipientData] = useState({
     fullName: '',
     relationship: '',
-    birthday: ''
+    birthday: '',
+    street: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    country: 'United States'
   });
 
   const [isValid, setIsValid] = useState(false);
@@ -49,9 +54,10 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
   };
 
   const validateForm = (data: typeof recipientData) => {
-    // Basic validation: always require name and relationship
+    // Basic validation: require name, relationship, and address fields
     const hasBasicInfo = Boolean(data.fullName && data.relationship);
-    setIsValid(hasBasicInfo);
+    const hasAddress = Boolean(data.street && data.city && data.state && data.zipCode);
+    setIsValid(hasBasicInfo && hasAddress);
   };
 
   const handleContinue = () => {
@@ -80,7 +86,7 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
 
   const getSubHeaderText = () => {
     if (selectedPersonForGift) {
-      return `We'll handle their shipping address during checkout`;
+      return `We'll need their shipping address for delivery`;
     }
     if (isManualEntry) {
       return "Tell us about the person you'd like to send a gift to";
@@ -157,11 +163,85 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
             />
           </div>
 
+          {/* Shipping Address Section */}
+          <div className="space-y-4 pt-4 border-t">
+            <div>
+              <h4 className="font-medium text-brand-charcoal mb-2">Shipping Address *</h4>
+              <p className="text-sm text-brand-charcoal/60 mb-4">
+                This address will be used for gift delivery
+              </p>
+            </div>
+
+            {/* Street Address */}
+            <div className="space-y-2">
+              <Label htmlFor="street">Street Address *</Label>
+              <Input
+                id="street"
+                placeholder="123 Main Street"
+                value={recipientData.street}
+                onChange={(e) => handleInputChange('street', e.target.value)}
+                required
+              />
+            </div>
+
+            {/* City and State */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="city">City *</Label>
+                <Input
+                  id="city"
+                  placeholder="City"
+                  value={recipientData.city}
+                  onChange={(e) => handleInputChange('city', e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="state">State *</Label>
+                <Input
+                  id="state"
+                  placeholder="State"
+                  value={recipientData.state}
+                  onChange={(e) => handleInputChange('state', e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            {/* ZIP Code and Country */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="zipCode">ZIP Code *</Label>
+                <Input
+                  id="zipCode"
+                  placeholder="12345"
+                  value={recipientData.zipCode}
+                  onChange={(e) => handleInputChange('zipCode', e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="country">Country *</Label>
+                <Select value={recipientData.country} onValueChange={(value) => handleInputChange('country', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="United States">United States</SelectItem>
+                    <SelectItem value="Canada">Canada</SelectItem>
+                    <SelectItem value="United Kingdom">United Kingdom</SelectItem>
+                    <SelectItem value="Australia">Australia</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
           {/* Manual entry mode note */}
           {isManualEntry && (
             <div className="bg-brand-cream/30 p-4 rounded-lg">
               <p className="text-sm text-brand-charcoal/70">
-                You can add more details like contact info and address later in your dashboard.
+                You can add more details like contact info later in your dashboard.
               </p>
             </div>
           )}

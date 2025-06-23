@@ -250,8 +250,8 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
     });
   };
 
-  // Show gift preview if both gift type and price range are selected
-  const showGiftPreview = giftType && priceRange;
+  // Show gift preview if gift type is selected
+  const showGiftPreview = giftType;
 
   return (
     <Card className="animate-fadeInUp">
@@ -426,6 +426,13 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
             </CardContent>
           </Card>
         )}
+
+        {/* Delivery Info */}
+        <div className="bg-brand-cream/50 p-3 rounded-lg border border-brand-cream">
+          <p className="text-sm text-brand-charcoal/80">
+            📦 Deliveries are sent 3 days before occasion
+          </p>
+        </div>
 
         {/* Payment Info */}
         {isValid && (

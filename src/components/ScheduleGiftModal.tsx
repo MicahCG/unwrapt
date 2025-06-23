@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { CreditCard, Package, Heart } from 'lucide-react';
+import { CreditCard, Package, Heart, MapPin } from 'lucide-react';
 import { useShopifyProductTypes } from '@/hooks/useShopifyProductTypes';
 
 interface ScheduleGiftModalProps {
@@ -30,7 +30,12 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     occasion_date: '',
     gift_type: '',
     price_range: '',
-    delivery_date: ''
+    // Address fields
+    street: '',
+    city: '',
+    state: '',
+    zip_code: '',
+    country: 'United States'
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -50,18 +55,6 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
       };
     }
     
-    if (recipient.anniversary) {
-      const anniversary = new Date(recipient.anniversary);
-      const thisYearAnniversary = new Date(currentYear, anniversary.getMonth(), anniversary.getDate());
-      if (thisYearAnniversary < today) {
-        thisYearAnniversary.setFullYear(currentYear + 1);
-      }
-      return {
-        occasion: 'Anniversary',
-        date: thisYearAnniversary.toISOString().split('T')[0]
-      };
-    }
-    
     return { occasion: '', date: '' };
   };
 
@@ -69,13 +62,28 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     if (isOpen) {
       // Check if this is a holiday preset
       if (recipient._holidayPreset) {
-        setFormData(recipient._holidayPreset);
+        setFormData(prev => ({
+          ...prev,
+          ...recipient._holidayPreset
+        }));
       } else {
         const defaultOccasion = getDefaultOccasionDate();
         setFormData(prev => ({
           ...prev,
           occasion: defaultOccasion.occasion,
           occasion_date: defaultOccasion.date
+        }));
+      }
+
+      // Auto-populate address if recipient has one
+      if (recipient.street || recipient.city || recipient.state || recipient.zip_code) {
+        setFormData(prev => ({
+          ...prev,
+          street: recipient.street || '',
+          city: recipient.city || '',
+          state: recipient.state || '',
+          zip_code: recipient.zip_code || '',
+          country: recipient.country || 'United States'
         }));
       }
     }
@@ -140,14 +148,26 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     }
   };
 
+  const isFormValid = () => {
+    return formData.occasion && 
+           formData.occasion_date && 
+           formData.gift_type && 
+           formData.price_range &&
+           formData.street &&
+           formData.city &&
+           formData.state &&
+           formData.zip_code;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isFormValid()) return;
+    
     setIsLoading(true);
 
     try {
-      const deliveryDate = formData.delivery_date || 
-        new Date(new Date(formData.occasion_date).getTime() - 3 * 24 * 60 * 60 * 1000)
-          .toISOString().split('T')[0];
+      const deliveryDate = new Date(new Date(formData.occasion_date).getTime() - 3 * 24 * 60 * 60 * 1000)
+        .toISOString().split('T')[0];
 
       // First create the scheduled gift
       const { data: giftData, error: giftError } = await supabase
@@ -180,6 +200,15 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             occasion: formData.occasion,
             giftType: formData.gift_type,
             priceRange: formData.price_range
+          },
+          shippingAddress: {
+            first_name: recipient.name.split(' ')[0] || recipient.name,
+            last_name: recipient.name.split(' ').slice(1).join(' ') || '',
+            address1: formData.street,
+            city: formData.city,
+            province: formData.state,
+            country: formData.country,
+            zip: formData.zip_code
           }
         }
       });
@@ -208,7 +237,11 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           occasion_date: '',
           gift_type: '',
           price_range: '',
-          delivery_date: ''
+          street: '',
+          city: '',
+          state: '',
+          zip_code: '',
+          country: 'United States'
         });
       }
     } catch (error) {
@@ -226,8 +259,8 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   // Get product types from Shopify or use fallback
   const productTypes = productTypesData?.productTypes || [];
 
-  // Show gift preview if both gift type and price range are selected
-  const showGiftPreview = formData.gift_type && formData.price_range;
+  // Show gift preview if gift type is selected
+  const showGiftPreview = formData.gift_type;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -272,7 +305,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="gift_type" className="text-brand-charcoal">Gift Type</Label>
+            <Label htmlFor="gift_type" className="text-brand-charcoal">Gift Type *</Label>
             <Select 
               value={formData.gift_type} 
               onValueChange={(value) => setFormData(prev => ({ ...prev, gift_type: value }))}
@@ -319,6 +352,82 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             </Select>
           </div>
 
+          {/* Shipping Address Section */}
+          <div className="space-y-4 pt-4 border-t">
+            <div className="flex items-center space-x-2 mb-3">
+              <MapPin className="h-4 w-4 text-brand-charcoal" />
+              <span className="font-medium text-sm text-brand-charcoal">Shipping Address *</span>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="street" className="text-brand-charcoal">Street Address *</Label>
+              <Input
+                id="street"
+                placeholder="123 Main Street"
+                value={formData.street}
+                onChange={(e) => setFormData(prev => ({ ...prev, street: e.target.value }))}
+                required
+                className="text-brand-charcoal border-brand-cream"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="city" className="text-brand-charcoal">City *</Label>
+                <Input
+                  id="city"
+                  placeholder="City"
+                  value={formData.city}
+                  onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                  required
+                  className="text-brand-charcoal border-brand-cream"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="state" className="text-brand-charcoal">State *</Label>
+                <Input
+                  id="state"
+                  placeholder="State"
+                  value={formData.state}
+                  onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
+                  required
+                  className="text-brand-charcoal border-brand-cream"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="zip_code" className="text-brand-charcoal">ZIP Code *</Label>
+                <Input
+                  id="zip_code"
+                  placeholder="12345"
+                  value={formData.zip_code}
+                  onChange={(e) => setFormData(prev => ({ ...prev, zip_code: e.target.value }))}
+                  required
+                  className="text-brand-charcoal border-brand-cream"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="country" className="text-brand-charcoal">Country *</Label>
+                <Select 
+                  value={formData.country} 
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, country: value }))}
+                >
+                  <SelectTrigger className="text-brand-charcoal border-brand-cream">
+                    <SelectValue placeholder="Select country" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
+                    <SelectItem value="United States">United States</SelectItem>
+                    <SelectItem value="Canada">Canada</SelectItem>
+                    <SelectItem value="United Kingdom">United Kingdom</SelectItem>
+                    <SelectItem value="Australia">Australia</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
           {/* Gift Preview Section */}
           {showGiftPreview && (
             <Card className="bg-brand-cream/30 border-brand-cream">
@@ -340,9 +449,11 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
                     <p className="text-xs text-brand-charcoal/70">
                       {getGiftDescription(formData.gift_type, recipient.name)}
                     </p>
-                    <p className="text-xs text-brand-gold font-medium mt-1">
-                      Price Range: {formData.price_range}
-                    </p>
+                    {formData.price_range && (
+                      <p className="text-xs text-brand-gold font-medium mt-1">
+                        Price Range: {formData.price_range}
+                      </p>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -371,17 +482,10 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             </Card>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="delivery_date" className="text-brand-charcoal">Delivery Date (optional)</Label>
-            <Input
-              id="delivery_date"
-              type="date"
-              value={formData.delivery_date}
-              onChange={(e) => setFormData(prev => ({ ...prev, delivery_date: e.target.value }))}
-              className="text-brand-charcoal border-brand-cream"
-            />
-            <p className="text-xs text-brand-charcoal/70">
-              Leave empty to auto-schedule 3 days before occasion
+          {/* Delivery Info */}
+          <div className="bg-brand-cream/50 p-3 rounded-lg border border-brand-cream">
+            <p className="text-sm text-brand-charcoal/80">
+              📦 Deliveries are sent 3 days before occasion
             </p>
           </div>
 
@@ -410,7 +514,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             </Button>
             <Button 
               type="submit" 
-              disabled={isLoading} 
+              disabled={isLoading || !isFormValid()} 
               className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
             >
               {isLoading ? 'Processing...' : 'Schedule & Pay for Gift'}
