@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,10 +11,12 @@ import ScheduleGiftModal from './ScheduleGiftModal';
 import AddRecipientModal from './AddRecipientModal';
 import CalendarSyncButton from './CalendarSyncButton';
 import GiftDetailsModal from './GiftDetailsModal';
+import { useQueryClient } from '@tanstack/react-query';
 
 const DashboardRecipients = () => {
   const { user } = useAuth();
-  const [schedulingGift, setSchedulingGift] = useState(null);
+  const queryClient = useQueryClient();
+  const [selectedRecipient, setSelectedRecipient] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAllRecipients, setShowAllRecipients] = useState(false);
   const [viewingGift, setViewingGift] = useState(null);
@@ -166,6 +167,22 @@ const DashboardRecipients = () => {
   // Determine which recipients to show based on state
   const displayedRecipients = recipients ? (showAllRecipients ? recipients : recipients.slice(0, 5)) : [];
   const hasMoreThanFive = recipients && recipients.length > 5;
+
+  const handleDeleteGift = async (giftId: string) => {
+    try {
+      const { error } = await supabase
+        .from('scheduled_gifts')
+        .delete()
+        .eq('id', giftId);
+
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['upcoming-gifts'] });
+      queryClient.invalidateQueries({ queryKey: ['user-metrics'] });
+    } catch (error) {
+      console.error('Error deleting gift:', error);
+    }
+  };
 
   return (
     <div className="space-y-4 sm:space-y-6 w-full">
@@ -359,6 +376,7 @@ const DashboardRecipients = () => {
           gift={viewingGift}
           isOpen={!!viewingGift}
           onClose={() => setViewingGift(null)}
+          onDelete={handleDeleteGift}
         />
       )}
 

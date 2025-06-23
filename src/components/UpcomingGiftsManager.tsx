@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -144,38 +143,9 @@ const UpcomingGiftsManager = () => {
                   </div>
                 </div>
 
-                {gift.recipients?.interests && gift.recipients.interests.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {gift.recipients.interests.slice(0, 3).map((interest: string, index: number) => (
-                      <Badge key={index} variant="outline" className="text-xs bg-brand-cream/50">
-                        {interest}
-                      </Badge>
-                    ))}
-                    {gift.recipients.interests.length > 3 && (
-                      <Badge variant="outline" className="text-xs bg-brand-cream/50">
-                        +{gift.recipients.interests.length - 3}
-                      </Badge>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-2">
-                  <div className="flex items-center text-xs sm:text-sm text-brand-charcoal/70">
-                    <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                    {formatDate(gift.occasion_date)}
-                  </div>
-                  {gift.price_range && (
-                    <div className="flex items-center text-xs sm:text-sm text-brand-gold font-medium">
-                      <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                      {gift.price_range}
-                    </div>
-                  )}
-                </div>
-
-                <div className="text-center pt-2">
-                  <div className="text-xs text-brand-charcoal/60 bg-brand-cream/50 px-3 py-2 rounded-full inline-block">
-                    🎁 Click to view details
-                  </div>
+                <div className="flex items-center text-xs sm:text-sm text-brand-charcoal/70">
+                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                  {formatDate(gift.occasion_date)}
                 </div>
               </CardContent>
             </Card>
