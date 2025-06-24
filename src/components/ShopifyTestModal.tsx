@@ -27,7 +27,7 @@ const ShopifyTestModal: React.FC<ShopifyTestModalProps> = ({ gift, isOpen, onClo
     
     if (!gift.recipients?.name) errors.push('Recipient name is missing');
     
-    // Updated validation to check individual address columns instead of JSONB
+    // Check individual address columns instead of JSONB
     if (!gift.recipients?.street) errors.push('Recipient street address is missing');
     if (!gift.recipients?.city) errors.push('Recipient city is missing');
     if (!gift.recipients?.state) errors.push('Recipient state is missing');
@@ -121,6 +121,7 @@ const ShopifyTestModal: React.FC<ShopifyTestModalProps> = ({ gift, isOpen, onClo
   };
 
   const validationErrors = validateGiftData();
+  const canTest = validationErrors.length === 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -209,12 +210,15 @@ const ShopifyTestModal: React.FC<ShopifyTestModalProps> = ({ gift, isOpen, onClo
               </p>
               <Button
                 onClick={() => handleTestIntegration(true)}
-                disabled={isTestingDry || validationErrors.length > 0}
-                className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+                disabled={isTestingDry || !canTest}
+                className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 disabled:opacity-50"
               >
                 {isTestingDry ? 'Testing...' : 'Run Dry Test'}
                 <TestTube2 className="h-4 w-4 ml-2" />
               </Button>
+              {!canTest && (
+                <p className="text-xs text-red-600">Fix validation issues above to enable testing</p>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -224,12 +228,15 @@ const ShopifyTestModal: React.FC<ShopifyTestModalProps> = ({ gift, isOpen, onClo
               </p>
               <Button
                 onClick={() => handleTestIntegration(false)}
-                disabled={isTestingLive || validationErrors.length > 0}
-                className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+                disabled={isTestingLive || !canTest}
+                className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 disabled:opacity-50"
               >
                 {isTestingLive ? 'Creating Order...' : 'Create Live Order'}
                 <ShoppingCart className="h-4 w-4 ml-2" />
               </Button>
+              {!canTest && (
+                <p className="text-xs text-red-600">Fix validation issues above to enable testing</p>
+              )}
             </div>
           </div>
 
