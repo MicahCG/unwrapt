@@ -63,7 +63,7 @@ const PaymentSuccess = () => {
   if (isVerifying) {
     return (
       <>
-        <ConfettiAnimation isActive={showConfetti} duration={3000} />
+        <ConfettiAnimation isActive={showConfetti} duration={5000} startDelay={0} />
         <div className="min-h-screen bg-brand-cream flex items-center justify-center">
           <Card className="w-full max-w-md">
             <CardContent className="pt-6">
@@ -80,8 +80,8 @@ const PaymentSuccess = () => {
 
   return (
     <>
-      <ConfettiAnimation isActive={showConfetti} duration={3000} />
-      <ConfettiAnimation isActive={showVerificationConfetti} duration={4000} />
+      <ConfettiAnimation isActive={showConfetti} duration={5000} startDelay={0} />
+      <ConfettiAnimation isActive={showVerificationConfetti} duration={5500} startDelay={0} />
       <div className="min-h-screen bg-brand-cream flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
@@ -103,7 +103,7 @@ const PaymentSuccess = () => {
             <p className="text-brand-charcoal/70">
               {verificationComplete 
                 ? 'Your gift has been scheduled and your payment has been confirmed. We\'ll take care of everything from here!'
-                : 'Thank you for your payment. We\'re processing your order now.'
+                : 'We\'re processing your order now.'
               }
             </p>
             

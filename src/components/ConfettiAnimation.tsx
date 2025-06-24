@@ -4,24 +4,43 @@ import React, { useEffect, useState } from 'react';
 interface ConfettiAnimationProps {
   isActive: boolean;
   duration?: number;
+  startDelay?: number;
 }
 
 const ConfettiAnimation: React.FC<ConfettiAnimationProps> = ({ 
   isActive, 
-  duration = 3000 
+  duration = 3000,
+  startDelay = 0
 }) => {
   const [showConfetti, setShowConfetti] = useState(false);
+  const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
     if (isActive) {
-      setShowConfetti(true);
-      const timer = setTimeout(() => {
-        setShowConfetti(false);
-      }, duration);
+      const startTimer = setTimeout(() => {
+        setShowConfetti(true);
+        setFadeOut(false);
+        
+        // Start fade out 500ms before the end
+        const fadeTimer = setTimeout(() => {
+          setFadeOut(true);
+        }, duration - 500);
 
-      return () => clearTimeout(timer);
+        // Hide completely after fade out
+        const hideTimer = setTimeout(() => {
+          setShowConfetti(false);
+          setFadeOut(false);
+        }, duration);
+
+        return () => {
+          clearTimeout(fadeTimer);
+          clearTimeout(hideTimer);
+        };
+      }, startDelay);
+
+      return () => clearTimeout(startTimer);
     }
-  }, [isActive, duration]);
+  }, [isActive, duration, startDelay]);
 
   if (!showConfetti) return null;
 
@@ -29,12 +48,12 @@ const ConfettiAnimation: React.FC<ConfettiAnimationProps> = ({
   const confettiPieces = Array.from({ length: 50 }, (_, i) => (
     <div
       key={i}
-      className="absolute w-3 h-3 opacity-100 animate-bounce"
+      className={`absolute w-3 h-3 transition-opacity duration-500 ${fadeOut ? 'opacity-0' : 'opacity-100'}`}
       style={{
         left: `${Math.random() * 100}%`,
         top: '-10px',
         animationDelay: `${Math.random() * 3}s`,
-        animationDuration: `${3 + Math.random() * 2}s`,
+        animationDuration: `${5 + Math.random() * 2}s`, // Slower falling (was 3 + Math.random() * 2)
         animationName: 'confettiFall',
         animationTimingFunction: 'linear',
         animationIterationCount: 'infinite',
