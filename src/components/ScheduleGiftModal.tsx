@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -170,7 +171,27 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
       const deliveryDate = new Date(new Date(formData.occasion_date).getTime() - 3 * 24 * 60 * 60 * 1000)
         .toISOString().split('T')[0];
 
-      // First create the scheduled gift
+      // First, update the recipient with the complete address information
+      const { error: recipientUpdateError } = await supabase
+        .from('recipients')
+        .update({
+          street: formData.street,
+          city: formData.city,
+          state: formData.state,
+          zip_code: formData.zip_code,
+          country: formData.country,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', recipient.id);
+
+      if (recipientUpdateError) {
+        console.error('Error updating recipient address:', recipientUpdateError);
+        throw new Error('Failed to update recipient address');
+      }
+
+      console.log('Successfully updated recipient address for:', recipient.name);
+
+      // Then create the scheduled gift
       const { data: giftData, error: giftError } = await supabase
         .from('scheduled_gifts')
         .insert({
@@ -228,16 +249,17 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           description: "Please complete payment in the new tab to finalize your gift scheduling. You'll receive an email confirmation.",
         });
 
-        // Refresh queries
+        // Refresh queries to update the UI
         queryClient.invalidateQueries({ queryKey: ['upcoming-gifts'] });
         queryClient.invalidateQueries({ queryKey: ['user-metrics'] });
+        queryClient.invalidateQueries({ queryKey: ['recipients'] }); // Refresh recipients to show updated address
         
         onClose();
         setFormData({
           occasion: '',
           occasion_date: '',
           gift_type: '',
-          price_range: '',
+          price_range: '$0-$25',
           street: '',
           city: '',
           state: '',
