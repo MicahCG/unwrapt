@@ -28,7 +28,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     occasion: '',
     occasion_date: '',
     gift_type: '',
-    price_range: '',
+    price_range: '$0-$25', // Auto-select the lowest price range by default
     // Address fields
     street: '',
     city: '',
@@ -63,14 +63,16 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
       if (recipient._holidayPreset) {
         setFormData(prev => ({
           ...prev,
-          ...recipient._holidayPreset
+          ...recipient._holidayPreset,
+          price_range: prev.price_range || '$0-$25' // Ensure price range is set even with preset
         }));
       } else {
         const defaultOccasion = getDefaultOccasionDate();
         setFormData(prev => ({
           ...prev,
           occasion: defaultOccasion.occasion,
-          occasion_date: defaultOccasion.date
+          occasion_date: defaultOccasion.date,
+          price_range: '$0-$25' // Ensure price range is always set
         }));
       }
 
