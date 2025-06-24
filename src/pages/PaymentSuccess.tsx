@@ -14,7 +14,8 @@ const PaymentSuccess = () => {
   const { toast } = useToast();
   const [isVerifying, setIsVerifying] = useState(true);
   const [verificationComplete, setVerificationComplete] = useState(false);
-  const [showConfetti, setShowConfetti] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(true); // Show confetti immediately on load
+  const [showVerificationConfetti, setShowVerificationConfetti] = useState(false);
 
   useEffect(() => {
     const sessionId = searchParams.get('session_id');
@@ -36,7 +37,7 @@ const PaymentSuccess = () => {
 
       if (data?.paymentStatus === 'paid') {
         setVerificationComplete(true);
-        setShowConfetti(true);
+        setShowVerificationConfetti(true);
         toast({
           title: "Payment Successful!",
           description: "Your gift has been scheduled and payment confirmed.",
@@ -61,22 +62,26 @@ const PaymentSuccess = () => {
 
   if (isVerifying) {
     return (
-      <div className="min-h-screen bg-brand-cream flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal mx-auto mb-4"></div>
-              <p className="text-brand-charcoal">Verifying your payment...</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <>
+        <ConfettiAnimation isActive={showConfetti} duration={3000} />
+        <div className="min-h-screen bg-brand-cream flex items-center justify-center">
+          <Card className="w-full max-w-md">
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal mx-auto mb-4"></div>
+                <p className="text-brand-charcoal">Verifying your payment...</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </>
     );
   }
 
   return (
     <>
-      <ConfettiAnimation isActive={showConfetti} duration={4000} />
+      <ConfettiAnimation isActive={showConfetti} duration={3000} />
+      <ConfettiAnimation isActive={showVerificationConfetti} duration={4000} />
       <div className="min-h-screen bg-brand-cream flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
