@@ -6,11 +6,9 @@ import { Calendar as CalendarIcon, Loader2, AlertCircle } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { format } from 'date-fns';
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -89,32 +87,9 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
       }
 
       if (authData?.authUrl) {
-        console.log('🚀 Opening Google Calendar auth window');
-        // Open the auth URL in a new window for OAuth flow
-        const authWindow = window.open(authData.authUrl, 'google-auth', 'width=500,height=600');
-        
-        // Listen for the auth completion
-        const checkAuth = setInterval(async () => {
-          try {
-            if (authWindow?.closed) {
-              clearInterval(checkAuth);
-              // Check if auth was successful by looking for integration
-              await checkCalendarIntegration();
-              setIsConnecting(false);
-            }
-          } catch (error) {
-            console.error('Error checking auth window:', error);
-          }
-        }, 1000);
-
-        // Cleanup after 5 minutes
-        setTimeout(() => {
-          clearInterval(checkAuth);
-          setIsConnecting(false);
-          if (authWindow && !authWindow.closed) {
-            authWindow.close();
-          }
-        }, 300000);
+        console.log('🚀 Redirecting to Google Calendar auth');
+        // Direct redirect to Google's OAuth page
+        window.location.href = authData.authUrl;
       }
     } catch (error) {
       console.error('💥 Calendar connection error:', error);
@@ -210,8 +185,11 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
         calendarConnected: isConnected
       });
     } else {
-      // Skip for now - in MVP we require calendar connection
-      onSkip();
+      // No events found, but still continue
+      onNext({
+        importedDates: [],
+        calendarConnected: isConnected
+      });
     }
   };
 
@@ -251,10 +229,6 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
               </>
             )}
           </Button>
-
-          <div className="flex justify-between pt-4">
-            <Button variant="secondary" onClick={onSkip}>Skip This Step</Button>
-          </div>
         </CardContent>
       </Card>
     );
@@ -359,16 +333,14 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
             <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">No Important Dates Found</h3>
             <p className="text-muted-foreground mb-4">
-              We couldn't find any birthdays or anniversaries in your calendar. You can try connecting again or skip this step.
+              We couldn't find any birthdays or anniversaries in your calendar. You can still continue to set up your first gift.
             </p>
           </div>
         )}
 
-        <div className="flex justify-between">
-          <Button variant="secondary" onClick={onSkip}>Skip</Button>
+        <div className="flex justify-end">
           <Button 
             onClick={handleNext}
-            disabled={events.length === 0 && !selectedEvent}
           >
             Continue
           </Button>
