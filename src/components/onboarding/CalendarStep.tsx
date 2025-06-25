@@ -14,7 +14,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import AddRecipientModal from '../AddRecipientModal';
 
 interface CalendarStepProps {
   onNext: (data: any) => void;
@@ -35,7 +34,6 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isFetchingEvents, setIsFetchingEvents] = useState(false);
-  const [showManualModal, setShowManualModal] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -161,12 +159,6 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
       
       setEvents(importantDates);
 
-      // Store imported dates for later use in onboarding flow
-      onNext({ 
-        importedDates: importantDates,
-        calendarConnected: true 
-      });
-
       toast({
         title: "Calendar Connected!",
         description: `Found ${importantDates.length} important dates in your calendar.`,
@@ -215,20 +207,12 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
       // If they have events but didn't select one, still pass the imported dates
       onNext({
         importedDates: events,
-        calendarConnected: isConnected,
-        noRecipientsFound: true
+        calendarConnected: isConnected
       });
     } else {
-      // No events found or no calendar connected
-      onNext({
-        noRecipientsFound: true,
-        manualRecipientAdded: true
-      });
+      // Skip for now - in MVP we require calendar connection
+      onSkip();
     }
-  };
-
-  const handleManualEntry = () => {
-    setShowManualModal(true);
   };
 
   // If not connected, show connection screen
@@ -268,43 +252,10 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
             )}
           </Button>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-muted-foreground">Or</span>
-            </div>
-          </div>
-
-          <Button 
-            variant="outline" 
-            onClick={handleManualEntry}
-            className="w-full"
-          >
-            Enter Person Manually
-          </Button>
-
           <div className="flex justify-between pt-4">
             <Button variant="secondary" onClick={onSkip}>Skip This Step</Button>
           </div>
         </CardContent>
-
-        {showManualModal && (
-          <AddRecipientModal
-            isOpen={showManualModal}
-            onClose={(recipientData) => {
-              setShowManualModal(false);
-              if (recipientData) {
-                // Pass the recipient data to the next step
-                onNext({
-                  manualRecipientData: recipientData,
-                  calendarConnected: false
-                });
-              }
-            }}
-          />
-        )}
       </Card>
     );
   }
@@ -336,7 +287,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
         <p className="text-muted-foreground">
           {events.length > 0 
             ? `Found ${events.length} important dates in your calendar. Select one to get started.`
-            : "No important dates found. You can add someone manually."
+            : "No important dates found in your calendar."
           }
         </p>
       </CardHeader>
@@ -382,26 +333,24 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
             )}
 
             {/* Show a preview of available events */}
-            {events.length > 0 && (
-              <div className="border rounded-md p-4">
-                <h4 className="font-medium mb-2 text-brand-charcoal">Available Events:</h4>
-                <div className="space-y-2">
-                  {events.slice(0, 3).map((event, index) => (
-                    <div key={index} className="text-sm flex justify-between">
-                      <span>{event.personName}</span>
-                      <span className="text-muted-foreground">
-                        {event.type === 'birthday' ? '🎂' : '💕'} {format(new Date(event.date), "MMM d")}
-                      </span>
-                    </div>
-                  ))}
-                  {events.length > 3 && (
-                    <div className="text-sm text-muted-foreground">
-                      ...and {events.length - 3} more
-                    </div>
-                  )}
-                </div>
+            <div className="border rounded-md p-4">
+              <h4 className="font-medium mb-2 text-brand-charcoal">Available Events:</h4>
+              <div className="space-y-2">
+                {events.slice(0, 3).map((event, index) => (
+                  <div key={index} className="text-sm flex justify-between">
+                    <span>{event.personName}</span>
+                    <span className="text-muted-foreground">
+                      {event.type === 'birthday' ? '🎂' : '💕'} {format(new Date(event.date), "MMM d")}
+                    </span>
+                  </div>
+                ))}
+                {events.length > 3 && (
+                  <div className="text-sm text-muted-foreground">
+                    ...and {events.length - 3} more
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </>
         )}
 
@@ -410,15 +359,8 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
             <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">No Important Dates Found</h3>
             <p className="text-muted-foreground mb-4">
-              We couldn't find any birthdays or anniversaries in your calendar.
+              We couldn't find any birthdays or anniversaries in your calendar. You can try connecting again or skip this step.
             </p>
-            <Button 
-              variant="outline" 
-              onClick={handleManualEntry}
-              className="w-full"
-            >
-              Add Someone Manually
-            </Button>
           </div>
         )}
 
@@ -432,23 +374,6 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
           </Button>
         </div>
       </CardContent>
-      
-      {showManualModal && (
-        <AddRecipientModal
-          isOpen={showManualModal}
-          onClose={(recipientData) => {
-            setShowManualModal(false);
-            if (recipientData) {
-              // Pass the recipient data to the next step
-              onNext({
-                manualRecipientData: recipientData,
-                calendarConnected: isConnected,
-                importedDates: events
-              });
-            }
-          }}
-        />
-      )}
     </Card>
   );
 };
