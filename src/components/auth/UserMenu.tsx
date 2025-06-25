@@ -7,9 +7,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, Settings, Calendar } from 'lucide-react';
+import { LogOut, Settings } from 'lucide-react';
 import { useAuth } from './AuthProvider';
 import { useNavigate } from 'react-router-dom';
 
@@ -20,11 +19,6 @@ const UserMenu: React.FC = () => {
   if (!user) return null;
 
   const userInitial = user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || 'U';
-
-  const handleCalendarClick = () => {
-    console.log('🔧 UserMenu: Navigating to calendar');
-    navigate('/calendar');
-  };
 
   const handleSettingsClick = () => {
     console.log('🔧 UserMenu: Navigating to settings');
@@ -66,14 +60,6 @@ const UserMenu: React.FC = () => {
             </p>
           </div>
         </div>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem 
-          onClick={handleCalendarClick}
-          className="text-brand-charcoal hover:bg-brand-cream hover:text-brand-charcoal cursor-pointer"
-        >
-          <Calendar className="mr-2 h-4 w-4" />
-          <span>Calendar</span>
-        </DropdownMenuItem>
         <DropdownMenuItem 
           onClick={handleSettingsClick}
           className="text-brand-charcoal hover:bg-brand-cream hover:text-brand-charcoal cursor-pointer"
@@ -81,7 +67,6 @@ const UserMenu: React.FC = () => {
           <Settings className="mr-2 h-4 w-4" />
           <span>Settings</span>
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
         <DropdownMenuItem 
           onClick={handleSignOut}
           className="text-brand-charcoal hover:bg-brand-cream hover:text-brand-charcoal cursor-pointer"

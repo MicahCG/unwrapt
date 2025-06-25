@@ -1,10 +1,8 @@
-
 #root {
   max-width: 1280px;
   margin: 0 auto;
   padding: 2rem;
   text-align: center;
-  background-color: #F5F2ED;
 }
 
 .logo {
@@ -42,6 +40,10 @@
 }
 
 .read-the-docs {
-  color: #4A4A4A;
+  color: #4A4A4A; /* Use your brand charcoal instead of #888 */
 }
 
+/* Force override any conflicting colors */
+* {
+  --foreground: 74 74 74 !important;
+}

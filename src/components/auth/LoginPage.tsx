@@ -8,6 +8,25 @@ import { useAuth } from './AuthProvider';
 const LoginPage: React.FC = () => {
   const { signInWithGoogle, loading } = useAuth();
 
+  const handleDevLogin = () => {
+    // Create a fake user session for development
+    const fakeUser = {
+      id: 'dev-user-123',
+      email: 'dev@example.com',
+      user_metadata: {
+        name: 'Dev User',
+        avatar_url: null
+      },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    // Manually trigger auth state change to simulate login
+    window.dispatchEvent(new CustomEvent('fake-auth', { 
+      detail: { user: fakeUser, session: { user: fakeUser, access_token: 'fake-token' } } 
+    }));
+  };
+
   return (
     <div className="min-h-screen bg-brand-cream flex items-center justify-center px-4">
       <Card className="w-full max-w-md animate-fadeInUp border-brand-cream shadow-lg">
@@ -22,6 +41,20 @@ const LoginPage: React.FC = () => {
         
         <CardContent className="pt-6">
           <div className="space-y-6">
+            {/* Development Login Shortcut */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="p-3 bg-yellow-100 border border-yellow-300 rounded-lg">
+                <p className="text-sm text-yellow-800 mb-2 font-medium">Development Mode</p>
+                <Button 
+                  size="sm" 
+                  className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+                  onClick={handleDevLogin}
+                >
+                  🚀 Skip to Dashboard (Dev Only)
+                </Button>
+              </div>
+            )}
+
             {/* Features Preview */}
             <div className="space-y-3">
               <div className="flex items-center space-x-3 p-3 bg-white/60 rounded-lg border border-brand-cream">

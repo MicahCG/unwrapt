@@ -309,6 +309,7 @@ const HolidayScheduleGiftModal: React.FC<{
     occasion_date: holiday.date.replace(', 2025', ', ' + new Date().getFullYear()),
     gift_type: holiday.giftType || '',
     price_range: holiday.priceRange || '',
+    gift_description: `Perfect ${holiday.name.toLowerCase()} gift`,
     delivery_date: ''
   });
 

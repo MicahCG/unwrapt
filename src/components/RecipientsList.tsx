@@ -1,16 +1,14 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
-import { Edit, Trash2, Gift, Calendar, Plus, Check } from 'lucide-react';
+import { Edit, Trash2, Gift, Calendar, Plus } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import EditRecipientModal from './EditRecipientModal';
 import ScheduleGiftModal from './ScheduleGiftModal';
 import AddRecipientModal from './AddRecipientModal';
-import GiftDetailsModal from './GiftDetailsModal';
 
 const RecipientsList = () => {
   const { user } = useAuth();
@@ -18,46 +16,19 @@ const RecipientsList = () => {
   const [editingRecipient, setEditingRecipient] = useState(null);
   const [schedulingGift, setSchedulingGift] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [viewingGift, setViewingGift] = useState(null);
 
-  // Fetch recipients with scheduled gifts
+  // Fetch recipients
   const { data: recipients } = useQuery({
     queryKey: ['recipients', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('recipients')
-        .select(`
-          *,
-          scheduled_gifts:scheduled_gifts(
-            id,
-            occasion,
-            occasion_date,
-            gift_type,
-            gift_description,
-            price_range,
-            status,
-            payment_status,
-            created_at,
-            updated_at
-          )
-        `)
+        .select('*')
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-
-      // Sort recipients: those without scheduled gifts first, then those with gifts, alphabetically within each group
-      return data.sort((a, b) => {
-        const aHasGifts = a.scheduled_gifts && a.scheduled_gifts.length > 0;
-        const bHasGifts = b.scheduled_gifts && b.scheduled_gifts.length > 0;
-        
-        // Primary sort: no gifts first
-        if (!aHasGifts && bHasGifts) return -1;
-        if (aHasGifts && !bHasGifts) return 1;
-        
-        // Secondary sort: alphabetical within groups
-        return a.name.localeCompare(b.name);
-      });
+      return data;
     },
     enabled: !!user
   });
@@ -75,23 +46,6 @@ const RecipientsList = () => {
       queryClient.invalidateQueries({ queryKey: ['user-metrics'] });
     } catch (error) {
       console.error('Error deleting recipient:', error);
-    }
-  };
-
-  const handleDeleteGift = async (giftId: string) => {
-    try {
-      const { error } = await supabase
-        .from('scheduled_gifts')
-        .delete()
-        .eq('id', giftId);
-
-      if (error) throw error;
-
-      queryClient.invalidateQueries({ queryKey: ['recipients'] });
-      queryClient.invalidateQueries({ queryKey: ['upcoming-gifts'] });
-      queryClient.invalidateQueries({ queryKey: ['user-metrics'] });
-    } catch (error) {
-      console.error('Error deleting gift:', error);
     }
   };
 
@@ -130,17 +84,6 @@ const RecipientsList = () => {
     return occasions[0];
   };
 
-  const getNextScheduledGift = (scheduledGifts: any[]) => {
-    if (!scheduledGifts || scheduledGifts.length === 0) return null;
-    
-    const today = new Date();
-    const upcomingGifts = scheduledGifts
-      .filter(gift => new Date(gift.occasion_date) >= today)
-      .sort((a, b) => new Date(a.occasion_date).getTime() - new Date(b.occasion_date).getTime());
-    
-    return upcomingGifts[0] || null;
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -158,28 +101,13 @@ const RecipientsList = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {recipients.map((recipient: any) => {
             const nextOccasion = getNextOccasion(recipient);
-            const hasScheduledGifts = recipient.scheduled_gifts && recipient.scheduled_gifts.length > 0;
-            const nextScheduledGift = getNextScheduledGift(recipient.scheduled_gifts);
             
             return (
-              <Card 
-                key={recipient.id} 
-                className={`hover:shadow-lg transition-shadow border-brand-cream ${
-                  hasScheduledGifts ? 'bg-gray-50' : 'bg-white'
-                }`}
-              >
+              <Card key={recipient.id} className="hover:shadow-lg transition-shadow bg-white border-brand-cream">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <CardTitle className="text-lg text-brand-charcoal">{recipient.name}</CardTitle>
-                        {hasScheduledGifts && (
-                          <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">
-                            <Check className="h-3 w-3 mr-1" />
-                            Scheduled
-                          </Badge>
-                        )}
-                      </div>
+                      <CardTitle className="text-lg text-brand-charcoal">{recipient.name}</CardTitle>
                       {recipient.relationship && (
                         <Badge 
                           variant="secondary" 
@@ -187,11 +115,6 @@ const RecipientsList = () => {
                         >
                           {recipient.relationship}
                         </Badge>
-                      )}
-                      {nextScheduledGift && (
-                        <p className="text-sm text-gray-500 mt-2">
-                          Next gift: {formatDate(nextScheduledGift.occasion_date)}
-                        </p>
                       )}
                     </div>
                     <div className="flex space-x-1">
@@ -220,7 +143,7 @@ const RecipientsList = () => {
                     <p className="text-sm text-brand-charcoal/70">{recipient.email}</p>
                   )}
                   
-                  {nextOccasion && !hasScheduledGifts && (
+                  {nextOccasion && (
                     <div className="flex items-center justify-between p-2 bg-brand-cream-light rounded">
                       <div className="flex items-center">
                         <Calendar className="h-4 w-4 text-brand-gold mr-2" />
@@ -256,26 +179,14 @@ const RecipientsList = () => {
                     </div>
                   )}
                   
-                  {hasScheduledGifts && nextScheduledGift ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full border-brand-charcoal text-brand-charcoal hover:bg-brand-cream"
-                      onClick={() => setViewingGift(nextScheduledGift)}
-                    >
-                      <Gift className="h-4 w-4 mr-2" />
-                      View Gift
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
-                      onClick={() => setSchedulingGift(recipient)}
-                    >
-                      <Gift className="h-4 w-4 mr-2" />
-                      Schedule Gift
-                    </Button>
-                  )}
+                  <Button
+                    size="sm"
+                    className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+                    onClick={() => setSchedulingGift(recipient)}
+                  >
+                    <Gift className="h-4 w-4 mr-2" />
+                    Schedule Gift
+                  </Button>
                 </CardContent>
               </Card>
             );
@@ -310,15 +221,6 @@ const RecipientsList = () => {
           recipient={schedulingGift}
           isOpen={!!schedulingGift}
           onClose={() => setSchedulingGift(null)}
-        />
-      )}
-
-      {viewingGift && (
-        <GiftDetailsModal
-          gift={viewingGift}
-          isOpen={!!viewingGift}
-          onClose={() => setViewingGift(null)}
-          onDelete={handleDeleteGift}
         />
       )}
 
