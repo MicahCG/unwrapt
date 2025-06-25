@@ -152,21 +152,6 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
     }
   };
 
-  const handleDateSelect = (newDate: Date | undefined) => {
-    setDate(newDate);
-    if (newDate && events.length > 0) {
-      const eventsForDate = events.filter(event => {
-        const eventDate = new Date(event.date);
-        return eventDate.toDateString() === newDate.toDateString();
-      });
-      if (eventsForDate.length > 0) {
-        setSelectedEvent(eventsForDate[0]);
-      } else {
-        setSelectedEvent(null);
-      }
-    }
-  };
-
   const handleNext = () => {
     if (selectedEvent) {
       onNext({ 
@@ -191,6 +176,25 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
         calendarConnected: isConnected
       });
     }
+  };
+
+  // Get the 3 soonest events
+  const getSoonestEvents = () => {
+    const now = new Date();
+    const sortedEvents = events
+      .map(event => ({
+        ...event,
+        dateObj: new Date(event.date)
+      }))
+      .filter(event => event.dateObj >= now)
+      .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime())
+      .slice(0, 3);
+    
+    return sortedEvents;
+  };
+
+  const handleEventSelect = (event: CalendarEvent) => {
+    setSelectedEvent(event);
   };
 
   // If not connected, show connection screen
@@ -246,7 +250,9 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
     );
   }
 
-  // Connected and events loaded - show date selection
+  const soonestEvents = getSoonestEvents();
+
+  // Connected and events loaded - show event selection
   return (
     <Card className="animate-fadeInUp">
       <CardHeader className="text-center">
@@ -256,84 +262,59 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
           </div>
         </div>
         <CardTitle className="text-3xl mb-2">
-          When is their special day?
+          We Found {events.length} Important Dates!
         </CardTitle>
         <p className="text-muted-foreground">
-          {events.length > 0 
-            ? `Found ${events.length} important dates in your calendar. Select one to get started.`
-            : "No important dates found in your calendar."
-          }
+          Who should we start with?
         </p>
       </CardHeader>
-      <CardContent className="grid gap-6">
-        {events.length > 0 && (
+      <CardContent className="space-y-6">
+        {soonestEvents.length > 0 ? (
           <>
-            <div className="flex justify-center w-full">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-[240px] justify-start text-left font-normal",
-                      !date && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date ? format(date, "PPP") : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="center" side="bottom">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={handleDateSelect}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+            <div className="space-y-3">
+              {soonestEvents.map((event, index) => (
+                <div
+                  key={index}
+                  className={cn(
+                    "border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md",
+                    selectedEvent?.personName === event.personName && selectedEvent?.date === event.date
+                      ? "border-brand-charcoal bg-brand-charcoal/5"
+                      : "border-gray-200 hover:border-brand-charcoal/50"
+                  )}
+                  onClick={() => handleEventSelect(event)}
+                >
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h3 className="font-semibold text-brand-charcoal">{event.personName}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {event.type === 'birthday' ? '🎂' : '💕'} {event.type === 'birthday' ? 'Birthday' : 'Anniversary'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-brand-charcoal">
+                        {format(new Date(event.date), "MMM d")}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(event.date), "yyyy")}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
 
-            {selectedEvent ? (
-              <div className="border rounded-md p-4 bg-brand-cream/20">
-                <h3 className="text-lg font-semibold">{selectedEvent.personName}</h3>
-                <p className="text-sm text-muted-foreground">
-                  {selectedEvent.type === 'birthday' ? 'Birthday' : 'Anniversary'} on {format(new Date(selectedEvent.date), "PPP")}
-                </p>
-              </div>
-            ) : (
-              <div className="border rounded-md p-4 text-center text-muted-foreground">
-                {date ? 'No event selected for this date.' : 'Select a date to see events.'}
+            {events.length > 3 && (
+              <div className="text-center text-sm text-muted-foreground">
+                ...and {events.length - 3} more dates in your calendar
               </div>
             )}
-
-            {/* Show a preview of available events */}
-            <div className="border rounded-md p-4">
-              <h4 className="font-medium mb-2 text-brand-charcoal">Available Events:</h4>
-              <div className="space-y-2">
-                {events.slice(0, 3).map((event, index) => (
-                  <div key={index} className="text-sm flex justify-between">
-                    <span>{event.personName}</span>
-                    <span className="text-muted-foreground">
-                      {event.type === 'birthday' ? '🎂' : '💕'} {format(new Date(event.date), "MMM d")}
-                    </span>
-                  </div>
-                ))}
-                {events.length > 3 && (
-                  <div className="text-sm text-muted-foreground">
-                    ...and {events.length - 3} more
-                  </div>
-                )}
-              </div>
-            </div>
           </>
-        )}
-
-        {events.length === 0 && (
+        ) : (
           <div className="text-center py-8">
             <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Important Dates Found</h3>
+            <h3 className="text-lg font-semibold mb-2">No Upcoming Events Found</h3>
             <p className="text-muted-foreground mb-4">
-              We couldn't find any birthdays or anniversaries in your calendar. You can still continue to set up your first gift.
+              We couldn't find any upcoming birthdays or anniversaries in your calendar. You can still continue to set up your first gift.
             </p>
           </div>
         )}
@@ -341,6 +322,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
         <div className="flex justify-end">
           <Button 
             onClick={handleNext}
+            disabled={soonestEvents.length > 0 && !selectedEvent}
           >
             Continue
           </Button>
