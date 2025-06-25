@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Gift, Calendar } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Gift, Calendar, MapPin, Heart } from 'lucide-react';
 
 interface RecipientStepProps {
   onNext: (data: any) => void;
@@ -33,6 +34,7 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
     country: 'United States'
   });
 
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [isValid, setIsValid] = useState(false);
 
   // Pre-populate form if we have calendar data
@@ -47,14 +49,27 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
     }
   }, [selectedPersonForGift]);
 
+  // Same interests as in AddRecipientModal
+  const predefinedInterests = [
+    'Coffee', 'Tea', 'Wine', 'Sweet Treats', 'Self Care'
+  ];
+
   const handleInputChange = (field: string, value: string) => {
     const updatedData = { ...recipientData, [field]: value };
     setRecipientData(updatedData);
     validateForm(updatedData);
   };
 
+  const toggleInterest = (interest: string) => {
+    setSelectedInterests(prev => 
+      prev.includes(interest) 
+        ? prev.filter(i => i !== interest)
+        : [...prev, interest]
+    );
+  };
+
   const validateForm = (data: typeof recipientData) => {
-    // Basic validation: require name, relationship, and address fields
+    // Require name, relationship, and complete address
     const hasBasicInfo = Boolean(data.fullName && data.relationship);
     const hasAddress = Boolean(data.street && data.city && data.state && data.zipCode);
     setIsValid(hasBasicInfo && hasAddress);
@@ -62,7 +77,10 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
 
   const handleContinue = () => {
     onNext({ 
-      firstRecipient: recipientData,
+      firstRecipient: {
+        ...recipientData,
+        interests: selectedInterests
+      },
       selectedPersonForGift 
     });
   };
@@ -76,22 +94,16 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
 
   const getHeaderText = () => {
     if (selectedPersonForGift) {
-      return `Let's get ${selectedPersonForGift.personName}'s details`;
+      return `What are ${selectedPersonForGift.personName}'s interests?`;
     }
     if (isManualEntry) {
       return "Who would you like to schedule a gift for?";
     }
-    return "Who's the most important person in your life?";
+    return "What are their interests?";
   };
 
   const getSubHeaderText = () => {
-    if (selectedPersonForGift) {
-      return `We'll need their shipping address for delivery`;
-    }
-    if (isManualEntry) {
-      return "Tell us about the person you'd like to send a gift to";
-    }
-    return "We'll help you make them feel special with thoughtful, perfectly timed gifts";
+    return "Select interests that will help us find the perfect gifts";
   };
 
   return (
@@ -99,7 +111,7 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
       <CardHeader className="text-center">
         <div className="flex justify-center mb-4">
           <div className="bg-brand-charcoal/10 p-4 rounded-full">
-            <Gift className="h-12 w-12 text-brand-charcoal" />
+            <Heart className="h-12 w-12 text-brand-charcoal" />
           </div>
         </div>
         <CardTitle className="text-3xl mb-2">
@@ -119,8 +131,8 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
       </CardHeader>
       
       <CardContent className="space-y-6">
-        <div className="grid gap-4">
-          {/* Full Name */}
+        {/* Basic Information */}
+        <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="fullName">Full Name *</Label>
             <Input
@@ -132,7 +144,6 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
             />
           </div>
 
-          {/* Relationship */}
           <div className="space-y-2">
             <Label htmlFor="relationship">Relationship *</Label>
             <Select value={recipientData.relationship} onValueChange={(value) => handleInputChange('relationship', value)}>
@@ -152,7 +163,6 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
             </Select>
           </div>
 
-          {/* Birthday */}
           <div className="space-y-2">
             <Label htmlFor="birthday">Birthday</Label>
             <Input
@@ -162,89 +172,122 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
               onChange={(e) => handleInputChange('birthday', e.target.value)}
             />
           </div>
+        </div>
 
-          {/* Shipping Address Section */}
-          <div className="space-y-4 pt-4 border-t">
-            <div>
-              <h4 className="font-medium text-brand-charcoal mb-2">Shipping Address *</h4>
-              <p className="text-sm text-brand-charcoal/60 mb-4">
-                This address will be used for gift delivery
-              </p>
+        {/* Interests Section */}
+        <div className="space-y-4 pt-4 border-t">
+          <h3 className="text-lg font-medium flex items-center">
+            <Gift className="h-5 w-5 mr-2" />
+            Select interests:
+          </h3>
+          
+          <div className="flex flex-wrap gap-2">
+            {predefinedInterests.map((interest) => (
+              <Badge
+                key={interest}
+                variant={selectedInterests.includes(interest) ? "default" : "outline"}
+                className={`cursor-pointer transition-colors ${
+                  selectedInterests.includes(interest)
+                    ? 'bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90'
+                    : 'border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light'
+                }`}
+                onClick={() => toggleInterest(interest)}
+              >
+                {interest}
+              </Badge>
+            ))}
+          </div>
+
+          {selectedInterests.length > 0 && (
+            <div className="bg-brand-cream/30 p-4 rounded-lg">
+              <h4 className="font-medium mb-2 text-brand-charcoal">Selected interests:</h4>
+              <div className="flex flex-wrap gap-2">
+                {selectedInterests.map((interest) => (
+                  <Badge
+                    key={interest}
+                    className="bg-brand-charcoal text-brand-cream"
+                  >
+                    {interest}
+                  </Badge>
+                ))}
+              </div>
             </div>
+          )}
+        </div>
 
-            {/* Street Address */}
+        {/* Shipping Address Section */}
+        <div className="space-y-4 pt-4 border-t">
+          <div className="flex items-center space-x-2 mb-3">
+            <MapPin className="h-5 w-5 text-brand-charcoal" />
+            <h3 className="text-lg font-medium text-brand-charcoal">Delivery Address *</h3>
+          </div>
+          <p className="text-sm text-brand-charcoal/60 mb-4">
+            This address will be used for gift delivery
+          </p>
+
+          {/* Street Address */}
+          <div className="space-y-2">
+            <Label htmlFor="street">Street Address *</Label>
+            <Input
+              id="street"
+              placeholder="123 Main Street"
+              value={recipientData.street}
+              onChange={(e) => handleInputChange('street', e.target.value)}
+              required
+            />
+          </div>
+
+          {/* City and State */}
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="street">Street Address *</Label>
+              <Label htmlFor="city">City *</Label>
               <Input
-                id="street"
-                placeholder="123 Main Street"
-                value={recipientData.street}
-                onChange={(e) => handleInputChange('street', e.target.value)}
+                id="city"
+                placeholder="City"
+                value={recipientData.city}
+                onChange={(e) => handleInputChange('city', e.target.value)}
                 required
               />
             </div>
-
-            {/* City and State */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="city">City *</Label>
-                <Input
-                  id="city"
-                  placeholder="City"
-                  value={recipientData.city}
-                  onChange={(e) => handleInputChange('city', e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="state">State *</Label>
-                <Input
-                  id="state"
-                  placeholder="State"
-                  value={recipientData.state}
-                  onChange={(e) => handleInputChange('state', e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            {/* ZIP Code and Country */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="zipCode">ZIP Code *</Label>
-                <Input
-                  id="zipCode"
-                  placeholder="12345"
-                  value={recipientData.zipCode}
-                  onChange={(e) => handleInputChange('zipCode', e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="country">Country *</Label>
-                <Select value={recipientData.country} onValueChange={(value) => handleInputChange('country', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select country" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="United States">United States</SelectItem>
-                    <SelectItem value="Canada">Canada</SelectItem>
-                    <SelectItem value="United Kingdom">United Kingdom</SelectItem>
-                    <SelectItem value="Australia">Australia</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="state">State *</Label>
+              <Input
+                id="state"
+                placeholder="State"
+                value={recipientData.state}
+                onChange={(e) => handleInputChange('state', e.target.value)}
+                required
+              />
             </div>
           </div>
 
-          {/* Manual entry mode note */}
-          {isManualEntry && (
-            <div className="bg-brand-cream/30 p-4 rounded-lg">
-              <p className="text-sm text-brand-charcoal/70">
-                You can add more details like contact info later in your dashboard.
-              </p>
+          {/* ZIP Code and Country */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="zipCode">ZIP Code *</Label>
+              <Input
+                id="zipCode"
+                placeholder="12345"
+                value={recipientData.zipCode}
+                onChange={(e) => handleInputChange('zipCode', e.target.value)}
+                required
+              />
             </div>
-          )}
+            <div className="space-y-2">
+              <Label htmlFor="country">Country *</Label>
+              <Select value={recipientData.country} onValueChange={(value) => handleInputChange('country', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select country" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="United States">United States</SelectItem>
+                  <SelectItem value="Canada">Canada</SelectItem>
+                  <SelectItem value="United Kingdom">United Kingdom</SelectItem>
+                  <SelectItem value="Australia">Australia</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
 
         <div className="pt-6">
@@ -253,7 +296,7 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
             disabled={!isValid}
             className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
           >
-            Continue
+            Continue with {selectedInterests.length} interests
           </Button>
         </div>
 
