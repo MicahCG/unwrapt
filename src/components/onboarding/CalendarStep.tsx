@@ -152,32 +152,6 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
     }
   };
 
-  const handleNext = () => {
-    if (selectedEvent) {
-      onNext({ 
-        selectedPersonForGift: {
-          personName: selectedEvent.personName,
-          date: selectedEvent.date,
-          type: selectedEvent.type
-        },
-        importedDates: events,
-        calendarConnected: isConnected
-      });
-    } else if (events.length > 0) {
-      // If they have events but didn't select one, still pass the imported dates
-      onNext({
-        importedDates: events,
-        calendarConnected: isConnected
-      });
-    } else {
-      // No events found, but still continue
-      onNext({
-        importedDates: [],
-        calendarConnected: isConnected
-      });
-    }
-  };
-
   // Get the 3 soonest events
   const getSoonestEvents = () => {
     const now = new Date();
@@ -195,6 +169,16 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
 
   const handleEventSelect = (event: CalendarEvent) => {
     setSelectedEvent(event);
+    // Automatically proceed to next step after selection
+    onNext({ 
+      selectedPersonForGift: {
+        personName: event.personName,
+        date: event.date,
+        type: event.type
+      },
+      importedDates: events,
+      calendarConnected: isConnected
+    });
   };
 
   // If not connected, show connection screen
@@ -275,12 +259,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
               {soonestEvents.map((event, index) => (
                 <div
                   key={index}
-                  className={cn(
-                    "border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md",
-                    selectedEvent?.personName === event.personName && selectedEvent?.date === event.date
-                      ? "border-brand-charcoal bg-brand-charcoal/5"
-                      : "border-gray-200 hover:border-brand-charcoal/50"
-                  )}
+                  className="border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md hover:border-brand-charcoal/50"
                   onClick={() => handleEventSelect(event)}
                 >
                   <div className="flex justify-between items-center">
@@ -316,17 +295,14 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
             <p className="text-muted-foreground mb-4">
               We couldn't find any upcoming birthdays or anniversaries in your calendar. You can still continue to set up your first gift.
             </p>
+            <Button onClick={() => onNext({
+              importedDates: [],
+              calendarConnected: isConnected
+            })}>
+              Continue Anyway
+            </Button>
           </div>
         )}
-
-        <div className="flex justify-end">
-          <Button 
-            onClick={handleNext}
-            disabled={soonestEvents.length > 0 && !selectedEvent}
-          >
-            Continue
-          </Button>
-        </div>
       </CardContent>
     </Card>
   );
