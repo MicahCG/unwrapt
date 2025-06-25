@@ -50,14 +50,15 @@ const CalendarOAuthCallback: React.FC = () => {
           description: error,
           variant: "destructive"
         });
-        navigate('/calendar', { replace: true });
+        // Redirect back to onboarding with error
+        navigate('/', { replace: true });
         return;
       }
 
       if (!code) {
         console.log('📅 CalendarOAuthCallback: No code received, redirecting...');
         setHasProcessed(true);
-        navigate('/calendar', { replace: true });
+        navigate('/', { replace: true });
         return;
       }
 
@@ -104,7 +105,7 @@ const CalendarOAuthCallback: React.FC = () => {
             description: "Please log in again to connect your calendar.",
             variant: "destructive"
           });
-          navigate('/calendar', { replace: true });
+          navigate('/', { replace: true });
           return;
         }
       }
@@ -145,14 +146,15 @@ const CalendarOAuthCallback: React.FC = () => {
           throw new Error('No access token received from Google');
         }
 
-        console.log('📅 CalendarOAuthCallback: Calendar connected successfully');
+        console.log('📅 CalendarOAuthCallback: Calendar connected successfully, redirecting to onboarding');
         
         toast({
           title: "Calendar Connected Successfully!",
-          description: "Your Google Calendar has been connected to your account.",
+          description: "Your Google Calendar has been connected. Returning to setup...",
         });
 
-        navigate('/calendar', { replace: true });
+        // Redirect back to onboarding - it will detect the connection and show events
+        navigate('/', { replace: true });
 
       } catch (error) {
         console.error('📅 CalendarOAuthCallback: Error processing OAuth callback:', error);
@@ -162,7 +164,7 @@ const CalendarOAuthCallback: React.FC = () => {
           description: errorMessage,
           variant: "destructive"
         });
-        navigate('/calendar', { replace: true });
+        navigate('/', { replace: true });
       } finally {
         setIsProcessing(false);
       }

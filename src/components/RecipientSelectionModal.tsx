@@ -75,9 +75,9 @@ const RecipientSelectionModal: React.FC<RecipientSelectionModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] bg-white border-brand-cream text-brand-charcoal">
+      <DialogContent className="sm:max-w-[600px] bg-white">
         <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2 text-brand-charcoal">
+          <DialogTitle className="flex items-center space-x-2">
             <Users className="h-5 w-5" />
             <span>Select a Recipient</span>
           </DialogTitle>
@@ -91,7 +91,7 @@ const RecipientSelectionModal: React.FC<RecipientSelectionModalProps> = ({
               return (
                 <Card 
                   key={recipient.id} 
-                  className="cursor-pointer hover:shadow-md transition-shadow border-brand-cream"
+                  className="cursor-pointer hover:shadow-md transition-shadow"
                   onClick={() => onRecipientSelected(recipient)}
                 >
                   <CardContent className="p-4">
@@ -99,12 +99,12 @@ const RecipientSelectionModal: React.FC<RecipientSelectionModalProps> = ({
                       <div className="flex-1">
                         <div className="flex items-center space-x-3">
                           <div>
-                            <h3 className="font-medium text-brand-charcoal">{recipient.name}</h3>
+                            <h3 className="font-medium">{recipient.name}</h3>
                             <div className="flex items-center space-x-2 mt-1">
                               {recipient.relationship && (
                                 <Badge 
                                   variant="secondary" 
-                                  className="text-xs bg-brand-cream text-brand-charcoal border-brand-cream"
+                                  className="text-xs bg-brand-cream"
                                 >
                                   {recipient.relationship}
                                 </Badge>
@@ -158,3 +158,4 @@ const RecipientSelectionModal: React.FC<RecipientSelectionModalProps> = ({
 };
 
 export default RecipientSelectionModal;
+

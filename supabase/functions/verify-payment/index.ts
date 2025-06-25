@@ -59,6 +59,41 @@ serve(async (req) => {
           })
           .eq("id", scheduledGiftId);
 
+        // Get gift and recipient details for email
+        const { data: giftData } = await supabaseService
+          .from("scheduled_gifts")
+          .select(`
+            *,
+            recipient:recipients(name),
+            user:profiles(email, full_name)
+          `)
+          .eq("id", scheduledGiftId)
+          .single();
+
+        // Send payment confirmation email
+        if (giftData?.user?.email) {
+          try {
+            await supabaseService.functions.invoke('send-notification-email', {
+              body: {
+                type: 'gift_scheduled',
+                userEmail: giftData.user.email,
+                userName: giftData.user.full_name || giftData.user.email.split('@')[0],
+                recipientName: giftData.recipient?.name || 'Unknown',
+                giftDetails: {
+                  occasion: giftData.occasion,
+                  occasionDate: giftData.occasion_date,
+                  giftType: giftData.gift_type,
+                  priceRange: giftData.price_range
+                }
+              }
+            });
+            console.log('Payment confirmation email sent successfully');
+          } catch (emailError) {
+            console.error('Failed to send payment confirmation email:', emailError);
+            // Don't fail the payment verification if email fails
+          }
+        }
+
         // Trigger gift fulfillment if not in onboarding
         if (scheduledGiftId !== 'onboarding-temp-id') {
           try {

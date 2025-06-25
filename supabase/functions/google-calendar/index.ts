@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -85,7 +84,8 @@ Deno.serve(async (req) => {
       const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
       const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/').slice(0, 3).join('/')
       
-      const redirectUri = `${origin}/auth/callback`
+      // Use the calendar OAuth callback for onboarding flow
+      const redirectUri = `${origin}/auth/calendar/callback`
       
       console.log('🔗 Generated redirect URI:', redirectUri)
       
@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
 
     if (action === 'exchange_code') {
       const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/').slice(0, 3).join('/')
-      const redirectUri = `${origin}/auth/callback`
+      const redirectUri = `${origin}/auth/calendar/callback`
 
       console.log('🔄 Exchange code - redirect URI:', redirectUri)
       console.log('🔄 Exchange code - user ID:', user.id)

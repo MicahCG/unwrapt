@@ -4,20 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
-import { Edit, Trash2, Calendar, DollarSign, TestTube2, Plus } from 'lucide-react';
+import { Calendar, DollarSign, Plus, Sparkles } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import EditGiftModal from './EditGiftModal';
 import GiftDetailsModal from './GiftDetailsModal';
-import ShopifyTestModal from './ShopifyTestModal';
-import ScheduleGiftModal from './ScheduleGiftModal';
 import RecipientSelectionModal from './RecipientSelectionModal';
+import ScheduleGiftModal from './ScheduleGiftModal';
 
 const UpcomingGiftsManager = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [editingGift, setEditingGift] = useState(null);
   const [viewingGift, setViewingGift] = useState(null);
-  const [testingGift, setTestingGift] = useState(null);
   const [showRecipientSelection, setShowRecipientSelection] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState(null);
 
@@ -80,6 +76,17 @@ const UpcomingGiftsManager = () => {
     }
   };
 
+  const getGiftImage = (giftType: string) => {
+    const imageMap = {
+      'wine': 'https://images.unsplash.com/photo-1482938289607-e9573fc25ebb?w=400&h=300&fit=crop',
+      'tea': 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=400&h=300&fit=crop',
+      'coffee': 'https://images.unsplash.com/photo-1581090464777-f3220bbe1b8b?w=400&h=300&fit=crop',
+      'sweet treats': 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=400&h=300&fit=crop',
+      'self care': 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?w=400&h=300&fit=crop'
+    };
+    return imageMap[giftType?.toLowerCase()] || 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop';
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6 w-full">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -97,90 +104,49 @@ const UpcomingGiftsManager = () => {
       {gifts && gifts.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-4 sm:gap-6">
           {gifts.map((gift: any) => (
-            <Card key={gift.id} className="hover:shadow-lg transition-shadow w-full">
+            <Card 
+              key={gift.id} 
+              className="hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1 bg-gradient-to-br from-white to-brand-cream/20 border-brand-cream w-full"
+              onClick={() => setViewingGift(gift)}
+            >
               <CardHeader className="pb-3 px-4 sm:px-6">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <CardTitle className="text-base sm:text-lg text-brand-charcoal truncate">
-                      {gift.recipients?.name}
-                    </CardTitle>
-                    <Badge className={`mt-1 text-xs ${getStatusColor(gift.status)}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Sparkles className="h-4 w-4 text-brand-gold" />
+                      <CardTitle className="text-base sm:text-lg text-brand-charcoal truncate">
+                        {gift.recipients?.name}
+                      </CardTitle>
+                    </div>
+                    <Badge className={`text-xs ${getStatusColor(gift.status)}`}>
                       {gift.status}
                     </Badge>
-                  </div>
-                  <div className="flex space-x-1 flex-shrink-0">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setTestingGift(gift)}
-                      title="Test Shopify Integration"
-                      className="h-8 w-8 p-0"
-                    >
-                      <TestTube2 className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setEditingGift(gift)}
-                      className="h-8 w-8 p-0"
-                    >
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleDeleteGift(gift.id)}
-                      className="text-red-600 hover:text-red-700 h-8 w-8 p-0"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
                   </div>
                 </div>
               </CardHeader>
               
-              <CardContent className="space-y-3 px-4 sm:px-6">
-                <div className="space-y-2">
-                  <p className="font-medium text-brand-charcoal text-sm sm:text-base">{gift.occasion}</p>
+              <CardContent className="space-y-4 px-4 sm:px-6">
+                {/* Gift Image & Details */}
+                <div className="flex items-center space-x-4">
                   {gift.gift_type && (
-                    <p className="text-xs sm:text-sm text-brand-charcoal/70">{gift.gift_type}</p>
+                    <img
+                      src={getGiftImage(gift.gift_type)}
+                      alt={`${gift.gift_type} gift`}
+                      className="w-16 h-16 object-cover rounded-lg shadow-sm"
+                    />
                   )}
-                </div>
-
-                {gift.recipients?.interests && gift.recipients.interests.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {gift.recipients.interests.slice(0, 3).map((interest: string, index: number) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {interest}
-                      </Badge>
-                    ))}
-                    {gift.recipients.interests.length > 3 && (
-                      <Badge variant="outline" className="text-xs">
-                        +{gift.recipients.interests.length - 3}
-                      </Badge>
+                  <div className="flex-1">
+                    <p className="font-medium text-brand-charcoal text-sm sm:text-base">{gift.occasion}</p>
+                    {gift.gift_type && (
+                      <p className="text-xs sm:text-sm text-brand-charcoal/70 font-medium">{gift.gift_type}</p>
                     )}
                   </div>
-                )}
-
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-2">
-                  <div className="flex items-center text-xs sm:text-sm text-brand-charcoal/70">
-                    <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                    {formatDate(gift.occasion_date)}
-                  </div>
-                  {gift.price_range && (
-                    <div className="flex items-center text-xs sm:text-sm text-brand-charcoal/70">
-                      <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                      {gift.price_range}
-                    </div>
-                  )}
                 </div>
 
-                <Button
-                  size="sm"
-                  className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 text-xs sm:text-sm"
-                  onClick={() => setViewingGift(gift)}
-                >
-                  View Details
-                </Button>
+                <div className="flex items-center text-xs sm:text-sm text-brand-charcoal/70">
+                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                  {formatDate(gift.occasion_date)}
+                </div>
               </CardContent>
             </Card>
           ))}
@@ -202,27 +168,12 @@ const UpcomingGiftsManager = () => {
         </Card>
       )}
 
-      {editingGift && (
-        <EditGiftModal
-          gift={editingGift}
-          isOpen={!!editingGift}
-          onClose={() => setEditingGift(null)}
-        />
-      )}
-
       {viewingGift && (
         <GiftDetailsModal
           gift={viewingGift}
           isOpen={!!viewingGift}
           onClose={() => setViewingGift(null)}
-        />
-      )}
-
-      {testingGift && (
-        <ShopifyTestModal
-          gift={testingGift}
-          isOpen={!!testingGift}
-          onClose={() => setTestingGift(null)}
+          onDelete={handleDeleteGift}
         />
       )}
 

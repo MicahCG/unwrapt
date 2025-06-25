@@ -17,6 +17,7 @@ import PaymentSuccess from "./pages/PaymentSuccess";
 import NotFound from "./pages/NotFound";
 import Onboarding from "./pages/Onboarding";
 import OAuthCallback from "./components/auth/OAuthCallback";
+import CalendarOAuthCallback from "./components/auth/CalendarOAuthCallback";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +42,7 @@ function App() {
               <Route path="/payment-success" element={<Navigate to="/payment/success" replace />} />
               <Route path="/onboarding" element={<Onboarding />} />
               <Route path="/auth/callback" element={<OAuthCallback />} />
+              <Route path="/auth/calendar/callback" element={<CalendarOAuthCallback />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
