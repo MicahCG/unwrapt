@@ -16,9 +16,18 @@ const PaymentSuccess = () => {
   const [verificationComplete, setVerificationComplete] = useState(false);
   const [showConfetti, setShowConfetti] = useState(true); // Show confetti immediately on load
   const [showVerificationConfetti, setShowVerificationConfetti] = useState(false);
+  const [isFromOnboarding, setIsFromOnboarding] = useState(false);
 
   useEffect(() => {
     const sessionId = searchParams.get('session_id');
+    
+    // Check if this payment came from onboarding flow
+    const onboardingFlag = localStorage.getItem('onboardingPaymentFlow');
+    if (onboardingFlag === 'true') {
+      setIsFromOnboarding(true);
+      // Clean up the flag
+      localStorage.removeItem('onboardingPaymentFlow');
+    }
     
     if (sessionId) {
       verifyPayment(sessionId);
@@ -57,6 +66,7 @@ const PaymentSuccess = () => {
 
   const handleGoToDashboard = () => {
     console.log('🔧 PaymentSuccess: Navigating to dashboard');
+    // Always navigate to dashboard, whether from onboarding or not
     navigate('/');
   };
 

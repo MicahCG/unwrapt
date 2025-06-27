@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useShopifyProductTypes } from '@/hooks/useShopifyProductTypes';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { useNavigate } from 'react-router-dom';
 
 interface GiftScheduleStepProps {
   onNext: (data: any) => void;
@@ -35,6 +36,7 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
   const { toast } = useToast();
   const { data: productTypesData, isLoading: isLoadingProductTypes } = useShopifyProductTypes();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   // Pre-populate form based on calendar data
   useEffect(() => {
@@ -213,6 +215,9 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
       if (paymentData?.url) {
         // Store the gift data for after payment
         localStorage.setItem('pendingGiftData', JSON.stringify(giftData));
+        
+        // Store a flag to indicate this is from onboarding flow
+        localStorage.setItem('onboardingPaymentFlow', 'true');
         
         // Open Stripe checkout in a new tab
         window.open(paymentData.url, '_blank');
