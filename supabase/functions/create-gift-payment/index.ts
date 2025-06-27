@@ -34,7 +34,8 @@ serve(async (req) => {
       giftDetails, 
       shippingAddress,
       productPrice,
-      productImage 
+      productImage,
+      variantId 
     } = await req.json();
     
     if (!scheduledGiftId || !productPrice) {
@@ -120,6 +121,7 @@ serve(async (req) => {
         user_id: user.id,
         gift_type: giftDetails.giftType,
         occasion: giftDetails.occasion,
+        variant_id: variantId || '', // Store variant ID for Shopify order creation
       },
     });
 

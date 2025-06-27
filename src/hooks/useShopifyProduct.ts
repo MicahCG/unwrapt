@@ -8,6 +8,7 @@ interface ShopifyProduct {
   price: number;
   image: string;
   productType: string;
+  variantId: string;
 }
 
 export const useShopifyProduct = (productType: string) => {
@@ -29,11 +30,19 @@ export const useShopifyProduct = (productType: string) => {
             title: productType,
             price: 25.00, // Default fallback price
             image: 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop',
-            productType
+            productType,
+            variantId: 'fallback'
           };
         }
 
-        return data?.product || null;
+        return data?.product || {
+          id: 'fallback',
+          title: productType,
+          price: 25.00,
+          image: 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop',
+          productType,
+          variantId: 'fallback'
+        };
       } catch (error) {
         console.error('Error in useShopifyProduct:', error);
         // Return fallback pricing
@@ -42,7 +51,8 @@ export const useShopifyProduct = (productType: string) => {
           title: productType,
           price: 25.00,
           image: 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop',
-          productType
+          productType,
+          variantId: 'fallback'
         };
       }
     },
