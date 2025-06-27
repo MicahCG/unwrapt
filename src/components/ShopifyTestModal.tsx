@@ -99,7 +99,7 @@ const ShopifyTestModal: React.FC<ShopifyTestModalProps> = ({ gift, isOpen, onClo
         toast({
           title: testMode ? "Test Completed Successfully" : "Order Created Successfully",
           description: testMode 
-            ? `Product selected: ${data.selectedProduct?.productName || 'Vanilla Candle'}`
+            ? `Product selected: ${data.selectedProduct?.productName || 'Ocean Driftwood Coconut Candle'}`
             : `Order ${data.shopifyOrderName} created successfully`,
         });
       } else {

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,9 +48,9 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
     }
   }, [selectedPersonForGift]);
 
-  // Same interests as in AddRecipientModal
+  // Same interests as in AddRecipientModal - updated with new product names
   const predefinedInterests = [
-    'Coffee', 'Tea', 'Wine', 'Sweet Treats', 'Self Care'
+    'Lavender Fields Coffee', 'Ocean Driftwood Coconut Candle', 'Truffle Chocolate'
   ];
 
   const handleInputChange = (field: string, value: string) => {

@@ -3,9 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 const PRODUCT_VARIANTS = {
-  VANILLA_CANDLE: 50924986532159,
-  COFFEE: 50924986663231,
-  THIRD_PRODUCT: 51013162041663
+  OCEAN_DRIFTWOOD_COCONUT_CANDLE: 51056282272063,
+  LAVENDER_FIELDS_COFFEE: 51056282075455,
+  TRUFFLE_CHOCOLATE: 51056285221183
 };
 
 export const useShopifyProductTypes = () => {
@@ -16,37 +16,37 @@ export const useShopifyProductTypes = () => {
         // Fetch all three products from Shopify
         const productRequests = await Promise.allSettled([
           supabase.functions.invoke('shopify-product', {
-            body: { variantId: PRODUCT_VARIANTS.VANILLA_CANDLE }
+            body: { variantId: PRODUCT_VARIANTS.OCEAN_DRIFTWOOD_COCONUT_CANDLE }
           }),
           supabase.functions.invoke('shopify-product', {
-            body: { variantId: PRODUCT_VARIANTS.COFFEE }
+            body: { variantId: PRODUCT_VARIANTS.LAVENDER_FIELDS_COFFEE }
           }),
           supabase.functions.invoke('shopify-product', {
-            body: { variantId: PRODUCT_VARIANTS.THIRD_PRODUCT }
+            body: { variantId: PRODUCT_VARIANTS.TRUFFLE_CHOCOLATE }
           })
         ]);
 
         const productTypes = [];
         
-        // Process vanilla candle
+        // Process Ocean Driftwood Coconut Candle
         if (productRequests[0].status === 'fulfilled' && productRequests[0].value.data?.success) {
           productTypes.push(productRequests[0].value.data.productName);
         } else {
-          productTypes.push('Vanilla Candle'); // Fallback
+          productTypes.push('Ocean Driftwood Coconut Candle'); // Fallback
         }
 
-        // Process coffee
+        // Process Lavender Fields Coffee
         if (productRequests[1].status === 'fulfilled' && productRequests[1].value.data?.success) {
           productTypes.push(productRequests[1].value.data.productName);
         } else {
-          productTypes.push('Coffee'); // Fallback
+          productTypes.push('Lavender Fields Coffee'); // Fallback
         }
 
-        // Process third product
+        // Process Truffle Chocolate
         if (productRequests[2].status === 'fulfilled' && productRequests[2].value.data?.success) {
           productTypes.push(productRequests[2].value.data.productName);
         } else {
-          productTypes.push('Bath & Body'); // Fallback
+          productTypes.push('Truffle Chocolate'); // Fallback
         }
 
         return {
@@ -58,7 +58,7 @@ export const useShopifyProductTypes = () => {
         // Fallback to default options
         return {
           success: true,
-          productTypes: ['Vanilla Candle', 'Coffee', 'Bath & Body']
+          productTypes: ['Ocean Driftwood Coconut Candle', 'Lavender Fields Coffee', 'Truffle Chocolate']
         };
       }
     },

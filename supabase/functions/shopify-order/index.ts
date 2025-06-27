@@ -9,9 +9,9 @@ const corsHeaders = {
 
 // Available product variants
 const PRODUCT_VARIANTS = {
-  VANILLA_CANDLE: 50924986532159,
-  COFFEE: 50924986663231,
-  THIRD_PRODUCT: 51013162041663
+  OCEAN_DRIFTWOOD_COCONUT_CANDLE: 51056282272063,
+  LAVENDER_FIELDS_COFFEE: 51056282075455,
+  TRUFFLE_CHOCOLATE: 51056285221183
 };
 
 interface ShopifyOrderRequest {
@@ -85,60 +85,63 @@ serve(async (req) => {
     });
 
     // Select product variant based on gift type or interests
-    let selectedVariantId = PRODUCT_VARIANTS.VANILLA_CANDLE; // Default
-    let matchReason = 'default vanilla candle';
+    let selectedVariantId = PRODUCT_VARIANTS.OCEAN_DRIFTWOOD_COCONUT_CANDLE; // Default
+    let matchReason = 'default ocean driftwood coconut candle';
 
     // Check if gift type is specified
     if (giftData.gift_type) {
-      if (giftData.gift_type.toLowerCase().includes('coffee')) {
-        selectedVariantId = PRODUCT_VARIANTS.COFFEE;
-        matchReason = 'gift type: coffee';
-      } else if (giftData.gift_type.toLowerCase().includes('candle') || giftData.gift_type.toLowerCase().includes('vanilla')) {
-        selectedVariantId = PRODUCT_VARIANTS.VANILLA_CANDLE;
-        matchReason = 'gift type: candle/vanilla';
-      } else if (giftData.gift_type.toLowerCase().includes('bath') || giftData.gift_type.toLowerCase().includes('body')) {
-        selectedVariantId = PRODUCT_VARIANTS.THIRD_PRODUCT;
-        matchReason = 'gift type: bath & body';
+      if (giftData.gift_type.toLowerCase().includes('coffee') || giftData.gift_type.toLowerCase().includes('lavender')) {
+        selectedVariantId = PRODUCT_VARIANTS.LAVENDER_FIELDS_COFFEE;
+        matchReason = 'gift type: coffee/lavender';
+      } else if (giftData.gift_type.toLowerCase().includes('candle') || giftData.gift_type.toLowerCase().includes('ocean') || giftData.gift_type.toLowerCase().includes('driftwood') || giftData.gift_type.toLowerCase().includes('coconut')) {
+        selectedVariantId = PRODUCT_VARIANTS.OCEAN_DRIFTWOOD_COCONUT_CANDLE;
+        matchReason = 'gift type: candle/ocean/driftwood/coconut';
+      } else if (giftData.gift_type.toLowerCase().includes('chocolate') || giftData.gift_type.toLowerCase().includes('truffle')) {
+        selectedVariantId = PRODUCT_VARIANTS.TRUFFLE_CHOCOLATE;
+        matchReason = 'gift type: chocolate/truffle';
       }
     }
 
     // Check recipient interests if no specific gift type match
-    if (selectedVariantId === PRODUCT_VARIANTS.VANILLA_CANDLE && giftData.recipients?.interests) {
+    if (selectedVariantId === PRODUCT_VARIANTS.OCEAN_DRIFTWOOD_COCONUT_CANDLE && giftData.recipients?.interests) {
       const interests = giftData.recipients.interests.map((i: string) => i.toLowerCase());
       
       if (interests.some((interest: string) => 
         interest.includes('coffee') || 
         interest.includes('caffeine') || 
         interest.includes('espresso') || 
-        interest.includes('latte')
+        interest.includes('latte') ||
+        interest.includes('lavender')
       )) {
-        selectedVariantId = PRODUCT_VARIANTS.COFFEE;
+        selectedVariantId = PRODUCT_VARIANTS.LAVENDER_FIELDS_COFFEE;
         matchReason = `recipient interests: ${interests.filter((i: string) => 
-          i.includes('coffee') || i.includes('caffeine') || i.includes('espresso') || i.includes('latte')
+          i.includes('coffee') || i.includes('caffeine') || i.includes('espresso') || i.includes('latte') || i.includes('lavender')
         ).join(', ')}`;
       } else if (interests.some((interest: string) => 
-        interest.includes('bath') || 
-        interest.includes('body') || 
-        interest.includes('skincare') || 
-        interest.includes('spa') ||
-        interest.includes('wellness')
+        interest.includes('chocolate') || 
+        interest.includes('truffle') || 
+        interest.includes('sweet') || 
+        interest.includes('dessert') ||
+        interest.includes('candy')
       )) {
-        selectedVariantId = PRODUCT_VARIANTS.THIRD_PRODUCT;
+        selectedVariantId = PRODUCT_VARIANTS.TRUFFLE_CHOCOLATE;
         matchReason = `recipient interests: ${interests.filter((i: string) => 
-          i.includes('bath') || i.includes('body') || i.includes('skincare') || 
-          i.includes('spa') || i.includes('wellness')
+          i.includes('chocolate') || i.includes('truffle') || i.includes('sweet') || 
+          i.includes('dessert') || i.includes('candy')
         ).join(', ')}`;
       } else if (interests.some((interest: string) => 
         interest.includes('candle') || 
-        interest.includes('vanilla') || 
+        interest.includes('ocean') || 
+        interest.includes('coconut') || 
+        interest.includes('driftwood') ||
         interest.includes('scent') || 
         interest.includes('aromatherapy') ||
         interest.includes('relaxation')
       )) {
-        selectedVariantId = PRODUCT_VARIANTS.VANILLA_CANDLE;
+        selectedVariantId = PRODUCT_VARIANTS.OCEAN_DRIFTWOOD_COCONUT_CANDLE;
         matchReason = `recipient interests: ${interests.filter((i: string) => 
-          i.includes('candle') || i.includes('vanilla') || i.includes('scent') || 
-          i.includes('aromatherapy') || i.includes('relaxation')
+          i.includes('candle') || i.includes('ocean') || i.includes('coconut') || i.includes('driftwood') ||
+          i.includes('scent') || i.includes('aromatherapy') || i.includes('relaxation')
         ).join(', ')}`;
       }
     }
@@ -147,9 +150,9 @@ serve(async (req) => {
 
     // Get variant details from Shopify
     let variantPrice = "25.00"; // Default price
-    let productName = selectedVariantId === PRODUCT_VARIANTS.COFFEE ? "Coffee" : 
-                     selectedVariantId === PRODUCT_VARIANTS.THIRD_PRODUCT ? "Bath & Body" : 
-                     "Vanilla Candle"; // Default names
+    let productName = selectedVariantId === PRODUCT_VARIANTS.LAVENDER_FIELDS_COFFEE ? "Lavender Fields Coffee" : 
+                     selectedVariantId === PRODUCT_VARIANTS.TRUFFLE_CHOCOLATE ? "Truffle Chocolate" : 
+                     "Ocean Driftwood Coconut Candle"; // Default names
     const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
     const shopifyToken = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
     
