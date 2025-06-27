@@ -180,7 +180,8 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
             occasion,
             giftType
           },
-          scheduledGiftId: 'onboarding-temp-id'
+          scheduledGiftId: 'onboarding-temp-id',
+          variantId: productData.variantId
         }
       });
 
@@ -193,13 +194,8 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
         // Store a flag to indicate this is from onboarding flow
         localStorage.setItem('onboardingPaymentFlow', 'true');
         
-        // Open Stripe checkout in a new tab
-        window.open(paymentData.url, '_blank');
-        
-        toast({
-          title: "Payment Required",
-          description: "Please complete payment in the new tab to continue with your gift scheduling.",
-        });
+        // Redirect in the same tab for onboarding flow
+        window.location.href = paymentData.url;
       }
     } catch (error) {
       console.error('Error processing payment:', error);
