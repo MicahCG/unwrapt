@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { CreditCard, Package, Heart, MapPin } from 'lucide-react';
 import { useShopifyProductTypes } from '@/hooks/useShopifyProductTypes';
+import { useShopifyProduct } from '@/hooks/useShopifyProduct';
 
 interface ScheduleGiftModalProps {
   recipient: any;
@@ -24,12 +24,13 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: productTypesData, isLoading: isLoadingProductTypes } = useShopifyProductTypes();
+  const { data: productData, isLoading: isLoadingProduct } = useShopifyProduct(formData.gift_type);
   
   const [formData, setFormData] = useState({
     occasion: '',
     occasion_date: '',
     gift_type: '',
-    price_range: '$0-$25', // Auto-select the lowest price range by default
+    // Removed price_range - now using Shopify pricing
     // Address fields
     street: '',
     city: '',
@@ -154,7 +155,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     return formData.occasion && 
            formData.occasion_date && 
            formData.gift_type && 
-           formData.price_range &&
+           productData && // Ensure we have product data
            formData.street &&
            formData.city &&
            formData.state &&
@@ -163,7 +164,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isFormValid()) return;
+    if (!isFormValid() || !productData) return;
     
     setIsLoading(true);
 
@@ -191,7 +192,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
       console.log('Successfully updated recipient address for:', recipient.name);
 
-      // Then create the scheduled gift
+      // Then create the scheduled gift with Shopify price
       const { data: giftData, error: giftError } = await supabase
         .from('scheduled_gifts')
         .insert({
@@ -200,7 +201,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           occasion: formData.occasion,
           occasion_date: formData.occasion_date,
           gift_type: formData.gift_type,
-          price_range: formData.price_range,
+          price_range: `$${productData.price.toFixed(2)}`, // Store actual price
           delivery_date: deliveryDate,
           status: 'scheduled',
           payment_status: 'unpaid'
@@ -210,18 +211,16 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
       if (giftError) throw giftError;
 
-      // Now process payment
-      const amount = getPriceRangeAmount(formData.price_range);
-
+      // Now process payment with Shopify product data
       const { data: paymentData, error: paymentError } = await supabase.functions.invoke('create-gift-payment', {
         body: {
           scheduledGiftId: giftData.id,
-          amount,
+          productPrice: productData.price,
+          productImage: productData.image,
           giftDetails: {
             recipientName: recipient.name,
             occasion: formData.occasion,
-            giftType: formData.gift_type,
-            priceRange: formData.price_range
+            giftType: formData.gift_type
           },
           shippingAddress: {
             first_name: recipient.name.split(' ')[0] || recipient.name,
@@ -239,7 +238,10 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
       if (paymentData?.url) {
         // Send notification email
-        await sendGiftNotificationEmail(formData);
+        await sendGiftNotificationEmail({
+          ...formData,
+          price: productData.price
+        });
 
         // Open Stripe checkout in a new tab
         window.open(paymentData.url, '_blank');
@@ -252,14 +254,13 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         // Refresh queries to update the UI
         queryClient.invalidateQueries({ queryKey: ['upcoming-gifts'] });
         queryClient.invalidateQueries({ queryKey: ['user-metrics'] });
-        queryClient.invalidateQueries({ queryKey: ['recipients'] }); // Refresh recipients to show updated address
+        queryClient.invalidateQueries({ queryKey: ['recipients'] });
         
         onClose();
         setFormData({
           occasion: '',
           occasion_date: '',
           gift_type: '',
-          price_range: '$0-$25',
           street: '',
           city: '',
           state: '',
@@ -352,8 +353,8 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             )}
           </div>
 
-          {/* Gift Preview Section - Moved right after gift type */}
-          {formData.gift_type && (
+          {/* Gift Preview Section with Shopify data */}
+          {formData.gift_type && productData && (
             <Card className="bg-brand-cream/30 border-brand-cream">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-2 mb-3">
@@ -362,26 +363,38 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
                 </div>
                 <div className="flex space-x-3">
                   <img
-                    src={getGiftImage(formData.gift_type)}
+                    src={productData.image}
                     alt={`${formData.gift_type} gift`}
                     className="w-20 h-20 object-cover rounded-lg"
                   />
                   <div className="flex-1">
                     <p className="text-sm text-brand-charcoal font-medium mb-1">
-                      {formData.gift_type}
+                      {productData.title}
                     </p>
                     <p className="text-xs text-brand-charcoal/70">
                       {getGiftDescription(formData.gift_type, recipient.name)}
                     </p>
-                    {formData.price_range && (
-                      <p className="text-xs text-brand-gold font-medium mt-1">
-                        Price Range: {formData.price_range}
-                      </p>
-                    )}
+                    <p className="text-lg text-brand-gold font-bold mt-2">
+                      ${productData.price.toFixed(2)}
+                    </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {/* Loading state for product data */}
+          {formData.gift_type && isLoadingProduct && (
+            <div className="bg-brand-cream/30 border-brand-cream p-4 rounded-lg">
+              <div className="animate-pulse flex space-x-3">
+                <div className="w-20 h-20 bg-brand-cream rounded-lg"></div>
+                <div className="flex-1">
+                  <div className="h-4 bg-brand-cream rounded mb-2"></div>
+                  <div className="h-3 bg-brand-cream rounded mb-2"></div>
+                  <div className="h-5 bg-brand-cream rounded w-20"></div>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Note Preview Section - Moved right after gift preview */}
@@ -406,25 +419,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             </Card>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="price_range" className="text-brand-charcoal">Price Range *</Label>
-            <Select 
-              value={formData.price_range} 
-              onValueChange={(value) => setFormData(prev => ({ ...prev, price_range: value }))}
-            >
-              <SelectTrigger className="text-brand-charcoal border-brand-cream">
-                <SelectValue placeholder="Select price range" />
-              </SelectTrigger>
-              <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
-                <SelectItem value="$0-$25">$0 - $25</SelectItem>
-                <SelectItem value="$25-$50">$25 - $50</SelectItem>
-                <SelectItem value="$50-$100">$50 - $100</SelectItem>
-                <SelectItem value="$100-$250">$100 - $250</SelectItem>
-                <SelectItem value="$250-$500">$250 - $500</SelectItem>
-                <SelectItem value="$500+">$500+</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Removed price range selector - now using Shopify pricing */}
 
           {/* Shipping Address Section */}
           <div className="space-y-4 pt-4 border-t">
@@ -509,15 +504,15 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             </p>
           </div>
 
-          {/* Payment Info */}
-          {formData.price_range && (
+          {/* Payment Info with Shopify pricing */}
+          {productData && (
             <div className="bg-brand-cream p-3 rounded-lg border border-brand-cream">
               <div className="flex items-center space-x-2 mb-1">
                 <CreditCard className="h-4 w-4 text-brand-charcoal" />
                 <span className="font-medium text-sm text-brand-charcoal">Payment Required</span>
               </div>
               <p className="text-xs text-brand-charcoal/70">
-                You'll pay {formatPriceRange(formData.price_range)} to schedule this gift
+                You'll pay ${productData.price.toFixed(2)} to schedule this gift
               </p>
             </div>
           )}
@@ -534,10 +529,13 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             </Button>
             <Button 
               type="submit" 
-              disabled={isLoading || !isFormValid()} 
+              disabled={isLoading || !isFormValid() || isLoadingProduct} 
               className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
             >
-              {isLoading ? 'Processing...' : 'Schedule & Pay for Gift'}
+              {isLoading ? 'Processing...' : 
+               isLoadingProduct ? 'Loading product...' :
+               productData ? `Schedule & Pay $${productData.price.toFixed(2)}` : 
+               'Schedule & Pay for Gift'}
             </Button>
           </div>
         </form>

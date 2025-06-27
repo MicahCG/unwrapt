@@ -29,10 +29,16 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated or email not available");
 
     // Parse request body
-    const { scheduledGiftId, amount, giftDetails } = await req.json();
+    const { 
+      scheduledGiftId, 
+      giftDetails, 
+      shippingAddress,
+      productPrice,
+      productImage 
+    } = await req.json();
     
-    if (!scheduledGiftId || !amount) {
-      throw new Error("Missing required fields: scheduledGiftId and amount");
+    if (!scheduledGiftId || !productPrice) {
+      throw new Error("Missing required fields: scheduledGiftId and productPrice");
     }
 
     // Initialize Stripe
@@ -47,7 +53,23 @@ serve(async (req) => {
       customerId = customers.data[0].id;
     }
 
-    // Create a one-time payment session
+    // Prepare shipping address for Stripe if provided
+    let shippingDetails = undefined;
+    if (shippingAddress) {
+      shippingDetails = {
+        name: `${shippingAddress.first_name} ${shippingAddress.last_name}`.trim(),
+        address: {
+          line1: shippingAddress.address1,
+          line2: shippingAddress.address2 || undefined,
+          city: shippingAddress.city,
+          state: shippingAddress.province,
+          postal_code: shippingAddress.zip,
+          country: shippingAddress.country === 'United States' ? 'US' : shippingAddress.country,
+        },
+      };
+    }
+
+    // Create a one-time payment session with gift image and shipping
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
@@ -56,10 +78,11 @@ serve(async (req) => {
           price_data: {
             currency: "usd",
             product_data: { 
-              name: `Gift for ${giftDetails.recipientName}`,
-              description: `${giftDetails.occasion} - ${giftDetails.giftType}`
+              name: `Gift: ${giftDetails.giftType} for ${giftDetails.recipientName}`,
+              description: `${giftDetails.occasion} gift`,
+              images: productImage ? [productImage] : undefined,
             },
-            unit_amount: amount, // Amount in cents
+            unit_amount: Math.round(productPrice * 100), // Convert to cents
           },
           quantity: 1,
         },
@@ -67,9 +90,36 @@ serve(async (req) => {
       mode: "payment",
       success_url: `${req.headers.get("origin")}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.get("origin")}/`,
+      shipping_address_collection: shippingAddress ? undefined : {
+        allowed_countries: ['US', 'CA', 'GB', 'AU'],
+      },
+      shipping_options: shippingAddress ? [
+        {
+          shipping_rate_data: {
+            type: 'fixed_amount',
+            fixed_amount: {
+              amount: 0, // Free shipping
+              currency: 'usd',
+            },
+            display_name: 'Standard Delivery',
+            delivery_estimate: {
+              minimum: {
+                unit: 'business_day',
+                value: 3,
+              },
+              maximum: {
+                unit: 'business_day',
+                value: 7,
+              },
+            },
+          },
+        },
+      ] : undefined,
       metadata: {
         scheduled_gift_id: scheduledGiftId,
         user_id: user.id,
+        gift_type: giftDetails.giftType,
+        occasion: giftDetails.occasion,
       },
     });
 
@@ -84,7 +134,7 @@ serve(async (req) => {
       user_id: user.id,
       scheduled_gift_id: scheduledGiftId,
       stripe_session_id: session.id,
-      amount: amount,
+      amount: Math.round(productPrice * 100),
       status: "pending",
     });
 

@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useShopifyProductTypes } from '@/hooks/useShopifyProductTypes';
+import { useShopifyProduct } from '@/hooks/useShopifyProduct';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useNavigate } from 'react-router-dom';
 
@@ -30,11 +31,11 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
   const [occasion, setOccasion] = useState('');
   const [occasionDate, setOccasionDate] = useState<Date>();
   const [giftType, setGiftType] = useState('');
-  const [priceRange, setPriceRange] = useState('under-25'); // Pre-set to lowest budget
   const [isValid, setIsValid] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const { toast } = useToast();
   const { data: productTypesData, isLoading: isLoadingProductTypes } = useShopifyProductTypes();
+  const { data: productData, isLoading: isLoadingProduct } = useShopifyProduct(giftType);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -113,11 +114,11 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
     }
   }, [productTypesData, interests, giftType]);
 
-  // Check form validity
+  // Check form validity - removed priceRange dependency
   useEffect(() => {
-    const formValid = occasion && occasionDate && giftType && priceRange;
+    const formValid = occasion && occasionDate && giftType;
     setIsValid(!!formValid);
-  }, [occasion, occasionDate, giftType, priceRange]);
+  }, [occasion, occasionDate, giftType]);
 
   // Gift preview helper functions
   const getGiftImage = (giftType: string) => {
@@ -137,47 +138,8 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
     return user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Someone special';
   };
 
-  const getPriceRangeAmount = (range: string) => {
-    switch (range) {
-      case 'under-25': return 2500; // $25 in cents
-      case '25-50': return 5000;    // $50 in cents
-      case '50-100': return 10000;  // $100 in cents
-      case '100-200': return 20000; // $200 in cents
-      case '200-500': return 50000; // $500 in cents
-      case 'over-500': return 75000; // $750 in cents (example for over $500)
-      default: return 2500;
-    }
-  };
-
-  const formatPriceRange = (range: string) => {
-    switch (range) {
-      case 'under-25': return 'under $25';
-      case '25-50': return '$25-$50';
-      case '50-100': return '$50-$100';
-      case '100-200': return '$100-$200';
-      case '200-500': return '$200-$500';
-      case 'over-500': return 'over $500';
-      default: return range;
-    }
-  };
-
-  const formatOccasion = (occasion: string) => {
-    switch (occasion) {
-      case 'birthday': return 'Birthday';
-      case 'anniversary': return 'Anniversary';
-      case 'valentine': return "Valentine's Day";
-      case 'christmas': return 'Christmas';
-      case 'mothers-day': return "Mother's Day";
-      case 'fathers-day': return "Father's Day";
-      case 'graduation': return 'Graduation';
-      case 'just-because': return 'Just Because';
-      case 'other': return 'Other';
-      default: return occasion;
-    }
-  };
-
   const handleScheduleWithPayment = async () => {
-    if (!isValid) return;
+    if (!isValid || !productData) return;
     
     setIsProcessingPayment(true);
     
@@ -188,24 +150,20 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
           occasion,
           occasionDate: occasionDate?.toISOString().split('T')[0],
           giftType,
-          priceRange
+          price: productData.price
         }
       };
 
-      // Get payment amount based on price range
-      const amount = getPriceRangeAmount(priceRange);
-
-      // Create payment session
+      // Create payment session with Shopify product data
       const { data: paymentData, error: paymentError } = await supabase.functions.invoke('create-gift-payment', {
         body: {
-          amount,
+          productPrice: productData.price,
+          productImage: productData.image,
           giftDetails: {
             recipientName: recipientName || 'your recipient',
             occasion,
-            giftType,
-            priceRange
+            giftType
           },
-          // We'll use a temporary ID for onboarding, will be replaced when gift is actually saved
           scheduledGiftId: 'onboarding-temp-id'
         }
       });
@@ -355,8 +313,8 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
             )}
           </div>
 
-          {/* Gift Preview Section - Moved right after gift type */}
-          {giftType && (
+          {/* Gift Preview Section with Shopify pricing */}
+          {giftType && productData && (
             <Card className="bg-brand-cream/30 border-brand-cream">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-2 mb-3">
@@ -365,24 +323,38 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
                 </div>
                 <div className="flex space-x-3">
                   <img
-                    src={getGiftImage(giftType)}
+                    src={productData.image}
                     alt={`${giftType} gift`}
                     className="w-20 h-20 object-cover rounded-lg"
                   />
                   <div className="flex-1">
                     <p className="text-sm text-brand-charcoal font-medium mb-1">
-                      {giftType}
+                      {productData.title}
                     </p>
                     <p className="text-xs text-brand-charcoal/70">
                       {getGiftDescription(giftType, recipientName || 'your recipient')}
                     </p>
-                    <p className="text-xs text-brand-gold font-medium mt-1">
-                      Price Range: {formatPriceRange(priceRange)}
+                    <p className="text-lg text-brand-gold font-bold mt-2">
+                      ${productData.price.toFixed(2)}
                     </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {/* Loading state for product data */}
+          {giftType && isLoadingProduct && (
+            <div className="bg-brand-cream/30 border-brand-cream p-4 rounded-lg">
+              <div className="animate-pulse flex space-x-3">
+                <div className="w-20 h-20 bg-brand-cream rounded-lg"></div>
+                <div className="flex-1">
+                  <div className="h-4 bg-brand-cream rounded mb-2"></div>
+                  <div className="h-3 bg-brand-cream rounded mb-2"></div>
+                  <div className="h-5 bg-brand-cream rounded w-20"></div>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Note Preview Section - Moved right after gift preview */}
@@ -406,24 +378,6 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
               </CardContent>
             </Card>
           )}
-
-          {/* Price Range */}
-          <div className="space-y-2">
-            <Label htmlFor="priceRange" className="text-brand-charcoal">What's your budget? *</Label>
-            <Select value={priceRange} onValueChange={setPriceRange}>
-              <SelectTrigger className="text-brand-charcoal border-brand-cream">
-                <SelectValue placeholder="Select price range" />
-              </SelectTrigger>
-              <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
-                <SelectItem value="under-25">Under $25</SelectItem>
-                <SelectItem value="25-50">$25 - $50</SelectItem>
-                <SelectItem value="50-100">$50 - $100</SelectItem>
-                <SelectItem value="100-200">$100 - $200</SelectItem>
-                <SelectItem value="200-500">$200 - $500</SelectItem>
-                <SelectItem value="over-500">Over $500</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
         </div>
 
         {/* Delivery Info */}
@@ -433,15 +387,15 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
           </p>
         </div>
 
-        {/* Payment Info */}
-        {isValid && (
+        {/* Payment Info with dynamic pricing */}
+        {isValid && productData && (
           <div className="bg-brand-cream p-4 rounded-lg border border-brand-cream">
             <div className="flex items-center space-x-2 mb-2">
               <CreditCard className="h-4 w-4 text-brand-charcoal" />
               <span className="font-medium text-brand-charcoal">Payment Required</span>
             </div>
             <p className="text-sm text-brand-charcoal/70">
-              You'll pay {formatPriceRange(priceRange)} to schedule this gift
+              You'll pay ${productData.price.toFixed(2)} to schedule this gift
             </p>
           </div>
         )}
@@ -453,7 +407,7 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
             <div className="text-sm text-brand-charcoal/80 leading-relaxed">
               <p className="mb-2">
                 You're gifting <span className="font-medium text-brand-charcoal">{recipientName}</span> on their <span className="font-medium text-brand-charcoal">{formatOccasion(occasion)}</span> 
-                {occasionDate && <span> ({format(occasionDate, "MMM d, yyyy")})</span>} with <span className="font-medium text-brand-charcoal">{giftType}</span> for <span className="font-medium text-brand-charcoal">{formatPriceRange(priceRange)}</span> because you want to show you care.
+                {occasionDate && <span> ({format(occasionDate, "MMM d, yyyy")})</span>} with <span className="font-medium text-brand-charcoal">{giftType}</span> for <span className="font-medium text-brand-charcoal">${productData?.price?.toFixed(2)}</span> because you want to show you care.
               </p>
               {interests.length > 0 && (
                 <p className="text-xs text-brand-charcoal/60 mt-2">
@@ -476,15 +430,19 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
           size="lg" 
           className="w-full text-lg py-6 bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
           onClick={handleScheduleWithPayment}
-          disabled={!isValid || isProcessingPayment}
+          disabled={!isValid || isProcessingPayment || isLoadingProduct || !productData}
         >
           {isProcessingPayment ? (
             "Processing..."
-          ) : (
+          ) : isLoadingProduct ? (
+            "Loading product..."
+          ) : productData ? (
             <>
-              Schedule & Pay for This Gift
+              Schedule & Pay ${productData.price.toFixed(2)} for This Gift
               <ArrowDown className="h-4 w-4 ml-2" />
             </>
+          ) : (
+            "Select a gift type to continue"
           )}
         </Button>
 
