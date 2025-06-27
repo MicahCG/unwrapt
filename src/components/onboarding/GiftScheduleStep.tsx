@@ -39,6 +39,22 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // Helper function to format occasion text
+  const formatOccasion = (occasion: string) => {
+    const formatMap: { [key: string]: string } = {
+      'birthday': 'birthday',
+      'anniversary': 'anniversary',
+      'valentine': 'Valentine\'s Day',
+      'christmas': 'Christmas',
+      'mothers-day': 'Mother\'s Day',
+      'fathers-day': 'Father\'s Day',
+      'graduation': 'graduation',
+      'just-because': 'special day',
+      'other': 'special occasion'
+    };
+    return formatMap[occasion.toLowerCase()] || occasion;
+  };
+
   // Pre-populate form based on calendar data
   useEffect(() => {
     if (selectedPersonForGift) {
@@ -114,7 +130,7 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
     }
   }, [productTypesData, interests, giftType]);
 
-  // Check form validity - removed priceRange dependency
+  // Check form validity
   useEffect(() => {
     const formValid = occasion && occasionDate && giftType;
     setIsValid(!!formValid);

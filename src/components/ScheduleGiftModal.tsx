@@ -24,20 +24,19 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: productTypesData, isLoading: isLoadingProductTypes } = useShopifyProductTypes();
-  const { data: productData, isLoading: isLoadingProduct } = useShopifyProduct(formData.gift_type);
   
   const [formData, setFormData] = useState({
     occasion: '',
     occasion_date: '',
     gift_type: '',
-    // Removed price_range - now using Shopify pricing
-    // Address fields
     street: '',
     city: '',
     state: '',
     zip_code: '',
     country: 'United States'
   });
+  
+  const { data: productData, isLoading: isLoadingProduct } = useShopifyProduct(formData.gift_type);
   const [isLoading, setIsLoading] = useState(false);
 
   const getDefaultOccasionDate = () => {
@@ -65,16 +64,14 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
       if (recipient._holidayPreset) {
         setFormData(prev => ({
           ...prev,
-          ...recipient._holidayPreset,
-          price_range: prev.price_range || '$0-$25' // Ensure price range is set even with preset
+          ...recipient._holidayPreset
         }));
       } else {
         const defaultOccasion = getDefaultOccasionDate();
         setFormData(prev => ({
           ...prev,
           occasion: defaultOccasion.occasion,
-          occasion_date: defaultOccasion.date,
-          price_range: '$0-$25' // Ensure price range is always set
+          occasion_date: defaultOccasion.date
         }));
       }
 
@@ -92,23 +89,6 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     }
   }, [isOpen, recipient]);
 
-  const getPriceRangeAmount = (range: string) => {
-    switch (range) {
-      case '$0-$25': return 2500;
-      case '$25-$50': return 5000;
-      case '$50-$100': return 10000;
-      case '$100-$250': return 25000;
-      case '$250-$500': return 50000;
-      case '$500+': return 75000;
-      default: return 5000;
-    }
-  };
-
-  const formatPriceRange = (range: string) => {
-    return range;
-  };
-
-  // Gift preview helper functions
   const getGiftImage = (giftType: string) => {
     const imageMap = {
       'wine': 'https://images.unsplash.com/photo-1482938289607-e9573fc25ebb?w=400&h=300&fit=crop',
@@ -140,7 +120,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             occasion: giftDetails.occasion,
             occasionDate: giftDetails.occasion_date,
             giftType: giftDetails.gift_type,
-            priceRange: giftDetails.price_range
+            price: giftDetails.price
           }
         }
       });
@@ -353,7 +333,6 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             )}
           </div>
 
-          {/* Gift Preview Section with Shopify data */}
           {formData.gift_type && productData && (
             <Card className="bg-brand-cream/30 border-brand-cream">
               <CardContent className="p-4">
@@ -383,7 +362,6 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             </Card>
           )}
 
-          {/* Loading state for product data */}
           {formData.gift_type && isLoadingProduct && (
             <div className="bg-brand-cream/30 border-brand-cream p-4 rounded-lg">
               <div className="animate-pulse flex space-x-3">
@@ -397,7 +375,6 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             </div>
           )}
 
-          {/* Note Preview Section - Moved right after gift preview */}
           {formData.gift_type && (
             <Card className="bg-gradient-to-br from-brand-cream/20 to-brand-cream/40 border-brand-cream">
               <CardContent className="p-4">
@@ -419,9 +396,6 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             </Card>
           )}
 
-          {/* Removed price range selector - now using Shopify pricing */}
-
-          {/* Shipping Address Section */}
           <div className="space-y-4 pt-4 border-t">
             <div className="flex items-center space-x-2 mb-3">
               <MapPin className="h-4 w-4 text-brand-charcoal" />
@@ -497,14 +471,12 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             </div>
           </div>
 
-          {/* Delivery Info */}
           <div className="bg-brand-cream/50 p-3 rounded-lg border border-brand-cream">
             <p className="text-sm text-brand-charcoal/80">
               📦 Deliveries are sent 3 days before occasion
             </p>
           </div>
 
-          {/* Payment Info with Shopify pricing */}
           {productData && (
             <div className="bg-brand-cream p-3 rounded-lg border border-brand-cream">
               <div className="flex items-center space-x-2 mb-1">
