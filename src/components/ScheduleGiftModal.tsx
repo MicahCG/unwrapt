@@ -210,7 +210,8 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             province: formData.state,
             country: formData.country,
             zip: formData.zip_code
-          }
+          },
+          variantId: productData.variantId
         }
       });
 
@@ -223,14 +224,9 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           price: productData.price
         });
 
-        // Open Stripe checkout in a new tab
-        window.open(paymentData.url, '_blank');
+        // Redirect in the same tab instead of opening new tab
+        window.location.href = paymentData.url;
         
-        toast({
-          title: "Payment Required",
-          description: "Please complete payment in the new tab to finalize your gift scheduling. You'll receive an email confirmation.",
-        });
-
         // Refresh queries to update the UI
         queryClient.invalidateQueries({ queryKey: ['upcoming-gifts'] });
         queryClient.invalidateQueries({ queryKey: ['user-metrics'] });
