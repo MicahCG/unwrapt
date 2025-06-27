@@ -20,6 +20,8 @@ serve(async (req) => {
       throw new Error("Missing session ID");
     }
 
+    console.log(`💳 Verifying payment for session: ${sessionId}`);
+
     // Initialize Stripe
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2023-10-16",
@@ -27,6 +29,7 @@ serve(async (req) => {
 
     // Retrieve the checkout session
     const session = await stripe.checkout.sessions.retrieve(sessionId);
+    console.log(`💳 Payment status: ${session.payment_status}, Amount: ${session.amount_total}`);
     
     if (session.payment_status === "paid") {
       // Update payment and gift status using service role key
@@ -37,10 +40,11 @@ serve(async (req) => {
       );
 
       const scheduledGiftId = session.metadata?.scheduled_gift_id;
+      console.log(`🎁 Processing gift fulfillment for: ${scheduledGiftId}`);
       
       if (scheduledGiftId) {
         // Update payment status
-        await supabaseService
+        const { error: paymentError } = await supabaseService
           .from("payments")
           .update({ 
             status: "paid",
@@ -49,8 +53,14 @@ serve(async (req) => {
           })
           .eq("stripe_session_id", sessionId);
 
+        if (paymentError) {
+          console.error('❌ Error updating payment status:', paymentError);
+        } else {
+          console.log('✅ Payment status updated successfully');
+        }
+
         // Update scheduled gift status
-        await supabaseService
+        const { error: giftError } = await supabaseService
           .from("scheduled_gifts")
           .update({ 
             payment_status: "paid",
@@ -58,6 +68,12 @@ serve(async (req) => {
             updated_at: new Date().toISOString()
           })
           .eq("id", scheduledGiftId);
+
+        if (giftError) {
+          console.error('❌ Error updating gift status:', giftError);
+        } else {
+          console.log('✅ Gift payment status updated successfully');
+        }
 
         // Get gift and recipient details for email
         const { data: giftData } = await supabaseService
@@ -87,15 +103,16 @@ serve(async (req) => {
                 }
               }
             });
-            console.log('Payment confirmation email sent successfully');
+            console.log('📧 Payment confirmation email sent successfully');
           } catch (emailError) {
-            console.error('Failed to send payment confirmation email:', emailError);
+            console.error('❌ Failed to send payment confirmation email:', emailError);
             // Don't fail the payment verification if email fails
           }
         }
 
         // Trigger gift fulfillment if not in onboarding
         if (scheduledGiftId !== 'onboarding-temp-id') {
+          console.log('🚀 Triggering Shopify order creation...');
           try {
             const fulfillmentResponse = await fetch(`${req.headers.get("origin")}/functions/process-gift-fulfillment`, {
               method: 'POST',
@@ -106,12 +123,24 @@ serve(async (req) => {
               body: JSON.stringify({ scheduledGiftId })
             });
 
+            if (!fulfillmentResponse.ok) {
+              const errorText = await fulfillmentResponse.text();
+              console.error('❌ Fulfillment response error:', errorText);
+              throw new Error(`Fulfillment failed: ${errorText}`);
+            }
+
             const fulfillmentResult = await fulfillmentResponse.json();
-            console.log('Fulfillment result:', fulfillmentResult);
+            console.log('✅ Fulfillment result:', fulfillmentResult);
+            
+            if (!fulfillmentResult.success) {
+              console.error('❌ Fulfillment failed:', fulfillmentResult.error);
+            }
           } catch (fulfillmentError) {
-            console.error('Error triggering fulfillment:', fulfillmentError);
-            // Don't fail the payment verification if fulfillment fails
+            console.error('❌ Error triggering fulfillment:', fulfillmentError);
+            // Don't fail the payment verification if fulfillment fails, but log it
           }
+        } else {
+          console.log('🧪 Skipping fulfillment for onboarding gift');
         }
       }
     }
@@ -124,7 +153,7 @@ serve(async (req) => {
       status: 200,
     });
   } catch (error) {
-    console.error("Error verifying payment:", error);
+    console.error("❌ Error verifying payment:", error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,

@@ -25,6 +25,8 @@ serve(async (req) => {
       throw new Error("Missing scheduledGiftId");
     }
 
+    console.log(`🎁 Processing gift fulfillment for: ${scheduledGiftId}`);
+
     // Get gift and recipient details
     const { data: giftData, error: giftError } = await supabaseService
       .from('scheduled_gifts')
@@ -37,17 +39,35 @@ serve(async (req) => {
       .single();
 
     if (giftError || !giftData) {
+      console.error('❌ Gift query error:', giftError);
       throw new Error("Gift not found or payment not confirmed");
     }
+
+    console.log(`✅ Found gift data:`, {
+      id: giftData.id,
+      recipient: giftData.recipients?.name,
+      paymentStatus: giftData.payment_status
+    });
 
     // Prepare recipient address from stored data
     const recipient = giftData.recipients;
     if (!recipient || !recipient.street) {
+      console.error('❌ Missing recipient address:', recipient);
       throw new Error("Recipient address not found");
     }
 
+    console.log(`📮 Recipient address:`, {
+      name: recipient.name,
+      street: recipient.street,
+      city: recipient.city,
+      state: recipient.state,
+      zip: recipient.zip_code
+    });
+
     // Create Shopify order
-    const orderResponse = await fetch(`${req.headers.get("origin")}/functions/shopify-order`, {
+    console.log('🛒 Creating Shopify order...');
+    const originUrl = req.headers.get("origin") || 'https://preview--unwrapt.lovable.app';
+    const orderResponse = await fetch(`${originUrl}/functions/shopify-order`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -68,13 +88,21 @@ serve(async (req) => {
       })
     });
 
+    if (!orderResponse.ok) {
+      const errorText = await orderResponse.text();
+      console.error('❌ Shopify order response error:', errorText);
+      throw new Error(`Order creation failed: ${errorText}`);
+    }
+
     const orderResult = await orderResponse.json();
+    console.log('🛒 Shopify order result:', orderResult);
 
     if (!orderResult.success) {
+      console.error('❌ Shopify order creation failed:', orderResult.error);
       throw new Error(`Order creation failed: ${orderResult.error}`);
     }
 
-    console.log(`Gift fulfillment processed successfully for ${scheduledGiftId}`);
+    console.log(`✅ Gift fulfillment processed successfully for ${scheduledGiftId}`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -86,7 +114,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Error processing gift fulfillment:', error);
+    console.error('❌ Error processing gift fulfillment:', error);
     return new Response(JSON.stringify({ 
       error: error.message,
       success: false 
