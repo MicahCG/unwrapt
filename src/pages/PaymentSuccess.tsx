@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,15 +5,19 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle, Gift } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import ConfettiAnimation from '@/components/ConfettiAnimation';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 const PaymentSuccess = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [isVerifying, setIsVerifying] = useState(true);
   const [verificationComplete, setVerificationComplete] = useState(false);
-  const [showConfetti, setShowConfetti] = useState(true); // Show confetti immediately on load
+  const [showConfetti, setShowConfetti] = useState(true);
   const [showVerificationConfetti, setShowVerificationConfetti] = useState(false);
   const [isFromOnboarding, setIsFromOnboarding] = useState(false);
 
@@ -47,6 +50,14 @@ const PaymentSuccess = () => {
       if (data?.paymentStatus === 'paid') {
         setVerificationComplete(true);
         setShowVerificationConfetti(true);
+        
+        // If this was from onboarding, invalidate onboarding status
+        if (isFromOnboarding && user?.id) {
+          await queryClient.invalidateQueries({ queryKey: ['onboarding-status', user.id] });
+          await queryClient.invalidateQueries({ queryKey: ['recipients', user.id] });
+          await queryClient.invalidateQueries({ queryKey: ['user-metrics', user.id] });
+        }
+        
         toast({
           title: "Payment Successful!",
           description: "Your gift has been scheduled and payment confirmed.",
@@ -64,10 +75,27 @@ const PaymentSuccess = () => {
     }
   };
 
-  const handleGoToDashboard = () => {
+  const handleGoToDashboard = async () => {
     console.log('🔧 PaymentSuccess: Navigating to dashboard');
-    // Always navigate to dashboard, whether from onboarding or not
-    navigate('/');
+    
+    // If from onboarding, force refresh the onboarding status before navigating
+    if (isFromOnboarding && user?.id) {
+      try {
+        // Invalidate all relevant queries to force refresh
+        await queryClient.invalidateQueries({ queryKey: ['onboarding-status', user.id] });
+        await queryClient.invalidateQueries({ queryKey: ['recipients', user.id] });
+        
+        // Small delay to allow queries to invalidate
+        setTimeout(() => {
+          navigate('/', { replace: true });
+        }, 100);
+      } catch (error) {
+        console.error('Error invalidating queries:', error);
+        navigate('/', { replace: true });
+      }
+    } else {
+      navigate('/', { replace: true });
+    }
   };
 
   if (isVerifying) {

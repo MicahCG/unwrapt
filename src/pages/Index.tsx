@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQuery } from '@tanstack/react-query';
@@ -46,7 +47,9 @@ const Index = () => {
       console.log('🔧 Index: New user detected, needs onboarding');
       return false;
     },
-    enabled: !!user?.id
+    enabled: !!user?.id,
+    staleTime: 0, // Always refetch to ensure fresh data
+    refetchOnWindowFocus: true
   });
 
   console.log('🔧 Index: Render state:', { 
