@@ -161,6 +161,8 @@ serve(async (req) => {
         const cleanStoreUrl = shopifyStore.replace(/^https?:\/\//, '').replace(/\/$/, '');
         const shopifyApiUrl = `https://${cleanStoreUrl}/admin/api/2024-01`;
         
+        console.log(`🔍 Fetching variant details from: ${shopifyApiUrl}/variants/${selectedVariantId}.json`);
+        
         const variantResponse = await fetch(`${shopifyApiUrl}/variants/${selectedVariantId}.json`, {
           headers: {
             'X-Shopify-Access-Token': shopifyToken,
@@ -186,10 +188,14 @@ serve(async (req) => {
           }
           
           console.log(`Retrieved product: ${productName}, price: $${variantPrice}`);
+        } else {
+          console.log(`⚠️ Could not fetch variant details: ${variantResponse.status}`);
         }
       } catch (error) {
         console.log('Could not fetch product details, using defaults:', error.message);
       }
+    } else {
+      console.log('⚠️ Shopify credentials not configured, using defaults');
     }
 
     // Create Shopify order (skip in test mode)
@@ -211,6 +217,8 @@ serve(async (req) => {
       const cleanStoreUrl = shopifyStore.replace(/^https?:\/\//, '').replace(/\/$/, '');
       const shopifyApiUrl = `https://${cleanStoreUrl}/admin/api/2024-01`;
 
+      console.log(`🛒 Creating order via: ${shopifyApiUrl}/orders.json`);
+
       const orderData = {
         order: {
           line_items: [
@@ -229,6 +237,8 @@ serve(async (req) => {
         }
       };
 
+      console.log('🛒 Order data prepared:', JSON.stringify(orderData, null, 2));
+
       const orderResponse = await fetch(`${shopifyApiUrl}/orders.json`, {
         method: 'POST',
         headers: {
@@ -238,13 +248,17 @@ serve(async (req) => {
         body: JSON.stringify(orderData),
       });
 
+      console.log(`🛒 Order response status: ${orderResponse.status}`);
+
       if (!orderResponse.ok) {
         const errorData = await orderResponse.text();
+        console.error('❌ Shopify order creation failed:', errorData);
         throw new Error(`Failed to create Shopify order: ${errorData}`);
       }
 
       const { order } = await orderResponse.json();
       orderResult = order;
+      console.log(`✅ Successfully created Shopify order: ${order.name} (ID: ${order.id})`);
     }
 
     // Update the scheduled gift with order information
@@ -253,7 +267,7 @@ serve(async (req) => {
       .update({
         status: testMode ? 'test-ordered' : 'ordered',
         updated_at: new Date().toISOString(),
-        gift_description: `${giftData.gift_description || ''} | Product: ${productName} | Variant ID: ${selectedVariantId} | Match: ${matchReason}${testMode ? ' | TEST MODE' : ''}`
+        gift_description: `${giftData.gift_description || ''} | Product: ${productName} | Variant ID: ${selectedVariantId} | Match: ${matchReason}${testMode ? ' | TEST MODE' : ''} | Shopify Order: ${orderResult.name}`
       })
       .eq('id', scheduledGiftId);
 

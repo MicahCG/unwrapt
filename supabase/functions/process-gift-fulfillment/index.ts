@@ -66,8 +66,14 @@ serve(async (req) => {
 
     // Create Shopify order
     console.log('🛒 Creating Shopify order...');
+    
+    // Get the current origin or use a default
     const originUrl = req.headers.get("origin") || 'https://preview--unwrapt.lovable.app';
-    const orderResponse = await fetch(`${originUrl}/functions/shopify-order`, {
+    const shopifyOrderUrl = `${originUrl}/functions/shopify-order`;
+    
+    console.log(`📞 Calling Shopify order function at: ${shopifyOrderUrl}`);
+    
+    const orderResponse = await fetch(shopifyOrderUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -88,6 +94,8 @@ serve(async (req) => {
       })
     });
 
+    console.log(`📞 Shopify order response status: ${orderResponse.status}`);
+
     if (!orderResponse.ok) {
       const errorText = await orderResponse.text();
       console.error('❌ Shopify order response error:', errorText);
@@ -100,6 +108,21 @@ serve(async (req) => {
     if (!orderResult.success) {
       console.error('❌ Shopify order creation failed:', orderResult.error);
       throw new Error(`Order creation failed: ${orderResult.error}`);
+    }
+
+    // Update the gift status to indicate it's been sent to Shopify
+    const { error: updateError } = await supabaseService
+      .from('scheduled_gifts')
+      .update({
+        status: 'ordered',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', scheduledGiftId);
+
+    if (updateError) {
+      console.error('❌ Error updating gift status:', updateError);
+    } else {
+      console.log('✅ Gift status updated to ordered');
     }
 
     console.log(`✅ Gift fulfillment processed successfully for ${scheduledGiftId}`);

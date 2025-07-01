@@ -114,7 +114,12 @@ serve(async (req) => {
         if (scheduledGiftId !== 'onboarding-temp-id') {
           console.log('🚀 Triggering Shopify order creation...');
           try {
-            const fulfillmentResponse = await fetch(`${req.headers.get("origin")}/functions/process-gift-fulfillment`, {
+            const originUrl = req.headers.get("origin") || 'https://preview--unwrapt.lovable.app';
+            const fulfillmentUrl = `${originUrl}/functions/process-gift-fulfillment`;
+            
+            console.log(`📞 Calling fulfillment function at: ${fulfillmentUrl}`);
+            
+            const fulfillmentResponse = await fetch(fulfillmentUrl, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -122,6 +127,8 @@ serve(async (req) => {
               },
               body: JSON.stringify({ scheduledGiftId })
             });
+
+            console.log(`📞 Fulfillment response status: ${fulfillmentResponse.status}`);
 
             if (!fulfillmentResponse.ok) {
               const errorText = await fulfillmentResponse.text();
@@ -134,6 +141,9 @@ serve(async (req) => {
             
             if (!fulfillmentResult.success) {
               console.error('❌ Fulfillment failed:', fulfillmentResult.error);
+              // Log but don't fail the payment verification
+            } else {
+              console.log('🎉 Shopify order created successfully!');
             }
           } catch (fulfillmentError) {
             console.error('❌ Error triggering fulfillment:', fulfillmentError);
@@ -142,7 +152,11 @@ serve(async (req) => {
         } else {
           console.log('🧪 Skipping fulfillment for onboarding gift');
         }
+      } else {
+        console.error('❌ No scheduled gift ID found in session metadata');
       }
+    } else {
+      console.log(`⚠️ Payment not completed. Status: ${session.payment_status}`);
     }
 
     return new Response(JSON.stringify({ 
