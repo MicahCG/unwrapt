@@ -24,8 +24,8 @@ const PaymentSuccess = () => {
   const [testMode, setTestMode] = useState(false);
 
   useEffect(() => {
-    // Get all possible session ID parameters from Stripe
-    const sessionId = searchParams.get('session_id') || searchParams.get('checkout_session_id');
+    // Get session ID from URL parameters - Stripe uses 'session_id' as the standard parameter
+    const sessionId = searchParams.get('session_id');
     const testParam = searchParams.get('test');
     
     console.log('🔧 PaymentSuccess: URL params:', { 
@@ -62,7 +62,7 @@ const PaymentSuccess = () => {
       // Don't show error immediately - give user option to retry or go back
       toast({
         title: "Payment Verification Issue",
-        description: "Unable to find payment session. This might be a URL issue. Please try again or contact support if the problem persists.",
+        description: "Unable to find payment session ID. This might be a URL issue from Stripe redirect.",
         variant: "destructive"
       });
     }
@@ -191,7 +191,7 @@ const PaymentSuccess = () => {
 
   const handleRetryVerification = () => {
     console.log('🔧 PaymentSuccess: Manually retrying verification');
-    const sessionId = searchParams.get('session_id') || searchParams.get('checkout_session_id');
+    const sessionId = searchParams.get('session_id');
     
     if (sessionId) {
       setIsVerifying(true);
@@ -234,8 +234,8 @@ const PaymentSuccess = () => {
     );
   }
 
-  // If no session ID and not in test mode, show error state with retry options
-  const sessionId = searchParams.get('session_id') || searchParams.get('checkout_session_id');
+  // Check if we have a session ID for display logic
+  const sessionId = searchParams.get('session_id');
   const hasSessionId = !!sessionId;
 
   return (
@@ -276,7 +276,7 @@ const PaymentSuccess = () => {
                   ? 'Your gift has been scheduled and your payment has been confirmed. We\'ll take care of everything from here!'
                   : hasSessionId
                     ? 'We\'re processing your order now.'
-                    : 'There was an issue finding your payment session. This might be due to a URL problem or payment cancellation.'
+                    : 'There was an issue finding your payment session. This might be due to a URL problem from the Stripe redirect.'
               }
             </p>
             

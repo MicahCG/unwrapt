@@ -107,7 +107,7 @@ serve(async (req) => {
         },
       ],
       mode: "payment",
-      // Make sure the success URL includes the session_id parameter
+      // Use session_id as the parameter name (Stripe's standard)
       success_url: `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/`,
       shipping_address_collection: shippingAddress ? undefined : {
