@@ -1,4 +1,4 @@
-
+// Enhanced PaymentSuccess component with better debugging
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,14 +24,17 @@ const PaymentSuccess = () => {
   const [testMode, setTestMode] = useState(false);
 
   useEffect(() => {
-    // Get session ID from URL parameters - Stripe uses 'session_id' as the standard parameter
-    const sessionId = searchParams.get('session_id');
+    // Get all possible session ID parameters from Stripe
+    const sessionId = searchParams.get('session_id') || searchParams.get('checkout_session_id');
     const testParam = searchParams.get('test');
     
     console.log('🔧 PaymentSuccess: URL params:', { 
       sessionId, 
       testParam,
-      allParams: Object.fromEntries(searchParams.entries())
+      allParams: Object.fromEntries(searchParams.entries()),
+      currentURL: window.location.href,
+      pathname: window.location.pathname,
+      search: window.location.search
     });
     
     if (testParam === 'true') {
@@ -57,18 +60,19 @@ const PaymentSuccess = () => {
     } else {
       console.error('🔧 PaymentSuccess: No session_id found in URL parameters');
       console.error('🔧 PaymentSuccess: Available URL parameters:', Object.fromEntries(searchParams.entries()));
+      console.error('🔧 PaymentSuccess: Full URL:', window.location.href);
       setIsVerifying(false);
       
-      // Don't show error immediately - give user option to retry or go back
+      // Show more detailed error information
       toast({
         title: "Payment Verification Issue",
-        description: "Unable to find payment session ID. This might be a URL issue from Stripe redirect.",
+        description: `Unable to find payment session. URL: ${window.location.href}. Available params: ${Object.keys(Object.fromEntries(searchParams.entries())).join(', ') || 'none'}`,
         variant: "destructive"
       });
     }
   }, [searchParams]);
 
-  const testVerifyPayment = async (testSessionId: string) => {
+  const testVerifyPayment = async (testSessionId) => {
     console.log('🧪 PaymentSuccess: Testing verification flow with session:', testSessionId);
     
     try {
@@ -113,7 +117,7 @@ const PaymentSuccess = () => {
     }
   };
 
-  const verifyPayment = async (sessionId: string) => {
+  const verifyPayment = async (sessionId) => {
     try {
       console.log('🔧 PaymentSuccess: Calling verify-payment function with session:', sessionId);
       console.log('🔧 PaymentSuccess: Supabase client configured, user authenticated:', !!user);
@@ -191,7 +195,7 @@ const PaymentSuccess = () => {
 
   const handleRetryVerification = () => {
     console.log('🔧 PaymentSuccess: Manually retrying verification');
-    const sessionId = searchParams.get('session_id');
+    const sessionId = searchParams.get('session_id') || searchParams.get('checkout_session_id');
     
     if (sessionId) {
       setIsVerifying(true);
@@ -234,8 +238,8 @@ const PaymentSuccess = () => {
     );
   }
 
-  // Check if we have a session ID for display logic
-  const sessionId = searchParams.get('session_id');
+  // If no session ID and not in test mode, show error state with retry options
+  const sessionId = searchParams.get('session_id') || searchParams.get('checkout_session_id');
   const hasSessionId = !!sessionId;
 
   return (
@@ -276,9 +280,18 @@ const PaymentSuccess = () => {
                   ? 'Your gift has been scheduled and your payment has been confirmed. We\'ll take care of everything from here!'
                   : hasSessionId
                     ? 'We\'re processing your order now.'
-                    : 'There was an issue finding your payment session. This might be due to a URL problem from the Stripe redirect.'
+                    : 'There was an issue finding your payment session. This might be due to a URL problem or payment cancellation.'
               }
             </p>
+            
+            {/* Debug info section - only show if no session ID */}
+            {!hasSessionId && !testMode && (
+              <div className="bg-gray-100 p-3 rounded text-left text-xs text-gray-600">
+                <p><strong>Debug Info:</strong></p>
+                <p>URL: {window.location.href}</p>
+                <p>Params: {JSON.stringify(Object.fromEntries(searchParams.entries()))}</p>
+              </div>
+            )}
             
             {(verificationComplete || hasSessionId) && (
               <div className="bg-brand-gold/10 p-4 rounded-lg">
