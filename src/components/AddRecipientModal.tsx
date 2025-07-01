@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -14,18 +15,32 @@ import { ErrorHandler } from '@/utils/errorHandler';
 import { rateLimiter, RATE_LIMITS } from '@/utils/rateLimiter';
 
 interface AddRecipientModalProps {
-  onRecipientAdded: () => void;
+  onRecipientAdded?: () => void;
   children?: React.ReactNode;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ 
   onRecipientAdded, 
-  children 
+  children,
+  isOpen,
+  onClose
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Use external state if provided, otherwise use internal state
+  const modalIsOpen = isOpen !== undefined ? isOpen : internalIsOpen;
+  const handleOpenChange = (open: boolean) => {
+    if (onClose && isOpen !== undefined) {
+      if (!open) onClose();
+    } else {
+      setInternalIsOpen(open);
+    }
+  };
   
   const [formData, setFormData] = useState({
     name: '',
@@ -186,8 +201,10 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
         interests: []
       });
       
-      setIsOpen(false);
-      onRecipientAdded();
+      handleOpenChange(false);
+      if (onRecipientAdded) {
+        onRecipientAdded();
+      }
     } catch (error: any) {
       console.error('Error adding recipient:', error);
       const friendlyMessage = ErrorHandler.handleApiError(error, 'add-recipient', user.id);
@@ -202,7 +219,7 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={modalIsOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {children || (
           <Button>
@@ -383,7 +400,7 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={isLoading}>
