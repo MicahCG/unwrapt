@@ -28,6 +28,8 @@ serve(async (req) => {
     const user = data.user;
     if (!user?.email) throw new Error("User not authenticated or email not available");
 
+    console.log(`💳 Creating payment for user: ${user.email}`);
+
     // Parse request body
     const { 
       scheduledGiftId, 
@@ -37,6 +39,14 @@ serve(async (req) => {
       productImage,
       variantId 
     } = await req.json();
+    
+    console.log(`💳 Payment request details:`, {
+      scheduledGiftId,
+      productPrice,
+      hasShippingAddress: !!shippingAddress,
+      hasProductImage: !!productImage,
+      variantId
+    });
     
     if (!scheduledGiftId || !productPrice) {
       throw new Error("Missing required fields: scheduledGiftId and productPrice");
@@ -52,6 +62,9 @@ serve(async (req) => {
     let customerId;
     if (customers.data.length > 0) {
       customerId = customers.data[0].id;
+      console.log(`💳 Found existing Stripe customer: ${customerId}`);
+    } else {
+      console.log(`💳 No existing Stripe customer found for ${user.email}`);
     }
 
     // Prepare shipping address for Stripe if provided
@@ -68,7 +81,12 @@ serve(async (req) => {
           country: shippingAddress.country === 'United States' ? 'US' : shippingAddress.country,
         },
       };
+      console.log(`💳 Using provided shipping address for ${shippingDetails.name}`);
     }
+
+    // Get the origin URL for redirect URLs
+    const origin = req.headers.get("origin");
+    console.log(`💳 Request origin: ${origin}`);
 
     // Create a one-time payment session with gift image and shipping
     const session = await stripe.checkout.sessions.create({
@@ -89,8 +107,9 @@ serve(async (req) => {
         },
       ],
       mode: "payment",
-      success_url: `${req.headers.get("origin")}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.get("origin")}/`,
+      // Make sure the success URL includes the session_id parameter
+      success_url: `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/`,
       shipping_address_collection: shippingAddress ? undefined : {
         allowed_countries: ['US', 'CA', 'GB', 'AU'],
       },
@@ -125,6 +144,9 @@ serve(async (req) => {
       },
     });
 
+    console.log(`💳 Created Stripe checkout session: ${session.id}`);
+    console.log(`💳 Success URL configured: ${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}`);
+
     // Create payment record in Supabase using service role key
     const supabaseService = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -132,7 +154,7 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
     
-    await supabaseService.from("payments").insert({
+    const { error: insertError } = await supabaseService.from("payments").insert({
       user_id: user.id,
       scheduled_gift_id: scheduledGiftId,
       stripe_session_id: session.id,
@@ -140,12 +162,19 @@ serve(async (req) => {
       status: "pending",
     });
 
+    if (insertError) {
+      console.error(`💳 Error creating payment record:`, insertError);
+      // Don't fail the payment creation for this, but log it
+    } else {
+      console.log(`💳 Created payment record in database`);
+    }
+
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
   } catch (error) {
-    console.error("Error creating payment:", error);
+    console.error("💳 Error creating payment:", error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,

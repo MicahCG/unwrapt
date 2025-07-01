@@ -24,15 +24,19 @@ const PaymentSuccess = () => {
   const [testMode, setTestMode] = useState(false);
 
   useEffect(() => {
-    const sessionId = searchParams.get('session_id');
+    // Get all possible session ID parameters from Stripe
+    const sessionId = searchParams.get('session_id') || searchParams.get('checkout_session_id');
     const testParam = searchParams.get('test');
     
-    console.log('🔧 PaymentSuccess: URL params:', { sessionId, testParam });
+    console.log('🔧 PaymentSuccess: URL params:', { 
+      sessionId, 
+      testParam,
+      allParams: Object.fromEntries(searchParams.entries())
+    });
     
     if (testParam === 'true') {
       console.log('🔧 PaymentSuccess: Test mode activated');
       setTestMode(true);
-      // For test mode, we'll simulate a proper session ID format
       const testSessionId = 'cs_test_' + Date.now();
       console.log('🔧 PaymentSuccess: Using test session ID:', testSessionId);
       testVerifyPayment(testSessionId);
@@ -51,11 +55,14 @@ const PaymentSuccess = () => {
       console.log('🔧 PaymentSuccess: Starting payment verification for session:', sessionId);
       verifyPayment(sessionId);
     } else {
-      console.error('🔧 PaymentSuccess: No session_id found in URL');
+      console.error('🔧 PaymentSuccess: No session_id found in URL parameters');
+      console.error('🔧 PaymentSuccess: Available URL parameters:', Object.fromEntries(searchParams.entries()));
       setIsVerifying(false);
+      
+      // Don't show error immediately - give user option to retry or go back
       toast({
-        title: "Verification Error",
-        description: "No payment session found in URL. Please contact support.",
+        title: "Payment Verification Issue",
+        description: "Unable to find payment session. This might be a URL issue. Please try again or contact support if the problem persists.",
         variant: "destructive"
       });
     }
@@ -81,7 +88,6 @@ const PaymentSuccess = () => {
           variant: "destructive"
         });
         
-        // Still show some success for test purposes
         setVerificationComplete(false);
       } else {
         console.log('🧪 PaymentSuccess: verify-payment succeeded');
@@ -183,6 +189,23 @@ const PaymentSuccess = () => {
     }
   };
 
+  const handleRetryVerification = () => {
+    console.log('🔧 PaymentSuccess: Manually retrying verification');
+    const sessionId = searchParams.get('session_id') || searchParams.get('checkout_session_id');
+    
+    if (sessionId) {
+      setIsVerifying(true);
+      setVerificationComplete(false);
+      verifyPayment(sessionId);
+    } else {
+      toast({
+        title: "No Session ID",
+        description: "Cannot retry verification without a valid session ID in the URL.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const runManualTest = () => {
     console.log('🧪 PaymentSuccess: Running manual test');
     setIsVerifying(true);
@@ -211,6 +234,10 @@ const PaymentSuccess = () => {
     );
   }
 
+  // If no session ID and not in test mode, show error state with retry options
+  const sessionId = searchParams.get('session_id') || searchParams.get('checkout_session_id');
+  const hasSessionId = !!sessionId;
+
   return (
     <>
       <ConfettiAnimation isActive={showConfetti} duration={5000} startDelay={0} />
@@ -219,16 +246,25 @@ const PaymentSuccess = () => {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
-              <div className="bg-green-100 p-4 rounded-full">
+              <div className={`p-4 rounded-full ${verificationComplete ? 'bg-green-100' : hasSessionId ? 'bg-brand-gold/20' : 'bg-red-100'}`}>
                 {verificationComplete ? (
                   <CheckCircle className="h-12 w-12 text-green-600" />
-                ) : (
+                ) : hasSessionId ? (
                   <Gift className="h-12 w-12 text-brand-gold" />
+                ) : (
+                  <Gift className="h-12 w-12 text-red-600" />
                 )}
               </div>
             </div>
             <CardTitle className="text-2xl text-brand-charcoal">
-              {testMode ? 'Test Complete!' : verificationComplete ? 'Payment Successful!' : 'Thank You!'}
+              {testMode 
+                ? 'Test Complete!' 
+                : verificationComplete 
+                  ? 'Payment Successful!' 
+                  : hasSessionId 
+                    ? 'Thank You!' 
+                    : 'Payment Issue'
+              }
             </CardTitle>
           </CardHeader>
           
@@ -238,15 +274,19 @@ const PaymentSuccess = () => {
                 ? 'Payment verification test completed. Check console logs and Supabase function logs for details.'
                 : verificationComplete 
                   ? 'Your gift has been scheduled and your payment has been confirmed. We\'ll take care of everything from here!'
-                  : 'We\'re processing your order now.'
+                  : hasSessionId
+                    ? 'We\'re processing your order now.'
+                    : 'There was an issue finding your payment session. This might be due to a URL problem or payment cancellation.'
               }
             </p>
             
-            <div className="bg-brand-gold/10 p-4 rounded-lg">
-              <p className="text-sm text-brand-charcoal">
-                🎁 We'll curate the perfect gift and handle delivery at just the right time
-              </p>
-            </div>
+            {(verificationComplete || hasSessionId) && (
+              <div className="bg-brand-gold/10 p-4 rounded-lg">
+                <p className="text-sm text-brand-charcoal">
+                  🎁 We'll curate the perfect gift and handle delivery at just the right time
+                </p>
+              </div>
+            )}
 
             {testMode && (
               <Button 
@@ -256,6 +296,16 @@ const PaymentSuccess = () => {
               >
                 <TestTube className="w-4 h-4 mr-2" />
                 Run Another Test
+              </Button>
+            )}
+
+            {!hasSessionId && !testMode && (
+              <Button 
+                onClick={handleRetryVerification}
+                variant="outline"
+                className="w-full mb-2"
+              >
+                Retry Verification
               </Button>
             )}
 
