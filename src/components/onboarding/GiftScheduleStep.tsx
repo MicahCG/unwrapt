@@ -154,25 +154,122 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
     return user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Someone special';
   };
 
+  // Function to create a recipient record if we don't have one
+  const createOrGetRecipient = async () => {
+    if (!recipientName || !user?.id) {
+      throw new Error('Missing recipient name or user');
+    }
+
+    // Check if recipient already exists for this user
+    const { data: existingRecipients, error: searchError } = await supabase
+      .from('recipients')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('name', recipientName)
+      .limit(1);
+
+    if (searchError) {
+      console.error('Error searching for existing recipient:', searchError);
+    }
+
+    // If recipient exists, use it
+    if (existingRecipients && existingRecipients.length > 0) {
+      console.log('Using existing recipient:', existingRecipients[0].id);
+      return existingRecipients[0].id;
+    }
+
+    // Create new recipient
+    const recipientData: any = {
+      user_id: user.id,
+      name: recipientName,
+      interests: interests || [],
+    };
+
+    // Add address if available from selectedPersonForGift
+    if (selectedPersonForGift?.address) {
+      recipientData.street = selectedPersonForGift.address.street;
+      recipientData.city = selectedPersonForGift.address.city;
+      recipientData.state = selectedPersonForGift.address.state;
+      recipientData.zip_code = selectedPersonForGift.address.zip;
+      recipientData.country = selectedPersonForGift.address.country || 'United States';
+    }
+
+    // Add birthday if available
+    if (selectedPersonForGift?.birthday) {
+      recipientData.birthday = selectedPersonForGift.birthday;
+    }
+
+    const { data: newRecipient, error: createError } = await supabase
+      .from('recipients')
+      .insert(recipientData)
+      .select('id')
+      .single();
+
+    if (createError) {
+      console.error('Error creating recipient:', createError);
+      throw new Error('Failed to create recipient');
+    }
+
+    console.log('Created new recipient:', newRecipient.id);
+    return newRecipient.id;
+  };
+
   const handleScheduleWithPayment = async () => {
     if (!isValid || !productData) return;
     
     setIsProcessingPayment(true);
     
     try {
-      // Save the gift data to continue with onboarding
-      const giftData = {
-        firstGift: {
-          occasion,
-          occasionDate: occasionDate?.toISOString().split('T')[0],
-          giftType,
-          price: productData.price
-        }
-      };
+      console.log('🎁 Starting onboarding gift creation process...');
 
-      // Create payment session with Shopify product data
+      // Get or create recipient
+      const recipientId = await createOrGetRecipient();
+
+      // Create the actual scheduled gift in the database
+      const deliveryDate = new Date(new Date(occasionDate!).getTime() - 3 * 24 * 60 * 60 * 1000)
+        .toISOString().split('T')[0];
+
+      const { data: giftData, error: giftError } = await supabase
+        .from('scheduled_gifts')
+        .insert({
+          user_id: user?.id,
+          recipient_id: recipientId,
+          occasion,
+          occasion_date: occasionDate?.toISOString().split('T')[0],
+          gift_type: giftType,
+          price_range: `$${productData.price.toFixed(2)}`, // Store actual price
+          delivery_date: deliveryDate,
+          status: 'scheduled',
+          payment_status: 'unpaid'
+        })
+        .select()
+        .single();
+
+      if (giftError) {
+        console.error('Error creating scheduled gift:', giftError);
+        throw new Error('Failed to create scheduled gift');
+      }
+
+      console.log('✅ Created scheduled gift with ID:', giftData.id);
+
+      // Prepare shipping address if available
+      let shippingAddress = undefined;
+      if (selectedPersonForGift?.address) {
+        shippingAddress = {
+          first_name: recipientName?.split(' ')[0] || 'Gift',
+          last_name: recipientName?.split(' ').slice(1).join(' ') || 'Recipient',
+          address1: selectedPersonForGift.address.street,
+          city: selectedPersonForGift.address.city,
+          province: selectedPersonForGift.address.state,
+          country: selectedPersonForGift.address.country || 'United States',
+          zip: selectedPersonForGift.address.zip,
+        };
+      }
+
+      // Create payment session with the real gift ID
       const { data: paymentData, error: paymentError } = await supabase.functions.invoke('create-gift-payment', {
         body: {
+          scheduledGiftId: giftData.id, // Use the real ID instead of 'onboarding-temp-id'
           productPrice: productData.price,
           productImage: productData.image,
           giftDetails: {
@@ -180,16 +277,32 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
             occasion,
             giftType
           },
-          scheduledGiftId: 'onboarding-temp-id',
-          variantId: productData.variantId
+          variantId: productData.variantId,
+          shippingAddress
         }
       });
 
-      if (paymentError) throw paymentError;
+      if (paymentError) {
+        console.error('Error creating payment:', paymentError);
+        throw new Error('Failed to create payment session');
+      }
 
       if (paymentData?.url) {
+        console.log('✅ Payment session created, redirecting to Stripe...');
+
         // Store the gift data for after payment
-        localStorage.setItem('pendingGiftData', JSON.stringify(giftData));
+        const pendingGiftData = {
+          firstGift: {
+            id: giftData.id, // Store the real ID
+            occasion,
+            occasionDate: occasionDate?.toISOString().split('T')[0],
+            giftType,
+            price: productData.price,
+            recipientId,
+            recipientName
+          }
+        };
+        localStorage.setItem('pendingGiftData', JSON.stringify(pendingGiftData));
         
         // Store a flag to indicate this is from onboarding flow
         localStorage.setItem('onboardingPaymentFlow', 'true');
@@ -198,12 +311,16 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
         window.location.href = paymentData.url;
       }
     } catch (error) {
-      console.error('Error processing payment:', error);
+      console.error('❌ Error processing payment:', error);
       toast({
         title: "Payment Error",
         description: "There was a problem processing your payment. Please try again.",
         variant: "destructive"
       });
+
+      // Clean up the gift if payment creation failed
+      // This prevents orphaned unpaid gifts
+      // Note: We could add cleanup logic here if needed
     } finally {
       setIsProcessingPayment(false);
     }
@@ -369,7 +486,7 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
             </div>
           )}
 
-          {/* Note Preview Section - Moved right after gift preview */}
+          {/* Note Preview Section */}
           {giftType && (
             <Card className="bg-gradient-to-br from-brand-cream/20 to-brand-cream/40 border-brand-cream">
               <CardContent className="p-4">
