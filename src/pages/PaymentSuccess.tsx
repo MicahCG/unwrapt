@@ -25,7 +25,12 @@ const PaymentSuccess = () => {
 
   useEffect(() => {
     // Get all possible session ID parameters from Stripe
-    const sessionId = searchParams.get('session_id') || searchParams.get('checkout_session_id');
+    const sessionId = 
+    searchParams.get('session_id') || 
+    searchParams.get('checkout_session_id') ||
+    searchParams.get('sessionId') ||  // Additional fallback
+    searchParams.get('checkoutSessionId'); // Additional fallback
+  
     const testParam = searchParams.get('test');
     
     console.log('🔧 PaymentSuccess: URL params:', { 
