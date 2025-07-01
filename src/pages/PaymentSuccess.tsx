@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,13 +32,11 @@ const PaymentSuccess = () => {
     if (testParam === 'true') {
       console.log('🔧 PaymentSuccess: Test mode activated');
       setTestMode(true);
-      // Simulate a test session ID for testing
-      if (!sessionId) {
-        const testSessionId = 'cs_test_' + Date.now();
-        console.log('🔧 PaymentSuccess: Using test session ID:', testSessionId);
-        testVerifyPayment(testSessionId);
-        return;
-      }
+      // For test mode, we'll simulate a proper session ID format
+      const testSessionId = 'cs_test_' + Date.now();
+      console.log('🔧 PaymentSuccess: Using test session ID:', testSessionId);
+      testVerifyPayment(testSessionId);
+      return;
     }
     
     // Check if this payment came from onboarding flow
@@ -68,32 +65,34 @@ const PaymentSuccess = () => {
     console.log('🧪 PaymentSuccess: Testing verification flow with session:', testSessionId);
     
     try {
-      // First test: Just call verify-payment to see if it responds
-      console.log('🧪 PaymentSuccess: Step 1 - Testing verify-payment function call');
+      console.log('🧪 PaymentSuccess: Calling verify-payment function...');
       
       const { data, error } = await supabase.functions.invoke('verify-payment', {
         body: { sessionId: testSessionId }
       });
 
-      console.log('🧪 PaymentSuccess: Test verify-payment response:', { data, error });
+      console.log('🧪 PaymentSuccess: verify-payment response:', { data, error });
 
       if (error) {
-        console.error('🧪 PaymentSuccess: Test failed at verify-payment:', error);
+        console.error('🧪 PaymentSuccess: verify-payment function error:', error);
         toast({
           title: "Test Failed",
           description: `verify-payment function error: ${error.message}`,
           variant: "destructive"
         });
+        
+        // Still show some success for test purposes
+        setVerificationComplete(false);
       } else {
-        console.log('🧪 PaymentSuccess: Test verify-payment succeeded');
+        console.log('🧪 PaymentSuccess: verify-payment succeeded');
+        setVerificationComplete(true);
+        setShowVerificationConfetti(true);
+        
         toast({
           title: "Test Status",
-          description: `Test session processed. Payment status: ${data?.paymentStatus || 'unknown'}`,
+          description: `Test session processed. Response received from verify-payment function.`,
         });
       }
-
-      setVerificationComplete(true);
-      setShowVerificationConfetti(true);
       
     } catch (error) {
       console.error('🧪 PaymentSuccess: Test error:', error);
@@ -102,6 +101,7 @@ const PaymentSuccess = () => {
         description: `Test failed: ${error.message}`,
         variant: "destructive"
       });
+      setVerificationComplete(false);
     } finally {
       setIsVerifying(false);
     }
@@ -235,7 +235,7 @@ const PaymentSuccess = () => {
           <CardContent className="space-y-4 text-center">
             <p className="text-brand-charcoal/70">
               {testMode 
-                ? 'Payment verification test completed. Check console logs for details.'
+                ? 'Payment verification test completed. Check console logs and Supabase function logs for details.'
                 : verificationComplete 
                   ? 'Your gift has been scheduled and your payment has been confirmed. We\'ll take care of everything from here!'
                   : 'We\'re processing your order now.'
@@ -274,4 +274,3 @@ const PaymentSuccess = () => {
 };
 
 export default PaymentSuccess;
-
