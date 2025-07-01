@@ -1,7 +1,10 @@
 
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { ErrorHandler } from '@/utils/errorHandler';
+import { rateLimiter, RATE_LIMITS } from '@/utils/rateLimiter';
 
 interface AuthContextType {
   user: User | null;
@@ -28,7 +31,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('🔧 AuthProvider: Setting up auth state management');
     
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error('🔧 AuthProvider: Error getting initial session:', error);
+        ErrorHandler.handleAuthError(error);
+      }
+      
       console.log('🔧 AuthProvider: Initial session check:', { 
         hasSession: !!session, 
         hasUser: !!session?.user,
@@ -63,6 +71,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             window.history.replaceState(null, '', cleanPath);
           } catch (error) {
             console.error('🔧 AuthProvider: Error cleaning URL after auth:', error);
+            ErrorHandler.logError({
+              code: 'URL_CLEANUP_ERROR',
+              message: 'Failed to clean URL after authentication',
+              details: error,
+              severity: 'low',
+              timestamp: new Date().toISOString()
+            });
           }
         }, 100);
       }
@@ -97,28 +112,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user, loading]);
 
   const signInWithGoogle = async () => {
-    console.log('🔧 AuthProvider: Starting Google sign in');
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/`,
-      },
-    });
-    if (error) {
-      console.error('🔧 AuthProvider: Error signing in with Google:', error);
+    try {
+      // Rate limiting check
+      const rateLimitKey = `google-signin-${window.location.hostname}`;
+      if (!rateLimiter.isAllowed(rateLimitKey, RATE_LIMITS.AUTH_ATTEMPTS)) {
+        const resetTime = rateLimiter.getResetTime(rateLimitKey, RATE_LIMITS.AUTH_ATTEMPTS);
+        const waitTime = Math.ceil((resetTime - Date.now()) / 1000 / 60);
+        throw new Error(`Too many sign-in attempts. Please wait ${waitTime} minutes.`);
+      }
+
+      console.log('🔧 AuthProvider: Starting Google sign in');
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/`,
+        },
+      });
+      
+      if (error) {
+        console.error('🔧 AuthProvider: Error signing in with Google:', error);
+        throw error;
+      }
+    } catch (error: any) {
+      const friendlyMessage = ErrorHandler.handleAuthError(error, user?.id);
+      throw new Error(friendlyMessage);
     }
   };
 
   const signOut = async () => {
-    console.log('🔧 AuthProvider: Signing out');
-    // Clear fake user state
-    if (process.env.NODE_ENV === 'development') {
-      setUser(null);
-    }
-    
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error('🔧 AuthProvider: Error signing out:', error);
+    try {
+      console.log('🔧 AuthProvider: Signing out');
+      
+      // Clear fake user state first
+      if (process.env.NODE_ENV === 'development') {
+        setUser(null);
+        // Clear dev auth rate limiting
+        localStorage.removeItem('last-dev-auth');
+      }
+      
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('🔧 AuthProvider: Error signing out:', error);
+        throw error;
+      }
+    } catch (error: any) {
+      const friendlyMessage = ErrorHandler.handleAuthError(error, user?.id);
+      console.error('Sign out error:', friendlyMessage);
+      // Don't throw on sign out errors, just log them
     }
   };
 
@@ -131,3 +171,4 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+

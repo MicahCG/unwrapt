@@ -1,10 +1,31 @@
 
-// Development-only authentication helper
+
+// Development-only authentication helper with improved security
 export const triggerDevAuth = () => {
+  // More restrictive environment check
   if (process.env.NODE_ENV !== 'development') {
-    console.warn('Dev auth is only available in development mode');
+    console.warn('🔒 Dev auth is only available in development mode');
     return;
   }
+
+  // Additional check for localhost
+  if (!window.location.hostname.includes('localhost') && 
+      !window.location.hostname.includes('127.0.0.1') &&
+      !window.location.hostname.includes('preview--')) {
+    console.warn('🔒 Dev auth blocked: not running on localhost or preview');
+    return;
+  }
+
+  // Rate limiting for dev auth
+  const lastDevAuth = localStorage.getItem('last-dev-auth');
+  const now = Date.now();
+  
+  if (lastDevAuth && (now - parseInt(lastDevAuth)) < 5000) {
+    console.warn('🔒 Dev auth rate limited: please wait 5 seconds between attempts');
+    return;
+  }
+
+  localStorage.setItem('last-dev-auth', now.toString());
 
   const fakeUser = {
     id: '00000000-0000-0000-0000-000000000001', // Proper UUID format for dev user
@@ -36,10 +57,17 @@ export const triggerDevAuth = () => {
 
   console.log('✅ Fake auth triggered with proper UUID:', fakeUser.id);
   console.log('📧 Dev user email:', fakeUser.email);
+  console.log('⏰ Session expires at:', new Date(fakeSession.expires_at * 1000).toLocaleString());
 };
 
-// Add to window for easy access in development
+// Add to window for easy access in development with additional security
 if (process.env.NODE_ENV === 'development') {
-  (window as any).triggerDevAuth = triggerDevAuth;
-  console.log('🔧 Dev mode: triggerDevAuth() available on window');
+  // Only expose if we're in a safe environment
+  if (window.location.hostname.includes('localhost') || 
+      window.location.hostname.includes('127.0.0.1') ||
+      window.location.hostname.includes('preview--')) {
+    (window as any).triggerDevAuth = triggerDevAuth;
+    console.log('🔧 Dev mode: triggerDevAuth() available on window (rate limited)');
+  }
 }
+
