@@ -1,9 +1,10 @@
 
+
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Gift } from 'lucide-react';
+import { CheckCircle, Gift, TestTube } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -21,17 +22,30 @@ const PaymentSuccess = () => {
   const [showConfetti, setShowConfetti] = useState(true);
   const [showVerificationConfetti, setShowVerificationConfetti] = useState(false);
   const [isFromOnboarding, setIsFromOnboarding] = useState(false);
+  const [testMode, setTestMode] = useState(false);
 
   useEffect(() => {
     const sessionId = searchParams.get('session_id');
+    const testParam = searchParams.get('test');
     
-    console.log('🔧 PaymentSuccess: Session ID from URL:', sessionId);
+    console.log('🔧 PaymentSuccess: URL params:', { sessionId, testParam });
+    
+    if (testParam === 'true') {
+      console.log('🔧 PaymentSuccess: Test mode activated');
+      setTestMode(true);
+      // Simulate a test session ID for testing
+      if (!sessionId) {
+        const testSessionId = 'cs_test_' + Date.now();
+        console.log('🔧 PaymentSuccess: Using test session ID:', testSessionId);
+        testVerifyPayment(testSessionId);
+        return;
+      }
+    }
     
     // Check if this payment came from onboarding flow
     const onboardingFlag = localStorage.getItem('onboardingPaymentFlow');
     if (onboardingFlag === 'true') {
       setIsFromOnboarding(true);
-      // Clean up the flag
       localStorage.removeItem('onboardingPaymentFlow');
       console.log('🔧 PaymentSuccess: Detected onboarding payment flow');
     }
@@ -50,9 +64,53 @@ const PaymentSuccess = () => {
     }
   }, [searchParams]);
 
+  const testVerifyPayment = async (testSessionId: string) => {
+    console.log('🧪 PaymentSuccess: Testing verification flow with session:', testSessionId);
+    
+    try {
+      // First test: Just call verify-payment to see if it responds
+      console.log('🧪 PaymentSuccess: Step 1 - Testing verify-payment function call');
+      
+      const { data, error } = await supabase.functions.invoke('verify-payment', {
+        body: { sessionId: testSessionId }
+      });
+
+      console.log('🧪 PaymentSuccess: Test verify-payment response:', { data, error });
+
+      if (error) {
+        console.error('🧪 PaymentSuccess: Test failed at verify-payment:', error);
+        toast({
+          title: "Test Failed",
+          description: `verify-payment function error: ${error.message}`,
+          variant: "destructive"
+        });
+      } else {
+        console.log('🧪 PaymentSuccess: Test verify-payment succeeded');
+        toast({
+          title: "Test Status",
+          description: `Test session processed. Payment status: ${data?.paymentStatus || 'unknown'}`,
+        });
+      }
+
+      setVerificationComplete(true);
+      setShowVerificationConfetti(true);
+      
+    } catch (error) {
+      console.error('🧪 PaymentSuccess: Test error:', error);
+      toast({
+        title: "Test Error",
+        description: `Test failed: ${error.message}`,
+        variant: "destructive"
+      });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   const verifyPayment = async (sessionId: string) => {
     try {
       console.log('🔧 PaymentSuccess: Calling verify-payment function with session:', sessionId);
+      console.log('🔧 PaymentSuccess: Supabase client configured, user authenticated:', !!user);
       
       const { data, error } = await supabase.functions.invoke('verify-payment', {
         body: { sessionId }
@@ -125,6 +183,13 @@ const PaymentSuccess = () => {
     }
   };
 
+  const runManualTest = () => {
+    console.log('🧪 PaymentSuccess: Running manual test');
+    setIsVerifying(true);
+    setVerificationComplete(false);
+    testVerifyPayment('cs_test_manual_' + Date.now());
+  };
+
   if (isVerifying) {
     return (
       <>
@@ -134,7 +199,9 @@ const PaymentSuccess = () => {
             <CardContent className="pt-6">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal mx-auto mb-4"></div>
-                <p className="text-brand-charcoal">Verifying your payment and creating your order...</p>
+                <p className="text-brand-charcoal">
+                  {testMode ? 'Testing payment verification...' : 'Verifying your payment and creating your order...'}
+                </p>
                 <p className="text-sm text-brand-charcoal/60 mt-2">This may take a few moments</p>
               </div>
             </CardContent>
@@ -161,15 +228,17 @@ const PaymentSuccess = () => {
               </div>
             </div>
             <CardTitle className="text-2xl text-brand-charcoal">
-              {verificationComplete ? 'Payment Successful!' : 'Thank You!'}
+              {testMode ? 'Test Complete!' : verificationComplete ? 'Payment Successful!' : 'Thank You!'}
             </CardTitle>
           </CardHeader>
           
           <CardContent className="space-y-4 text-center">
             <p className="text-brand-charcoal/70">
-              {verificationComplete 
-                ? 'Your gift has been scheduled and your payment has been confirmed. We\'ll take care of everything from here!'
-                : 'We\'re processing your order now.'
+              {testMode 
+                ? 'Payment verification test completed. Check console logs for details.'
+                : verificationComplete 
+                  ? 'Your gift has been scheduled and your payment has been confirmed. We\'ll take care of everything from here!'
+                  : 'We\'re processing your order now.'
               }
             </p>
             
@@ -178,6 +247,17 @@ const PaymentSuccess = () => {
                 🎁 We'll curate the perfect gift and handle delivery at just the right time
               </p>
             </div>
+
+            {testMode && (
+              <Button 
+                onClick={runManualTest}
+                variant="outline"
+                className="w-full mb-2"
+              >
+                <TestTube className="w-4 h-4 mr-2" />
+                Run Another Test
+              </Button>
+            )}
 
             <Button 
               size="lg" 
@@ -194,3 +274,4 @@ const PaymentSuccess = () => {
 };
 
 export default PaymentSuccess;
+
