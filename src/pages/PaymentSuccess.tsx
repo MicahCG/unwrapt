@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,35 +25,54 @@ const PaymentSuccess = () => {
   useEffect(() => {
     const sessionId = searchParams.get('session_id');
     
+    console.log('🔧 PaymentSuccess: Session ID from URL:', sessionId);
+    
     // Check if this payment came from onboarding flow
     const onboardingFlag = localStorage.getItem('onboardingPaymentFlow');
     if (onboardingFlag === 'true') {
       setIsFromOnboarding(true);
       // Clean up the flag
       localStorage.removeItem('onboardingPaymentFlow');
+      console.log('🔧 PaymentSuccess: Detected onboarding payment flow');
     }
     
     if (sessionId) {
+      console.log('🔧 PaymentSuccess: Starting payment verification for session:', sessionId);
       verifyPayment(sessionId);
     } else {
+      console.error('🔧 PaymentSuccess: No session_id found in URL');
       setIsVerifying(false);
+      toast({
+        title: "Verification Error",
+        description: "No payment session found in URL. Please contact support.",
+        variant: "destructive"
+      });
     }
   }, [searchParams]);
 
   const verifyPayment = async (sessionId: string) => {
     try {
+      console.log('🔧 PaymentSuccess: Calling verify-payment function with session:', sessionId);
+      
       const { data, error } = await supabase.functions.invoke('verify-payment', {
         body: { sessionId }
       });
 
-      if (error) throw error;
+      console.log('🔧 PaymentSuccess: Verify payment response:', { data, error });
+
+      if (error) {
+        console.error('🔧 PaymentSuccess: Error from verify-payment function:', error);
+        throw error;
+      }
 
       if (data?.paymentStatus === 'paid') {
+        console.log('🔧 PaymentSuccess: Payment verified successfully');
         setVerificationComplete(true);
         setShowVerificationConfetti(true);
         
         // If this was from onboarding, invalidate onboarding status
         if (isFromOnboarding && user?.id) {
+          console.log('🔧 PaymentSuccess: Invalidating onboarding queries');
           await queryClient.invalidateQueries({ queryKey: ['onboarding-status', user.id] });
           await queryClient.invalidateQueries({ queryKey: ['recipients', user.id] });
           await queryClient.invalidateQueries({ queryKey: ['user-metrics', user.id] });
@@ -62,9 +82,16 @@ const PaymentSuccess = () => {
           title: "Payment Successful!",
           description: "Your gift has been scheduled and payment confirmed.",
         });
+      } else {
+        console.log('🔧 PaymentSuccess: Payment not completed, status:', data?.paymentStatus);
+        toast({
+          title: "Payment Status",
+          description: `Payment status: ${data?.paymentStatus || 'unknown'}`,
+          variant: "destructive"
+        });
       }
     } catch (error) {
-      console.error('Error verifying payment:', error);
+      console.error('🔧 PaymentSuccess: Error verifying payment:', error);
       toast({
         title: "Verification Error",
         description: "There was an issue verifying your payment. Please contact support if needed.",
@@ -107,7 +134,8 @@ const PaymentSuccess = () => {
             <CardContent className="pt-6">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal mx-auto mb-4"></div>
-                <p className="text-brand-charcoal">Verifying your payment...</p>
+                <p className="text-brand-charcoal">Verifying your payment and creating your order...</p>
+                <p className="text-sm text-brand-charcoal/60 mt-2">This may take a few moments</p>
               </div>
             </CardContent>
           </Card>
