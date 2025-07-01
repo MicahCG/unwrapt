@@ -1,0 +1,7 @@
+
+# Security redirects - block access to sensitive files
+/.git/* /404.html 404
+/.hg/* /404.html 404
+/.env* /404.html 404
+/.well-known/security.txt /security.txt 200
+/security.txt /404.html 404
