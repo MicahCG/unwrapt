@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -84,9 +83,15 @@ serve(async (req) => {
       console.log(`💳 Using provided shipping address for ${shippingDetails.name}`);
     }
 
-    // Get the origin URL for redirect URLs
-    const origin = req.headers.get("origin");
-    console.log(`💳 Request origin: ${origin}`);
+    // Get the origin URL for redirect URLs with fallback and cleanup
+    const origin = req.headers.get("origin") || 
+                  req.headers.get("referer")?.replace(/\/[^\/]*$/, '') || 
+                  'https://preview--unwrapt.lovable.app';
+    
+    // Ensure the origin doesn't end with a slash for consistent URL building
+    const cleanOrigin = origin.replace(/\/$/, '');
+    
+    console.log(`💳 Request origin: ${origin} -> cleaned: ${cleanOrigin}`);
 
     // Create a one-time payment session with gift image and shipping
     const session = await stripe.checkout.sessions.create({
@@ -107,9 +112,9 @@ serve(async (req) => {
         },
       ],
       mode: "payment",
-      // Use session_id as the parameter name (Stripe's standard)
-      success_url: `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/`,
+      // Use the clean origin for consistent URL building with session_id parameter
+      success_url: `${cleanOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${cleanOrigin}/`,
       shipping_address_collection: shippingAddress ? undefined : {
         allowed_countries: ['US', 'CA', 'GB', 'AU'],
       },
@@ -145,7 +150,7 @@ serve(async (req) => {
     });
 
     console.log(`💳 Created Stripe checkout session: ${session.id}`);
-    console.log(`💳 Success URL configured: ${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}`);
+    console.log(`💳 Success URL configured: ${cleanOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}`);
 
     // Create payment record in Supabase using service role key
     const supabaseService = createClient(
