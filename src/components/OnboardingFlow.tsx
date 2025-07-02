@@ -507,7 +507,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
               {/* Progress Indicator */}
               <div className="flex items-center space-x-2">
                 <span className="text-sm text-brand-charcoal/70">
-                  {getStepTitle()} ({currentStep} of {totalSteps})
+                  {getStepTitle()}
                 </span>
                 <div className="w-32 bg-brand-cream-light rounded-full h-2">
                   <div 
