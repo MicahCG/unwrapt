@@ -36,7 +36,7 @@ serve(async (req) => {
         message: "Test payment verification completed successfully"
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
+        status: 500,
       });
     }
 
