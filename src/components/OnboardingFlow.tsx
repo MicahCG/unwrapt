@@ -437,44 +437,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   };
 
   const getStepTitle = () => {
-    const hasManualRecipientData = onboardingData.manualRecipientData;
-    const isManualRecipientFlow = onboardingData.manualRecipientAdded || onboardingData.noRecipientsFound;
-    
-    if (hasManualRecipientData) {
-      // Shortened flow
-      switch (currentStep) {
-        case 1:
-          return "Connect Your Calendar";
-        case 2:
-          return "Schedule Gift";
-        default:
-          return `Step ${currentStep}`;
-      }
-    } else if (isManualRecipientFlow) {
-      // Regular manual flow
-      switch (currentStep) {
-        case 1:
-          return "Connect Your Calendar";
-        case 2:
-          return "Add Recipient";
-        case 3:
-          return "Schedule Gift";
-        default:
-          return `Step ${currentStep}`;
-      }
-    } else {
-      // Calendar-based flow
-      switch (currentStep) {
-        case 1:
-          return "Connect Your Calendar";
-        case 2:
-          return "Select Interests";
-        case 3:
-          return "Schedule Gift";
-        default:
-          return `Step ${currentStep}`;
-      }
-    }
+    return "";
   };
 
   const totalSteps = getTotalSteps();
