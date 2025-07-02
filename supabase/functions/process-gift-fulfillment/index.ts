@@ -1,13 +1,14 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { corsHeaders, handleCors } from "../_shared/cors.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 serve(async (req) => {
-  // Handle CORS preflight requests
-  const corsResponse = handleCors(req);
-  if (corsResponse) {
-    return corsResponse;
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
@@ -62,22 +63,11 @@ serve(async (req) => {
       zip: recipient.zip_code
     });
 
-    // Create Shopify order
+    // Create Shopify order using Supabase function invocation
     console.log('🛒 Creating Shopify order...');
     
-    // Get the current origin or use a default
-    const originUrl = req.headers.get("origin") || 'https://preview--unwrapt.lovable.app';
-    const shopifyOrderUrl = `${originUrl}/functions/shopify-order`;
-    
-    console.log(`📞 Calling Shopify order function at: ${shopifyOrderUrl}`);
-    
-    const orderResponse = await fetch(shopifyOrderUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': req.headers.get('Authorization') || '',
-      },
-      body: JSON.stringify({
+    const orderResult = await supabaseService.functions.invoke('shopify-order', {
+      body: {
         scheduledGiftId,
         recipientAddress: {
           first_name: recipient.name.split(' ')[0] || 'Gift',
@@ -89,23 +79,19 @@ serve(async (req) => {
           zip: recipient.zip_code || '',
           phone: recipient.phone || '',
         }
-      })
+      }
     });
 
-    console.log(`📞 Shopify order response status: ${orderResponse.status}`);
-
-    if (!orderResponse.ok) {
-      const errorText = await orderResponse.text();
-      console.error('❌ Shopify order response error:', errorText);
-      throw new Error(`Order creation failed: ${errorText}`);
-    }
-
-    const orderResult = await orderResponse.json();
     console.log('🛒 Shopify order result:', orderResult);
 
-    if (!orderResult.success) {
+    if (orderResult.error) {
       console.error('❌ Shopify order creation failed:', orderResult.error);
-      throw new Error(`Order creation failed: ${orderResult.error}`);
+      throw new Error(`Order creation failed: ${orderResult.error.message}`);
+    }
+
+    if (!orderResult.data?.success) {
+      console.error('❌ Shopify order creation failed:', orderResult.data?.error);
+      throw new Error(`Order creation failed: ${orderResult.data?.error}`);
     }
 
     // Update the gift status to indicate it's been sent to Shopify
@@ -128,7 +114,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       message: "Gift fulfillment processed successfully",
-      orderDetails: orderResult
+      orderDetails: orderResult.data
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
