@@ -93,8 +93,15 @@ const DashboardRecipients = () => {
         };
       });
 
+      console.log('📊 DashboardRecipients: Processing recipients:', recipientsWithData.map(r => ({
+        name: r.name,
+        hasScheduledGifts: r.hasScheduledGifts,
+        daysUntilNext: r.daysUntilNext,
+        nextOccasion: r.nextOccasion
+      })));
+
       // Sort: recipients without scheduled gifts first, then those with gifts, by urgency within each group
-      return recipientsWithData.sort((a, b) => {
+      const sortedRecipients = recipientsWithData.sort((a, b) => {
         // Primary sort: no scheduled gifts first
         if (!a.hasScheduledGifts && b.hasScheduledGifts) return -1;
         if (a.hasScheduledGifts && !b.hasScheduledGifts) return 1;
@@ -105,6 +112,9 @@ const DashboardRecipients = () => {
         if (!b.daysUntilNext) return -1;
         return a.daysUntilNext - b.daysUntilNext;
       });
+
+      console.log('📊 DashboardRecipients: Final sorted recipients:', sortedRecipients.map(r => r.name));
+      return sortedRecipients;
     },
     enabled: !!user
   });
