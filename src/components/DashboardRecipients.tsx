@@ -27,6 +27,8 @@ const DashboardRecipients = () => {
   const { data: recipients } = useQuery({
     queryKey: ['recipients', user?.id],
     queryFn: async () => {
+      console.log('📊 DashboardRecipients: Querying recipients for user_id:', user?.id);
+      
       const { data, error } = await supabase
         .from('recipients')
         .select(`
@@ -46,6 +48,8 @@ const DashboardRecipients = () => {
         `)
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
+      
+      console.log('📊 DashboardRecipients: Raw database response:', { data, error, count: data?.length });
       
       if (error) throw error;
 
