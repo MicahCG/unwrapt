@@ -12,21 +12,30 @@ serve(async (req) => {
   }
 
   try {
+    console.log('🎁 Process-gift-fulfillment: Function started');
+    
     const supabaseService = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       { auth: { persistSession: false } }
     );
 
-    const { scheduledGiftId } = await req.json();
+    console.log('🎁 Process-gift-fulfillment: Supabase client created');
+
+    const requestBody = await req.json();
+    console.log('🎁 Process-gift-fulfillment: Request body:', requestBody);
+
+    const { scheduledGiftId } = requestBody;
 
     if (!scheduledGiftId) {
+      console.error('🎁 Process-gift-fulfillment: Missing scheduledGiftId');
       throw new Error("Missing scheduledGiftId");
     }
 
-    console.log(`🎁 Processing gift fulfillment for: ${scheduledGiftId}`);
+    console.log(`🎁 Process-gift-fulfillment: Processing gift fulfillment for: ${scheduledGiftId}`);
 
     // Get gift and recipient details
+    console.log('🎁 Process-gift-fulfillment: Querying database for gift data...');
     const { data: giftData, error: giftError } = await supabaseService
       .from('scheduled_gifts')
       .select(`
@@ -37,12 +46,14 @@ serve(async (req) => {
       .eq('payment_status', 'paid')
       .single();
 
+    console.log('🎁 Process-gift-fulfillment: Database query result:', { giftData, giftError });
+
     if (giftError || !giftData) {
-      console.error('❌ Gift query error:', giftError);
+      console.error('🎁 Process-gift-fulfillment: Gift query error:', giftError);
       throw new Error("Gift not found or payment not confirmed");
     }
 
-    console.log(`✅ Found gift data:`, {
+    console.log(`🎁 Process-gift-fulfillment: Found gift data:`, {
       id: giftData.id,
       recipient: giftData.recipients?.name,
       paymentStatus: giftData.payment_status
@@ -50,12 +61,14 @@ serve(async (req) => {
 
     // Prepare recipient address from stored data
     const recipient = giftData.recipients;
+    console.log('🎁 Process-gift-fulfillment: Recipient data:', recipient);
+
     if (!recipient || !recipient.street) {
-      console.error('❌ Missing recipient address:', recipient);
+      console.error('🎁 Process-gift-fulfillment: Missing recipient address:', recipient);
       throw new Error("Recipient address not found");
     }
 
-    console.log(`📮 Recipient address:`, {
+    console.log(`🎁 Process-gift-fulfillment: Recipient address validated:`, {
       name: recipient.name,
       street: recipient.street,
       city: recipient.city,
@@ -64,37 +77,46 @@ serve(async (req) => {
     });
 
     // Create Shopify order using Supabase function invocation
-    console.log('🛒 Creating Shopify order...');
+    console.log('🎁 Process-gift-fulfillment: Preparing to call shopify-order function...');
+    
+    const recipientAddress = {
+      first_name: recipient.name.split(' ')[0] || 'Gift',
+      last_name: recipient.name.split(' ').slice(1).join(' ') || 'Recipient',
+      address1: recipient.street || '',
+      city: recipient.city || '',
+      province: recipient.state || '',
+      country: recipient.country || 'US',
+      zip: recipient.zip_code || '',
+      phone: recipient.phone || '',
+    };
+
+    console.log('🎁 Process-gift-fulfillment: Recipient address prepared:', recipientAddress);
+
+    console.log('🎁 Process-gift-fulfillment: Calling shopify-order function...');
     
     const orderResult = await supabaseService.functions.invoke('shopify-order', {
       body: {
         scheduledGiftId,
-        recipientAddress: {
-          first_name: recipient.name.split(' ')[0] || 'Gift',
-          last_name: recipient.name.split(' ').slice(1).join(' ') || 'Recipient',
-          address1: recipient.street || '',
-          city: recipient.city || '',
-          province: recipient.state || '',
-          country: recipient.country || 'US',
-          zip: recipient.zip_code || '',
-          phone: recipient.phone || '',
-        }
+        recipientAddress
       }
     });
 
-    console.log('🛒 Shopify order result:', orderResult);
+    console.log('🎁 Process-gift-fulfillment: Shopify order result:', orderResult);
 
     if (orderResult.error) {
-      console.error('❌ Shopify order creation failed:', orderResult.error);
+      console.error('🎁 Process-gift-fulfillment: Shopify order creation failed:', orderResult.error);
       throw new Error(`Order creation failed: ${orderResult.error.message}`);
     }
 
     if (!orderResult.data?.success) {
-      console.error('❌ Shopify order creation failed:', orderResult.data?.error);
+      console.error('🎁 Process-gift-fulfillment: Shopify order creation failed:', orderResult.data?.error);
       throw new Error(`Order creation failed: ${orderResult.data?.error}`);
     }
 
+    console.log('🎁 Process-gift-fulfillment: Shopify order created successfully');
+
     // Update the gift status to indicate it's been sent to Shopify
+    console.log('🎁 Process-gift-fulfillment: Updating gift status...');
     const { error: updateError } = await supabaseService
       .from('scheduled_gifts')
       .update({
@@ -104,12 +126,12 @@ serve(async (req) => {
       .eq('id', scheduledGiftId);
 
     if (updateError) {
-      console.error('❌ Error updating gift status:', updateError);
+      console.error('🎁 Process-gift-fulfillment: Error updating gift status:', updateError);
     } else {
-      console.log('✅ Gift status updated to ordered');
+      console.log('🎁 Process-gift-fulfillment: Gift status updated to ordered');
     }
 
-    console.log(`✅ Gift fulfillment processed successfully for ${scheduledGiftId}`);
+    console.log(`🎁 Process-gift-fulfillment: Gift fulfillment processed successfully for ${scheduledGiftId}`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -121,7 +143,8 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('❌ Error processing gift fulfillment:', error);
+    console.error('🎁 Process-gift-fulfillment: Error processing gift fulfillment:', error);
+    console.error('🎁 Process-gift-fulfillment: Error stack:', error.stack);
     return new Response(JSON.stringify({ 
       error: error.message,
       success: false 
