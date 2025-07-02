@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -22,7 +21,26 @@ serve(async (req) => {
 
     console.log(`💳 Verifying payment for session: ${sessionId}`);
 
-    // Initialize Stripe
+    // Check if this is a test session (from PaymentSuccess test mode)
+    const isTestSession = sessionId.startsWith('cs_test_') && 
+                         (sessionId.includes('_manual_') || sessionId.length < 25);
+    
+    if (isTestSession) {
+      console.log(`🧪 Test session detected: ${sessionId}`);
+      
+      // For test sessions, return a mock successful response
+      return new Response(JSON.stringify({ 
+        paymentStatus: "paid",
+        scheduledGiftId: "test-gift-id",
+        testMode: true,
+        message: "Test payment verification completed successfully"
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
+    // Initialize Stripe for real sessions
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2023-10-16",
     });
@@ -110,47 +128,43 @@ serve(async (req) => {
           }
         }
 
-        // Trigger gift fulfillment if not in onboarding
-        if (scheduledGiftId !== 'onboarding-temp-id') {
-          console.log('🚀 Triggering Shopify order creation...');
-          try {
-            const originUrl = req.headers.get("origin") || 'https://preview--unwrapt.lovable.app';
-            const fulfillmentUrl = `${originUrl}/functions/process-gift-fulfillment`;
-            
-            console.log(`📞 Calling fulfillment function at: ${fulfillmentUrl}`);
-            
-            const fulfillmentResponse = await fetch(fulfillmentUrl, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-              },
-              body: JSON.stringify({ scheduledGiftId })
-            });
+        // Trigger gift fulfillment for ALL real gifts (including onboarding)
+        console.log('🚀 Triggering Shopify order creation...');
+        try {
+          const originUrl = req.headers.get("origin") || 'https://preview--unwrapt.lovable.app';
+          const fulfillmentUrl = `${originUrl}/functions/process-gift-fulfillment`;
+          
+          console.log(`📞 Calling fulfillment function at: ${fulfillmentUrl}`);
+          
+          const fulfillmentResponse = await fetch(fulfillmentUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            },
+            body: JSON.stringify({ scheduledGiftId })
+          });
 
-            console.log(`📞 Fulfillment response status: ${fulfillmentResponse.status}`);
+          console.log(`📞 Fulfillment response status: ${fulfillmentResponse.status}`);
 
-            if (!fulfillmentResponse.ok) {
-              const errorText = await fulfillmentResponse.text();
-              console.error('❌ Fulfillment response error:', errorText);
-              throw new Error(`Fulfillment failed: ${errorText}`);
-            }
-
-            const fulfillmentResult = await fulfillmentResponse.json();
-            console.log('✅ Fulfillment result:', fulfillmentResult);
-            
-            if (!fulfillmentResult.success) {
-              console.error('❌ Fulfillment failed:', fulfillmentResult.error);
-              // Log but don't fail the payment verification
-            } else {
-              console.log('🎉 Shopify order created successfully!');
-            }
-          } catch (fulfillmentError) {
-            console.error('❌ Error triggering fulfillment:', fulfillmentError);
-            // Don't fail the payment verification if fulfillment fails, but log it
+          if (!fulfillmentResponse.ok) {
+            const errorText = await fulfillmentResponse.text();
+            console.error('❌ Fulfillment response error:', errorText);
+            throw new Error(`Fulfillment failed: ${errorText}`);
           }
-        } else {
-          console.log('🧪 Skipping fulfillment for onboarding gift');
+
+          const fulfillmentResult = await fulfillmentResponse.json();
+          console.log('✅ Fulfillment result:', fulfillmentResult);
+          
+          if (!fulfillmentResult.success) {
+            console.error('❌ Fulfillment failed:', fulfillmentResult.error);
+            // Log but don't fail the payment verification
+          } else {
+            console.log('🎉 Shopify order created successfully!');
+          }
+        } catch (fulfillmentError) {
+          console.error('❌ Error triggering fulfillment:', fulfillmentError);
+          // Don't fail the payment verification if fulfillment fails, but log it
         }
       } else {
         console.error('❌ No scheduled gift ID found in session metadata');
