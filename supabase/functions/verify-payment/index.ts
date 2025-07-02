@@ -131,36 +131,20 @@ serve(async (req) => {
         // Trigger gift fulfillment for ALL real gifts (including onboarding)
         console.log('🚀 Triggering Shopify order creation...');
         try {
-          const originUrl = req.headers.get("origin") || 'https://preview--unwrapt.lovable.app';
-          const fulfillmentUrl = `${originUrl}/functions/process-gift-fulfillment`;
-          
-          console.log(`📞 Calling fulfillment function at: ${fulfillmentUrl}`);
-          
-          const fulfillmentResponse = await fetch(fulfillmentUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-            },
-            body: JSON.stringify({ scheduledGiftId })
+          // Use Supabase function invocation instead of fetch to another URL
+          const fulfillmentResult = await supabaseService.functions.invoke('process-gift-fulfillment', {
+            body: { scheduledGiftId }
           });
 
-          console.log(`📞 Fulfillment response status: ${fulfillmentResponse.status}`);
-
-          if (!fulfillmentResponse.ok) {
-            const errorText = await fulfillmentResponse.text();
-            console.error('❌ Fulfillment response error:', errorText);
-            throw new Error(`Fulfillment failed: ${errorText}`);
-          }
-
-          const fulfillmentResult = await fulfillmentResponse.json();
           console.log('✅ Fulfillment result:', fulfillmentResult);
           
-          if (!fulfillmentResult.success) {
+          if (fulfillmentResult.error) {
             console.error('❌ Fulfillment failed:', fulfillmentResult.error);
             // Log but don't fail the payment verification
-          } else {
+          } else if (fulfillmentResult.data?.success) {
             console.log('🎉 Shopify order created successfully!');
+          } else {
+            console.log('⚠️ Fulfillment completed with warnings:', fulfillmentResult.data);
           }
         } catch (fulfillmentError) {
           console.error('❌ Error triggering fulfillment:', fulfillmentError);
@@ -184,7 +168,7 @@ serve(async (req) => {
     console.error("❌ Error verifying payment:", error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: 200,
     });
   }
 });
