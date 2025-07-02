@@ -266,10 +266,10 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
         };
       }
 
-      // Create payment session with the real gift ID
+      // Create payment session with the REAL gift ID (not temp ID)
       const { data: paymentData, error: paymentError } = await supabase.functions.invoke('create-gift-payment', {
         body: {
-          scheduledGiftId: giftData.id, // Use the real ID instead of 'onboarding-temp-id'
+          scheduledGiftId: giftData.id, // 🔥 REAL ID instead of 'onboarding-temp-id'
           productPrice: productData.price,
           productImage: productData.image,
           giftDetails: {
