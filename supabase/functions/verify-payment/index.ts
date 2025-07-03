@@ -16,14 +16,20 @@ serve(async (req) => {
     const { sessionId } = await req.json();
     
     if (!sessionId) {
-      throw new Error("Missing session ID");
+      return new Response(JSON.stringify({
+        error: "Missing session ID",
+        success: false
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
     }
 
     console.log(`💳 Verifying payment for session: ${sessionId}`);
 
     // Check if this is a test session (from PaymentSuccess test mode)
     const isTestSession = sessionId.startsWith('cs_test_') && 
-                         (sessionId.includes('_manual_') || sessionId.length < 25);
+                         (sessionId.includes('_manual_') || sessionId.includes('_fulfillment_test') || sessionId.length < 30);
     
     if (isTestSession) {
       console.log(`🧪 Test session detected: ${sessionId}`);
@@ -33,6 +39,7 @@ serve(async (req) => {
         paymentStatus: "paid",
         scheduledGiftId: "test-gift-id",
         testMode: true,
+        success: true,
         message: "Test payment verification completed successfully"
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -43,7 +50,13 @@ serve(async (req) => {
     // Initialize Stripe using direct API calls
     const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeSecretKey) {
-      throw new Error("Stripe secret key not configured");
+      return new Response(JSON.stringify({
+        error: "Stripe secret key not configured",
+        success: false
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      });
     }
 
     // Retrieve the checkout session using direct API call
@@ -56,7 +69,13 @@ serve(async (req) => {
     });
 
     if (!sessionResponse.ok) {
-      throw new Error(`Failed to retrieve Stripe session: ${sessionResponse.status}`);
+      return new Response(JSON.stringify({
+        error: `Failed to retrieve Stripe session: ${sessionResponse.status}`,
+        success: false
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      });
     }
 
     const session = await sessionResponse.json();
@@ -182,7 +201,8 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ 
       paymentStatus: session.payment_status,
-      scheduledGiftId: session.metadata?.scheduled_gift_id
+      scheduledGiftId: session.metadata?.scheduled_gift_id,
+      success: true
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
@@ -191,6 +211,7 @@ serve(async (req) => {
     console.error("❌ Error verifying payment:", error);
     return new Response(JSON.stringify({ 
       error: error.message,
+      success: false,
       details: error.stack 
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
