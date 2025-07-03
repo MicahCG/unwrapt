@@ -22,33 +22,49 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
+    if (!supabaseService) {
+      throw new Error("Failed to initialize Supabase client");
+    }
+
     const requestBody = await req.json();
     console.log('🧪 Create-test-data: Request body:', requestBody);
 
     const { testGiftId, testUserId, testRecipientId, recipient, gift } = requestBody;
 
     if (!testGiftId || !testUserId || !testRecipientId || !recipient || !gift) {
-      throw new Error("Missing required test data parameters");
+      console.log('🧪 Create-test-data: Missing required parameters');
+      return new Response(JSON.stringify({
+        error: "Missing required test data parameters",
+        success: false,
+        details: { testGiftId, testUserId, testRecipientId, hasRecipient: !!recipient, hasGift: !!gift }
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
     }
 
-    // First, create a test profile if it doesn't exist
+    // First, create a test profile if it doesn't exist (ignore errors if it already exists)
     console.log('👤 Creating/updating test profile...');
-    const { error: profileError } = await supabaseService
-      .from('profiles')
-      .upsert({
-        id: testUserId,
-        email: 'test@unwrapt.com',
-        full_name: 'Test User',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'id'
-      });
+    try {
+      const { error: profileError } = await supabaseService
+        .from('profiles')
+        .upsert({
+          id: testUserId,
+          email: 'test@unwrapt.com',
+          full_name: 'Test User',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'id'
+        });
 
-    if (profileError) {
-      console.log('⚠️ Profile upsert warning (may be OK):', profileError);
-    } else {
-      console.log('✅ Test profile created/updated');
+      if (profileError && !profileError.message.includes('violates foreign key constraint')) {
+        console.log('⚠️ Profile creation warning (may be OK):', profileError);
+      } else {
+        console.log('✅ Test profile created/updated');
+      }
+    } catch (profileErr) {
+      console.log('⚠️ Profile creation error (continuing anyway):', profileErr);
     }
 
     console.log('👤 Creating test recipient...');
@@ -57,13 +73,13 @@ serve(async (req) => {
       .insert({
         id: testRecipientId,
         user_id: testUserId,
-        name: recipient.name,
-        email: recipient.email,
-        street: recipient.street,
-        city: recipient.city,
-        state: recipient.state,
-        zip_code: recipient.zip_code,
-        country: recipient.country,
+        name: recipient.name || 'Test Recipient',
+        email: recipient.email || 'test@example.com',
+        street: recipient.street || '123 Test St',
+        city: recipient.city || 'Test City',
+        state: recipient.state || 'CA',
+        zip_code: recipient.zip_code || '12345',
+        country: recipient.country || 'US',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
@@ -72,7 +88,14 @@ serve(async (req) => {
 
     if (recipientError) {
       console.error('❌ Failed to create test recipient:', recipientError);
-      throw new Error(`Failed to create test recipient: ${recipientError.message}`);
+      return new Response(JSON.stringify({
+        error: `Failed to create test recipient: ${recipientError.message}`,
+        success: false,
+        details: recipientError
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      });
     }
 
     console.log('✅ Test recipient created:', recipientData);
@@ -83,13 +106,13 @@ serve(async (req) => {
       .insert({
         id: testGiftId,
         user_id: testUserId,
-        occasion: gift.occasion,
-        occasion_date: gift.occasion_date,
+        occasion: gift.occasion || 'Test Birthday',
+        occasion_date: gift.occasion_date || '2024-12-25',
         recipient_id: testRecipientId,
-        payment_status: gift.payment_status,
-        status: gift.status,
-        gift_type: gift.gift_type,
-        price_range: gift.price_range,
+        payment_status: gift.payment_status || 'paid',
+        status: gift.status || 'scheduled',
+        gift_type: gift.gift_type || 'Test Gift',
+        price_range: gift.price_range || '$25-50',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
@@ -98,7 +121,26 @@ serve(async (req) => {
 
     if (giftError) {
       console.error('❌ Failed to create test gift:', giftError);
-      throw new Error(`Failed to create test gift: ${giftError.message}`);
+      
+      // Clean up recipient if gift creation failed
+      try {
+        await supabaseService
+          .from('recipients')
+          .delete()
+          .eq('id', testRecipientId);
+        console.log('🧹 Cleaned up test recipient after gift creation failure');
+      } catch (cleanupError) {
+        console.log('⚠️ Failed to cleanup recipient:', cleanupError);
+      }
+      
+      return new Response(JSON.stringify({
+        error: `Failed to create test gift: ${giftError.message}`,
+        success: false,
+        details: giftError
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      });
     }
 
     console.log('✅ Test gift created:', giftData);
@@ -117,7 +159,8 @@ serve(async (req) => {
     console.error('❌ Error creating test data:', error);
     return new Response(JSON.stringify({ 
       error: error.message || 'Unknown error occurred',
-      success: false
+      success: false,
+      details: error.stack
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,

@@ -30,13 +30,13 @@ const ProductionTestDashboard = () => {
     return uuid;
   };
 
-  // Helper function to handle edge function responses
+  // Helper function to handle edge function responses with better error details
   const handleEdgeFunctionResponse = async (response: any, functionName: string) => {
     console.log(`📡 ${functionName} response:`, response);
     
     if (response.error) {
       console.error(`❌ ${functionName} error:`, response.error);
-      throw new Error(`${functionName} failed: ${response.error.message || response.error}`);
+      throw new Error(`${functionName} failed: ${response.error.message || JSON.stringify(response.error)}`);
     }
     
     if (!response.data) {
@@ -44,15 +44,16 @@ const ProductionTestDashboard = () => {
       throw new Error(`${functionName} returned no data`);
     }
     
-    if (!response.data.success) {
+    if (response.data.success === false) {
       console.error(`❌ ${functionName} not successful:`, response.data);
-      throw new Error(`${functionName} failed: ${response.data.error || 'Unknown error'}`);
+      const errorMessage = response.data.error || response.data.message || 'Unknown error';
+      throw new Error(`${functionName} failed: ${errorMessage}`);
     }
     
     return response.data;
   };
 
-  // Test the specific payment fulfillment flow
+  // Test the specific payment fulfillment flow with better error handling
   const testPaymentFulfillmentFlow = async () => {
     setIsRunningTests(true);
     
@@ -128,17 +129,21 @@ const ProductionTestDashboard = () => {
 
       // Clean up test data via edge function
       console.log('🧹 Cleaning up test data via edge function...');
-      const cleanupResponse = await supabase.functions.invoke('cleanup-test-data', {
-        body: {
-          testGiftId,
-          testRecipientId
-        }
-      });
+      try {
+        const cleanupResponse = await supabase.functions.invoke('cleanup-test-data', {
+          body: {
+            testGiftId,
+            testRecipientId
+          }
+        });
 
-      if (cleanupResponse.error) {
-        console.log('⚠️ Cleanup warning (may be OK):', cleanupResponse.error);
-      } else {
-        console.log('✅ Cleanup completed');
+        if (cleanupResponse.error) {
+          console.log('⚠️ Cleanup warning (may be OK):', cleanupResponse.error);
+        } else {
+          console.log('✅ Cleanup completed');
+        }
+      } catch (cleanupError) {
+        console.log('⚠️ Cleanup failed (not critical):', cleanupError);
       }
 
     } catch (error) {
