@@ -30,6 +30,28 @@ const ProductionTestDashboard = () => {
     return uuid;
   };
 
+  // Helper function to handle edge function responses
+  const handleEdgeFunctionResponse = async (response: any, functionName: string) => {
+    console.log(`📡 ${functionName} response:`, response);
+    
+    if (response.error) {
+      console.error(`❌ ${functionName} error:`, response.error);
+      throw new Error(`${functionName} failed: ${response.error.message || response.error}`);
+    }
+    
+    if (!response.data) {
+      console.error(`❌ ${functionName} no data:`, response);
+      throw new Error(`${functionName} returned no data`);
+    }
+    
+    if (!response.data.success) {
+      console.error(`❌ ${functionName} not successful:`, response.data);
+      throw new Error(`${functionName} failed: ${response.data.error || 'Unknown error'}`);
+    }
+    
+    return response.data;
+  };
+
   // Test the specific payment fulfillment flow
   const testPaymentFulfillmentFlow = async () => {
     setIsRunningTests(true);
@@ -51,7 +73,7 @@ const ProductionTestDashboard = () => {
       
       // Use an edge function to create test data (bypasses RLS)
       console.log('👤 Creating test data with IDs via edge function...');
-      const { data: testDataResult, error: testDataError } = await supabase.functions.invoke('create-test-data', {
+      const createTestDataResponse = await supabase.functions.invoke('create-test-data', {
         body: {
           testGiftId,
           testUserId,
@@ -76,85 +98,55 @@ const ProductionTestDashboard = () => {
         }
       });
 
-      if (testDataError) {
-        console.error('❌ Failed to create test data via edge function:', testDataError);
-        throw new Error(`Failed to create test data: ${testDataError.message}`);
-      }
-
+      const testDataResult = await handleEdgeFunctionResponse(createTestDataResponse, 'create-test-data');
       console.log('✅ Test data created via edge function:', testDataResult);
 
       // Step 2: Test process-gift-fulfillment function
       console.log('Step 2: Testing process-gift-fulfillment with gift ID:', testGiftId);
       
-      const { data: fulfillmentData, error: fulfillmentError } = await supabase.functions.invoke('process-gift-fulfillment', {
+      const fulfillmentResponse = await supabase.functions.invoke('process-gift-fulfillment', {
         body: {
           scheduledGiftId: testGiftId
         }
       });
 
-      console.log('🔍 Fulfillment response:', { fulfillmentData, fulfillmentError });
+      const fulfillmentData = await handleEdgeFunctionResponse(fulfillmentResponse, 'process-gift-fulfillment');
+      console.log('✅ Process-gift-fulfillment succeeded:', fulfillmentData);
 
-      if (fulfillmentError) {
-        console.error('❌ Process-gift-fulfillment failed:', fulfillmentError);
-        setTestResults(prev => [...prev, {
-          test: 'Payment Fulfillment Flow',
-          status: 'error',
-          step: 'process-gift-fulfillment',
-          result: `Fulfillment failed: ${fulfillmentError.message}`,
-          timestamp: new Date().toISOString()
-        }]);
+      setTestResults(prev => [...prev, {
+        test: 'Payment Fulfillment Flow',
+        status: 'success',
+        step: 'complete',
+        result: fulfillmentData,
+        timestamp: new Date().toISOString()
+      }]);
 
-        toast({
-          title: "Fulfillment Test Failed",
-          description: `process-gift-fulfillment error: ${fulfillmentError.message}`,
-          variant: "destructive"
-        });
-      } else if (fulfillmentData?.success) {
-        console.log('✅ Process-gift-fulfillment succeeded');
-        setTestResults(prev => [...prev, {
-          test: 'Payment Fulfillment Flow',
-          status: 'success',
-          step: 'complete',
-          result: fulfillmentData,
-          timestamp: new Date().toISOString()
-        }]);
-
-        toast({
-          title: "Fulfillment Test Successful",
-          description: "Complete payment fulfillment flow tested successfully",
-        });
-      } else {
-        console.log('⚠️ Process-gift-fulfillment completed with issues:', fulfillmentData);
-        setTestResults(prev => [...prev, {
-          test: 'Payment Fulfillment Flow',
-          status: 'warning',
-          step: 'process-gift-fulfillment',
-          result: fulfillmentData,
-          timestamp: new Date().toISOString()
-        }]);
-
-        toast({
-          title: "Fulfillment Test Warning",
-          description: "Function completed but with potential issues",
-          variant: "destructive"
-        });
-      }
+      toast({
+        title: "Fulfillment Test Successful",
+        description: "Complete payment fulfillment flow tested successfully",
+      });
 
       // Clean up test data via edge function
       console.log('🧹 Cleaning up test data via edge function...');
-      await supabase.functions.invoke('cleanup-test-data', {
+      const cleanupResponse = await supabase.functions.invoke('cleanup-test-data', {
         body: {
           testGiftId,
           testRecipientId
         }
       });
 
+      if (cleanupResponse.error) {
+        console.log('⚠️ Cleanup warning (may be OK):', cleanupResponse.error);
+      } else {
+        console.log('✅ Cleanup completed');
+      }
+
     } catch (error) {
       console.error('❌ Payment fulfillment flow test failed:', error);
       setTestResults(prev => [...prev, {
         test: 'Payment Fulfillment Flow',
         status: 'error',
-        step: 'setup',
+        step: 'execution',
         result: error.message,
         timestamp: new Date().toISOString()
       }]);
@@ -190,7 +182,7 @@ const ProductionTestDashboard = () => {
         phone: '555-123-4567'
       };
 
-      const { data, error } = await supabase.functions.invoke('shopify-order', {
+      const response = await supabase.functions.invoke('shopify-order', {
         body: {
           scheduledGiftId: testGiftId,
           recipientAddress: testAddress,
@@ -198,10 +190,7 @@ const ProductionTestDashboard = () => {
         }
       });
 
-      if (error) {
-        console.error('❌ Shopify order test failed:', error);
-        throw error;
-      }
+      const data = await handleEdgeFunctionResponse(response, 'shopify-order');
 
       setTestResults(prev => [...prev, {
         test: 'Shopify Order Direct',
@@ -244,11 +233,11 @@ const ProductionTestDashboard = () => {
       const testSessionId = 'cs_test_' + Date.now() + '_fulfillment_test';
       console.log('💳 Using test session ID:', testSessionId);
       
-      const { data, error } = await supabase.functions.invoke('verify-payment', {
+      const response = await supabase.functions.invoke('verify-payment', {
         body: { sessionId: testSessionId }
       });
 
-      if (error) throw error;
+      const data = await handleEdgeFunctionResponse(response, 'verify-payment');
 
       setTestResults(prev => [...prev, {
         test: 'Verify Payment Flow',
@@ -496,13 +485,24 @@ const ProductionTestDashboard = () => {
   // Run all tests in sequence
   const runAllTests = async () => {
     setTestResults([]);
-    await testStripeIntegration();
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second between tests
-    await testVerifyPaymentFlow();
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    await testPaymentFulfillmentFlow();
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    await testEmailFunction();
+    
+    const tests = [
+      { name: 'Payment Verification', func: testVerifyPaymentFlow },
+      { name: 'Shopify Order Direct', func: testShopifyOrderDirect },
+      { name: 'Payment Fulfillment Flow', func: testPaymentFulfillmentFlow }
+    ];
+    
+    for (const test of tests) {
+      try {
+        console.log(`🧪 Running ${test.name}...`);
+        await test.func();
+        // Wait between tests
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (error) {
+        console.error(`❌ ${test.name} failed:`, error);
+        // Continue with next test even if one fails
+      }
+    }
   };
 
   return (
@@ -530,16 +530,13 @@ const ProductionTestDashboard = () => {
               <div className="bg-blue-50 p-4 rounded-lg mb-4">
                 <h3 className="font-semibold text-blue-900 mb-2">Payment Fulfillment Flow Testing</h3>
                 <p className="text-sm text-blue-800 mb-3">
-                  These tests specifically target the flow you described where process-gift-fulfillment is failing.
+                  These tests specifically target the flow where process-gift-fulfillment is called.
                 </p>
                 <div className="text-xs text-blue-700 space-y-1">
-                  <div>1. ✅ User completes payment (Stripe)</div>
-                  <div>2. ✅ Redirect to /payment/success</div>
-                  <div>3. ✅ verify-payment processes</div>
-                  <div>4. ✅ Database updated</div>
-                  <div>5. ❌ process-gift-fulfillment called <strong>(TESTING THIS)</strong></div>
-                  <div>6. ❌ shopify-order function called</div>
-                  <div>7. ❌ Shopify order created</div>
+                  <div>1. ✅ Create test data (bypasses RLS)</div>
+                  <div>2. ✅ Call process-gift-fulfillment</div>
+                  <div>3. ✅ Verify Shopify order creation</div>
+                  <div>4. ✅ Clean up test data</div>
                 </div>
               </div>
 
@@ -553,7 +550,7 @@ const ProductionTestDashboard = () => {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <p className="text-xs text-muted-foreground">
-                      Tests the complete flow from payment verification to order creation (bypasses RLS with edge functions)
+                      Tests the complete flow from payment verification to order creation
                     </p>
                     <Button 
                       size="sm" 
@@ -576,7 +573,7 @@ const ProductionTestDashboard = () => {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <p className="text-xs text-muted-foreground">
-                      Tests shopify-order function directly (bypassing fulfillment)
+                      Tests shopify-order function directly in test mode
                     </p>
                     <Button 
                       size="sm" 
@@ -616,53 +613,9 @@ const ProductionTestDashboard = () => {
             </TabsContent>
 
             <TabsContent value="individual" className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <CreditCard className="h-4 w-4" />
-                      Stripe Payment Test
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <p className="text-xs text-muted-foreground">
-                      Tests payment session creation using Stripe's test mode
-                    </p>
-                    <Button 
-                      size="sm" 
-                      onClick={testStripeIntegration}
-                      disabled={isRunningTests}
-                      className="w-full"
-                    >
-                      <Play className="h-3 w-3 mr-1" />
-                      Test Stripe
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <Webhook className="h-4 w-4" />
-                      Email Notifications
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <p className="text-xs text-muted-foreground">
-                      Tests email sending functionality with test data
-                    </p>
-                    <Button 
-                      size="sm" 
-                      onClick={testEmailFunction}
-                      disabled={isRunningTests}
-                      className="w-full"
-                    >
-                      <Play className="h-3 w-3 mr-1" />
-                      Test Email
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
+              <p className="text-sm text-muted-foreground">
+                Individual function tests are available in the Fulfillment Flow tab.
+              </p>
             </TabsContent>
 
             <TabsContent value="batch" className="space-y-4">

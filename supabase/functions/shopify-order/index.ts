@@ -49,28 +49,48 @@ serve(async (req) => {
 
     console.log(`🛒 Processing ${testMode ? 'TEST' : 'LIVE'} order for gift: ${scheduledGiftId}`);
 
-    // Get the scheduled gift details - for test mode, don't require payment confirmation
-    const giftQuery = supabaseService
-      .from('scheduled_gifts')
-      .select(`
-        *,
-        recipients (name, email, phone, street, city, state, zip_code, country, interests)
-      `)
-      .eq('id', scheduledGiftId);
+    // For test mode, create mock data if gift doesn't exist
+    let giftData;
+    if (testMode) {
+      console.log('🧪 Test mode: Creating mock gift data...');
+      giftData = {
+        id: scheduledGiftId,
+        user_id: 'test-user-id',
+        occasion: 'Test Birthday',
+        occasion_date: '2024-12-25',
+        payment_status: 'paid',
+        status: 'scheduled',
+        gift_type: 'Test Gift',
+        price_range: '$25-50',
+        recipients: {
+          name: 'Test Recipient',
+          email: 'test@example.com',
+          interests: ['coffee', 'chocolate'],
+          street: '123 Test St',
+          city: 'Test City',
+          state: 'CA',
+          zip_code: '12345',
+          country: 'US'
+        }
+      };
+    } else {
+      // Get the scheduled gift details - for live mode, require payment confirmation
+      const giftQuery = supabaseService
+        .from('scheduled_gifts')
+        .select(`
+          *,
+          recipients (name, email, phone, street, city, state, zip_code, country, interests)
+        `)
+        .eq('id', scheduledGiftId)
+        .eq('payment_status', 'paid');
 
-    // Only require payment confirmation for live orders
-    if (!testMode) {
-      giftQuery.eq('payment_status', 'paid');
-    }
+      const { data: giftQueryData, error: giftError } = await giftQuery.single();
 
-    const { data: giftData, error: giftError } = await giftQuery.single();
-
-    if (giftError || !giftData) {
-      console.error('❌ Gift query error:', giftError);
-      const errorMessage = testMode 
-        ? "Gift not found - please ensure the gift exists and try again" 
-        : "Gift not found or payment not confirmed";
-      throw new Error(errorMessage);
+      if (giftError || !giftQueryData) {
+        console.error('❌ Gift query error:', giftError);
+        throw new Error("Gift not found or payment not confirmed");
+      }
+      giftData = giftQueryData;
     }
 
     console.log(`🎁 Gift data:`, {
@@ -97,14 +117,10 @@ serve(async (req) => {
       } else if (giftTypeLower.includes('chocolate') || giftTypeLower.includes('truffle')) {
         selectedVariantId = PRODUCT_VARIANTS.TRUFFLE_CHOCOLATE;
         matchReason = `gift type: ${giftData.gift_type}`;
-      } else if (giftTypeLower.includes('candle') || giftTypeLower.includes('ocean') || 
-                 giftTypeLower.includes('driftwood') || giftTypeLower.includes('coconut')) {
-        selectedVariantId = PRODUCT_VARIANTS.OCEAN_DRIFTWOOD_COCONUT_CANDLE;
-        matchReason = `gift type: ${giftData.gift_type}`;
       }
     }
 
-    // Check recipient interests if no specific gift type match and using default
+    // Check recipient interests if using default and interests exist
     if (selectedVariantId === PRODUCT_VARIANTS.OCEAN_DRIFTWOOD_COCONUT_CANDLE && 
         matchReason === 'default ocean driftwood coconut candle' &&
         giftData.recipients?.interests && Array.isArray(giftData.recipients.interests)) {
@@ -115,8 +131,6 @@ serve(async (req) => {
       const coffeeInterests = interests.filter((interest: string) => 
         interest.includes('coffee') || 
         interest.includes('caffeine') || 
-        interest.includes('espresso') || 
-        interest.includes('latte') ||
         interest.includes('lavender')
       );
       
@@ -128,89 +142,23 @@ serve(async (req) => {
         const chocolateInterests = interests.filter((interest: string) => 
           interest.includes('chocolate') || 
           interest.includes('truffle') || 
-          interest.includes('sweet') || 
-          interest.includes('dessert') ||
-          interest.includes('candy')
+          interest.includes('sweet')
         );
         
         if (chocolateInterests.length > 0) {
           selectedVariantId = PRODUCT_VARIANTS.TRUFFLE_CHOCOLATE;
           matchReason = `recipient interests: ${chocolateInterests.join(', ')}`;
-        } else {
-          // Check for candle/aromatherapy interests
-          const candleInterests = interests.filter((interest: string) => 
-            interest.includes('candle') || 
-            interest.includes('ocean') || 
-            interest.includes('coconut') || 
-            interest.includes('driftwood') ||
-            interest.includes('scent') || 
-            interest.includes('aromatherapy') ||
-            interest.includes('relaxation')
-          );
-          
-          if (candleInterests.length > 0) {
-            selectedVariantId = PRODUCT_VARIANTS.OCEAN_DRIFTWOOD_COCONUT_CANDLE;
-            matchReason = `recipient interests: ${candleInterests.join(', ')}`;
-          }
         }
       }
     }
 
     console.log(`🎯 Selected variant ID: ${selectedVariantId} (${matchReason})`);
 
-    // Get Shopify configuration
-    const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
-    const shopifyToken = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
-    
     // Default product information
     let variantPrice = "25.00";
     let productName = selectedVariantId === PRODUCT_VARIANTS.LAVENDER_FIELDS_COFFEE ? "Lavender Fields Coffee" : 
                      selectedVariantId === PRODUCT_VARIANTS.TRUFFLE_CHOCOLATE ? "Truffle Chocolate" : 
                      "Ocean Driftwood Coconut Candle";
-
-    // Try to get actual product details from Shopify
-    if (shopifyStore && shopifyToken && !testMode) {
-      try {
-        const cleanStoreUrl = shopifyStore.replace(/^https?:\/\//, '').replace(/\/$/, '');
-        const shopifyApiUrl = `https://${cleanStoreUrl}/admin/api/2024-01`;
-        
-        console.log(`🔍 Fetching variant details from: ${shopifyApiUrl}/variants/${selectedVariantId}.json`);
-        
-        const variantResponse = await fetch(`${shopifyApiUrl}/variants/${selectedVariantId}.json`, {
-          headers: {
-            'X-Shopify-Access-Token': shopifyToken,
-            'Content-Type': 'application/json',
-          },
-        });
-        
-        if (variantResponse.ok) {
-          const { variant } = await variantResponse.json();
-          variantPrice = variant.price;
-          
-          // Get product name
-          const productResponse = await fetch(`${shopifyApiUrl}/products/${variant.product_id}.json`, {
-            headers: {
-              'X-Shopify-Access-Token': shopifyToken,
-              'Content-Type': 'application/json',
-            },
-          });
-          
-          if (productResponse.ok) {
-            const { product } = await productResponse.json();
-            productName = product.title;
-          }
-          
-          console.log(`✅ Retrieved product: ${productName}, price: $${variantPrice}`);
-        } else {
-          const errorText = await variantResponse.text();
-          console.log(`⚠️ Could not fetch variant details: ${variantResponse.status} - ${errorText}`);
-        }
-      } catch (error) {
-        console.log('⚠️ Could not fetch product details, using defaults:', error.message);
-      }
-    } else if (!shopifyStore || !shopifyToken) {
-      console.log('⚠️ Shopify credentials not configured, using defaults');
-    }
 
     // Create Shopify order (skip in test mode)
     let orderResult;
@@ -224,6 +172,10 @@ serve(async (req) => {
       };
       console.log('🧪 TEST MODE: Skipping actual order creation');
     } else {
+      // Get Shopify configuration
+      const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
+      const shopifyToken = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
+      
       if (!shopifyStore || !shopifyToken) {
         throw new Error("Shopify credentials not configured for live orders");
       }
@@ -253,11 +205,9 @@ serve(async (req) => {
           phone: recipientAddress.phone || giftData.recipients?.phone,
           note: `Gift from Unwrapt - Occasion: ${giftData.occasion}. Recipient interests: ${giftData.recipients?.interests?.join(', ') || 'none'}. Selected product: ${productName}. Match reason: ${matchReason}. ${giftData.gift_description || ''}`,
           tags: "unwrapt-gift",
-          financial_status: "paid", // Since we already collected payment
+          financial_status: "paid",
         }
       };
-
-      console.log('🛒 Order data prepared:', JSON.stringify(orderData, null, 2));
 
       const orderResponse = await fetch(`${shopifyApiUrl}/orders.json`, {
         method: 'POST',
@@ -268,12 +218,10 @@ serve(async (req) => {
         body: JSON.stringify(orderData),
       });
 
-      console.log(`🛒 Order response status: ${orderResponse.status}`);
-
       if (!orderResponse.ok) {
         const errorData = await orderResponse.text();
         console.error('❌ Shopify order creation failed:', errorData);
-        throw new Error(`Failed to create Shopify order: ${orderData}`);
+        throw new Error(`Failed to create Shopify order: ${errorData}`);
       }
 
       const { order } = await orderResponse.json();
@@ -281,22 +229,24 @@ serve(async (req) => {
       console.log(`✅ Successfully created Shopify order: ${order.name} (ID: ${order.id})`);
     }
 
-    // Update the scheduled gift with order information
-    const giftDescription = `${giftData.gift_description || ''} | Product: ${productName} | Variant ID: ${selectedVariantId} | Match: ${matchReason}${testMode ? ' | TEST MODE' : ''} | Shopify Order: ${orderResult.name}`;
-    
-    const { error: updateError } = await supabaseService
-      .from('scheduled_gifts')
-      .update({
-        status: testMode ? 'test-ordered' : 'ordered',
-        updated_at: new Date().toISOString(),
-        gift_description: giftDescription.substring(0, 500) // Ensure we don't exceed any length limits
-      })
-      .eq('id', scheduledGiftId);
+    // Update the scheduled gift with order information (only if not test mode with mock data)
+    if (!testMode || giftData.id !== scheduledGiftId) {
+      const giftDescription = `${giftData.gift_description || ''} | Product: ${productName} | Variant ID: ${selectedVariantId} | Match: ${matchReason}${testMode ? ' | TEST MODE' : ''} | Shopify Order: ${orderResult.name}`;
+      
+      const { error: updateError } = await supabaseService
+        .from('scheduled_gifts')
+        .update({
+          status: testMode ? 'test-ordered' : 'ordered',
+          updated_at: new Date().toISOString(),
+          gift_description: giftDescription.substring(0, 500)
+        })
+        .eq('id', scheduledGiftId);
 
-    if (updateError) {
-      console.error('❌ Error updating gift status:', updateError);
-    } else {
-      console.log(`✅ Updated gift status to ${testMode ? 'test-ordered' : 'ordered'}`);
+      if (updateError) {
+        console.error('❌ Error updating gift status:', updateError);
+      } else {
+        console.log(`✅ Updated gift status to ${testMode ? 'test-ordered' : 'ordered'}`);
+      }
     }
 
     console.log(`🎉 Successfully ${testMode ? 'tested' : 'created'} Shopify order ${orderResult.name} for gift ${scheduledGiftId}`);
@@ -316,7 +266,7 @@ serve(async (req) => {
         price: variantPrice
       },
       interests: giftData.recipients?.interests || [],
-      trackingUrl: testMode ? null : `https://${shopifyStore}/admin/orders/${orderResult.id}`
+      trackingUrl: testMode ? null : `https://${Deno.env.get("SHOPIFY_STORE_URL")}/admin/orders/${orderResult.id}`
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,

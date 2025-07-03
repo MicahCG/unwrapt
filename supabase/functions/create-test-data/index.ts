@@ -31,6 +31,26 @@ serve(async (req) => {
       throw new Error("Missing required test data parameters");
     }
 
+    // First, create a test profile if it doesn't exist
+    console.log('👤 Creating/updating test profile...');
+    const { error: profileError } = await supabaseService
+      .from('profiles')
+      .upsert({
+        id: testUserId,
+        email: 'test@unwrapt.com',
+        full_name: 'Test User',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'id'
+      });
+
+    if (profileError) {
+      console.log('⚠️ Profile upsert warning (may be OK):', profileError);
+    } else {
+      console.log('✅ Test profile created/updated');
+    }
+
     console.log('👤 Creating test recipient...');
     const { data: recipientData, error: recipientError } = await supabaseService
       .from('recipients')
@@ -43,7 +63,9 @@ serve(async (req) => {
         city: recipient.city,
         state: recipient.state,
         zip_code: recipient.zip_code,
-        country: recipient.country
+        country: recipient.country,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       })
       .select()
       .single();
@@ -67,7 +89,9 @@ serve(async (req) => {
         payment_status: gift.payment_status,
         status: gift.status,
         gift_type: gift.gift_type,
-        price_range: gift.price_range
+        price_range: gift.price_range,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       })
       .select()
       .single();
