@@ -25,7 +25,9 @@ const ProductionTestDashboard = () => {
 
   // Helper function to generate proper UUIDs
   const generateTestUUID = () => {
-    return crypto.randomUUID();
+    const uuid = crypto.randomUUID();
+    console.log('🔑 Generated UUID:', uuid);
+    return uuid;
   };
 
   // Test the specific payment fulfillment flow
@@ -41,7 +43,14 @@ const ProductionTestDashboard = () => {
       const testUserId = generateTestUUID();
       const testRecipientId = generateTestUUID();
       
+      console.log('📋 Test IDs generated:', {
+        testGiftId,
+        testUserId,
+        testRecipientId
+      });
+      
       // First create a test recipient
+      console.log('👤 Creating test recipient with ID:', testRecipientId);
       const { data: recipientData, error: recipientError } = await supabase
         .from('recipients')
         .insert({
@@ -65,6 +74,7 @@ const ProductionTestDashboard = () => {
 
       console.log('✅ Test recipient created:', recipientData);
 
+      console.log('🎁 Creating test scheduled gift with ID:', testGiftId);
       const { data: giftData, error: giftError } = await supabase
         .from('scheduled_gifts')
         .insert({
@@ -89,7 +99,7 @@ const ProductionTestDashboard = () => {
       console.log('✅ Test gift created:', giftData);
 
       // Step 2: Test process-gift-fulfillment function
-      console.log('Step 2: Testing process-gift-fulfillment...');
+      console.log('Step 2: Testing process-gift-fulfillment with gift ID:', testGiftId);
       
       const { data: fulfillmentData, error: fulfillmentError } = await supabase.functions.invoke('process-gift-fulfillment', {
         body: {
@@ -185,6 +195,8 @@ const ProductionTestDashboard = () => {
       console.log('🧪 Testing shopify-order function directly...');
       
       const testGiftId = generateTestUUID();
+      console.log('🎁 Using gift ID for Shopify test:', testGiftId);
+      
       const testAddress = {
         first_name: 'Test',
         last_name: 'User',
@@ -248,6 +260,7 @@ const ProductionTestDashboard = () => {
       console.log('🧪 Testing verify-payment flow...');
       
       const testSessionId = 'cs_test_' + Date.now() + '_fulfillment_test';
+      console.log('💳 Using test session ID:', testSessionId);
       
       const { data, error } = await supabase.functions.invoke('verify-payment', {
         body: { sessionId: testSessionId }
@@ -286,7 +299,6 @@ const ProductionTestDashboard = () => {
     }
   };
 
-  
   // Test Stripe with test card numbers (no real charges)
   const testStripeIntegration = async () => {
     setIsRunningTests(true);
@@ -294,9 +306,12 @@ const ProductionTestDashboard = () => {
     try {
       console.log('🧪 Testing Stripe integration with test data...');
       
+      const testGiftId = generateTestUUID();
+      console.log('🎁 Using gift ID for Stripe test:', testGiftId);
+      
       const { data, error } = await supabase.functions.invoke('create-gift-payment', {
         body: {
-          scheduledGiftId: generateTestUUID(),
+          scheduledGiftId: testGiftId,
           testMode: true
         }
       });
@@ -388,9 +403,12 @@ const ProductionTestDashboard = () => {
     try {
       console.log('🧪 Testing Shopify integration in test mode...');
       
+      const testGiftId = generateTestUUID();
+      console.log('🎁 Using gift ID for Shopify integration test:', testGiftId);
+      
       const { data, error } = await supabase.functions.invoke('shopify-order', {
         body: {
-          scheduledGiftId: generateTestUUID(),
+          scheduledGiftId: testGiftId,
           recipientAddress: {
             first_name: 'Test',
             last_name: 'User',
