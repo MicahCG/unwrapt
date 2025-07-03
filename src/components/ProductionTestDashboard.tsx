@@ -23,6 +23,11 @@ const ProductionTestDashboard = () => {
   const [testResults, setTestResults] = useState<any[]>([]);
   const [isRunningTests, setIsRunningTests] = useState(false);
 
+  // Helper function to generate proper UUIDs
+  const generateTestUUID = () => {
+    return crypto.randomUUID();
+  };
+
   // Test the specific payment fulfillment flow
   const testPaymentFulfillmentFlow = async () => {
     setIsRunningTests(true);
@@ -32,18 +37,43 @@ const ProductionTestDashboard = () => {
       
       // Step 1: Create a test scheduled gift record first
       console.log('Step 1: Creating test scheduled gift...');
-      const testGiftId = 'test-fulfillment-' + Date.now();
-      const testUserId = 'test-user-' + Date.now(); // Add test user ID
+      const testGiftId = generateTestUUID();
+      const testUserId = generateTestUUID();
+      const testRecipientId = generateTestUUID();
       
+      // First create a test recipient
+      const { data: recipientData, error: recipientError } = await supabase
+        .from('recipients')
+        .insert({
+          id: testRecipientId,
+          user_id: testUserId,
+          name: 'Test Recipient',
+          email: 'test@example.com',
+          street: '123 Test Street',
+          city: 'Test City', 
+          state: 'CA',
+          zip_code: '12345',
+          country: 'US'
+        })
+        .select()
+        .single();
+
+      if (recipientError) {
+        console.error('❌ Failed to create test recipient:', recipientError);
+        throw new Error(`Failed to create test recipient: ${recipientError.message}`);
+      }
+
+      console.log('✅ Test recipient created:', recipientData);
+
       const { data: giftData, error: giftError } = await supabase
         .from('scheduled_gifts')
         .insert({
           id: testGiftId,
-          user_id: testUserId, // Add the missing user_id field
+          user_id: testUserId,
           occasion: 'Test Birthday',
           occasion_date: '2024-12-25',
-          recipient_id: 'test-recipient-id',
-          payment_status: 'paid', // Mark as paid for testing
+          recipient_id: testRecipientId,
+          payment_status: 'paid',
           status: 'scheduled',
           gift_type: 'Test Gift',
           price_range: '$25-50'
@@ -122,6 +152,11 @@ const ProductionTestDashboard = () => {
         .delete()
         .eq('id', testGiftId);
 
+      await supabase
+        .from('recipients')
+        .delete()
+        .eq('id', testRecipientId);
+
     } catch (error) {
       console.error('❌ Payment fulfillment flow test failed:', error);
       setTestResults(prev => [...prev, {
@@ -142,14 +177,14 @@ const ProductionTestDashboard = () => {
     }
   };
 
-  // Test just the shopify-order function directly
+  // Test just the shopify-order function directly  
   const testShopifyOrderDirect = async () => {
     setIsRunningTests(true);
     
     try {
       console.log('🧪 Testing shopify-order function directly...');
       
-      const testGiftId = 'test-shopify-' + Date.now();
+      const testGiftId = generateTestUUID();
       const testAddress = {
         first_name: 'Test',
         last_name: 'User',
@@ -251,6 +286,7 @@ const ProductionTestDashboard = () => {
     }
   };
 
+  
   // Test Stripe with test card numbers (no real charges)
   const testStripeIntegration = async () => {
     setIsRunningTests(true);
@@ -260,7 +296,7 @@ const ProductionTestDashboard = () => {
       
       const { data, error } = await supabase.functions.invoke('create-gift-payment', {
         body: {
-          scheduledGiftId: 'test-gift-' + Date.now(),
+          scheduledGiftId: generateTestUUID(),
           testMode: true
         }
       });
@@ -354,7 +390,7 @@ const ProductionTestDashboard = () => {
       
       const { data, error } = await supabase.functions.invoke('shopify-order', {
         body: {
-          scheduledGiftId: 'test-gift-' + Date.now(),
+          scheduledGiftId: generateTestUUID(),
           recipientAddress: {
             first_name: 'Test',
             last_name: 'User',
@@ -579,6 +615,7 @@ const ProductionTestDashboard = () => {
               </div>
             </TabsContent>
 
+            
             <TabsContent value="individual" className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Card>
