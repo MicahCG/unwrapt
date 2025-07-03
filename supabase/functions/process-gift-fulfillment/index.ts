@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -94,23 +95,29 @@ serve(async (req) => {
 
     console.log('🎁 Process-gift-fulfillment: Calling shopify-order function...');
     
-    const orderResult = await supabaseService.functions.invoke('shopify-order', {
-      body: {
-        scheduledGiftId,
-        recipientAddress
-      }
-    });
+    // Add timeout for the shopify-order call
+    const orderResult = await Promise.race([
+      supabaseService.functions.invoke('shopify-order', {
+        body: {
+          scheduledGiftId,
+          recipientAddress
+        }
+      }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Shopify order creation timeout after 25 seconds')), 25000)
+      )
+    ]);
 
     console.log('🎁 Process-gift-fulfillment: Shopify order result:', orderResult);
 
     if (orderResult.error) {
       console.error('🎁 Process-gift-fulfillment: Shopify order creation failed:', orderResult.error);
-      throw new Error(`Order creation failed: ${orderResult.error.message}`);
+      throw new Error(`Order creation failed: ${orderResult.error.message || orderResult.error}`);
     }
 
     if (!orderResult.data?.success) {
       console.error('🎁 Process-gift-fulfillment: Shopify order creation failed:', orderResult.data?.error);
-      throw new Error(`Order creation failed: ${orderResult.data?.error}`);
+      throw new Error(`Order creation failed: ${orderResult.data?.error || 'Unknown error'}`);
     }
 
     console.log('🎁 Process-gift-fulfillment: Shopify order created successfully');
@@ -146,8 +153,9 @@ serve(async (req) => {
     console.error('🎁 Process-gift-fulfillment: Error processing gift fulfillment:', error);
     console.error('🎁 Process-gift-fulfillment: Error stack:', error.stack);
     return new Response(JSON.stringify({ 
-      error: error.message,
-      success: false 
+      error: error.message || 'Unknown error occurred',
+      success: false,
+      details: error.stack
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,

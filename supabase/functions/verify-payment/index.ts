@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -28,7 +29,7 @@ serve(async (req) => {
     if (isTestSession) {
       console.log(`🧪 Test session detected: ${sessionId}`);
       
-      // For test sessions, return a mock successful response
+      // For test sessions, return a mock successful response with correct status
       return new Response(JSON.stringify({ 
         paymentStatus: "paid",
         scheduledGiftId: "test-gift-id",
@@ -36,7 +37,7 @@ serve(async (req) => {
         message: "Test payment verification completed successfully"
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
+        status: 200, // Fixed: was 500, should be 200
       });
     }
 
@@ -107,7 +108,7 @@ serve(async (req) => {
         // Send payment confirmation email
         if (giftData?.user?.email) {
           try {
-            await supabaseService.functions.invoke('send-notification-email', {
+            const emailResult = await supabaseService.functions.invoke('send-notification-email', {
               body: {
                 type: 'gift_scheduled',
                 userEmail: giftData.user.email,
@@ -121,7 +122,12 @@ serve(async (req) => {
                 }
               }
             });
-            console.log('📧 Payment confirmation email sent successfully');
+            
+            if (emailResult.error) {
+              console.error('❌ Email function returned error:', emailResult.error);
+            } else {
+              console.log('📧 Payment confirmation email sent successfully');
+            }
           } catch (emailError) {
             console.error('❌ Failed to send payment confirmation email:', emailError);
             // Don't fail the payment verification if email fails
@@ -131,10 +137,15 @@ serve(async (req) => {
         // Trigger gift fulfillment for ALL real gifts (including onboarding)
         console.log('🚀 Triggering Shopify order creation...');
         try {
-          // Use Supabase function invocation instead of fetch to another URL
-          const fulfillmentResult = await supabaseService.functions.invoke('process-gift-fulfillment', {
-            body: { scheduledGiftId }
-          });
+          // Add timeout and better error handling for fulfillment
+          const fulfillmentResult = await Promise.race([
+            supabaseService.functions.invoke('process-gift-fulfillment', {
+              body: { scheduledGiftId }
+            }),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Fulfillment timeout after 30 seconds')), 30000)
+            )
+          ]);
 
           console.log('✅ Fulfillment result:', fulfillmentResult);
           
@@ -166,9 +177,12 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("❌ Error verifying payment:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      details: error.stack 
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
+      status: 500,
     });
   }
 });
