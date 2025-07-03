@@ -1,5 +1,5 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -51,19 +51,37 @@ serve(async (req) => {
       throw new Error("Missing required fields: scheduledGiftId and productPrice");
     }
 
-    // Initialize Stripe
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-      apiVersion: "2023-10-16",
-    });
+    // Initialize Stripe using direct API calls instead of the library
+    const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
+    if (!stripeSecretKey) {
+      throw new Error("Stripe secret key not configured");
+    }
 
     // Check if a Stripe customer record exists for this user
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     let customerId;
-    if (customers.data.length > 0) {
-      customerId = customers.data[0].id;
-      console.log(`💳 Found existing Stripe customer: ${customerId}`);
-    } else {
-      console.log(`💳 No existing Stripe customer found for ${user.email}`);
+    try {
+      const customersResponse = await fetch(`https://api.stripe.com/v1/customers?email=${encodeURIComponent(user.email)}&limit=1`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${stripeSecretKey}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      });
+
+      if (!customersResponse.ok) {
+        throw new Error(`Stripe API error: ${customersResponse.status}`);
+      }
+
+      const customersData = await customersResponse.json();
+      if (customersData.data && customersData.data.length > 0) {
+        customerId = customersData.data[0].id;
+        console.log(`💳 Found existing Stripe customer: ${customerId}`);
+      } else {
+        console.log(`💳 No existing Stripe customer found for ${user.email}`);
+      }
+    } catch (error) {
+      console.error('Error checking for existing customer:', error);
+      // Continue without existing customer
     }
 
     // Prepare shipping address for Stripe if provided
@@ -93,61 +111,69 @@ serve(async (req) => {
     
     console.log(`💳 Request origin: ${origin} -> cleaned: ${cleanOrigin}`);
 
-    // Create a one-time payment session with gift image and shipping
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      customer_email: customerId ? undefined : user.email,
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            product_data: { 
-              name: `Gift: ${giftDetails.giftType} for ${giftDetails.recipientName}`,
-              description: `${giftDetails.occasion} gift`,
-              images: productImage ? [productImage] : undefined,
-            },
-            unit_amount: Math.round(productPrice * 100), // Convert to cents
-          },
-          quantity: 1,
-        },
-      ],
-      mode: "payment",
-      // Use the clean origin for consistent URL building with session_id parameter
-      success_url: `${cleanOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${cleanOrigin}/`,
-      shipping_address_collection: shippingAddress ? undefined : {
-        allowed_countries: ['US', 'CA', 'GB', 'AU'],
-      },
-      shipping_options: shippingAddress ? [
-        {
-          shipping_rate_data: {
-            type: 'fixed_amount',
-            fixed_amount: {
-              amount: 0, // Free shipping
-              currency: 'usd',
-            },
-            display_name: 'Standard Delivery',
-            delivery_estimate: {
-              minimum: {
-                unit: 'business_day',
-                value: 3,
-              },
-              maximum: {
-                unit: 'business_day',
-                value: 7,
-              },
-            },
-          },
-        },
-      ] : undefined,
-      metadata: {
-        scheduled_gift_id: scheduledGiftId,
-        user_id: user.id,
-        gift_type: giftDetails.giftType,
-        occasion: giftDetails.occasion,
-        variant_id: variantId || '', // Store variant ID for Shopify order creation
-      },
+    // Create checkout session data
+    const sessionData = new URLSearchParams({
+      'mode': 'payment',
+      'success_url': `${cleanOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      'cancel_url': `${cleanOrigin}/`,
+      'line_items[0][price_data][currency]': 'usd',
+      'line_items[0][price_data][product_data][name]': `Gift: ${giftDetails.giftType} for ${giftDetails.recipientName}`,
+      'line_items[0][price_data][product_data][description]': `${giftDetails.occasion} gift`,
+      'line_items[0][price_data][unit_amount]': Math.round(productPrice * 100).toString(),
+      'line_items[0][quantity]': '1',
+      'metadata[scheduled_gift_id]': scheduledGiftId,
+      'metadata[user_id]': user.id,
+      'metadata[gift_type]': giftDetails.giftType,
+      'metadata[occasion]': giftDetails.occasion,
+      'metadata[variant_id]': variantId || '',
     });
+
+    // Add customer information
+    if (customerId) {
+      sessionData.append('customer', customerId);
+    } else {
+      sessionData.append('customer_email', user.email);
+    }
+
+    // Add product image if provided
+    if (productImage) {
+      sessionData.append('line_items[0][price_data][product_data][images][0]', productImage);
+    }
+
+    // Add shipping configuration
+    if (shippingAddress) {
+      sessionData.append('shipping_options[0][shipping_rate_data][type]', 'fixed_amount');
+      sessionData.append('shipping_options[0][shipping_rate_data][fixed_amount][amount]', '0');
+      sessionData.append('shipping_options[0][shipping_rate_data][fixed_amount][currency]', 'usd');
+      sessionData.append('shipping_options[0][shipping_rate_data][display_name]', 'Standard Delivery');
+      sessionData.append('shipping_options[0][shipping_rate_data][delivery_estimate][minimum][unit]', 'business_day');
+      sessionData.append('shipping_options[0][shipping_rate_data][delivery_estimate][minimum][value]', '3');
+      sessionData.append('shipping_options[0][shipping_rate_data][delivery_estimate][maximum][unit]', 'business_day');
+      sessionData.append('shipping_options[0][shipping_rate_data][delivery_estimate][maximum][value]', '7');
+    } else {
+      sessionData.append('shipping_address_collection[allowed_countries][0]', 'US');
+      sessionData.append('shipping_address_collection[allowed_countries][1]', 'CA');
+      sessionData.append('shipping_address_collection[allowed_countries][2]', 'GB');
+      sessionData.append('shipping_address_collection[allowed_countries][3]', 'AU');
+    }
+
+    // Create a one-time payment session
+    const sessionResponse = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${stripeSecretKey}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: sessionData.toString(),
+    });
+
+    if (!sessionResponse.ok) {
+      const errorData = await sessionResponse.text();
+      console.error('Stripe session creation failed:', errorData);
+      throw new Error(`Failed to create Stripe session: ${sessionResponse.status}`);
+    }
+
+    const session = await sessionResponse.json();
 
     console.log(`💳 Created Stripe checkout session: ${session.id}`);
     console.log(`💳 Success URL configured: ${cleanOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}`);

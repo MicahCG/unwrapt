@@ -1,6 +1,5 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -37,17 +36,30 @@ serve(async (req) => {
         message: "Test payment verification completed successfully"
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200, // Fixed: was 500, should be 200
+        status: 200,
       });
     }
 
-    // Initialize Stripe for real sessions
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-      apiVersion: "2023-10-16",
+    // Initialize Stripe using direct API calls
+    const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
+    if (!stripeSecretKey) {
+      throw new Error("Stripe secret key not configured");
+    }
+
+    // Retrieve the checkout session using direct API call
+    const sessionResponse = await fetch(`https://api.stripe.com/v1/checkout/sessions/${sessionId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${stripeSecretKey}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
     });
 
-    // Retrieve the checkout session
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    if (!sessionResponse.ok) {
+      throw new Error(`Failed to retrieve Stripe session: ${sessionResponse.status}`);
+    }
+
+    const session = await sessionResponse.json();
     console.log(`💳 Payment status: ${session.payment_status}, Amount: ${session.amount_total}`);
     
     if (session.payment_status === "paid") {
