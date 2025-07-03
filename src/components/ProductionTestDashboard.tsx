@@ -33,11 +33,13 @@ const ProductionTestDashboard = () => {
       // Step 1: Create a test scheduled gift record first
       console.log('Step 1: Creating test scheduled gift...');
       const testGiftId = 'test-fulfillment-' + Date.now();
+      const testUserId = 'test-user-' + Date.now(); // Add test user ID
       
       const { data: giftData, error: giftError } = await supabase
         .from('scheduled_gifts')
         .insert({
           id: testGiftId,
+          user_id: testUserId, // Add the missing user_id field
           occasion: 'Test Birthday',
           occasion_date: '2024-12-25',
           recipient_id: 'test-recipient-id',
