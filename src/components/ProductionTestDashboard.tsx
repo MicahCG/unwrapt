@@ -37,8 +37,8 @@ const ProductionTestDashboard = () => {
     try {
       console.log('🧪 Testing Payment Fulfillment Flow...');
       
-      // Step 1: Create a test scheduled gift record first
-      console.log('Step 1: Creating test scheduled gift...');
+      // Step 1: Create test data using edge function (bypasses RLS)
+      console.log('Step 1: Creating test data via edge function...');
       const testGiftId = generateTestUUID();
       const testUserId = generateTestUUID();
       const testRecipientId = generateTestUUID();
@@ -49,54 +49,39 @@ const ProductionTestDashboard = () => {
         testRecipientId
       });
       
-      // First create a test recipient
-      console.log('👤 Creating test recipient with ID:', testRecipientId);
-      const { data: recipientData, error: recipientError } = await supabase
-        .from('recipients')
-        .insert({
-          id: testRecipientId,
-          user_id: testUserId,
-          name: 'Test Recipient',
-          email: 'test@example.com',
-          street: '123 Test Street',
-          city: 'Test City', 
-          state: 'CA',
-          zip_code: '12345',
-          country: 'US'
-        })
-        .select()
-        .single();
+      // Use an edge function to create test data (bypasses RLS)
+      console.log('👤 Creating test data with IDs via edge function...');
+      const { data: testDataResult, error: testDataError } = await supabase.functions.invoke('create-test-data', {
+        body: {
+          testGiftId,
+          testUserId,
+          testRecipientId,
+          recipient: {
+            name: 'Test Recipient',
+            email: 'test@example.com',
+            street: '123 Test Street',
+            city: 'Test City',
+            state: 'CA',
+            zip_code: '12345',
+            country: 'US'
+          },
+          gift: {
+            occasion: 'Test Birthday',
+            occasion_date: '2024-12-25',
+            payment_status: 'paid',
+            status: 'scheduled',
+            gift_type: 'Test Gift',
+            price_range: '$25-50'
+          }
+        }
+      });
 
-      if (recipientError) {
-        console.error('❌ Failed to create test recipient:', recipientError);
-        throw new Error(`Failed to create test recipient: ${recipientError.message}`);
+      if (testDataError) {
+        console.error('❌ Failed to create test data via edge function:', testDataError);
+        throw new Error(`Failed to create test data: ${testDataError.message}`);
       }
 
-      console.log('✅ Test recipient created:', recipientData);
-
-      console.log('🎁 Creating test scheduled gift with ID:', testGiftId);
-      const { data: giftData, error: giftError } = await supabase
-        .from('scheduled_gifts')
-        .insert({
-          id: testGiftId,
-          user_id: testUserId,
-          occasion: 'Test Birthday',
-          occasion_date: '2024-12-25',
-          recipient_id: testRecipientId,
-          payment_status: 'paid',
-          status: 'scheduled',
-          gift_type: 'Test Gift',
-          price_range: '$25-50'
-        })
-        .select()
-        .single();
-
-      if (giftError) {
-        console.error('❌ Failed to create test gift:', giftError);
-        throw new Error(`Failed to create test gift: ${giftError.message}`);
-      }
-
-      console.log('✅ Test gift created:', giftData);
+      console.log('✅ Test data created via edge function:', testDataResult);
 
       // Step 2: Test process-gift-fulfillment function
       console.log('Step 2: Testing process-gift-fulfillment with gift ID:', testGiftId);
@@ -155,17 +140,14 @@ const ProductionTestDashboard = () => {
         });
       }
 
-      // Clean up test data
-      console.log('🧹 Cleaning up test data...');
-      await supabase
-        .from('scheduled_gifts')
-        .delete()
-        .eq('id', testGiftId);
-
-      await supabase
-        .from('recipients')
-        .delete()
-        .eq('id', testRecipientId);
+      // Clean up test data via edge function
+      console.log('🧹 Cleaning up test data via edge function...');
+      await supabase.functions.invoke('cleanup-test-data', {
+        body: {
+          testGiftId,
+          testRecipientId
+        }
+      });
 
     } catch (error) {
       console.error('❌ Payment fulfillment flow test failed:', error);
@@ -571,7 +553,7 @@ const ProductionTestDashboard = () => {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <p className="text-xs text-muted-foreground">
-                      Tests the complete flow from payment verification to order creation
+                      Tests the complete flow from payment verification to order creation (bypasses RLS with edge functions)
                     </p>
                     <Button 
                       size="sm" 
@@ -633,7 +615,6 @@ const ProductionTestDashboard = () => {
               </div>
             </TabsContent>
 
-            
             <TabsContent value="individual" className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Card>
