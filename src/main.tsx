@@ -1,64 +1,59 @@
 
-import { createRoot } from 'react-dom/client';
-import App from './App.tsx';
-import './index.css';
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import App from "./App.tsx";
+import "./index.css";
 
-// Simple URL cleanup - restore previous working behavior
-const cleanupUrl = () => {
-  const currentUrl = window.location.href;
-  const hasAccessToken = currentUrl.includes('access_token=');
-  const hasCode = currentUrl.includes('code=');
-  
-  // Don't clean up OAuth callback URLs - let the OAuth components handle them
-  if (hasAccessToken || hasCode) {
-    console.log('🔧 URL Cleanup: OAuth callback detected, skipping cleanup');
-    return;
-  }
-  
-  // Handle hash-based URLs (but not OAuth tokens) 
-  if (window.location.hash && window.location.hash !== '#' && !hasAccessToken) {
-    const hashPath = window.location.hash.slice(1);
-    
-    // Only clean if it's a valid path, not an OAuth fragment
-    if (hashPath.startsWith('/') && !hashPath.includes('=')) {
-      try {
-        const newUrl = window.location.origin + hashPath;
-        console.log('🔧 URL Cleanup: Removing hash from URL:', currentUrl, '->', newUrl);
-        window.history.replaceState(null, '', newUrl);
-      } catch (error) {
-        console.error('🔧 URL Cleanup: Failed to clean hash URL:', error);
-      }
-    }
-    return;
-  }
-  
-  // Handle preview URLs with staging domains (but not OAuth callbacks)
-  if (currentUrl.includes('preview--') && window.location.hash === '#' && !hasAccessToken && !hasCode) {
-    try {
-      const cleanUrl = window.location.origin + window.location.pathname;
-      console.log('🔧 URL Cleanup: Cleaning preview URL:', currentUrl, '->', cleanUrl);
-      window.history.replaceState(null, '', cleanUrl);
-    } catch (error) {
-      console.error('🔧 URL Cleanup: Failed to clean preview URL:', error);
-    }
-    return;
-  }
-};
+// Import pages
+import Index from "./pages/Index.tsx";
+import Analytics from "./pages/Analytics.tsx";
+import Settings from "./pages/Settings.tsx";
+import Notifications from "./pages/Notifications.tsx";
+import Onboarding from "./pages/Onboarding.tsx";
+import PaymentSuccess from "./pages/PaymentSuccess.tsx";
+import ProductionTesting from "./pages/ProductionTesting.tsx";
+import CalendarView from "./pages/CalendarView.tsx";
+import GiftHistory from "./pages/GiftHistory.tsx";
+import Wishlist from "./pages/Wishlist.tsx";
+import NotFound from "./pages/NotFound.tsx";
 
-// Clean up URL immediately, but safely
-try {
-  cleanupUrl();
-} catch (error) {
-  console.error('🔧 URL Cleanup: Error during initial cleanup:', error);
-}
+// Import auth components
+import { AuthProvider } from "./components/auth/AuthProvider";
+import LoginPage from "./components/auth/LoginPage";
+import OAuthCallback from "./components/auth/OAuthCallback";
+import CalendarOAuthCallback from "./components/auth/CalendarOAuthCallback";
+import SettingsOAuthCallback from "./components/auth/SettingsOAuthCallback";
 
-// Also clean up after DOM is ready, but safely
-document.addEventListener('DOMContentLoaded', () => {
-  try {
-    cleanupUrl();
-  } catch (error) {
-    console.error('🔧 URL Cleanup: Error during DOM ready cleanup:', error);
-  }
-});
+const queryClient = new QueryClient();
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/auth/callback" element={<OAuthCallback />} />
+            <Route path="/auth/calendar/callback" element={<CalendarOAuthCallback />} />
+            <Route path="/auth/settings/callback" element={<SettingsOAuthCallback />} />
+            <Route path="/payment-success" element={<PaymentSuccess />} />
+            <Route path="/" element={<App />}>
+              <Route index element={<Index />} />
+              <Route path="analytics" element={<Analytics />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="notifications" element={<Notifications />} />
+              <Route path="onboarding" element={<Onboarding />} />
+              <Route path="calendar" element={<CalendarView />} />
+              <Route path="history" element={<GiftHistory />} />
+              <Route path="wishlist" element={<Wishlist />} />
+              <Route path="testing" element={<ProductionTesting />} />
+              <Route path="*" element={<NotFound />} />
+            </Route>
+          </Routes>
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
+  </StrictMode>
+);
