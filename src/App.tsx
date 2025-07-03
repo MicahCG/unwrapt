@@ -14,6 +14,7 @@ import Notifications from "./pages/Notifications";
 import GiftHistory from "./pages/GiftHistory";
 import Wishlist from "./pages/Wishlist";
 import PaymentSuccess from "./pages/PaymentSuccess";
+import ProductionTesting from "./pages/ProductionTesting";
 import NotFound from "./pages/NotFound";
 import Onboarding from "./pages/Onboarding";
 import OAuthCallback from "./components/auth/OAuthCallback";
@@ -40,6 +41,7 @@ function App() {
               <Route path="/wishlist" element={<Wishlist />} />
               <Route path="/payment/success" element={<PaymentSuccess />} />
               <Route path="/payment-success" element={<Navigate to="/payment/success" replace />} />
+              <Route path="/testing" element={<ProductionTesting />} />
               <Route path="/onboarding" element={<Onboarding />} />
               <Route path="/auth/callback" element={<OAuthCallback />} />
               <Route path="/auth/calendar/callback" element={<CalendarOAuthCallback />} />
