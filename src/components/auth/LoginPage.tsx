@@ -57,7 +57,7 @@ const LoginPage: React.FC = () => {
             </Button>
             
             <p className="text-center text-sm text-brand-charcoal/60">
-              Join 1,000+ people who never forget to show they care
+              Join hundreds who never forget to show they care
             </p>
           </div>
         </CardContent>
