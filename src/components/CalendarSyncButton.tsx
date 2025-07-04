@@ -89,6 +89,17 @@ const CalendarSyncButton = () => {
 
       if (eventsError) {
         console.error('❌ Calendar sync error:', eventsError);
+        
+        // Check if it's an auth error (token expired)
+        if (eventsError.status === 401 || eventsError.message?.includes('Calendar access expired')) {
+          toast({
+            title: "Calendar Access Expired",
+            description: "Please reconnect your Google Calendar to sync recipients.",
+            variant: "destructive"
+          });
+          return;
+        }
+        
         throw new Error(eventsError.message || 'Failed to fetch calendar events');
       }
 

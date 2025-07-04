@@ -170,18 +170,89 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'fetch_events') {
+      // Check if we need to refresh the token first for onboarding flow too
+      const { data: currentIntegration } = await supabase
+        .from('calendar_integrations')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('provider', 'google')
+        .maybeSingle();
+
+      let validAccessToken = access_token;
+
+      // Check if token is expired or will expire in the next 5 minutes
+      if (currentIntegration?.expires_at) {
+        const expiresAt = new Date(currentIntegration.expires_at);
+        const now = new Date();
+        const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
+
+        if (expiresAt <= fiveMinutesFromNow && currentIntegration.refresh_token) {
+          console.log('🔄 Token expired (onboarding), refreshing...');
+          
+          // Refresh the token
+          const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              client_id: Deno.env.get('GOOGLE_CLIENT_ID') ?? '',
+              client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') ?? '',
+              refresh_token: currentIntegration.refresh_token,
+              grant_type: 'refresh_token'
+            })
+          });
+
+          const refreshData = await refreshResponse.json();
+
+          if (refreshData.error) {
+            console.error('❌ Token refresh failed (onboarding):', refreshData.error);
+            return new Response(JSON.stringify({ 
+              error: 'Calendar access expired. Please reconnect your Google Calendar.' 
+            }), {
+              status: 401,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          // Update the stored tokens
+          const newExpiresAt = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
+          await supabase
+            .from('calendar_integrations')
+            .update({
+              access_token: refreshData.access_token,
+              expires_at: newExpiresAt,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', currentIntegration.id);
+
+          validAccessToken = refreshData.access_token;
+          console.log('✅ Token refreshed successfully (onboarding)');
+        }
+      }
+
       // Original onboarding flow - fetch limited events for single person selection
       const calendarResponse = await fetch(
         'https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=' + 
         new Date().toISOString() + '&maxResults=100&singleEvents=true&orderBy=startTime',
         {
-          headers: { 'Authorization': `Bearer ${access_token}` }
+          headers: { 'Authorization': `Bearer ${validAccessToken}` }
         }
       )
 
       const calendarData = await calendarResponse.json()
 
       if (calendarData.error) {
+        console.error('❌ Calendar API error (onboarding):', calendarData.error);
+        
+        // If it's an auth error, suggest reconnection
+        if (calendarData.error.code === 401 || calendarData.error.status === 'UNAUTHENTICATED') {
+          return new Response(JSON.stringify({ 
+            error: 'Calendar access expired. Please reconnect your Google Calendar.' 
+          }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
         return new Response(JSON.stringify({ error: calendarData.error }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -206,6 +277,65 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'fetch_dashboard_events') {
+      // Check if we need to refresh the token first
+      const { data: currentIntegration } = await supabase
+        .from('calendar_integrations')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('provider', 'google')
+        .maybeSingle();
+
+      let validAccessToken = access_token;
+
+      // Check if token is expired or will expire in the next 5 minutes
+      if (currentIntegration?.expires_at) {
+        const expiresAt = new Date(currentIntegration.expires_at);
+        const now = new Date();
+        const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
+
+        if (expiresAt <= fiveMinutesFromNow && currentIntegration.refresh_token) {
+          console.log('🔄 Token expired, refreshing...');
+          
+          // Refresh the token
+          const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              client_id: Deno.env.get('GOOGLE_CLIENT_ID') ?? '',
+              client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') ?? '',
+              refresh_token: currentIntegration.refresh_token,
+              grant_type: 'refresh_token'
+            })
+          });
+
+          const refreshData = await refreshResponse.json();
+
+          if (refreshData.error) {
+            console.error('❌ Token refresh failed:', refreshData.error);
+            return new Response(JSON.stringify({ 
+              error: 'Calendar access expired. Please reconnect your Google Calendar.' 
+            }), {
+              status: 401,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          // Update the stored tokens
+          const newExpiresAt = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
+          await supabase
+            .from('calendar_integrations')
+            .update({
+              access_token: refreshData.access_token,
+              expires_at: newExpiresAt,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', currentIntegration.id);
+
+          validAccessToken = refreshData.access_token;
+          console.log('✅ Token refreshed successfully');
+        }
+      }
+
       // NEW: Dashboard flow - fetch comprehensive events for multiple people
       const calendarResponse = await fetch(
         'https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=' + 
@@ -214,13 +344,25 @@ Deno.serve(async (req) => {
         new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString() + // Next 12 months
         '&maxResults=250&singleEvents=true&orderBy=startTime',
         {
-          headers: { 'Authorization': `Bearer ${access_token}` }
+          headers: { 'Authorization': `Bearer ${validAccessToken}` }
         }
       )
 
       const calendarData = await calendarResponse.json()
 
       if (calendarData.error) {
+        console.error('❌ Calendar API error:', calendarData.error);
+        
+        // If it's an auth error, suggest reconnection
+        if (calendarData.error.code === 401 || calendarData.error.status === 'UNAUTHENTICATED') {
+          return new Response(JSON.stringify({ 
+            error: 'Calendar access expired. Please reconnect your Google Calendar.' 
+          }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
         return new Response(JSON.stringify({ error: calendarData.error }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
