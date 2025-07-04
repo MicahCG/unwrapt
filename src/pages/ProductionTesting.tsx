@@ -1,11 +1,60 @@
 
 import React from 'react';
+import { useAuth } from '@/components/auth/AuthProvider';
 import ProductionTestDashboard from '@/components/ProductionTestDashboard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Info, ExternalLink } from 'lucide-react';
+import { Info, ExternalLink, Lock } from 'lucide-react';
+
+const ALLOWED_EMAILS = ['giraudelc@gmail.com', 'kevin.kinyua9595@gmail.com'];
 
 const ProductionTesting = () => {
+  const { user, loading } = useAuth();
+
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <div className="container mx-auto p-6 flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Check if user is authenticated and authorized
+  const isAuthorized = user && ALLOWED_EMAILS.includes(user.email || '');
+
+  if (!isAuthorized) {
+    return (
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Card className="w-full max-w-md">
+            <CardHeader className="text-center">
+              <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                <Lock className="h-6 w-6 text-red-600" />
+              </div>
+              <CardTitle className="text-xl text-red-800">Access Restricted</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center space-y-4">
+              <p className="text-gray-600">
+                This page is only accessible to authorized personnel.
+              </p>
+              {!user && (
+                <p className="text-sm text-gray-500">
+                  Please sign in with an authorized account to continue.
+                </p>
+              )}
+              {user && (
+                <p className="text-sm text-gray-500">
+                  Your account ({user.email}) does not have permission to access this page.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="space-y-2">
