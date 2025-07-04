@@ -27,11 +27,11 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClo
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'scheduled': return 'bg-blue-100 text-blue-800';
-      case 'ordered': return 'bg-yellow-100 text-yellow-800';
-      case 'delivered': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
+    switch (status?.toLowerCase()) {
+      case 'scheduled': return 'bg-slate-100 text-slate-800';
+      case 'ordered': return 'status-warning';
+      case 'delivered': return 'status-success';
+      default: return 'bg-slate-100 text-slate-800';
     }
   };
 
@@ -171,7 +171,7 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClo
                 variant="outline"
                 onClick={handleCancelGift}
                 disabled={isDeleting}
-                className="border-red-500 text-red-600 hover:bg-red-50"
+                className="btn-danger"
               >
                 <X className="h-4 w-4 mr-2" />
                 {isDeleting ? 'Canceling...' : 'Cancel Gift'}

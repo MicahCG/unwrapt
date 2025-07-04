@@ -230,7 +230,7 @@ const CalendarSyncButton = () => {
       onClick={handleCalendarSync}
       disabled={syncing}
       className={`border-brand-charcoal text-brand-charcoal hover:bg-brand-cream ${
-        justSynced ? 'bg-green-50 border-green-300 text-green-700' : ''
+        justSynced ? 'status-success' : ''
       }`}
     >
       {syncing ? (

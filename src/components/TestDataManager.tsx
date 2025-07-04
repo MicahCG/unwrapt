@@ -91,23 +91,23 @@ const TestDataManager = () => {
   }
 
   return (
-    <Card className="border-yellow-200 bg-yellow-50">
+    <Card className="alert-warning">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-yellow-800">
+        <CardTitle className="flex items-center gap-2 text-slate-700">
           <TestTube2 className="h-5 w-5" />
           Test Data Manager
-          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">
+          <Badge variant="outline" className="status-warning">
             Development Only
           </Badge>
         </CardTitle>
       </CardHeader>
       
       <CardContent className="space-y-4">
-        <div className="flex items-start gap-3 p-3 bg-yellow-100 rounded-lg border border-yellow-200">
-          <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5" />
+        <div className="flex items-start gap-3 p-3 alert-warning rounded-lg">
+          <AlertTriangle className="h-4 w-4 text-slate-600 mt-0.5" />
           <div className="text-sm">
-            <p className="font-medium text-yellow-800">Testing Environment</p>
-            <p className="text-yellow-700 mt-1">
+            <p className="font-medium text-slate-700">Testing Environment</p>
+            <p className="text-slate-600 mt-1">
               Use these controls to set up realistic test data for Shopify integration testing.
               Test recipients include complete shipping addresses required for orders.
             </p>
@@ -126,7 +126,7 @@ const TestDataManager = () => {
             <Button
               onClick={handleCreateTestData}
               disabled={isCreating}
-              className="w-full bg-green-600 hover:bg-green-700 text-white"
+              className="w-full btn-success"
             >
               {isCreating ? 'Creating...' : 'Create Test Data'}
               <Users className="h-4 w-4 ml-2" />
@@ -145,7 +145,7 @@ const TestDataManager = () => {
               onClick={handleClearTestData}
               disabled={isClearing}
               variant="outline"
-              className="w-full border-red-200 text-red-600 hover:bg-red-50"
+              className="w-full btn-danger"
             >
               {isClearing ? 'Clearing...' : 'Clear Test Data'}
               <Trash2 className="h-4 w-4 ml-2" />
@@ -153,7 +153,7 @@ const TestDataManager = () => {
           </div>
         </div>
 
-        <div className="bg-white p-3 rounded border border-yellow-200">
+        <div className="bg-white p-3 rounded border border-slate-200">
           <h5 className="font-medium text-gray-800 mb-2 flex items-center gap-2">
             <Gift className="h-4 w-4" />
             Test Data Preview

@@ -257,12 +257,12 @@ const CalendarView = () => {
 
   const getPersonStatus = (person: CalendarPerson) => {
     if (person.hasScheduledGifts) {
-      return { status: 'scheduled', color: 'bg-green-100 text-green-800', icon: Check };
+      return { status: 'scheduled', color: 'status-success', icon: Check };
     }
     if (person.isRecipient) {
-      return { status: 'recipient', color: 'bg-blue-100 text-blue-800', icon: User };
+      return { status: 'recipient', color: 'status-info', icon: User };
     }
-    return { status: 'processing', color: 'bg-yellow-100 text-yellow-800', icon: Clock };
+    return { status: 'processing', color: 'status-warning', icon: Clock };
   };
 
   if (loading) {
@@ -350,16 +350,16 @@ const CalendarView = () => {
                   {calendarPeople.length} people from your calendar
                 </h3>
                 <div className="flex flex-wrap gap-2 text-xs">
-                  <Badge className="bg-green-100 text-green-800">
+                  <Badge className="status-success">
                     <Check className="h-3 w-3 mr-1" />
                     Gift Scheduled
                   </Badge>
-                  <Badge className="bg-blue-100 text-blue-800">
+                  <Badge className="status-info">
                     <User className="h-3 w-3 mr-1" />
                     Recipient Ready
                   </Badge>
                   {autoAddingRecipients && (
-                    <Badge className="bg-yellow-100 text-yellow-800">
+                    <Badge className="status-warning">
                       <Clock className="h-3 w-3 mr-1" />
                       Adding Recipients...
                     </Badge>
@@ -388,12 +388,12 @@ const CalendarView = () => {
                             {person.name}
                           </h4>
                           {person.hasScheduledGifts && (
-                            <Badge className="bg-green-100 text-green-800 text-xs">
+                            <Badge className="status-success text-xs">
                               Gift Scheduled
                             </Badge>
                           )}
                           {person.isRecipient && !person.hasScheduledGifts && (
-                            <Badge className="bg-blue-100 text-blue-800 text-xs">
+                            <Badge className="status-info text-xs">
                               Ready for Gifts
                             </Badge>
                           )}
