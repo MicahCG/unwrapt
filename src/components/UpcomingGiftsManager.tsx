@@ -28,7 +28,7 @@ const UpcomingGiftsManager = () => {
           recipients (name, email, interests, street, city, state, zip_code, country, phone)
         `)
         .eq('user_id', user?.id)
-        .eq('status', 'scheduled')
+        .in('status', ['scheduled', 'ordered', 'paid'])
         .order('delivery_date', { ascending: true });
       
       if (error) throw error;
@@ -76,15 +76,23 @@ const UpcomingGiftsManager = () => {
     }
   };
 
-  const getGiftImage = (giftType: string) => {
+  const getGiftImage = (gift: any) => {
+    // First priority: use the actual gift image URL if available
+    if (gift.gift_image_url) {
+      return gift.gift_image_url;
+    }
+    
+    // Fallback to type-based mapping for older gifts
     const imageMap = {
       'wine': 'https://images.unsplash.com/photo-1482938289607-e9573fc25ebb?w=400&h=300&fit=crop',
       'tea': 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=400&h=300&fit=crop',
       'coffee': 'https://images.unsplash.com/photo-1581090464777-f3220bbe1b8b?w=400&h=300&fit=crop',
       'sweet treats': 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=400&h=300&fit=crop',
-      'self care': 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?w=400&h=300&fit=crop'
+      'self care': 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?w=400&h=300&fit=crop',
+      'candle': 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&h=300&fit=crop&q=80',
+      'ocean driftwood coconut candle': 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&h=300&fit=crop&q=80'
     };
-    return imageMap[giftType?.toLowerCase()] || 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop';
+    return imageMap[gift.gift_type?.toLowerCase()] || 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop';
   };
 
   return (
@@ -130,7 +138,7 @@ const UpcomingGiftsManager = () => {
                 <div className="flex items-center space-x-4">
                   {gift.gift_type && (
                     <img
-                      src={getGiftImage(gift.gift_type)}
+                      src={getGiftImage(gift)}
                       alt={`${gift.gift_type} gift`}
                       className="w-16 h-16 object-cover rounded-lg shadow-sm"
                     />

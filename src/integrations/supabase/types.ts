@@ -185,6 +185,7 @@ export type Database = {
           created_at: string
           delivery_date: string | null
           gift_description: string | null
+          gift_image_url: string | null
           gift_type: string | null
           id: string
           occasion: string
@@ -202,6 +203,7 @@ export type Database = {
           created_at?: string
           delivery_date?: string | null
           gift_description?: string | null
+          gift_image_url?: string | null
           gift_type?: string | null
           id?: string
           occasion: string
@@ -219,6 +221,7 @@ export type Database = {
           created_at?: string
           delivery_date?: string | null
           gift_description?: string | null
+          gift_image_url?: string | null
           gift_type?: string | null
           id?: string
           occasion?: string
