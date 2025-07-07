@@ -168,7 +168,7 @@ const RecipientSelectionModal: React.FC<RecipientSelectionModalProps> = ({
                         {/* Avatar with initials */}
                         <Avatar className="h-10 w-10 bg-gradient-to-br from-brand-charcoal to-brand-charcoal/80">
                           <AvatarFallback className="bg-gradient-to-br from-brand-charcoal to-brand-charcoal/80 text-brand-cream font-semibold text-sm">
-                            {getInitials(recipient.name)}
+                            {getInitials(cleanName(recipient.name))}
                           </AvatarFallback>
                         </Avatar>
                         
