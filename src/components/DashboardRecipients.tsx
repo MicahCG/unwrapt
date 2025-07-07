@@ -276,87 +276,100 @@ const DashboardRecipients = () => {
 
       {recipients && recipients.length > 0 ? (
         <div className="space-y-3 sm:space-y-4">
-          <div className="space-y-3 sm:space-y-4">
+          <div className="space-y-3">
             {displayedRecipients.map((recipient: any) => (
-              <Card 
-                key={recipient.id} 
-                className={`border-brand-cream hover:shadow-md transition-shadow w-full ${
-                  recipient.hasScheduledGifts ? 'bg-gray-50' : 'bg-white'
-                }`}
+              <div 
+                key={recipient.id}
+                className="group relative bg-white border border-brand-cream/50 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 ease-out overflow-hidden hover:bg-gradient-to-r hover:from-white hover:to-brand-cream/10"
               >
-                <CardContent className="p-3 sm:p-4">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div className="flex-1 min-w-0 w-full sm:w-auto">
-                      <div className="flex flex-col space-y-2">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-medium text-brand-charcoal text-sm sm:text-base truncate">
-                              {cleanName(recipient.name)}
-                            </h3>
-                            {recipient.hasScheduledGifts && (
-                              <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">
-                                <Check className="h-3 w-3 mr-1" />
-                                Scheduled
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 mt-1">
-                            {recipient.relationship && (
-                              <Badge 
-                                variant="secondary" 
-                                className="text-xs bg-brand-cream text-brand-charcoal border-brand-cream w-fit"
-                              >
-                                {recipient.relationship}
-                              </Badge>
-                            )}
-                            {recipient.nextScheduledGift ? (
-                              <div className="flex items-center text-xs">
-                                <Clock className="h-3 w-3 mr-1 flex-shrink-0 text-brand-charcoal" />
-                                <span className="font-medium text-gray-500">
-                                  Next gift: {formatDate(recipient.nextScheduledGift.occasion_date)}
-                                </span>
-                              </div>
-                            ) : recipient.nextOccasion && (
-                              <>
-                                <div className="flex items-center text-xs">
-                                  <Clock className="h-3 w-3 mr-1 flex-shrink-0 text-brand-charcoal" />
-                                  <span className="font-medium text-brand-charcoal">
-                                    {getDaysUntilText(recipient.daysUntilNext, recipient.nextOccasion.type)}
-                                  </span>
-                                </div>
-                                <div className="flex items-center text-xs text-brand-charcoal/70">
-                                  <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
-                                  <span>{formatDate(recipient.nextOccasion.date.toISOString())}</span>
-                                </div>
-                              </>
-                            )}
-                          </div>
+                {/* Default State */}
+                <div className="p-4 sm:p-5 transition-all duration-300 group-hover:pb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      {/* Urgency Dot */}
+                      <div className="relative">
+                        <div 
+                          className={`w-3 h-3 rounded-full transition-all duration-200 ${
+                            recipient.daysUntilNext <= 7 
+                              ? 'bg-red-400 animate-pulse' 
+                              : recipient.daysUntilNext <= 14 
+                                ? 'bg-yellow-400' 
+                                : 'bg-green-400'
+                          }`}
+                        />
+                      </div>
+                      
+                      {/* Name and Countdown */}
+                      <div>
+                        <h3 className="font-bold text-brand-charcoal text-base sm:text-lg">
+                          {cleanName(recipient.name)}
+                        </h3>
+                        <div className="flex items-center space-x-1 text-sm text-brand-charcoal/70">
+                          {recipient.nextOccasion && (
+                            <>
+                              <span>Birthday in {recipient.daysUntilNext} days</span>
+                              <span className="text-base">⏰</span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
-                    {recipient.hasScheduledGifts && recipient.nextScheduledGift ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream w-full sm:w-auto flex-shrink-0"
-                        onClick={() => setViewingGift(recipient.nextScheduledGift)}
-                      >
-                        <Gift className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                        <span className="text-xs sm:text-sm">View Gift</span>
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 w-full sm:w-auto flex-shrink-0"
-                        onClick={() => setSchedulingGift(recipient)}
-                      >
-                        <Gift className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                        <span className="text-xs sm:text-sm">Schedule Gift</span>
-                      </Button>
+                    
+                    {/* Status Badge (if has scheduled gifts) */}
+                    {recipient.hasScheduledGifts && (
+                      <Badge className="bg-green-100 text-green-800 border-green-200 text-xs opacity-100 group-hover:opacity-0 transition-opacity duration-300">
+                        <Check className="h-3 w-3 mr-1" />
+                        Scheduled
+                      </Badge>
                     )}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+
+                {/* Expanded State (on hover) */}
+                <div className="px-4 sm:px-5 pb-4 sm:pb-5 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
+                  <div className="flex items-center justify-between pt-2 border-t border-brand-cream/30">
+                    {/* Birthday Date */}
+                    {recipient.nextOccasion && (
+                      <div className="flex items-center space-x-2 text-sm text-brand-charcoal/80">
+                        <span className="text-base">🎉</span>
+                        <span className="font-medium">
+                          {formatDate(recipient.nextOccasion.date.toISOString())}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {/* Action Button */}
+                    <div className="transform transition-all duration-200 group-hover:scale-105">
+                      {recipient.hasScheduledGifts && recipient.nextScheduledGift ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-brand-charcoal/20 text-brand-charcoal hover:bg-brand-cream/50 rounded-full px-4 py-2 transition-all duration-200 hover:scale-105"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewingGift(recipient.nextScheduledGift);
+                          }}
+                        >
+                          <Gift className="h-4 w-4 mr-2" />
+                          <span className="text-sm">View Gift</span>
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 rounded-full px-4 py-2 transition-all duration-200 hover:scale-105 active:scale-95"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSchedulingGift(recipient);
+                          }}
+                        >
+                          <Gift className="h-4 w-4 mr-2 animate-bounce" />
+                          <span className="text-sm">Schedule Gift</span>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             ))}
           </div>
 
