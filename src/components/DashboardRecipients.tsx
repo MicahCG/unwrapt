@@ -231,9 +231,8 @@ const DashboardRecipients = () => {
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <Button 
-            variant="outline"
             size="sm"
-            className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream w-full sm:w-auto"
+            className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 w-full sm:w-auto"
             onClick={() => setShowAddModal(true)}
           >
             <Plus className="h-4 w-4 mr-2" />
