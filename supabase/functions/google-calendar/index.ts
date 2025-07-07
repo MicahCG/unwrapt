@@ -35,6 +35,11 @@ function extractPersonFromEvent(eventSummary: string) {
     ) || '';
   }
   
+  // Remove any remaining "'s" suffix from the extracted name
+  if (personName.endsWith("'s")) {
+    personName = personName.slice(0, -2);
+  }
+  
   return personName;
 }
 
