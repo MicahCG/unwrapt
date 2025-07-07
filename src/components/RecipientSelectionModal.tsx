@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, Calendar } from 'lucide-react';
+import { Users, Calendar, ChevronRight } from 'lucide-react';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cleanName } from '@/lib/utils';
 
 interface RecipientSelectionModalProps {
@@ -92,6 +93,10 @@ const RecipientSelectionModal: React.FC<RecipientSelectionModalProps> = ({
     });
   };
 
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
   const getNextOccasion = (recipient: any) => {
     const today = new Date();
     const currentYear = today.getFullYear();
@@ -137,12 +142,18 @@ const RecipientSelectionModal: React.FC<RecipientSelectionModalProps> = ({
         <div className="space-y-4 max-h-[400px] overflow-y-auto">
           {recipients && recipients.length > 0 ? (
             recipients.map((recipient: any) => {
+              const isUpcoming = recipient.daysUntilNext && recipient.daysUntilNext <= 30;
+              
               return (
                 <div 
                   key={recipient.id}
                   role="button"
                   tabIndex={0}
-                  className="group relative bg-white border border-brand-cream/50 rounded-2xl shadow-sm hover:shadow-lg hover:shadow-brand-charcoal/10 transition-all duration-300 ease-out overflow-hidden hover:bg-gradient-to-r hover:from-white hover:to-brand-cream/20 cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-charcoal/20 focus:ring-offset-2"
+                  className={`group relative border rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 ease-out cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-charcoal/20 focus:ring-offset-2 ${
+                    isUpcoming 
+                      ? 'bg-gradient-to-r from-orange-50 to-pink-50 border-orange-200/50 hover:shadow-orange-200/30 hover:bg-gradient-to-r hover:from-orange-100 hover:to-pink-100' 
+                      : 'bg-white border-brand-cream/50 hover:shadow-brand-charcoal/10 hover:bg-gradient-to-r hover:from-white hover:to-brand-cream/20'
+                  }`}
                   onClick={() => onRecipientSelected(recipient)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
@@ -153,48 +164,52 @@ const RecipientSelectionModal: React.FC<RecipientSelectionModalProps> = ({
                 >
                   <div className="p-4 sm:p-5">
                     <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3">
-                          <div>
-                            <h3 className="font-bold text-brand-charcoal text-base">{cleanName(recipient.name)}</h3>
-                            <div className="flex items-center space-x-2 mt-1">
-                              {recipient.relationship && (
-                                <Badge 
-                                  variant="secondary" 
-                                  className="text-xs bg-brand-cream text-brand-charcoal/70"
-                                >
-                                  {recipient.relationship}
-                                </Badge>
-                              )}
-                              {recipient.nextOccasion && (
-                                <div className={`flex items-center text-xs ${
-                                  recipient.daysUntilNext <= 30 
-                                    ? 'text-red-500' 
-                                    : 'text-brand-charcoal/70'
-                                }`}>
-                                  <Calendar className="h-3 w-3 mr-1" />
-                                  <span className="font-medium">{recipient.nextOccasion.type}:</span>
-                                  <span className="ml-1">{formatDate(recipient.nextOccasion.date.toISOString())}</span>
-                                  {recipient.daysUntilNext <= 30 && (
-                                    <span className="ml-1 text-base">⏰</span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
+                      <div className="flex items-center space-x-3 flex-1">
+                        {/* Avatar with initials */}
+                        <Avatar className="h-10 w-10 bg-gradient-to-br from-brand-charcoal to-brand-charcoal/80">
+                          <AvatarFallback className="bg-gradient-to-br from-brand-charcoal to-brand-charcoal/80 text-brand-cream font-semibold text-sm">
+                            {getInitials(recipient.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        
+                        {/* Name and details */}
+                        <div className="flex-1">
+                          <h3 className="font-bold text-brand-charcoal text-base">{cleanName(recipient.name)}</h3>
+                          <div className="flex items-center space-x-2 mt-1">
+                            {recipient.relationship && (
+                              <Badge 
+                                variant="secondary" 
+                                className={`text-xs ${
+                                  isUpcoming 
+                                    ? 'bg-orange-100 text-orange-800' 
+                                    : 'bg-brand-cream text-brand-charcoal/70'
+                                }`}
+                              >
+                                {recipient.relationship}
+                              </Badge>
+                            )}
+                            {recipient.nextOccasion && (
+                              <div className={`flex items-center text-xs ${
+                                isUpcoming 
+                                  ? 'text-orange-700 font-medium' 
+                                  : 'text-brand-charcoal/70'
+                              }`}>
+                                <Calendar className="h-3 w-3 mr-1" />
+                                <span className="font-medium">{recipient.nextOccasion.type}:</span>
+                                <span className="ml-1">{formatDate(recipient.nextOccasion.date.toISOString())}</span>
+                                {isUpcoming && (
+                                  <span className="ml-1 text-base">⏰</span>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-brand-charcoal/20 text-brand-charcoal hover:bg-brand-cream/50 rounded-full px-4 py-2 transition-all duration-200 hover:scale-105"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRecipientSelected(recipient);
-                        }}
-                      >
-                        Select
-                      </Button>
+                      
+                      {/* Arrow icon */}
+                      <ChevronRight className={`h-5 w-5 transition-all duration-200 group-hover:translate-x-1 ${
+                        isUpcoming ? 'text-orange-600' : 'text-brand-charcoal/40'
+                      }`} />
                     </div>
                   </div>
                 </div>
