@@ -9,6 +9,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import GiftDetailsModal from './GiftDetailsModal';
 import RecipientSelectionModal from './RecipientSelectionModal';
 import ScheduleGiftModal from './ScheduleGiftModal';
+import { cleanName } from '@/lib/utils';
 
 const UpcomingGiftsManager = () => {
   const { user } = useAuth();
@@ -123,7 +124,7 @@ const UpcomingGiftsManager = () => {
                     <div className="flex items-center gap-2 mb-2">
                       <Sparkles className="h-4 w-4 text-brand-gold" />
                       <CardTitle className="text-base sm:text-lg text-brand-charcoal truncate">
-                        {gift.recipients?.name}
+                        {cleanName(gift.recipients?.name)}
                       </CardTitle>
                     </div>
                     <Badge className={`text-xs ${getStatusColor(gift.status)}`}>

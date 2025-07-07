@@ -8,6 +8,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Users, Calendar } from 'lucide-react';
+import { cleanName } from '@/lib/utils';
 
 interface RecipientSelectionModalProps {
   isOpen: boolean;
@@ -103,7 +104,7 @@ const RecipientSelectionModal: React.FC<RecipientSelectionModalProps> = ({
                       <div className="flex-1">
                         <div className="flex items-center space-x-3">
                           <div>
-                            <h3 className="font-medium">{recipient.name}</h3>
+                            <h3 className="font-medium">{cleanName(recipient.name)}</h3>
                             <div className="flex items-center space-x-2 mt-1">
                               {recipient.relationship && (
                                 <Badge 

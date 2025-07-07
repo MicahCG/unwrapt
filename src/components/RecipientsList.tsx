@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
-import { Edit, Trash2, Gift, Calendar, Plus, Check } from 'lucide-react';
+import { Calendar, Gift, Phone, MapPin, Mail, Star, Eye, Trash2, Pencil, Plus, Clock, Edit, Check } from 'lucide-react';
+import { cleanName } from '@/lib/utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import EditRecipientModal from './EditRecipientModal';
 import ScheduleGiftModal from './ScheduleGiftModal';
@@ -176,7 +177,7 @@ const RecipientsList = () => {
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <CardTitle className="text-lg text-brand-charcoal">{recipient.name}</CardTitle>
+                        <CardTitle className="text-lg text-brand-charcoal">{cleanName(recipient.name)}</CardTitle>
                         {hasScheduledGifts && (
                           <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">
                             <Check className="h-3 w-3 mr-1" />

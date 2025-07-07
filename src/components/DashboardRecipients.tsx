@@ -8,6 +8,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { Gift, Calendar, Plus, Users, Clock, ChevronDown, ChevronUp, Check } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { cleanName } from '@/lib/utils';
 import ScheduleGiftModal from './ScheduleGiftModal';
 import AddRecipientModal from './AddRecipientModal';
 import CalendarSyncButton from './CalendarSyncButton';
@@ -292,7 +293,7 @@ const DashboardRecipients = () => {
                         <div>
                           <div className="flex items-center gap-2 mb-1">
                             <h3 className="font-medium text-brand-charcoal text-sm sm:text-base truncate">
-                              {recipient.name}
+                              {cleanName(recipient.name)}
                             </h3>
                             {recipient.hasScheduledGifts && (
                               <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">
