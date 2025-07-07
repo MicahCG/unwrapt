@@ -282,8 +282,8 @@ const DashboardRecipients = () => {
                 key={recipient.id}
                 className="group relative bg-white border border-brand-cream/50 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 ease-out overflow-hidden hover:bg-gradient-to-r hover:from-white hover:to-brand-cream/10"
               >
-                {/* Default State */}
-                <div className="p-4 sm:p-5 transition-all duration-300 group-hover:pb-2">
+                {/* Default State - Compact */}
+                <div className="p-4 sm:p-5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       {/* Name and Countdown */}
@@ -318,8 +318,8 @@ const DashboardRecipients = () => {
                   </div>
                 </div>
 
-                {/* Expanded State (on hover) */}
-                <div className="px-4 sm:px-5 pb-4 sm:pb-5 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
+                {/* Expanded State (on hover) - Only visible on hover */}
+                <div className="px-4 sm:px-5 pb-4 sm:pb-5 max-h-0 opacity-0 group-hover:max-h-20 group-hover:opacity-100 transition-all duration-300 overflow-hidden">
                   <div className="flex items-center justify-between pt-2 border-t border-brand-cream/30">
                     {/* Birthday Date */}
                     {recipient.nextOccasion && (
