@@ -129,11 +129,19 @@ const DashboardRecipients = () => {
     queryFn: async () => {
       if (!user?.id) return { totalRecipients: 0, recipientsWithGifts: 0 };
       
+      console.log('🔍 Fetching gift coverage for user:', user.id);
+      
       // Get total recipients
       const { data: recipients, error: recipientsError } = await supabase
         .from('recipients')
         .select('id')
         .eq('user_id', user.id);
+      
+      console.log('📊 Recipients query result:', { 
+        count: recipients?.length, 
+        error: recipientsError,
+        recipients: recipients 
+      });
       
       if (recipientsError) {
         console.error('Error fetching recipients:', recipientsError);
@@ -147,6 +155,12 @@ const DashboardRecipients = () => {
         .eq('user_id', user.id)
         .eq('status', 'scheduled');
       
+      console.log('🎁 Scheduled gifts query result:', { 
+        count: giftsData?.length, 
+        error: giftsError,
+        gifts: giftsData 
+      });
+      
       if (giftsError) {
         console.error('Error fetching scheduled gifts:', giftsError);
         return { totalRecipients: recipients?.length || 0, recipientsWithGifts: 0 };
@@ -155,10 +169,13 @@ const DashboardRecipients = () => {
       // Count unique recipients with gifts
       const uniqueRecipientIds = new Set(giftsData?.map(gift => gift.recipient_id) || []);
       
-      return {
+      const result = {
         totalRecipients: recipients?.length || 0,
         recipientsWithGifts: uniqueRecipientIds.size
       };
+      
+      console.log('📈 Final gift coverage result:', result);
+      return result;
     },
     enabled: !!user?.id
   });
