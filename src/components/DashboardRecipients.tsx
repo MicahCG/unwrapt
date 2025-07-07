@@ -280,7 +280,26 @@ const DashboardRecipients = () => {
             {displayedRecipients.map((recipient: any) => (
               <div 
                 key={recipient.id}
-                className="group relative bg-white border border-brand-cream/50 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 ease-out overflow-hidden hover:bg-gradient-to-r hover:from-white hover:to-brand-cream/10"
+                role="button"
+                tabIndex={0}
+                className="group relative bg-white border border-brand-cream/50 rounded-2xl shadow-sm hover:shadow-lg hover:shadow-brand-charcoal/10 transition-all duration-300 ease-out overflow-hidden hover:bg-gradient-to-r hover:from-white hover:to-brand-cream/20 cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-charcoal/20 focus:ring-offset-2"
+                onClick={() => {
+                  if (!recipient.hasScheduledGifts || !recipient.nextScheduledGift) {
+                    setSchedulingGift(recipient);
+                  } else {
+                    setViewingGift(recipient.nextScheduledGift);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (!recipient.hasScheduledGifts || !recipient.nextScheduledGift) {
+                      setSchedulingGift(recipient);
+                    } else {
+                      setViewingGift(recipient.nextScheduledGift);
+                    }
+                  }
+                }}
               >
                 {/* Default State - Compact */}
                 <div className="p-4 sm:p-5">
@@ -331,33 +350,18 @@ const DashboardRecipients = () => {
                       </div>
                     )}
                     
-                    {/* Action Button */}
-                    <div className="transform transition-all duration-200 group-hover:scale-105">
+                    {/* Action Indicator */}
+                    <div className="flex items-center space-x-2 text-sm text-brand-charcoal/60 transition-all duration-200 group-hover:scale-105">
                       {recipient.hasScheduledGifts && recipient.nextScheduledGift ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-brand-charcoal/20 text-brand-charcoal hover:bg-brand-cream/50 rounded-full px-4 py-2 transition-all duration-200 hover:scale-105"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setViewingGift(recipient.nextScheduledGift);
-                          }}
-                        >
-                          <Gift className="h-4 w-4 mr-2" />
-                          <span className="text-sm">View Gift</span>
-                        </Button>
+                        <>
+                          <Gift className="h-4 w-4" />
+                          <span>Click to view gift</span>
+                        </>
                       ) : (
-                        <Button
-                          size="sm"
-                          className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 rounded-full px-4 py-2 transition-all duration-200 hover:scale-105 active:scale-95"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSchedulingGift(recipient);
-                          }}
-                        >
-                          <Gift className="h-4 w-4 mr-2 animate-bounce" />
-                          <span className="text-sm">Schedule Gift</span>
-                        </Button>
+                        <>
+                          <Gift className="h-4 w-4 animate-bounce" />
+                          <span>Click to schedule gift</span>
+                        </>
                       )}
                     </div>
                   </div>
