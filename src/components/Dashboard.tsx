@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import UserMenu from '@/components/auth/UserMenu';
 import TestDataManager from '@/components/TestDataManager';
@@ -11,6 +12,7 @@ import { ResponsiveContainer, ResponsiveHeader, ResponsiveNavigation, Responsive
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const { data: profile } = useUserProfile();
 
   return (
     <ResponsiveContainer>
@@ -18,7 +20,9 @@ const Dashboard = () => {
         <ResponsiveNavigation>
           <div className="flex items-center gap-4">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-brand-charcoal">Welcome back!</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-brand-charcoal">
+                Welcome back{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}!
+              </h1>
               <p className="text-brand-charcoal/70 mt-1 text-sm sm:text-base">Here's what's happening with your gifting schedule</p>
             </div>
           </div>
