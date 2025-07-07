@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { createTestData, clearTestData, testRecipients } from '@/utils/testDataGenerator';
 import { Database, TestTube2, Trash2, Users, Gift, AlertTriangle } from 'lucide-react';
+import { cleanName } from '@/lib/utils';
 
 const TestDataManager = () => {
   const { user } = useAuth();
@@ -161,7 +162,7 @@ const TestDataManager = () => {
           <div className="space-y-2 text-sm text-gray-600">
             {testRecipients.map((recipient, index) => (
               <div key={index} className="flex justify-between items-center">
-                <span>{recipient.name} ({recipient.relationship})</span>
+                <span>{cleanName(recipient.name)} ({recipient.relationship})</span>
                 <span className="text-xs bg-gray-100 px-2 py-1 rounded">
                   {recipient.address.city}, {recipient.address.state}
                 </span>

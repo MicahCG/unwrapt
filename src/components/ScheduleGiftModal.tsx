@@ -118,7 +118,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           type: 'gift_scheduled',
           userEmail: user?.email,
           userName: user?.user_metadata?.full_name || user?.email?.split('@')[0],
-          recipientName: recipient.name,
+          recipientName: cleanName(recipient.name),
           giftDetails: {
             occasion: giftDetails.occasion,
             occasionDate: giftDetails.occasion_date,
@@ -173,7 +173,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         throw new Error('Failed to update recipient address');
       }
 
-      console.log('Successfully updated recipient address for:', recipient.name);
+      console.log('Successfully updated recipient address for:', cleanName(recipient.name));
 
       // Then create the scheduled gift with Shopify price
       const { data: giftData, error: giftError } = await supabase
@@ -201,13 +201,13 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           productPrice: productData.price,
           productImage: productData.image,
           giftDetails: {
-            recipientName: recipient.name,
+            recipientName: cleanName(recipient.name),
             occasion: formData.occasion,
             giftType: formData.gift_type
           },
           shippingAddress: {
-            first_name: recipient.name.split(' ')[0] || recipient.name,
-            last_name: recipient.name.split(' ').slice(1).join(' ') || '',
+            first_name: cleanName(recipient.name).split(' ')[0] || cleanName(recipient.name),
+            last_name: cleanName(recipient.name).split(' ').slice(1).join(' ') || '',
             address1: formData.street,
             city: formData.city,
             province: formData.state,
