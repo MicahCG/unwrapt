@@ -230,7 +230,6 @@ const DashboardRecipients = () => {
           <h2 className="text-lg sm:text-xl font-semibold text-brand-charcoal">Your Recipients</h2>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <CalendarSyncButton />
           <Button 
             variant="outline"
             size="sm"
@@ -238,7 +237,7 @@ const DashboardRecipients = () => {
             onClick={() => setShowAddModal(true)}
           >
             <Plus className="h-4 w-4 mr-2" />
-            Manage
+            Add
           </Button>
         </div>
       </div>
