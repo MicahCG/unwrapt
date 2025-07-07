@@ -7,6 +7,9 @@ export function cn(...inputs: ClassValue[]) {
 
 export function cleanName(name: string | null | undefined): string {
   if (!name) return '';
+  console.log('cleanName called with:', name);
   // Remove "'s" suffix from names (e.g., "Frankie's" becomes "Frankie")
-  return name.endsWith("'s") ? name.slice(0, -2) : name;
+  const cleaned = name.endsWith("'s") ? name.slice(0, -2) : name;
+  console.log('cleanName result:', cleaned);
+  return cleaned;
 }
