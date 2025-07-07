@@ -286,29 +286,22 @@ const DashboardRecipients = () => {
                 <div className="p-4 sm:p-5 transition-all duration-300 group-hover:pb-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      {/* Urgency Dot */}
-                      <div className="relative">
-                        <div 
-                          className={`w-3 h-3 rounded-full transition-all duration-200 ${
-                            recipient.daysUntilNext <= 7 
-                              ? 'bg-red-400 animate-pulse' 
-                              : recipient.daysUntilNext <= 14 
-                                ? 'bg-yellow-400' 
-                                : 'bg-green-400'
-                          }`}
-                        />
-                      </div>
-                      
                       {/* Name and Countdown */}
                       <div>
                         <h3 className="font-bold text-brand-charcoal text-base sm:text-lg">
                           {cleanName(recipient.name)}
                         </h3>
-                        <div className="flex items-center space-x-1 text-sm text-brand-charcoal/70">
+                        <div className={`flex items-center space-x-1 text-sm ${
+                          recipient.daysUntilNext <= 30 
+                            ? 'text-red-500' 
+                            : 'text-brand-charcoal/70'
+                        }`}>
                           {recipient.nextOccasion && (
                             <>
                               <span>Birthday in {recipient.daysUntilNext} days</span>
-                              <span className="text-base">⏰</span>
+                              {recipient.daysUntilNext <= 30 && (
+                                <span className="text-base">⏰</span>
+                              )}
                             </>
                           )}
                         </div>
