@@ -99,15 +99,20 @@ const UpcomingGiftsManager = () => {
   return (
     <div className="space-y-4 sm:space-y-6 w-full">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <h2 className="text-xl sm:text-2xl font-bold text-brand-charcoal">Upcoming Gifts</h2>
-        <Button
-          className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 w-full sm:w-auto"
-          onClick={() => setShowRecipientSelection(true)}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          <span className="sm:hidden">Schedule Gifts</span>
-          <span className="hidden sm:inline">Schedule More Gifts</span>
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-brand-gold" />
+          <h2 className="text-lg sm:text-xl font-semibold text-brand-charcoal">Upcoming Gifts</h2>
+        </div>
+        {gifts && gifts.length > 0 && (
+          <Button
+            className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 w-full sm:w-auto"
+            onClick={() => setShowRecipientSelection(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            <span className="sm:hidden">Schedule Gifts</span>
+            <span className="hidden sm:inline">Schedule More Gifts</span>
+          </Button>
+        )}
       </div>
 
       {gifts && gifts.length > 0 ? (
@@ -161,18 +166,40 @@ const UpcomingGiftsManager = () => {
           ))}
         </div>
       ) : (
-        <Card className="w-full">
-          <CardContent className="py-8 sm:py-12 text-center px-4 sm:px-6">
-            <div className="text-brand-charcoal/50 mb-4 text-sm sm:text-base">
-              No upcoming gifts scheduled
+        <Card className="w-full min-h-[400px] bg-gradient-to-br from-white via-brand-cream/10 to-brand-cream/20 border-brand-cream/30 shadow-sm">
+          <CardContent className="flex flex-col items-center justify-center h-full py-12 px-4 sm:px-6 text-center space-y-6">
+            {/* Animated Gift Icon */}
+            <div className="relative">
+              <div className="w-20 h-20 bg-gradient-to-br from-brand-gold/20 to-brand-gold/10 rounded-full flex items-center justify-center animate-pulse">
+                <Sparkles className="h-10 w-10 text-brand-gold animate-bounce" />
+              </div>
+              <div className="absolute -top-1 -right-1 w-6 h-6 bg-brand-gold/20 rounded-full animate-ping"></div>
             </div>
+            
+            {/* Main Message */}
+            <div className="space-y-3 max-w-sm">
+              <h3 className="text-xl font-semibold text-brand-charcoal">
+                Ready to spread some joy?
+              </h3>
+              <p className="text-brand-charcoal/70 leading-relaxed">
+                Start your thoughtful gifting journey by scheduling your first gift. We'll handle the rest!
+              </p>
+            </div>
+            
+            {/* CTA Button */}
             <Button
-              className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 w-full sm:w-auto"
+              size="lg"
+              className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 transition-all duration-200 hover:scale-105 shadow-lg hover:shadow-xl"
               onClick={() => setShowRecipientSelection(true)}
             >
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-5 w-5 mr-2" />
               Schedule Your First Gift
             </Button>
+            
+            {/* Supporting Text */}
+            <p className="text-xs text-brand-charcoal/50 max-w-xs">
+              Choose from curated gifts and we'll deliver at the perfect time
+            </p>
           </CardContent>
         </Card>
       )}
