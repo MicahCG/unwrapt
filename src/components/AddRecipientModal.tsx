@@ -220,14 +220,11 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
 
   return (
     <Dialog open={modalIsOpen} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        {children || (
-          <Button>
-            <UserPlus className="h-4 w-4 mr-2" />
-            Add Recipient
-          </Button>
-        )}
-      </DialogTrigger>
+      {children && (
+        <DialogTrigger asChild>
+          {children}
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New Recipient</DialogTitle>
