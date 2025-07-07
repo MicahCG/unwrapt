@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { CreditCard, Package, Heart, MapPin } from 'lucide-react';
 import { useShopifyProductTypes } from '@/hooks/useShopifyProductTypes';
 import { useShopifyProduct } from '@/hooks/useShopifyProduct';
+import { cleanName } from '@/lib/utils';
 
 interface ScheduleGiftModalProps {
   recipient: any;
@@ -265,7 +266,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px] bg-white border-brand-cream text-brand-charcoal max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-brand-charcoal">Schedule Gift for {recipient.name}</DialogTitle>
+          <DialogTitle className="text-brand-charcoal">Schedule Gift for {cleanName(recipient.name)}</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -349,7 +350,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
                       {productData.title}
                     </p>
                     <p className="text-xs text-brand-charcoal/70">
-                      {getGiftDescription(formData.gift_type, recipient.name)}
+                      {getGiftDescription(formData.gift_type, cleanName(recipient.name))}
                     </p>
                     <p className="text-lg text-brand-gold font-bold mt-2">
                       ${productData.price.toFixed(2)}

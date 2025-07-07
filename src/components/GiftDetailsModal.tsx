@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Gift, DollarSign, User, Clock, TestTube2, X } from 'lucide-react';
 import ShopifyTestModal from './ShopifyTestModal';
+import { cleanName } from '@/lib/utils';
 
 interface GiftDetailsModalProps {
   gift: any;
@@ -72,7 +73,7 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClo
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-semibold text-brand-charcoal">
-                {gift.occasion} for {gift.recipients?.name}
+                {gift.occasion} for {cleanName(gift.recipients?.name)}
               </h3>
               <Badge className={getStatusColor(gift.status)}>
                 {gift.status}
@@ -93,7 +94,7 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClo
                       {gift.gift_type}
                     </h4>
                     <p className="text-sm text-brand-charcoal/70">
-                      We'll curate premium {gift.gift_type.toLowerCase()} perfect for {gift.recipients?.name}'s interests
+                      We'll curate premium {gift.gift_type.toLowerCase()} perfect for {cleanName(gift.recipients?.name)}'s interests
                     </p>
                   </div>
                 </div>
@@ -106,7 +107,7 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClo
                   <User className="h-4 w-4 text-brand-charcoal/60" />
                   <div>
                     <p className="text-sm font-medium text-brand-charcoal">Recipient</p>
-                    <p className="text-sm text-brand-charcoal/70">{gift.recipients?.name}</p>
+                    <p className="text-sm text-brand-charcoal/70">{cleanName(gift.recipients?.name)}</p>
                     {gift.recipients?.relationship && (
                       <p className="text-xs text-brand-charcoal/50">{gift.recipients.relationship}</p>
                     )}

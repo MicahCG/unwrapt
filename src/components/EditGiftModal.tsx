@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useShopifyProductTypes } from '@/hooks/useShopifyProductTypes';
 import { Package, Calendar, DollarSign, Trash2 } from 'lucide-react';
+import { cleanName } from '@/lib/utils';
 
 interface EditGiftModalProps {
   gift: any;
@@ -99,7 +100,7 @@ const EditGiftModal: React.FC<EditGiftModalProps> = ({ gift, isOpen, onClose, on
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px] bg-white border-brand-cream text-brand-charcoal max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-brand-charcoal text-xl">Edit Gift for {gift.recipients?.name}</DialogTitle>
+          <DialogTitle className="text-brand-charcoal text-xl">Edit Gift for {cleanName(gift.recipients?.name)}</DialogTitle>
         </DialogHeader>
         
         {/* Gift Preview Section - Made more prominent */}
@@ -121,7 +122,7 @@ const EditGiftModal: React.FC<EditGiftModalProps> = ({ gift, isOpen, onClose, on
                     {formData.gift_type}
                   </h3>
                   <p className="text-sm text-brand-charcoal/70 mb-3">
-                    {getGiftDescription(formData.gift_type, gift.recipients?.name)}
+                    {getGiftDescription(formData.gift_type, cleanName(gift.recipients?.name))}
                   </p>
                   
                   <div className="flex flex-wrap gap-3 text-sm">
