@@ -9,11 +9,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { CreditCard, Package, Heart, MapPin, Check, Sparkles } from 'lucide-react';
+import { CreditCard, Package, Heart, MapPin } from 'lucide-react';
 import { useShopifyProductTypes } from '@/hooks/useShopifyProductTypes';
 import { useShopifyProduct } from '@/hooks/useShopifyProduct';
 import { cleanName } from '@/lib/utils';
-import ConfettiAnimation from '@/components/ConfettiAnimation';
 
 interface ScheduleGiftModalProps {
   recipient: any;
@@ -40,8 +39,6 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   
   const { data: productData, isLoading: isLoadingProduct } = useShopifyProduct(formData.gift_type);
   const [isLoading, setIsLoading] = useState(false);
-  const [showConfetti, setShowConfetti] = useState(false);
-  const [justSelected, setJustSelected] = useState('');
 
   const getDefaultOccasionDate = () => {
     const today = new Date();
@@ -108,29 +105,6 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
   const getGiftDescription = (giftType: string, recipientName: string) => {
     return `We'll curate premium ${giftType.toLowerCase()} perfect for ${recipientName}'s interests`;
-  };
-
-  const getGiftVibeDescription = (giftType: string) => {
-    const vibeMap: { [key: string]: string } = {
-      'wine': 'Elegant & sophisticated',
-      'tea': 'Calming & mindful',
-      'coffee': 'Energizing & artisanal',
-      'sweet treats': 'Delightful & indulgent',
-      'self care': 'Relaxing & nurturing'
-    };
-    return vibeMap[giftType.toLowerCase()] || 'Thoughtfully curated';
-  };
-
-  const handleGiftSelection = (giftType: string) => {
-    setFormData(prev => ({ ...prev, gift_type: giftType }));
-    setJustSelected(giftType);
-    setShowConfetti(true);
-    
-    // Reset confetti after animation
-    setTimeout(() => {
-      setShowConfetti(false);
-      setJustSelected('');
-    }, 2000);
   };
 
   const getSenderName = () => {
@@ -289,10 +263,8 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   const productTypes = productTypesData?.productTypes || [];
 
   return (
-    <>
-      <ConfettiAnimation isActive={showConfetti} duration={1500} />
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[500px] bg-white border-brand-cream text-brand-charcoal max-h-[90vh] overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[500px] bg-white border-brand-cream text-brand-charcoal max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-brand-charcoal">Schedule Gift for {cleanName(recipient.name)}</DialogTitle>
         </DialogHeader>
@@ -332,86 +304,29 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             />
           </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center space-x-2">
-              <Sparkles className="h-4 w-4 text-brand-gold" />
-              <Label className="text-brand-charcoal font-medium">Choose Your Perfect Gift *</Label>
-            </div>
-            
-            {isLoadingProductTypes ? (
-              <div className="grid grid-cols-2 gap-3">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="aspect-square bg-brand-cream/30 rounded-xl animate-pulse" />
+          <div className="space-y-2">
+            <Label htmlFor="gift_type" className="text-brand-charcoal">Gift Type *</Label>
+            <Select 
+              value={formData.gift_type} 
+              onValueChange={(value) => setFormData(prev => ({ ...prev, gift_type: value }))}
+              disabled={isLoadingProductTypes}
+            >
+              <SelectTrigger className="text-brand-charcoal border-brand-cream">
+                <SelectValue placeholder={isLoadingProductTypes ? "Loading gift types..." : "Select gift type"} />
+              </SelectTrigger>
+              <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
+                {productTypes.map((type: string) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
                 ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3">
-                {productTypes.map((type: string) => {
-                  const isSelected = formData.gift_type === type;
-                  const wasJustSelected = justSelected === type;
-                  
-                  return (
-                    <div
-                      key={type}
-                      onClick={() => handleGiftSelection(type)}
-                      className={`relative group cursor-pointer rounded-xl border-2 transition-all duration-300 overflow-hidden ${
-                        isSelected 
-                          ? 'border-brand-gold shadow-lg shadow-brand-gold/20 scale-[1.02]' 
-                          : 'border-brand-cream/50 hover:border-brand-gold/40 hover:shadow-md hover:scale-[1.01]'
-                      }`}
-                    >
-                      {/* Gift Image */}
-                      <div className="aspect-square relative overflow-hidden">
-                        <img
-                          src={getGiftImage(type)}
-                          alt={type}
-                          className={`w-full h-full object-cover transition-transform duration-300 ${
-                            isSelected ? 'scale-110' : 'group-hover:scale-105'
-                          }`}
-                        />
-                        
-                        {/* Overlay */}
-                        <div className={`absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent transition-opacity duration-300 ${
-                          isSelected ? 'opacity-70' : 'opacity-50 group-hover:opacity-60'
-                        }`} />
-                        
-                        {/* Selection indicator */}
-                        {isSelected && (
-                          <div className="absolute top-2 right-2 w-6 h-6 bg-brand-gold rounded-full flex items-center justify-center shadow-lg">
-                            <Check className="h-3 w-3 text-white" />
-                          </div>
-                        )}
-                        
-                        {/* Just selected animation */}
-                        {wasJustSelected && (
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="w-8 h-8 bg-brand-gold rounded-full flex items-center justify-center animate-ping">
-                              <Sparkles className="h-4 w-4 text-white" />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Gift Info */}
-                      <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
-                        <h4 className="font-medium text-sm mb-1 capitalize">{type}</h4>
-                        <p className="text-xs opacity-90">{getGiftVibeDescription(type)}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            
-            {productTypes.length === 0 && !isLoadingProductTypes && (
-              <div className="text-center py-8 text-brand-charcoal/60">
-                <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">No gift types available</p>
-              </div>
-            )}
-            
+                {productTypes.length === 0 && !isLoadingProductTypes && (
+                  <SelectItem value="no-types-available" disabled>No gift types available</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
             {productTypesData?.success === false && (
-              <p className="text-xs text-brand-charcoal/60 text-center">
+              <p className="text-xs text-brand-charcoal/60">
                 Using fallback options - Shopify connection unavailable
               </p>
             )}
@@ -595,11 +510,9 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             </Button>
           </div>
         </form>
-        </DialogContent>
-      </Dialog>
-    </>
+      </DialogContent>
+    </Dialog>
   );
-
 };
 
 export default ScheduleGiftModal;
