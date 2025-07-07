@@ -303,33 +303,34 @@ const DashboardRecipients = () => {
               >
                 {/* Default State - Compact */}
                 <div className="p-4 sm:p-5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      {/* Name and Countdown */}
-                      <div>
-                        <h3 className="font-bold text-brand-charcoal text-base sm:text-lg">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      {/* Name */}
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-bold text-brand-charcoal text-base sm:text-lg pr-2">
                           {cleanName(recipient.name)}
                         </h3>
-                        <div className={`flex items-center space-x-1 text-sm ${
-                          recipient.daysUntilNext <= 30 
-                            ? 'text-red-500' 
-                            : 'text-brand-charcoal/70'
-                        }`}>
-                          {recipient.nextOccasion && (
-                            <>
-                              <span>Birthday in {recipient.daysUntilNext} days</span>
-                              {recipient.daysUntilNext <= 30 && (
-                                <span className="text-base">⏰</span>
-                              )}
-                            </>
-                          )}
-                        </div>
+                        {/* Icon positioned in top right */}
+                        {recipient.nextOccasion && recipient.daysUntilNext <= 30 && (
+                          <span className="text-base flex-shrink-0">⏰</span>
+                        )}
+                      </div>
+                      
+                      {/* Countdown */}
+                      <div className={`text-sm ${
+                        recipient.daysUntilNext <= 30 
+                          ? 'text-red-500' 
+                          : 'text-brand-charcoal/70'
+                      }`}>
+                        {recipient.nextOccasion && (
+                          <span>Birthday in {recipient.daysUntilNext} days</span>
+                        )}
                       </div>
                     </div>
                     
                     {/* Status Badge (if has scheduled gifts) */}
                     {recipient.hasScheduledGifts && (
-                      <Badge className="bg-green-100 text-green-800 border-green-200 text-xs opacity-100 group-hover:opacity-0 transition-opacity duration-300">
+                      <Badge className="bg-green-100 text-green-800 border-green-200 text-xs opacity-100 group-hover:opacity-0 transition-opacity duration-300 ml-2 flex-shrink-0">
                         <Check className="h-3 w-3 mr-1" />
                         Scheduled
                       </Badge>
