@@ -170,10 +170,10 @@ const UpcomingGiftsManager = () => {
           <CardContent className="flex flex-col items-center justify-center h-full py-12 px-4 sm:px-6 text-center space-y-6">
             {/* Animated Gift Icon */}
             <div className="relative">
-              <div className="w-20 h-20 bg-gradient-to-br from-brand-gold/20 to-brand-gold/10 rounded-full flex items-center justify-center animate-pulse">
+              <div className="w-20 h-20 bg-gradient-to-br from-brand-gold/40 to-brand-charcoal/20 rounded-full flex items-center justify-center animate-pulse shadow-lg">
                 <Sparkles className="h-10 w-10 text-brand-gold animate-bounce" />
               </div>
-              <div className="absolute -top-1 -right-1 w-6 h-6 bg-brand-gold/20 rounded-full animate-ping"></div>
+              <div className="absolute -top-1 -right-1 w-6 h-6 bg-brand-gold/60 rounded-full animate-ping"></div>
             </div>
             
             {/* Main Message */}
