@@ -44,7 +44,9 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     const currentYear = today.getFullYear();
     
     if (recipient.birthday) {
-      const birthday = new Date(recipient.birthday);
+      // Parse date as local date to avoid timezone issues
+      const birthdayParts = recipient.birthday.split('-');
+      const birthday = new Date(parseInt(birthdayParts[0]), parseInt(birthdayParts[1]) - 1, parseInt(birthdayParts[2]));
       const thisYearBirthday = new Date(currentYear, birthday.getMonth(), birthday.getDate());
       if (thisYearBirthday < today) {
         thisYearBirthday.setFullYear(currentYear + 1);

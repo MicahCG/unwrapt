@@ -109,7 +109,9 @@ const RecipientsList = () => {
     const occasions = [];
     
     if (recipient.birthday) {
-      const birthday = new Date(recipient.birthday);
+      // Parse date as local date to avoid timezone issues
+      const birthdayParts = recipient.birthday.split('-');
+      const birthday = new Date(parseInt(birthdayParts[0]), parseInt(birthdayParts[1]) - 1, parseInt(birthdayParts[2]));
       const thisYearBirthday = new Date(currentYear, birthday.getMonth(), birthday.getDate());
       if (thisYearBirthday < today) {
         thisYearBirthday.setFullYear(currentYear + 1);
@@ -118,7 +120,9 @@ const RecipientsList = () => {
     }
     
     if (recipient.anniversary) {
-      const anniversary = new Date(recipient.anniversary);
+      // Parse date as local date to avoid timezone issues
+      const anniversaryParts = recipient.anniversary.split('-');
+      const anniversary = new Date(parseInt(anniversaryParts[0]), parseInt(anniversaryParts[1]) - 1, parseInt(anniversaryParts[2]));
       const thisYearAnniversary = new Date(currentYear, anniversary.getMonth(), anniversary.getDate());
       if (thisYearAnniversary < today) {
         thisYearAnniversary.setFullYear(currentYear + 1);
