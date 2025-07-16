@@ -12,7 +12,7 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
 
   const screens = [
     "Life is busy.",
-    "Special moments slip through the cracks.",
+    "Special moments get missed.",
     "We help you plan gifts they'll never forget."
   ];
 
