@@ -1,14 +1,26 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import LoginPage from '@/components/auth/LoginPage';
 import OnboardingFlow from '@/components/OnboardingFlow';
+import OnboardingIntro from '@/components/OnboardingIntro';
 import Dashboard from '@/components/Dashboard';
 
 const Index = () => {
   const { user, loading } = useAuth();
+  const [showIntro, setShowIntro] = useState(true);
+  const [isFirstVisit, setIsFirstVisit] = useState(true);
+
+  useEffect(() => {
+    // Check if this is a first visit (no user and hasn't seen intro)
+    const hasSeenIntro = sessionStorage.getItem('introShown');
+    if (hasSeenIntro) {
+      setShowIntro(false);
+      setIsFirstVisit(false);
+    }
+  }, []);
 
   // Check if user has completed onboarding by looking for existing recipients
   const { data: hasCompletedOnboarding, isLoading: checkingOnboarding } = useQuery({
@@ -68,8 +80,19 @@ const Index = () => {
     );
   }
 
+  const handleIntroComplete = () => {
+    setShowIntro(false);
+    sessionStorage.setItem('introShown', 'true');
+  };
+
   if (!user) {
     console.log('🔧 Index: No user, showing login page');
+    
+    // Show intro for first-time visitors
+    if (showIntro && isFirstVisit) {
+      return <OnboardingIntro onComplete={handleIntroComplete} />;
+    }
+    
     return <LoginPage />;
   }
 
