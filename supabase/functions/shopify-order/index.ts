@@ -229,8 +229,10 @@ serve(async (req) => {
       console.log(`✅ Successfully created Shopify order: ${order.name} (ID: ${order.id})`);
     }
 
-    // Fetch actual product image from Shopify (for live orders)
+    // Get product image URL based on selected variant
     let productImageUrl = null;
+    
+    // First try to get actual Shopify product images for live orders
     if (!testMode && orderResult && orderResult.line_items && orderResult.line_items.length > 0) {
       try {
         const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
@@ -260,8 +262,19 @@ serve(async (req) => {
         }
       } catch (imageError) {
         console.error('⚠️ Error fetching product image:', imageError);
-        // Continue without image - not critical
       }
+    }
+    
+    // Fallback to variant-specific image URLs if no Shopify image was retrieved
+    if (!productImageUrl) {
+      const VARIANT_IMAGES = {
+        [PRODUCT_VARIANTS.OCEAN_DRIFTWOOD_COCONUT_CANDLE]: "https://cdn.shopify.com/s/files/1/0234/5678/products/ocean-driftwood-coconut-candle.jpg",
+        [PRODUCT_VARIANTS.LAVENDER_FIELDS_COFFEE]: "https://cdn.shopify.com/s/files/1/0234/5678/products/lavender-fields-coffee.jpg", 
+        [PRODUCT_VARIANTS.TRUFFLE_CHOCOLATE]: "https://cdn.shopify.com/s/files/1/0234/5678/products/truffle-chocolate.jpg"
+      };
+      
+      productImageUrl = VARIANT_IMAGES[selectedVariantId];
+      console.log(`📷 Using fallback image for variant ${selectedVariantId}: ${productImageUrl}`);
     }
 
     // Update the scheduled gift with order information (only if not test mode with mock data)
