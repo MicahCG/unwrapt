@@ -8,6 +8,7 @@ import TestDataManager from '@/components/TestDataManager';
 import UpcomingGiftsManager from '@/components/UpcomingGiftsManager';
 import DashboardRecipients from '@/components/DashboardRecipients';
 import WelcomeOverlay from '@/components/WelcomeOverlay';
+import { Logo } from '@/components/ui/logo';
 import { ResponsiveContainer, ResponsiveHeader, ResponsiveNavigation, ResponsiveActions } from '@/components/ui/responsive-container';
 
 const Dashboard = () => {
@@ -41,9 +42,7 @@ const Dashboard = () => {
         <ResponsiveNavigation>
           <div className="flex items-center gap-4">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-brand-charcoal">
-                Welcome back{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}!
-              </h1>
+              <Logo size="lg" className="mb-2" />
               <p className="text-brand-charcoal/70 mt-1 text-sm sm:text-base">Here's what's happening with your gifting schedule</p>
             </div>
           </div>
