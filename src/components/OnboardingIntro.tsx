@@ -7,12 +7,13 @@ interface OnboardingIntroProps {
 const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
   const [currentScreen, setCurrentScreen] = useState(0);
   const [displayedText, setDisplayedText] = useState('');
+  const [showEffortlessly, setShowEffortlessly] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
 
   const screens = [
     "Life is busy.",
     "Special moments slip through the cracks.",
-    "We help you plan gifts they'll never forget.\n\nEffortlessly."
+    "We help you plan gifts they'll never forget."
   ];
 
   useEffect(() => {
@@ -28,6 +29,7 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
     const currentText = screens[currentScreen];
     let currentIndex = 0;
     setDisplayedText('');
+    setShowEffortlessly(false);
 
     const typewriterInterval = setInterval(() => {
       if (currentIndex < currentText.length) {
@@ -35,11 +37,24 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
         currentIndex++;
       } else {
         clearInterval(typewriterInterval);
-        // Move to next screen after text completion + pause
-        const pauseTime = currentScreen === 0 ? 1000 : 2000; // First screen has shorter pause
-        setTimeout(() => {
-          setCurrentScreen(prev => prev + 1);
-        }, pauseTime);
+        
+        // If this is the last screen, show "Effortlessly" after a brief pause
+        if (currentScreen === screens.length - 1) {
+          setTimeout(() => {
+            setShowEffortlessly(true);
+          }, 800);
+          
+          // Then move to completion after showing "Effortlessly"
+          setTimeout(() => {
+            setCurrentScreen(prev => prev + 1);
+          }, 3000);
+        } else {
+          // Move to next screen after text completion + pause
+          const pauseTime = currentScreen === 0 ? 1000 : 2000;
+          setTimeout(() => {
+            setCurrentScreen(prev => prev + 1);
+          }, pauseTime);
+        }
       }
     }, 60); // Typewriter speed
 
@@ -61,16 +76,16 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
     >
       <div className="text-center max-w-2xl px-8">
         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-light text-brand-charcoal tracking-tight leading-tight whitespace-pre-line">
-          {displayedText.split('Effortlessly').map((part, index) => (
-            <span key={index}>
-              {part}
-              {index === 0 && displayedText.includes('Effortlessly') && (
-                <span className="font-bold">Effortlessly</span>
-              )}
-            </span>
-          ))}
+          {displayedText}
           <span className="animate-pulse">|</span>
         </h1>
+        {currentScreen === screens.length - 1 && (
+          <div className={`mt-8 transition-opacity duration-1000 ${showEffortlessly ? 'opacity-100' : 'opacity-0'}`}>
+            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-brand-charcoal tracking-tight">
+              Effortlessly.
+            </h2>
+          </div>
+        )}
       </div>
     </div>
   );
