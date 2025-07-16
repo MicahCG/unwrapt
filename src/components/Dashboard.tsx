@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,14 +7,36 @@ import UserMenu from '@/components/auth/UserMenu';
 import TestDataManager from '@/components/TestDataManager';
 import UpcomingGiftsManager from '@/components/UpcomingGiftsManager';
 import DashboardRecipients from '@/components/DashboardRecipients';
+import WelcomeOverlay from '@/components/WelcomeOverlay';
 import { ResponsiveContainer, ResponsiveHeader, ResponsiveNavigation, ResponsiveActions } from '@/components/ui/responsive-container';
 
 const Dashboard = () => {
   const { user } = useAuth();
   const { data: profile } = useUserProfile();
+  const [showWelcome, setShowWelcome] = useState(true);
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
+
+  useEffect(() => {
+    // Check if this is a new session
+    const hasShownWelcome = sessionStorage.getItem('welcomeShown');
+    if (hasShownWelcome) {
+      setShowWelcome(false);
+      setIsFirstLoad(false);
+    } else {
+      sessionStorage.setItem('welcomeShown', 'true');
+    }
+  }, []);
+
+  const handleWelcomeComplete = () => {
+    setShowWelcome(false);
+  };
 
   return (
-    <ResponsiveContainer>
+    <>
+      {showWelcome && isFirstLoad && (
+        <WelcomeOverlay onComplete={handleWelcomeComplete} />
+      )}
+      <ResponsiveContainer>
       <ResponsiveHeader>
         <ResponsiveNavigation>
           <div className="flex items-center gap-4">
@@ -49,6 +71,7 @@ const Dashboard = () => {
         </div>
       </div>
     </ResponsiveContainer>
+    </>
   );
 };
 
