@@ -7,7 +7,6 @@ import UserMenu from '@/components/auth/UserMenu';
 import TestDataManager from '@/components/TestDataManager';
 import UpcomingGiftsManager from '@/components/UpcomingGiftsManager';
 import DashboardRecipients from '@/components/DashboardRecipients';
-import HolidayCarousel from '@/components/HolidayCarousel';
 import { ResponsiveContainer, ResponsiveHeader, ResponsiveNavigation, ResponsiveActions } from '@/components/ui/responsive-container';
 
 const Dashboard = () => {
@@ -48,11 +47,6 @@ const Dashboard = () => {
         <div className="w-full order-2 xl:order-2">
           <UpcomingGiftsManager />
         </div>
-      </div>
-
-      {/* Holiday Carousel */}
-      <div className="mb-6 sm:mb-8">
-        <HolidayCarousel />
       </div>
     </ResponsiveContainer>
   );
