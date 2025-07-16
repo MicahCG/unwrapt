@@ -12,7 +12,7 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
   const screens = [
     "Life is busy.",
     "Special moments slip through the cracks.",
-    "We help you plan gifts they'll never forget.\nEffortlessly."
+    "We help you plan gifts they'll never forget.\n\nEffortlessly."
   ];
 
   useEffect(() => {
@@ -61,7 +61,14 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
     >
       <div className="text-center max-w-2xl px-8">
         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-light text-brand-charcoal tracking-tight leading-tight whitespace-pre-line">
-          {displayedText}
+          {displayedText.split('Effortlessly').map((part, index) => (
+            <span key={index}>
+              {part}
+              {index === 0 && displayedText.includes('Effortlessly') && (
+                <span className="font-bold">Effortlessly</span>
+              )}
+            </span>
+          ))}
           <span className="animate-pulse">|</span>
         </h1>
       </div>
