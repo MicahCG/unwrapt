@@ -13,7 +13,7 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
   const screens = [
     "Life is busy.",
     "Special moments get missed.",
-    "We help you plan gifts they'll never forget."
+    "We make gifting easy for you."
   ];
 
   useEffect(() => {
