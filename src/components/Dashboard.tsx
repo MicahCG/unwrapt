@@ -43,7 +43,6 @@ const Dashboard = () => {
           <div className="flex items-center gap-4">
             <div>
               <Logo size="lg" className="mb-2" />
-              <p className="text-brand-charcoal/70 mt-1 text-sm sm:text-base">Here's what's happening with your gifting schedule</p>
             </div>
           </div>
         </ResponsiveNavigation>
