@@ -160,13 +160,12 @@ const DashboardRecipients = () => {
         nextOccasion: r.nextOccasion
       })));
 
-      // Sort: recipients without scheduled gifts first, then those with gifts, by urgency within each group
-      const sortedRecipients = recipientsWithData.sort((a, b) => {
-        // Primary sort: no scheduled gifts first
-        if (!a.hasScheduledGifts && b.hasScheduledGifts) return -1;
-        if (a.hasScheduledGifts && !b.hasScheduledGifts) return 1;
-        
-        // Secondary sort: by urgency/days until next event
+      // Filter out recipients who already have scheduled gifts
+      const recipientsWithoutGifts = recipientsWithData.filter(recipient => !recipient.hasScheduledGifts);
+      
+      // Sort filtered recipients by urgency/days until next event
+      const sortedRecipients = recipientsWithoutGifts.sort((a, b) => {
+        // Sort by urgency/days until next event
         if (!a.daysUntilNext && !b.daysUntilNext) return a.name.localeCompare(b.name);
         if (!a.daysUntilNext) return 1;
         if (!b.daysUntilNext) return -1;

@@ -227,6 +227,12 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           price: productData.price
         });
 
+        // Set success flag for animation when user returns
+        sessionStorage.setItem('giftScheduledSuccess', JSON.stringify({
+          recipientId: recipient.id,
+          timestamp: Date.now()
+        }));
+
         // Redirect in the same tab instead of opening new tab
         window.location.href = paymentData.url;
         

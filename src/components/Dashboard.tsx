@@ -8,14 +8,57 @@ import TestDataManager from '@/components/TestDataManager';
 import UpcomingGiftsManager from '@/components/UpcomingGiftsManager';
 import DashboardRecipients from '@/components/DashboardRecipients';
 import WelcomeOverlay from '@/components/WelcomeOverlay';
+import GiftScheduledSuccess from '@/components/GiftScheduledSuccess';
 import { Logo } from '@/components/ui/logo';
 import { ResponsiveContainer, ResponsiveHeader, ResponsiveNavigation, ResponsiveActions } from '@/components/ui/responsive-container';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 const Dashboard = () => {
   const { user } = useAuth();
   const { data: profile } = useUserProfile();
   const [showWelcome, setShowWelcome] = useState(true);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+  const [successRecipient, setSuccessRecipient] = useState(null);
+
+  // Check for recently scheduled gift to show success animation
+  const { data: recentGift } = useQuery({
+    queryKey: ['recent-gift', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      
+      // Check if we have a success flag in sessionStorage
+      const giftSuccess = sessionStorage.getItem('giftScheduledSuccess');
+      if (!giftSuccess) return null;
+      
+      // Parse the stored data
+      const { recipientId, timestamp } = JSON.parse(giftSuccess);
+      
+      // Only show animation if it's within the last 30 seconds
+      const now = Date.now();
+      if (now - timestamp > 30000) {
+        sessionStorage.removeItem('giftScheduledSuccess');
+        return null;
+      }
+      
+      // Fetch the recipient data
+      const { data: recipient, error } = await supabase
+        .from('recipients')
+        .select('*')
+        .eq('id', recipientId)
+        .eq('user_id', user.id)
+        .single();
+      
+      if (error || !recipient) {
+        sessionStorage.removeItem('giftScheduledSuccess');
+        return null;
+      }
+      
+      return recipient;
+    },
+    enabled: !!user?.id
+  });
 
   useEffect(() => {
     // Check if this is a new session
@@ -28,8 +71,22 @@ const Dashboard = () => {
     }
   }, []);
 
+  useEffect(() => {
+    // Show success animation if we have a recent gift
+    if (recentGift && !showWelcome) {
+      setSuccessRecipient(recentGift);
+      setShowSuccessAnimation(true);
+    }
+  }, [recentGift, showWelcome]);
+
   const handleWelcomeComplete = () => {
     setShowWelcome(false);
+  };
+
+  const handleSuccessComplete = () => {
+    setShowSuccessAnimation(false);
+    setSuccessRecipient(null);
+    sessionStorage.removeItem('giftScheduledSuccess');
   };
 
   return (
@@ -37,6 +94,16 @@ const Dashboard = () => {
       {showWelcome && isFirstLoad && (
         <WelcomeOverlay onComplete={handleWelcomeComplete} />
       )}
+      
+      {/* Success Animation */}
+      {successRecipient && (
+        <GiftScheduledSuccess
+          recipient={successRecipient}
+          onComplete={handleSuccessComplete}
+          isVisible={showSuccessAnimation}
+        />
+      )}
+      
       <ResponsiveContainer>
       <ResponsiveHeader>
         <ResponsiveNavigation>
