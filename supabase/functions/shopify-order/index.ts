@@ -229,23 +229,61 @@ serve(async (req) => {
       console.log(`✅ Successfully created Shopify order: ${order.name} (ID: ${order.id})`);
     }
 
+    // Fetch actual product image from Shopify (for live orders)
+    let productImageUrl = null;
+    if (!testMode && orderResult && orderResult.line_items && orderResult.line_items.length > 0) {
+      try {
+        const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
+        const shopifyToken = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
+        const cleanStoreUrl = shopifyStore.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        const shopifyApiUrl = `https://${cleanStoreUrl}/admin/api/2024-01`;
+        
+        // Get the product ID from the order line item
+        const lineItem = orderResult.line_items[0];
+        if (lineItem.product_id) {
+          console.log(`🖼️ Fetching product image for product ID: ${lineItem.product_id}`);
+          
+          const productResponse = await fetch(`${shopifyApiUrl}/products/${lineItem.product_id}.json`, {
+            headers: {
+              'X-Shopify-Access-Token': shopifyToken,
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (productResponse.ok) {
+            const { product } = await productResponse.json();
+            if (product.images && product.images.length > 0) {
+              productImageUrl = product.images[0].src;
+              console.log(`✅ Retrieved product image: ${productImageUrl}`);
+            }
+          }
+        }
+      } catch (imageError) {
+        console.error('⚠️ Error fetching product image:', imageError);
+        // Continue without image - not critical
+      }
+    }
+
     // Update the scheduled gift with order information (only if not test mode with mock data)
     if (!testMode || giftData.id !== scheduledGiftId) {
       const giftDescription = `${giftData.gift_description || ''} | Product: ${productName} | Variant ID: ${selectedVariantId} | Match: ${matchReason}${testMode ? ' | TEST MODE' : ''} | Shopify Order: ${orderResult.name}`;
       
+      const updateData = {
+        status: testMode ? 'test-ordered' : 'ordered',
+        updated_at: new Date().toISOString(),
+        gift_description: giftDescription.substring(0, 500),
+        ...(productImageUrl && { gift_image_url: productImageUrl })
+      };
+      
       const { error: updateError } = await supabaseService
         .from('scheduled_gifts')
-        .update({
-          status: testMode ? 'test-ordered' : 'ordered',
-          updated_at: new Date().toISOString(),
-          gift_description: giftDescription.substring(0, 500)
-        })
+        .update(updateData)
         .eq('id', scheduledGiftId);
 
       if (updateError) {
         console.error('❌ Error updating gift status:', updateError);
       } else {
-        console.log(`✅ Updated gift status to ${testMode ? 'test-ordered' : 'ordered'}`);
+        console.log(`✅ Updated gift status to ${testMode ? 'test-ordered' : 'ordered'}${productImageUrl ? ' with product image' : ''}`);
       }
     }
 

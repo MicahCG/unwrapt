@@ -78,10 +78,13 @@ const UpcomingGiftsManager = () => {
   };
 
   const getGiftImage = (gift: any) => {
-    // First priority: use the actual gift image URL if available
+    // First priority: use the stored gift image URL if available
     if (gift.gift_image_url) {
       return gift.gift_image_url;
     }
+    
+    // Second priority: try to get Shopify product image
+    // This will be handled by updating gifts with actual product images when they're created/ordered
     
     // Fallback to type-based mapping for older gifts
     const imageMap = {
@@ -91,7 +94,9 @@ const UpcomingGiftsManager = () => {
       'sweet treats': 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=400&h=300&fit=crop',
       'self care': 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?w=400&h=300&fit=crop',
       'candle': 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&h=300&fit=crop&q=80',
-      'ocean driftwood coconut candle': 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&h=300&fit=crop&q=80'
+      'ocean driftwood coconut candle': 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&h=300&fit=crop&q=80',
+      'lavender fields coffee': 'https://images.unsplash.com/photo-1581090464777-f3220bbe1b8b?w=400&h=300&fit=crop',
+      'truffle chocolate': 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=400&h=300&fit=crop'
     };
     return imageMap[gift.gift_type?.toLowerCase()] || 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop';
   };

@@ -36,15 +36,25 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClo
     }
   };
 
-  const getGiftImage = (giftType: string) => {
+  const getGiftImage = (gift: any) => {
+    // First priority: use the stored gift image URL if available
+    if (gift.gift_image_url) {
+      return gift.gift_image_url;
+    }
+    
+    // Fallback to type-based mapping
     const imageMap = {
       'wine': 'https://images.unsplash.com/photo-1482938289607-e9573fc25ebb?w=400&h=300&fit=crop',
       'tea': 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=400&h=300&fit=crop',
       'coffee': 'https://images.unsplash.com/photo-1581090464777-f3220bbe1b8b?w=400&h=300&fit=crop',
       'sweet treats': 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=400&h=300&fit=crop',
-      'self care': 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?w=400&h=300&fit=crop'
+      'self care': 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?w=400&h=300&fit=crop',
+      'candle': 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&h=300&fit=crop&q=80',
+      'ocean driftwood coconut candle': 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&h=300&fit=crop&q=80',
+      'lavender fields coffee': 'https://images.unsplash.com/photo-1581090464777-f3220bbe1b8b?w=400&h=300&fit=crop',
+      'truffle chocolate': 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=400&h=300&fit=crop'
     };
-    return imageMap[giftType?.toLowerCase()] || 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop';
+    return imageMap[gift.gift_type?.toLowerCase()] || 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop';
   };
 
   const handleCancelGift = async () => {
@@ -85,7 +95,7 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClo
               <div className="bg-gradient-to-br from-brand-cream/20 to-brand-cream/40 border border-brand-cream rounded-lg p-4">
                 <div className="flex items-center space-x-4">
                   <img
-                    src={getGiftImage(gift.gift_type)}
+                    src={getGiftImage(gift)}
                     alt={`${gift.gift_type} gift`}
                     className="w-20 h-20 object-cover rounded-lg shadow-sm"
                   />
