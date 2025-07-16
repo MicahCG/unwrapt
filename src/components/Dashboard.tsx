@@ -48,7 +48,9 @@ const Dashboard = () => {
         </ResponsiveNavigation>
 
         <ResponsiveActions>
-          <UserMenu />
+          <div className="flex justify-end w-full">
+            <UserMenu />
+          </div>
         </ResponsiveActions>
       </ResponsiveHeader>
 

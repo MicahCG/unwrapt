@@ -41,11 +41,11 @@ const UserMenu: React.FC = () => {
       <DropdownMenuTrigger asChild>
         <Button 
           variant="ghost" 
-          className="relative h-8 w-8 rounded-full text-brand-charcoal hover:bg-brand-cream hover:text-brand-charcoal"
+          className="relative h-10 w-10 sm:h-8 sm:w-8 rounded-full text-brand-charcoal hover:bg-brand-cream hover:text-brand-charcoal p-0"
         >
-          <Avatar className="h-8 w-8">
+          <Avatar className="h-10 w-10 sm:h-8 sm:w-8">
             <AvatarImage src={user.user_metadata?.avatar_url} alt={user.user_metadata?.full_name} />
-            <AvatarFallback className="bg-brand-charcoal text-brand-cream">
+            <AvatarFallback className="bg-brand-charcoal text-brand-cream text-sm sm:text-xs">
               {userInitial}
             </AvatarFallback>
           </Avatar>
