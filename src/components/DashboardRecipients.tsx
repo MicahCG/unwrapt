@@ -285,11 +285,46 @@ const DashboardRecipients = () => {
 
   const upcomingHolidays = getUpcomingHolidays();
   
-  // Combine recipients and holidays for display
-  const combinedItems = [
-    ...(recipients || []),
-    ...upcomingHolidays
-  ];
+  // Combine recipients and holidays, then sort chronologically while maintaining recipient priority
+  const combinedItems = (() => {
+    if (!recipients) return upcomingHolidays;
+    
+    const allItems = [...recipients, ...upcomingHolidays];
+    
+    // Sort all items chronologically by their next event date
+    return allItems.sort((a: any, b: any) => {
+      // For recipients, use daysUntilNext; for holidays, use daysUntil
+      const aDays = a.isHoliday ? a.daysUntil : a.daysUntilNext;
+      const bDays = b.isHoliday ? b.daysUntil : b.daysUntilNext;
+      
+      // Handle null/undefined days (items without upcoming events go to end)
+      if (aDays == null && bDays == null) {
+        // If both have no upcoming events, sort recipients by name, holidays by date
+        if (a.isHoliday && b.isHoliday) return a.daysUntil - b.daysUntil;
+        if (a.isHoliday) return 1; // Holidays go after recipients with no events
+        if (b.isHoliday) return -1;
+        return a.name.localeCompare(b.name);
+      }
+      if (aDays == null) return 1;
+      if (bDays == null) return -1;
+      
+      // Primary sort: by days until next event
+      if (aDays !== bDays) return aDays - bDays;
+      
+      // Secondary sort: if same number of days, recipients without scheduled gifts come first
+      if (!a.isHoliday && !b.isHoliday) {
+        if (!a.hasScheduledGifts && b.hasScheduledGifts) return -1;
+        if (a.hasScheduledGifts && !b.hasScheduledGifts) return 1;
+        return a.name.localeCompare(b.name);
+      }
+      
+      // If comparing recipient vs holiday with same days, recipient comes first
+      if (!a.isHoliday && b.isHoliday) return -1;
+      if (a.isHoliday && !b.isHoliday) return 1;
+      
+      return 0;
+    });
+  })();
 
   // Determine which items to show based on state
   const displayedItems = combinedItems ? (showAllRecipients ? combinedItems : combinedItems.slice(0, 5)) : [];
