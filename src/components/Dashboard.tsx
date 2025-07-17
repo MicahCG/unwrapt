@@ -8,6 +8,7 @@ import TestDataManager from '@/components/TestDataManager';
 import UpcomingGiftsManager from '@/components/UpcomingGiftsManager';
 import DashboardRecipients from '@/components/DashboardRecipients';
 import WelcomeOverlay from '@/components/WelcomeOverlay';
+import ProgressOverlay from '@/components/ProgressOverlay';
 import GiftScheduledSuccess from '@/components/GiftScheduledSuccess';
 import { Logo } from '@/components/ui/logo';
 import { ResponsiveContainer, ResponsiveHeader, ResponsiveNavigation, ResponsiveActions } from '@/components/ui/responsive-container';
@@ -18,6 +19,7 @@ const Dashboard = () => {
   const { user } = useAuth();
   const { data: profile } = useUserProfile();
   const [showWelcome, setShowWelcome] = useState(true);
+  const [showProgress, setShowProgress] = useState(false);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [successRecipient, setSuccessRecipient] = useState(null);
@@ -63,8 +65,15 @@ const Dashboard = () => {
   useEffect(() => {
     // Check if this is a new session
     const hasShownWelcome = sessionStorage.getItem('welcomeShown');
-    if (hasShownWelcome) {
+    const hasShownProgress = sessionStorage.getItem('progressShown');
+    
+    if (hasShownWelcome && hasShownProgress) {
       setShowWelcome(false);
+      setShowProgress(false);
+      setIsFirstLoad(false);
+    } else if (hasShownWelcome && !hasShownProgress) {
+      setShowWelcome(false);
+      setShowProgress(true);
       setIsFirstLoad(false);
     } else {
       sessionStorage.setItem('welcomeShown', 'true');
@@ -73,14 +82,20 @@ const Dashboard = () => {
 
   useEffect(() => {
     // Show success animation if we have a recent gift
-    if (recentGift && !showWelcome) {
+    if (recentGift && !showWelcome && !showProgress) {
       setSuccessRecipient(recentGift);
       setShowSuccessAnimation(true);
     }
-  }, [recentGift, showWelcome]);
+  }, [recentGift, showWelcome, showProgress]);
 
   const handleWelcomeComplete = () => {
     setShowWelcome(false);
+    setShowProgress(true);
+  };
+
+  const handleProgressComplete = () => {
+    setShowProgress(false);
+    sessionStorage.setItem('progressShown', 'true');
   };
 
   const handleSuccessComplete = () => {
@@ -93,6 +108,11 @@ const Dashboard = () => {
     <>
       {showWelcome && isFirstLoad && (
         <WelcomeOverlay onComplete={handleWelcomeComplete} />
+      )}
+      
+      {/* Progress Overlay */}
+      {showProgress && !showWelcome && (
+        <ProgressOverlay onComplete={handleProgressComplete} />
       )}
       
       {/* Success Animation */}
