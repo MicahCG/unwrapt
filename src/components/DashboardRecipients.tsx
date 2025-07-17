@@ -203,12 +203,11 @@ const DashboardRecipients = () => {
         return { totalRecipients: 0, recipientsWithGifts: 0 };
       }
       
-      // Get recipients with scheduled gifts
+      // Get recipients with scheduled gifts (any status)
       const { data: giftsData, error: giftsError } = await supabase
         .from('scheduled_gifts')
         .select('recipient_id')
-        .eq('user_id', user.id)
-        .eq('status', 'scheduled');
+        .eq('user_id', user.id);
       
       console.log('🎁 Scheduled gifts query result:', { 
         count: giftsData?.length, 
