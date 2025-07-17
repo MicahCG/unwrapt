@@ -64,27 +64,24 @@ const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({ onComplete }) => {
         currentIndex++;
       } else {
         clearInterval(typewriterInterval);
-        // Start fade to progress after text is complete + small delay
+        // Start showing progress after text is complete + small delay
         setTimeout(() => {
-          setShowWelcome(false);
-          setTimeout(() => {
-            setShowProgress(true);
-            // Animate progress bar
-            const progressInterval = setInterval(() => {
-              setProgress((prev) => {
-                if (prev >= progressPercentage) {
-                  clearInterval(progressInterval);
-                  // Start fade out after animation completes
-                  setTimeout(() => {
-                    setIsVisible(false);
-                    setTimeout(onComplete, 500);
-                  }, 2000);
-                  return progressPercentage;
-                }
-                return prev + 2;
-              });
-            }, 30);
-          }, 500);
+          setShowProgress(true);
+          // Animate progress bar
+          const progressInterval = setInterval(() => {
+            setProgress((prev) => {
+              if (prev >= progressPercentage) {
+                clearInterval(progressInterval);
+                // Start fade out after animation completes
+                setTimeout(() => {
+                  setIsVisible(false);
+                  setTimeout(onComplete, 500);
+                }, 2000);
+                return progressPercentage;
+              }
+              return prev + 2;
+            });
+          }, 30);
         }, 1000);
       }
     }, 80); // Typewriter speed
@@ -105,74 +102,76 @@ const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({ onComplete }) => {
         WebkitBackdropFilter: 'blur(20px)',
       }}
     >
-      {showWelcome && (
-        <div className={`text-center transition-opacity duration-500 ${showWelcome ? 'opacity-100' : 'opacity-0'}`}>
+      <div className="text-center max-w-md mx-auto px-6 space-y-8">
+        {/* Welcome Message */}
+        <div>
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-light text-brand-charcoal tracking-tight">
             {displayedText}
             <span className="animate-pulse">|</span>
           </h1>
         </div>
-      )}
 
-      {showProgress && (
-        <div className={`text-center max-w-md mx-auto px-6 transition-opacity duration-500 ${showProgress ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="mb-8">
-            <div className="w-32 h-32 mx-auto mb-6 relative">
-              <svg
-                className="w-32 h-32 transform -rotate-90"
-                viewBox="0 0 100 100"
-              >
-                {/* Background circle */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="45"
-                  stroke="hsl(var(--muted))"
-                  strokeWidth="8"
-                  fill="none"
-                />
-                {/* Progress circle */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="45"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth="8"
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeDasharray={`${2 * Math.PI * 45}`}
-                  strokeDashoffset={`${2 * Math.PI * 45 * (1 - progress / 100)}`}
-                  className="transition-all duration-300 ease-out"
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-2xl font-semibold text-brand-charcoal">
-                  {progress}%
-                </span>
+        {/* Progress Wheel */}
+        {showProgress && (
+          <div className={`transition-opacity duration-1000 ${showProgress ? 'opacity-100' : 'opacity-0'}`}>
+            <div className="mb-6">
+              <div className="w-32 h-32 mx-auto mb-6 relative">
+                <svg
+                  className="w-32 h-32 transform -rotate-90"
+                  viewBox="0 0 100 100"
+                >
+                  {/* Background circle */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="45"
+                    stroke="hsl(var(--muted))"
+                    strokeWidth="8"
+                    fill="none"
+                  />
+                  {/* Progress circle */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="45"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth="8"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeDasharray={`${2 * Math.PI * 45}`}
+                    strokeDashoffset={`${2 * Math.PI * 45 * (1 - progress / 100)}`}
+                    className="transition-all duration-300 ease-out"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-2xl font-semibold text-brand-charcoal">
+                    {progress}%
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h2 className="text-xl font-light text-brand-charcoal">
+                Your Gift Planning Progress
+              </h2>
+              
+              <div className="text-brand-charcoal/70">
+                <p className="text-base">
+                  <span className="font-semibold text-brand-charcoal">{yearlyScheduledGifts}</span> of{' '}
+                  <span className="font-semibold text-brand-charcoal">{totalRecipients}</span> gifts scheduled this year
+                </p>
+                
+                {hoursPerRecipient > 0 && (
+                  <p className="text-sm mt-2">
+                    Saving you <span className="font-semibold text-brand-charcoal">{hoursPerRecipient} hours</span> per recipient
+                  </p>
+                )}
               </div>
             </div>
           </div>
-
-          <div className="space-y-4">
-            <h2 className="text-2xl font-light text-brand-charcoal">
-              Your Gift Planning Progress
-            </h2>
-            
-            <div className="text-brand-charcoal/70">
-              <p className="text-lg">
-                <span className="font-semibold text-brand-charcoal">{yearlyScheduledGifts}</span> of{' '}
-                <span className="font-semibold text-brand-charcoal">{totalRecipients}</span> gifts scheduled this year
-              </p>
-              
-              {hoursPerRecipient > 0 && (
-                <p className="text-sm mt-2">
-                  Saving you <span className="font-semibold text-brand-charcoal">{hoursPerRecipient} hours</span> per recipient
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
