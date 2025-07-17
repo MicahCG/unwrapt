@@ -18,9 +18,8 @@ import { supabase } from '@/integrations/supabase/client';
 const Dashboard = () => {
   const { user } = useAuth();
   const { data: profile } = useUserProfile();
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(false);
   const [showMonthlyOpportunities, setShowMonthlyOpportunities] = useState(false);
-  const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [successRecipient, setSuccessRecipient] = useState(null);
 
@@ -65,16 +64,17 @@ const Dashboard = () => {
   useEffect(() => {
     // Check if this is a new session
     const hasShownWelcome = sessionStorage.getItem('welcomeShown');
-    if (hasShownWelcome) {
-      setShowWelcome(false);
-      setIsFirstLoad(false);
-    } else {
+    console.log('Dashboard mounted, hasShownWelcome:', hasShownWelcome);
+    
+    if (!hasShownWelcome) {
+      console.log('First time visit, showing welcome overlay');
+      setShowWelcome(true);
       sessionStorage.setItem('welcomeShown', 'true');
     }
   }, []);
 
   useEffect(() => {
-    // Show success animation if we have a recent gift
+    // Show success animation if we have a recent gift and no other overlays are showing
     if (recentGift && !showWelcome && !showMonthlyOpportunities) {
       setSuccessRecipient(recentGift);
       setShowSuccessAnimation(true);
@@ -82,11 +82,16 @@ const Dashboard = () => {
   }, [recentGift, showWelcome, showMonthlyOpportunities]);
 
   const handleWelcomeComplete = () => {
+    console.log('Welcome overlay completed, showing monthly opportunities');
     setShowWelcome(false);
-    setShowMonthlyOpportunities(true);
+    // Small delay to ensure smooth transition
+    setTimeout(() => {
+      setShowMonthlyOpportunities(true);
+    }, 100);
   };
 
   const handleMonthlyOpportunitiesComplete = () => {
+    console.log('Monthly opportunities overlay completed');
     setShowMonthlyOpportunities(false);
   };
 
@@ -96,9 +101,11 @@ const Dashboard = () => {
     sessionStorage.removeItem('giftScheduledSuccess');
   };
 
+  console.log('Dashboard render state:', { showWelcome, showMonthlyOpportunities, showSuccessAnimation });
+
   return (
     <>
-      {showWelcome && isFirstLoad && (
+      {showWelcome && (
         <WelcomeOverlay onComplete={handleWelcomeComplete} />
       )}
       
