@@ -20,20 +20,20 @@ const LoginPage: React.FC = () => {
         <CardContent className="pt-6">
           <div className="space-y-6">
             {/* Features Preview */}
-            <div className="space-y-3">
-              <div className="flex items-center space-x-3 p-3 bg-white/60 rounded-lg border border-brand-cream">
-                <div className="w-2 h-2 bg-brand-gold rounded-full"></div>
-                <span className="text-sm text-brand-charcoal">Automate your gifts</span>
+            <div className="space-y-4">
+              <div className="flex items-center space-x-4 p-4 bg-white/40 rounded-xl border border-white/30 backdrop-blur-sm animate-fade-in" style={{ animationDelay: '0.2s', animationFillMode: 'both' }}>
+                <div className="w-3 h-3 bg-gradient-to-r from-brand-gold to-brand-gold/80 rounded-full shadow-sm"></div>
+                <span className="text-base text-brand-charcoal font-medium">Automate your gifts</span>
               </div>
               
-              <div className="flex items-center space-x-3 p-3 bg-white/60 rounded-lg border border-brand-cream">
-                <div className="w-2 h-2 bg-brand-gold rounded-full"></div>
-                <span className="text-sm text-brand-charcoal">Curate them based on interests</span>
+              <div className="flex items-center space-x-4 p-4 bg-white/40 rounded-xl border border-white/30 backdrop-blur-sm animate-fade-in" style={{ animationDelay: '0.4s', animationFillMode: 'both' }}>
+                <div className="w-3 h-3 bg-gradient-to-r from-brand-gold to-brand-gold/80 rounded-full shadow-sm"></div>
+                <span className="text-base text-brand-charcoal font-medium">Curate them based on interests</span>
               </div>
               
-              <div className="flex items-center space-x-3 p-3 bg-white/60 rounded-lg border border-brand-cream">
-                <div className="w-2 h-2 bg-brand-gold rounded-full"></div>
-                <span className="text-sm text-brand-charcoal">Save time and show you care</span>
+              <div className="flex items-center space-x-4 p-4 bg-white/40 rounded-xl border border-white/30 backdrop-blur-sm animate-fade-in" style={{ animationDelay: '0.6s', animationFillMode: 'both' }}>
+                <div className="w-3 h-3 bg-gradient-to-r from-brand-gold to-brand-gold/80 rounded-full shadow-sm"></div>
+                <span className="text-base text-brand-charcoal font-medium">Save time and show you care</span>
               </div>
             </div>
 
