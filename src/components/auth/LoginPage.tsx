@@ -15,9 +15,6 @@ const LoginPage: React.FC = () => {
           <div className="flex justify-center mb-6">
             <Logo variant="full" size="lg" />
           </div>
-          <p className="text-xl text-brand-charcoal/80">
-            Never miss a moment
-          </p>
         </CardHeader>
         
         <CardContent className="pt-6">
@@ -56,9 +53,6 @@ const LoginPage: React.FC = () => {
               Get Started
             </Button>
             
-            <p className="text-center text-sm text-brand-charcoal/60">
-              Join hundreds who never forget to show they care
-            </p>
           </div>
         </CardContent>
       </Card>
