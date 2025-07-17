@@ -74,12 +74,14 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
       }}
     >
       <div className="text-center max-w-2xl px-8">
-        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-light text-brand-charcoal tracking-tight leading-tight whitespace-pre-line">
-          {displayedText}
-          <span className="animate-pulse">|</span>
-        </h1>
+        <div className={`transition-opacity duration-500 ${currentScreen === screens.length - 1 && showEffortlessly ? 'opacity-0' : 'opacity-100'}`}>
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-light text-brand-charcoal tracking-tight leading-tight whitespace-pre-line">
+            {displayedText}
+            <span className="animate-pulse">|</span>
+          </h1>
+        </div>
         {currentScreen === screens.length - 1 && (
-          <div className={`mt-8 transition-opacity duration-1000 ${showEffortlessly ? 'opacity-100' : 'opacity-0'}`}>
+          <div className={`transition-opacity duration-1000 ${showEffortlessly ? 'opacity-100' : 'opacity-0'}`}>
             <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-brand-charcoal tracking-tight">
               Effortlessly.
             </h2>
