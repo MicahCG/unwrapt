@@ -8,6 +8,7 @@ import TestDataManager from '@/components/TestDataManager';
 import UpcomingGiftsManager from '@/components/UpcomingGiftsManager';
 import DashboardRecipients from '@/components/DashboardRecipients';
 import WelcomeOverlay from '@/components/WelcomeOverlay';
+import MonthlyOpportunitiesOverlay from '@/components/MonthlyOpportunitiesOverlay';
 import GiftScheduledSuccess from '@/components/GiftScheduledSuccess';
 import { Logo } from '@/components/ui/logo';
 import { ResponsiveContainer, ResponsiveHeader, ResponsiveNavigation, ResponsiveActions } from '@/components/ui/responsive-container';
@@ -18,6 +19,7 @@ const Dashboard = () => {
   const { user } = useAuth();
   const { data: profile } = useUserProfile();
   const [showWelcome, setShowWelcome] = useState(true);
+  const [showMonthlyOpportunities, setShowMonthlyOpportunities] = useState(false);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [successRecipient, setSuccessRecipient] = useState(null);
@@ -73,14 +75,19 @@ const Dashboard = () => {
 
   useEffect(() => {
     // Show success animation if we have a recent gift
-    if (recentGift && !showWelcome) {
+    if (recentGift && !showWelcome && !showMonthlyOpportunities) {
       setSuccessRecipient(recentGift);
       setShowSuccessAnimation(true);
     }
-  }, [recentGift, showWelcome]);
+  }, [recentGift, showWelcome, showMonthlyOpportunities]);
 
   const handleWelcomeComplete = () => {
     setShowWelcome(false);
+    setShowMonthlyOpportunities(true);
+  };
+
+  const handleMonthlyOpportunitiesComplete = () => {
+    setShowMonthlyOpportunities(false);
   };
 
   const handleSuccessComplete = () => {
@@ -93,6 +100,10 @@ const Dashboard = () => {
     <>
       {showWelcome && isFirstLoad && (
         <WelcomeOverlay onComplete={handleWelcomeComplete} />
+      )}
+      
+      {showMonthlyOpportunities && (
+        <MonthlyOpportunitiesOverlay onComplete={handleMonthlyOpportunitiesComplete} />
       )}
       
       {/* Success Animation */}
