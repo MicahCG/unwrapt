@@ -21,8 +21,8 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
       // All screens completed, fade out and show registration
       setTimeout(() => {
         setIsVisible(false);
-        setTimeout(onComplete, 500); // Wait for fade out animation
-      }, 2000); // Show "Effortlessly" for 2 seconds before transitioning
+        setTimeout(onComplete, 300); // Quick fade to registration
+      }, 200); // Minimal delay before transitioning
       return;
     }
 
@@ -42,10 +42,10 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
         if (currentScreen === screens.length - 1) {
           setTimeout(() => {
             setShowEffortlessly(true);
-            // Move to completion after showing "Effortlessly"
+            // Move to completion immediately after showing "Effortlessly"
             setTimeout(() => {
               setCurrentScreen(prev => prev + 1);
-            }, 2000);
+            }, 800); // Short delay to see "Effortlessly" then go straight to registration
           }, 800);
         } else {
           // Move to next screen after text completion + pause
