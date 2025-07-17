@@ -22,7 +22,7 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
       setTimeout(() => {
         setIsVisible(false);
         setTimeout(onComplete, 500); // Wait for fade out animation
-      }, 1500);
+      }, 2000); // Show "Effortlessly" for 2 seconds before transitioning
       return;
     }
 
@@ -42,12 +42,11 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
         if (currentScreen === screens.length - 1) {
           setTimeout(() => {
             setShowEffortlessly(true);
+            // Move to completion after showing "Effortlessly"
+            setTimeout(() => {
+              setCurrentScreen(prev => prev + 1);
+            }, 2000);
           }, 800);
-          
-          // Then move to completion after showing "Effortlessly"
-          setTimeout(() => {
-            setCurrentScreen(prev => prev + 1);
-          }, 3000);
         } else {
           // Move to next screen after text completion + pause
           const pauseTime = currentScreen === 0 ? 1000 : 2000;
@@ -59,7 +58,7 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
     }, 60); // Typewriter speed
 
     return () => clearInterval(typewriterInterval);
-  }, [currentScreen]);
+  }, [currentScreen, onComplete]);
 
   if (!isVisible) return null;
 
