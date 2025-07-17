@@ -268,9 +268,9 @@ serve(async (req) => {
     // Fallback to variant-specific image URLs if no Shopify image was retrieved
     if (!productImageUrl) {
       const VARIANT_IMAGES = {
-        [PRODUCT_VARIANTS.OCEAN_DRIFTWOOD_COCONUT_CANDLE]: "https://cdn.shopify.com/s/files/1/0234/5678/products/ocean-driftwood-coconut-candle.jpg",
-        [PRODUCT_VARIANTS.LAVENDER_FIELDS_COFFEE]: "https://cdn.shopify.com/s/files/1/0234/5678/products/lavender-fields-coffee.jpg", 
-        [PRODUCT_VARIANTS.TRUFFLE_CHOCOLATE]: "https://cdn.shopify.com/s/files/1/0234/5678/products/truffle-chocolate.jpg"
+        [PRODUCT_VARIANTS.OCEAN_DRIFTWOOD_COCONUT_CANDLE]: "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&h=300&fit=crop&q=80",
+        [PRODUCT_VARIANTS.LAVENDER_FIELDS_COFFEE]: "https://images.unsplash.com/photo-1581090464777-f3220bbe1b8b?w=400&h=300&fit=crop", 
+        [PRODUCT_VARIANTS.TRUFFLE_CHOCOLATE]: "https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=400&h=300&fit=crop"
       };
       
       productImageUrl = VARIANT_IMAGES[selectedVariantId];
