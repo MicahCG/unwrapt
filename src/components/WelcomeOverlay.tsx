@@ -19,20 +19,23 @@ const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({ onComplete }) => {
   const fullText = `Welcome back, ${firstName}`;
 
   // Fetch user metrics and recipient data
-  const { data: userMetrics } = useQuery({
+  const { data: userMetrics, refetch: refetchMetrics } = useQuery({
     queryKey: ['user-metrics', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
       
       // First, calculate/update metrics
-      await supabase.rpc('calculate_user_metrics', { user_uuid: user.id });
+      const { error: calcError } = await supabase.rpc('calculate_user_metrics', { user_uuid: user.id });
+      if (calcError) {
+        console.error('Error calculating user metrics:', calcError);
+      }
       
       // Then fetch the updated metrics
       const { data, error } = await supabase
         .from('user_metrics')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
       
       if (error) {
         console.error('Error fetching user metrics:', error);
