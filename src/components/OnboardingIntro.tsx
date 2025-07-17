@@ -9,6 +9,7 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
   const [displayedText, setDisplayedText] = useState('');
   const [showEffortlessly, setShowEffortlessly] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
+  const [isCompleting, setIsCompleting] = useState(false);
 
   const screens = [
     "Life is busy.",
@@ -17,12 +18,7 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
   ];
 
   useEffect(() => {
-    if (currentScreen >= screens.length) {
-      // All screens completed, fade out and show registration
-      setTimeout(() => {
-        setIsVisible(false);
-        setTimeout(onComplete, 300); // Quick fade to registration
-      }, 200); // Minimal delay before transitioning
+    if (isCompleting || currentScreen >= screens.length) {
       return;
     }
 
@@ -42,10 +38,12 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
         if (currentScreen === screens.length - 1) {
           setTimeout(() => {
             setShowEffortlessly(true);
-            // Move to completion immediately after showing "Effortlessly"
+            // Start completion process
             setTimeout(() => {
-              setCurrentScreen(prev => prev + 1);
-            }, 800); // Short delay to see "Effortlessly" then go straight to registration
+              setIsCompleting(true);
+              setIsVisible(false);
+              setTimeout(onComplete, 300);
+            }, 800);
           }, 800);
         } else {
           // Move to next screen after text completion + pause
@@ -55,10 +53,10 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
           }, pauseTime);
         }
       }
-    }, 60); // Typewriter speed
+    }, 60);
 
     return () => clearInterval(typewriterInterval);
-  }, [currentScreen, onComplete]);
+  }, [currentScreen, onComplete, isCompleting]);
 
   if (!isVisible) return null;
 
