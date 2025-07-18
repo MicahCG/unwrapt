@@ -69,6 +69,16 @@ const Landing = () => {
                 </Button>
               </div>
             </form>
+            
+            <div className="mt-6">
+              <Button 
+                onClick={() => window.location.href = 'https://app.unwrapt.io'}
+                variant="outline"
+                className="text-brand-charcoal border-brand-charcoal hover:bg-brand-cream"
+              >
+                Automate Your Gifting
+              </Button>
+            </div>
           </div>
         </div>
       </section>
