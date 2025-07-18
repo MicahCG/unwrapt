@@ -7,6 +7,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import Index from "./pages/Index";
+import Landing from "./pages/Landing";
+import AppStart from "./pages/AppStart";
 import CalendarView from "./pages/CalendarView";
 import Settings from "./pages/Settings";
 import Analytics from "./pages/Analytics";
@@ -31,7 +33,14 @@ function App() {
           <Sonner />
           <BrowserRouter>
             <Routes>
+              {/* Landing page route */}
+              <Route path="/landing" element={<Landing />} />
+              
+              {/* App flow routes */}
+              <Route path="/app" element={<AppStart />} />
               <Route path="/" element={<Index />} />
+              
+              {/* Main app routes */}
               <Route path="/calendar" element={<CalendarView />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/analytics" element={<Analytics />} />
