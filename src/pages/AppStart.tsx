@@ -41,7 +41,7 @@ const AppStart = () => {
       setCurrentStep(currentStep + 1);
     } else {
       // Redirect to registration/login
-      window.location.href = '/auth';
+      window.location.href = '/onboarding';
     }
   };
 

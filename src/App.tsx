@@ -33,12 +33,12 @@ function App() {
           <Sonner />
           <BrowserRouter>
             <Routes>
-              {/* Landing page route */}
+              {/* Landing page route - only on main domain */}
               <Route path="/landing" element={<Landing />} />
+              <Route path="/" element={window.location.hostname === 'unwrapt.io' ? <Landing /> : window.location.pathname === '/app' ? <AppStart /> : <Index />} />
               
-              {/* App flow routes */}
+              {/* App flow routes - primarily on app subdomain */}
               <Route path="/app" element={<AppStart />} />
-              <Route path="/" element={<Index />} />
               
               {/* Main app routes */}
               <Route path="/calendar" element={<CalendarView />} />

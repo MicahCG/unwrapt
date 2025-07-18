@@ -15,9 +15,9 @@ const Landing = () => {
       sessionStorage.setItem('userEmail', email);
       setIsSubmitted(true);
       
-      // Redirect to app subdomain (for now, redirect to current domain with app flow)
+      // Redirect to app subdomain
       setTimeout(() => {
-        window.location.href = '/app';
+        window.location.href = 'https://app.unwrapt.io';
       }, 1500);
     }
   };
