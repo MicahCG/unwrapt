@@ -12,6 +12,7 @@ const Index = () => {
   const { user, loading } = useAuth();
   const [showIntro, setShowIntro] = useState(true);
   const [isFirstVisit, setIsFirstVisit] = useState(true);
+  const [showLoginPage, setShowLoginPage] = useState(false);
 
   useEffect(() => {
     // Check if this is a first visit (no user and hasn't seen intro)
@@ -19,6 +20,7 @@ const Index = () => {
     if (hasSeenIntro) {
       setShowIntro(false);
       setIsFirstVisit(false);
+      setShowLoginPage(true);
     }
   }, []);
 
@@ -83,6 +85,10 @@ const Index = () => {
   const handleIntroComplete = () => {
     setShowIntro(false);
     sessionStorage.setItem('introShown', 'true');
+    // Add a small delay before showing login page to create smooth transition
+    setTimeout(() => {
+      setShowLoginPage(true);
+    }, 100);
   };
 
   if (!user) {
@@ -93,7 +99,11 @@ const Index = () => {
       return <OnboardingIntro onComplete={handleIntroComplete} />;
     }
     
-    return <LoginPage />;
+    return (
+      <div className={`transition-opacity duration-500 ${showLoginPage || !isFirstVisit ? 'opacity-100' : 'opacity-0'}`}>
+        <LoginPage />
+      </div>
+    );
   }
 
   // If user has completed onboarding, show Dashboard
