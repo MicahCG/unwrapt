@@ -73,27 +73,42 @@ const Landing = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-brand-cream via-white to-brand-peach relative">
-      {/* Animated Background Shapes */}
+    <div className="min-h-screen bg-gradient-to-br from-white via-brand-cream/30 to-white relative overflow-hidden">
+      {/* Abstract Animated Background Shapes */}
       <AnimatedShape 
         delay={0} 
         duration={25} 
-        className="w-32 h-32 bg-brand-gold/10 rounded-full top-20 left-10 animate-bounce" 
+        className="w-32 h-32 bg-gradient-to-br from-brand-gold/20 to-brand-peach/20 rounded-full top-20 left-10 animate-bounce" 
       />
       <AnimatedShape 
         delay={2} 
         duration={30} 
-        className="w-20 h-20 bg-brand-peach/20 rounded-lg top-40 right-20 rotate-45 animate-spin" 
+        className="w-20 h-20 bg-gradient-to-r from-brand-peach/15 to-brand-gold/15 rounded-lg top-40 right-20 rotate-45 animate-spin" 
       />
       <AnimatedShape 
         delay={4} 
         duration={35} 
-        className="w-24 h-24 bg-brand-cream/30 rounded-full bottom-40 left-1/4 animate-pulse" 
+        className="w-24 h-24 bg-gradient-to-bl from-brand-gold/10 to-brand-cream/20 rounded-full bottom-40 left-1/4 animate-pulse" 
       />
       <AnimatedShape 
         delay={1} 
         duration={28} 
-        className="w-16 h-16 bg-brand-gold/15 top-1/3 right-1/3 transform rotate-12 animate-bounce" 
+        className="w-16 h-16 bg-brand-peach/10 top-1/3 right-1/3 transform rotate-12 animate-bounce" 
+      />
+      <AnimatedShape 
+        delay={3} 
+        duration={32} 
+        className="w-28 h-28 bg-gradient-to-tr from-brand-gold/8 to-brand-peach/8 rounded-full top-1/2 left-1/2 animate-pulse" 
+      />
+      <AnimatedShape 
+        delay={5} 
+        duration={22} 
+        className="w-40 h-40 bg-brand-cream/15 rounded-full bottom-20 right-10 animate-bounce" 
+      />
+      <AnimatedShape 
+        delay={2.5} 
+        duration={27} 
+        className="w-12 h-12 bg-brand-gold/20 top-60 left-20 rotate-45 animate-spin" 
       />
 
       {/* Hero Section */}
