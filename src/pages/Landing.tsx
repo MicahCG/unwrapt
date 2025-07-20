@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Gift, Clock, Heart, CheckCircle, Star, Calendar, Users, TrendingUp, Sparkles, Coffee, Book, Music } from 'lucide-react';
+import { Gift, Clock, Heart, CheckCircle, Star, Calendar, Users, TrendingUp, Sparkles, Coffee, Book, Music, ArrowRight, Zap, Shield } from 'lucide-react';
 
 const Landing = () => {
   const [email, setEmail] = useState('');
@@ -73,58 +73,64 @@ const Landing = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-brand-cream/30 to-white relative overflow-hidden">
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Animated Background with Muted Confetti */}
+      <div className="absolute inset-0 bg-gradient-to-br from-white via-brand-cream/20 to-brand-peach/10" />
+      
       {/* Abstract Animated Background Shapes */}
       <AnimatedShape 
         delay={0} 
         duration={25} 
-        className="w-32 h-32 bg-gradient-to-br from-brand-gold/20 to-brand-peach/20 rounded-full top-20 left-10 animate-bounce" 
+        className="w-32 h-32 bg-gradient-to-br from-brand-gold/15 to-brand-peach/15 rounded-full top-20 left-10 animate-bounce" 
       />
       <AnimatedShape 
         delay={2} 
         duration={30} 
-        className="w-20 h-20 bg-gradient-to-r from-brand-peach/15 to-brand-gold/15 rounded-lg top-40 right-20 rotate-45 animate-spin" 
+        className="w-20 h-20 bg-gradient-to-r from-brand-peach/10 to-brand-gold/10 rounded-lg top-40 right-20 rotate-45 animate-spin" 
       />
       <AnimatedShape 
         delay={4} 
         duration={35} 
-        className="w-24 h-24 bg-gradient-to-bl from-brand-gold/10 to-brand-cream/20 rounded-full bottom-40 left-1/4 animate-pulse" 
+        className="w-24 h-24 bg-gradient-to-bl from-brand-gold/8 to-brand-cream/15 rounded-full bottom-40 left-1/4 animate-pulse" 
       />
       <AnimatedShape 
         delay={1} 
         duration={28} 
-        className="w-16 h-16 bg-brand-peach/10 top-1/3 right-1/3 transform rotate-12 animate-bounce" 
+        className="w-16 h-16 bg-brand-peach/8 top-1/3 right-1/3 transform rotate-12 animate-bounce" 
       />
       <AnimatedShape 
         delay={3} 
         duration={32} 
-        className="w-28 h-28 bg-gradient-to-tr from-brand-gold/8 to-brand-peach/8 rounded-full top-1/2 left-1/2 animate-pulse" 
+        className="w-28 h-28 bg-gradient-to-tr from-brand-gold/6 to-brand-peach/6 rounded-full top-1/2 left-1/2 animate-pulse" 
       />
       <AnimatedShape 
         delay={5} 
         duration={22} 
-        className="w-40 h-40 bg-brand-cream/15 rounded-full bottom-20 right-10 animate-bounce" 
-      />
-      <AnimatedShape 
-        delay={2.5} 
-        duration={27} 
-        className="w-12 h-12 bg-brand-gold/20 top-60 left-20 rotate-45 animate-spin" 
+        className="w-40 h-40 bg-brand-cream/10 rounded-full bottom-20 right-10 animate-bounce" 
       />
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-24">
+      {/* 1. Full-Screen Hero Section */}
+      <section className="min-h-screen flex items-center relative z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <div className="text-center">
-            <h1 className="text-4xl md:text-6xl font-bold text-brand-charcoal mb-6 animate-fade-in">
-              Never forget a special
-              <span className="text-brand-gold block animate-slide-in-right">moment again</span>
+            {/* Animated Typewriter Headline */}
+            <h1 className="text-5xl md:text-7xl font-bold text-brand-charcoal mb-6">
+              Never forget a 
+              <span className="text-brand-gold block animate-fade-in" style={{ animationDelay: '0.5s' }}>
+                special moment
+              </span>
+              <span className="block animate-fade-in" style={{ animationDelay: '1s' }}>
+                again
+              </span>
             </h1>
-            <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto animate-fade-in">
+            
+            <p className="text-xl md:text-2xl text-gray-600 mb-12 max-w-3xl mx-auto animate-fade-in" style={{ animationDelay: '1.5s' }}>
               Unwrapt automatically schedules and delivers personalized gifts for birthdays, 
               anniversaries, and holidays. Be thoughtful without the stress.
             </p>
             
-            <form onSubmit={handleGetStarted} className="max-w-md mx-auto mb-8">
+            {/* Email Input with CTA */}
+            <form onSubmit={handleGetStarted} className="max-w-lg mx-auto mb-8 animate-fade-in" style={{ animationDelay: '2s' }}>
               <div className="flex gap-4">
                 <Input
                   type="email"
@@ -132,68 +138,84 @@ const Landing = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="flex-1 transition-all duration-300 focus:scale-105"
+                  className="flex-1 h-14 text-lg transition-all duration-300 focus:scale-105 focus:shadow-lg"
                 />
                 <Button 
                   type="submit"
-                  className="bg-brand-gold hover:bg-brand-gold/90 text-white px-8 hover:scale-105 transition-transform duration-200"
+                  className="bg-brand-gold hover:bg-brand-gold/90 text-white px-8 h-14 text-lg hover:scale-105 transition-transform duration-200 group"
                 >
                   Get Started
+                  <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform duration-200" />
                 </Button>
               </div>
             </form>
             
-            <div className="mb-12">
+            {/* Skip Button for Logged Users */}
+            <div className="animate-fade-in" style={{ animationDelay: '2.5s' }}>
               <Button 
                 onClick={() => window.location.href = 'https://app.unwrapt.io'}
-                variant="outline"
-                className="text-brand-charcoal border-brand-charcoal hover:bg-brand-cream hover:scale-105 transition-all duration-200"
+                variant="ghost"
+                className="text-brand-charcoal hover:text-brand-gold transition-colors duration-200"
               >
-                Automate Your Gifting
+                Skip to App →
               </Button>
-            </div>
-
-            {/* Interactive Gift Categories Carousel */}
-            <div className="mt-16">
-              <h3 className="text-2xl font-semibold text-brand-charcoal mb-8">Popular Gift Categories</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
-                {giftCategories.map((category, index) => {
-                  const IconComponent = category.icon;
-                  return (
-                    <Card 
-                      key={index}
-                      className={`p-6 cursor-pointer transition-all duration-300 hover:scale-105 border-2 ${
-                        activeGiftType === index 
-                          ? 'border-brand-gold bg-brand-gold/10 shadow-lg' 
-                          : 'border-gray-200 hover:border-brand-gold/50'
-                      }`}
-                      onClick={() => setActiveGiftType(index)}
-                    >
-                      <CardContent className="text-center space-y-3 p-0">
-                        <IconComponent className={`w-8 h-8 mx-auto transition-colors duration-300 ${
-                          activeGiftType === index ? 'text-brand-gold' : 'text-brand-charcoal'
-                        }`} />
-                        <h4 className="font-semibold text-brand-charcoal">{category.name}</h4>
-                        <p className="text-sm text-gray-600">{category.desc}</p>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Statistics Section */}
-      <section className="py-20 bg-white/80 backdrop-blur-sm relative z-10">
+      {/* 2. Gift Categories Grid */}
+      <section className="py-20 bg-white/90 backdrop-blur-sm relative z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-brand-charcoal mb-4">
+              Perfect Gifts for Every Occasion
+            </h2>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Curated categories to make every moment special
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+            {[
+              { icon: Coffee, name: "Coffee & Tea", desc: "Premium blends" },
+              { icon: Book, name: "Books", desc: "Bestsellers" },
+              { icon: Music, name: "Experiences", desc: "Adventures" },
+              { icon: Sparkles, name: "Jewelry", desc: "Special pieces" },
+              { icon: Gift, name: "Personalized", desc: "Custom gifts" },
+              { icon: Star, name: "Luxury", desc: "Premium items" },
+            ].map((category, index) => {
+              const IconComponent = category.icon;
+              return (
+                <Card 
+                  key={index}
+                  className="group p-6 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl border-2 border-gray-100 hover:border-brand-gold/30 animate-fade-in"
+                  style={{ animationDelay: `${index * 0.1}s` }}
+                  onClick={() => setActiveGiftType(index)}
+                >
+                  <CardContent className="text-center space-y-3 p-0">
+                    <div className="w-12 h-12 mx-auto bg-brand-gold/10 rounded-full flex items-center justify-center group-hover:bg-brand-gold/20 transition-colors duration-300">
+                      <IconComponent className="w-6 h-6 text-brand-gold" />
+                    </div>
+                    <h4 className="font-semibold text-brand-charcoal">{category.name}</h4>
+                    <p className="text-sm text-gray-600">{category.desc}</p>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* 3. Problem Stats */}
+      <section className="py-20 bg-gradient-to-r from-brand-peach/10 to-brand-gold/10 relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-brand-charcoal mb-4">
               The Gift-Giving Challenge
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              See why thousands trust Unwrapt to handle their special moments
+              Real statistics that show why automation matters
             </p>
           </div>
 
@@ -203,18 +225,23 @@ const Landing = () => {
               return (
                 <Card 
                   key={index}
-                  className={`text-center p-8 border-none shadow-lg cursor-pointer transition-all duration-300 hover:scale-105 ${
-                    hoveredStat === index ? 'bg-brand-gold/10 shadow-xl' : ''
+                  className={`group text-center p-8 bg-white/80 backdrop-blur-sm border-none shadow-lg cursor-pointer transition-all duration-500 hover:scale-105 hover:shadow-xl animate-fade-in ${
+                    hoveredStat === index ? 'bg-white shadow-2xl' : ''
                   }`}
+                  style={{ animationDelay: `${index * 0.2}s` }}
                   onMouseEnter={() => setHoveredStat(index)}
                   onMouseLeave={() => setHoveredStat(null)}
                 >
                   <CardContent className="space-y-4 p-0">
-                    <IconComponent className={`w-12 h-12 mx-auto transition-colors duration-300 ${
-                      hoveredStat === index ? 'text-brand-gold' : 'text-brand-charcoal'
-                    }`} />
-                    <div className="text-3xl font-bold text-brand-gold">{stat.value}</div>
-                    <p className="text-gray-600 text-sm leading-relaxed">{stat.label}</p>
+                    <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center transition-all duration-300 ${
+                      hoveredStat === index ? 'bg-brand-gold/20 scale-110' : 'bg-brand-gold/10'
+                    }`}>
+                      <IconComponent className={`w-8 h-8 transition-colors duration-300 ${
+                        hoveredStat === index ? 'text-brand-gold' : 'text-brand-charcoal'
+                      }`} />
+                    </div>
+                    <div className="text-4xl font-bold text-brand-gold group-hover:scale-110 transition-transform duration-300">{stat.value}</div>
+                    <p className="text-gray-600 text-sm leading-relaxed font-medium">{stat.label}</p>
                   </CardContent>
                 </Card>
               );
@@ -223,12 +250,12 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-20 bg-white">
+      {/* 4. How It Works */}
+      <section className="py-20 bg-white relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-brand-charcoal mb-4">
-              How Unwrapt Works
+              How It Works
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
               Three simple steps to never miss another special occasion
@@ -236,80 +263,90 @@ const Landing = () => {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            <Card className="text-center p-8 border-none shadow-lg">
-              <CardContent className="space-y-4">
-                <div className="w-16 h-16 bg-brand-peach rounded-full flex items-center justify-center mx-auto">
-                  <Heart className="w-8 h-8 text-brand-charcoal" />
-                </div>
-                <h3 className="text-xl font-semibold text-brand-charcoal">Add Your People</h3>
-                <p className="text-gray-600">
-                  Tell us about the important people in your life and their special dates
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="text-center p-8 border-none shadow-lg">
-              <CardContent className="space-y-4">
-                <div className="w-16 h-16 bg-brand-gold/20 rounded-full flex items-center justify-center mx-auto">
-                  <Clock className="w-8 h-8 text-brand-charcoal" />
-                </div>
-                <h3 className="text-xl font-semibold text-brand-charcoal">Set & Forget</h3>
-                <p className="text-gray-600">
-                  We automatically schedule thoughtful gifts based on their interests
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="text-center p-8 border-none shadow-lg">
-              <CardContent className="space-y-4">
-                <div className="w-16 h-16 bg-brand-cream rounded-full flex items-center justify-center mx-auto">
-                  <Gift className="w-8 h-8 text-brand-charcoal" />
-                </div>
-                <h3 className="text-xl font-semibold text-brand-charcoal">Perfect Delivery</h3>
-                <p className="text-gray-600">
-                  Gifts arrive right on time, making you look thoughtful and caring
-                </p>
-              </CardContent>
-            </Card>
+            {[
+              {
+                icon: Heart,
+                title: "Add Your People",
+                description: "Tell us about the important people in your life and their special dates",
+                bgColor: "bg-brand-peach/20"
+              },
+              {
+                icon: Zap,
+                title: "Set & Forget",
+                description: "We automatically schedule thoughtful gifts based on their interests",
+                bgColor: "bg-brand-gold/20"
+              },
+              {
+                icon: Gift,
+                title: "Perfect Delivery",
+                description: "Gifts arrive right on time, making you look thoughtful and caring",
+                bgColor: "bg-brand-cream"
+              }
+            ].map((step, index) => {
+              const IconComponent = step.icon;
+              return (
+                <Card 
+                  key={index} 
+                  className="group text-center p-8 border-none shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 animate-fade-in"
+                  style={{ animationDelay: `${index * 0.2}s` }}
+                >
+                  <CardContent className="space-y-6 p-0">
+                    <div className={`w-20 h-20 ${step.bgColor} rounded-2xl flex items-center justify-center mx-auto group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
+                      <IconComponent className="w-10 h-10 text-brand-charcoal" />
+                    </div>
+                    <div className="space-y-3">
+                      <h3 className="text-2xl font-bold text-brand-charcoal">{step.title}</h3>
+                      <p className="text-gray-600 leading-relaxed">{step.description}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </div>
       </section>
 
-      {/* About Section */}
-      <section className="py-20 bg-gradient-to-r from-brand-peach/20 to-brand-gold/20">
+      {/* 5. About Unwrapt */}
+      <section className="py-20 bg-gradient-to-r from-brand-peach/10 to-brand-gold/10 relative z-10">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-brand-charcoal mb-6">
+          <h2 className="text-3xl md:text-4xl font-serif font-light text-brand-charcoal mb-8">
             About Unwrapt
           </h2>
-          <p className="text-lg text-gray-700 mb-8 leading-relaxed">
-            Life gets busy, and it's easy to forget the small gestures that mean the most. 
-            Unwrapt was born from the idea that technology should help us be more human, 
-            not less. We believe that staying connected to the people you care about 
-            shouldn't require perfect memory or endless to-do lists.
-          </p>
-          <p className="text-lg text-gray-700 leading-relaxed">
-            Our mission is simple: help you be the thoughtful person you want to be, 
-            even when life gets overwhelming. Because the people you love deserve to 
-            feel remembered, appreciated, and celebrated.
-          </p>
+          <div className="space-y-6 text-lg text-gray-700 leading-relaxed font-light">
+            <p>Life gets busy, and it's easy to forget the small gestures that mean the most.</p>
+            <p>Unwrapt was born from the idea that technology should help us be more human, not less.</p>
+            <p>We believe staying connected to the people you care about shouldn't require perfect memory.</p>
+            <p>Our mission: help you be the thoughtful person you want to be, even when life gets overwhelming.</p>
+          </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 bg-brand-charcoal">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
-            Ready to become the most thoughtful person you know?
+      {/* 6. Final CTA */}
+      <section className="py-24 bg-brand-charcoal relative overflow-hidden">
+        {/* Subtle animated background elements */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-10 left-10 w-32 h-32 bg-brand-gold rounded-full animate-pulse" />
+          <div className="absolute bottom-10 right-10 w-24 h-24 bg-brand-peach rounded-full animate-bounce" />
+        </div>
+        
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+          <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+            Ready to become the most 
+            <span className="text-brand-gold">thoughtful person</span> you know?
           </h2>
-          <p className="text-xl text-gray-300 mb-8">
+          <p className="text-xl text-gray-300 mb-12 max-w-2xl mx-auto">
             Join thousands who never miss a special moment
           </p>
+          
           <Button 
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="bg-brand-gold hover:bg-brand-gold/90 text-white text-lg px-8 py-3"
+            className="group bg-brand-gold hover:bg-brand-gold/90 text-brand-charcoal text-xl px-12 py-4 rounded-full font-bold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 animate-pulse"
           >
-            Get Started Today
+            Start Your Journey Today
+            <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-2 transition-transform duration-300" />
           </Button>
+          
+          <p className="text-sm text-gray-400 mt-6">No credit card required • Free to start</p>
         </div>
       </section>
     </div>
