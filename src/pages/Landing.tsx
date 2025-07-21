@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Gift, Clock, Heart, CheckCircle, Star, Calendar, Users, TrendingUp, Sparkles, Coffee, Book, Music, ArrowRight, Zap, Shield } from 'lucide-react';
+import AnimatedBackground3D from '@/components/AnimatedBackground3D';
 
 const Landing = () => {
   const [email, setEmail] = useState('');
@@ -97,6 +98,9 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
+      {/* 3D Animated Background */}
+      <AnimatedBackground3D />
+      
       {/* Animated Background with Muted Confetti */}
       <div className="absolute inset-0 bg-gradient-to-br from-white via-brand-cream/20 to-brand-peach/10" />
       
