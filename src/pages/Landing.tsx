@@ -9,6 +9,10 @@ const Landing = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [activeGiftType, setActiveGiftType] = useState(0);
   const [hoveredStat, setHoveredStat] = useState<number | null>(null);
+  const [typewriterText, setTypewriterText] = useState('');
+  const [showContent, setShowContent] = useState(false);
+
+  const fullText = "Never forget a special moment again";
 
   const handleGetStarted = (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,6 +54,25 @@ const Landing = () => {
     { value: "4.2 billion", label: "Missed moments due to busy schedules", icon: Heart },
     { value: "89%", label: "Feel stressed about gift giving", icon: TrendingUp },
   ];
+
+  // Typewriter effect
+  useEffect(() => {
+    let index = 0;
+    const timer = setInterval(() => {
+      if (index <= fullText.length) {
+        setTypewriterText(fullText.slice(0, index));
+        index++;
+      } else {
+        clearInterval(timer);
+        // Show rest of content after typewriter is complete
+        setTimeout(() => {
+          setShowContent(true);
+        }, 500);
+      }
+    }, 80);
+
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -113,53 +136,54 @@ const Landing = () => {
       <section className="min-h-screen flex items-center relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <div className="text-center">
-            {/* Animated Typewriter Headline */}
-            <h1 className="text-5xl md:text-7xl font-bold text-brand-charcoal mb-6">
-              Never forget a 
-              <span className="text-brand-charcoal block animate-fade-in" style={{ animationDelay: '0.5s' }}>
-                special moment
-              </span>
-              <span className="block animate-fade-in" style={{ animationDelay: '1s' }}>
-                again
+            {/* Typewriter Headline */}
+            <h1 className="text-5xl md:text-7xl font-bold text-brand-charcoal mb-6 min-h-[200px] md:min-h-[280px] flex items-center justify-center">
+              <span className="block text-center">
+                {typewriterText}
+                <span className="animate-pulse">|</span>
               </span>
             </h1>
             
-            <p className="text-xl md:text-2xl text-slate-800 mb-12 max-w-3xl mx-auto animate-fade-in" style={{ animationDelay: '1.5s' }}>
-              Unwrapt automatically schedules and delivers personalized gifts for birthdays, 
-              anniversaries, and holidays. Be thoughtful without the stress.
-            </p>
-            
-            {/* Email Input with CTA */}
-            <form onSubmit={handleGetStarted} className="max-w-lg mx-auto mb-8 animate-fade-in" style={{ animationDelay: '2s' }}>
-              <div className="flex gap-4">
-                <Input
-                  type="email"
-                  placeholder="Enter your email address"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="flex-1 h-14 text-lg transition-all duration-300 focus:scale-105 focus:shadow-lg"
-                />
-                <Button 
-                  type="submit"
-                  className="bg-slate-700 hover:bg-slate-600 text-white px-8 h-14 text-lg hover:scale-105 transition-all duration-300 group animate-pulse hover:animate-none hover:shadow-2xl hover:shadow-slate-500/25"
-                >
-                  Get Started
-                  <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform duration-200" />
-                </Button>
-              </div>
-            </form>
-            
-            {/* Skip Button for Logged Users */}
-            <div className="animate-fade-in" style={{ animationDelay: '2.5s' }}>
-              <Button 
-                onClick={() => window.location.href = 'https://app.unwrapt.io'}
-                variant="ghost"
-                className="text-brand-charcoal hover:text-brand-gold transition-colors duration-200"
-              >
-                Skip to App →
-              </Button>
-            </div>
+            {showContent && (
+              <>
+                <p className="text-xl md:text-2xl text-slate-800 mb-12 max-w-3xl mx-auto animate-fade-in">
+                  Unwrapt automatically schedules and delivers personalized gifts for birthdays, 
+                  anniversaries, and holidays. Be thoughtful without the stress.
+                </p>
+                
+                {/* Email Input with CTA */}
+                <form onSubmit={handleGetStarted} className="max-w-lg mx-auto mb-8 animate-fade-in" style={{ animationDelay: '0.5s' }}>
+                  <div className="flex gap-4">
+                    <Input
+                      type="email"
+                      placeholder="Enter your email address"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      className="flex-1 h-14 text-lg transition-all duration-300 focus:scale-105 focus:shadow-lg"
+                    />
+                    <Button 
+                      type="submit"
+                      className="bg-slate-700 hover:bg-slate-600 text-white px-8 h-14 text-lg hover:scale-105 transition-all duration-300 group animate-pulse hover:animate-none hover:shadow-2xl hover:shadow-slate-500/25"
+                    >
+                      Get Started
+                      <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform duration-200" />
+                    </Button>
+                  </div>
+                </form>
+                
+                {/* Skip Button for Logged Users */}
+                <div className="animate-fade-in" style={{ animationDelay: '1s' }}>
+                  <Button 
+                    onClick={() => window.location.href = 'https://app.unwrapt.io'}
+                    variant="ghost"
+                    className="text-brand-charcoal hover:text-brand-gold transition-colors duration-200"
+                  >
+                    Skip to App →
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </section>
