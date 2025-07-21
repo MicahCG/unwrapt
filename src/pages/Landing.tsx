@@ -114,7 +114,7 @@ const Landing = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <div className="text-center">
             {/* Animated Typewriter Headline */}
-            <h1 className="text-5xl md:text-7xl font-bold text-slate-900 mb-6">
+            <h1 className="text-5xl md:text-7xl font-bold text-brand-charcoal mb-6">
               Never forget a 
               <span className="text-brand-gold block animate-fade-in" style={{ animationDelay: '0.5s' }}>
                 special moment
