@@ -124,7 +124,7 @@ const Landing = () => {
               </span>
             </h1>
             
-            <p className="text-xl md:text-2xl text-gray-600 mb-12 max-w-3xl mx-auto animate-fade-in" style={{ animationDelay: '1.5s' }}>
+            <p className="text-xl md:text-2xl text-slate-800 mb-12 max-w-3xl mx-auto animate-fade-in" style={{ animationDelay: '1.5s' }}>
               Unwrapt automatically schedules and delivers personalized gifts for birthdays, 
               anniversaries, and holidays. Be thoughtful without the stress.
             </p>
