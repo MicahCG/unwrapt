@@ -116,7 +116,7 @@ const Landing = () => {
             {/* Animated Typewriter Headline */}
             <h1 className="text-5xl md:text-7xl font-bold text-brand-charcoal mb-6">
               Never forget a 
-              <span className="text-brand-gold block animate-fade-in" style={{ animationDelay: '0.5s' }}>
+              <span className="text-brand-charcoal block animate-fade-in" style={{ animationDelay: '0.5s' }}>
                 special moment
               </span>
               <span className="block animate-fade-in" style={{ animationDelay: '1s' }}>
@@ -240,8 +240,8 @@ const Landing = () => {
                         hoveredStat === index ? 'text-brand-gold' : 'text-brand-charcoal'
                       }`} />
                     </div>
-                    <div className="text-4xl font-bold text-brand-gold group-hover:scale-110 transition-transform duration-300">{stat.value}</div>
-                    <p className="text-gray-600 text-sm leading-relaxed font-medium">{stat.label}</p>
+                    <div className="text-4xl font-bold text-brand-charcoal group-hover:scale-110 transition-transform duration-300">{stat.value}</div>
+                    <p className="text-slate-700 text-sm leading-relaxed font-medium">{stat.label}</p>
                   </CardContent>
                 </Card>
               );
