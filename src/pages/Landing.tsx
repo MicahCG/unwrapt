@@ -375,7 +375,7 @@ const Landing = () => {
           
           <Button 
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="group bg-brand-gold hover:bg-brand-gold/90 text-brand-charcoal text-xl px-12 py-4 rounded-full font-bold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 animate-pulse"
+            className="group bg-brand-gold hover:bg-brand-gold/90 text-brand-charcoal text-xl px-12 py-4 rounded-full font-bold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
           >
             Start Your Journey Today
             <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-2 transition-transform duration-300" />
