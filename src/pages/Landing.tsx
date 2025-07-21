@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Gift, Clock, Heart, CheckCircle, Star, Calendar, Users, TrendingUp, Sparkles, Coffee, Book, Music, ArrowRight, Zap, Shield } from 'lucide-react';
 import AnimatedBackground3D from '@/components/AnimatedBackground3D';
+import AnimatedGiftDrawing from '@/components/AnimatedGiftDrawing';
 
 const Landing = () => {
   const [email, setEmail] = useState('');
@@ -340,6 +341,12 @@ const Landing = () => {
           <h2 className="text-3xl md:text-4xl font-serif font-light text-brand-charcoal mb-8">
             About Unwrapt
           </h2>
+          
+          {/* Animated Gift Drawing */}
+          <div className="mb-12">
+            <AnimatedGiftDrawing />
+          </div>
+          
           <div className="space-y-6 text-lg text-gray-700 leading-relaxed font-light">
             <p>Life gets busy, and it's easy to forget the small gestures that mean the most.</p>
             <p>Unwrapt was born from the idea that technology should help us be more human, not less.</p>
