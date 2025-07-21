@@ -149,17 +149,17 @@ const Landing = () => {
               </span>
             </h1>
             
-            {/* Gift exchange illustration */}
-            <div className="mb-12 max-w-md mx-auto opacity-60">
-              <img 
-                src="/lovable-uploads/bef0cf70-e0e5-4ef1-b309-fb387d471aa1.png" 
-                alt="Two people exchanging a gift"
-                className="w-full h-auto"
-              />
-            </div>
-            
             {showContent && (
               <>
+                {/* Gift exchange illustration */}
+                <div className="mb-12 max-w-md mx-auto opacity-60 animate-fade-in">
+                  <img 
+                    src="/lovable-uploads/bef0cf70-e0e5-4ef1-b309-fb387d471aa1.png" 
+                    alt="Two people exchanging a gift"
+                    className="w-full h-auto"
+                  />
+                </div>
+                
                 <p className="text-xl md:text-2xl text-slate-800 mb-12 max-w-3xl mx-auto animate-fade-in">
                   Unwrapt automatically schedules and delivers personalized gifts for birthdays, 
                   anniversaries, and holidays. Be thoughtful without the stress.
