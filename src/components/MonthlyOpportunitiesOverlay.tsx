@@ -25,34 +25,38 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
   const { data: monthlyOpportunities, isLoading } = useQuery({
     queryKey: ['monthly-opportunities', user?.id, currentMonth, currentYear],
     queryFn: async () => {
-      if (!user?.id) return 0;
+      if (!user?.id) return { count: 0, opportunities: [], allScheduled: false };
       
       console.log('Fetching monthly opportunities...');
       
       // Get all recipients for the user
       const { data: recipients, error: recipientsError } = await supabase
         .from('recipients')
-        .select('id, birthday, anniversary')
+        .select('id, name, birthday, anniversary')
         .eq('user_id', user.id);
       
       if (recipientsError) {
         console.error('Error fetching recipients:', recipientsError);
-        return 0;
+        return { count: 0, opportunities: [], allScheduled: false };
       }
 
-      if (!recipients) return 0;
+      if (!recipients) return { count: 0, opportunities: [], allScheduled: false };
 
       console.log('Recipients found:', recipients.length);
 
-      // Filter recipients who have events this month
-      const recipientsWithEventsThisMonth = recipients.filter(recipient => {
-        const events = [];
-        
+      // Filter recipients who have events this month and build opportunities list
+      const opportunitiesList = [];
+      recipients.forEach(recipient => {
         if (recipient.birthday) {
           const birthday = new Date(recipient.birthday);
           const birthdayThisYear = new Date(currentYear, birthday.getMonth(), birthday.getDate());
           if (birthdayThisYear >= monthStart && birthdayThisYear <= monthEnd) {
-            events.push({ type: 'birthday', date: birthdayThisYear });
+            opportunitiesList.push({
+              recipientId: recipient.id,
+              recipientName: recipient.name,
+              occasion: 'birthday',
+              date: birthdayThisYear
+            });
           }
         }
         
@@ -60,22 +64,27 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
           const anniversary = new Date(recipient.anniversary);
           const anniversaryThisYear = new Date(currentYear, anniversary.getMonth(), anniversary.getDate());
           if (anniversaryThisYear >= monthStart && anniversaryThisYear <= monthEnd) {
-            events.push({ type: 'anniversary', date: anniversaryThisYear });
+            opportunitiesList.push({
+              recipientId: recipient.id,
+              recipientName: recipient.name,
+              occasion: 'anniversary',
+              date: anniversaryThisYear
+            });
           }
         }
-        
-        return events.length > 0;
       });
 
-      console.log('Recipients with events this month:', recipientsWithEventsThisMonth.length);
+      console.log('Total opportunities this month:', opportunitiesList.length);
 
-      if (recipientsWithEventsThisMonth.length === 0) return 0;
+      if (opportunitiesList.length === 0) {
+        return { count: 0, opportunities: [], allScheduled: false };
+      }
 
-      // Get scheduled gifts for these recipients this month
-      const recipientIds = recipientsWithEventsThisMonth.map(r => r.id);
+      // Get scheduled gifts for this month
+      const recipientIds = [...new Set(opportunitiesList.map(o => o.recipientId))];
       const { data: scheduledGifts, error: giftsError } = await supabase
         .from('scheduled_gifts')
-        .select('recipient_id, occasion_date')
+        .select('recipient_id, occasion_date, occasion')
         .eq('user_id', user.id)
         .in('recipient_id', recipientIds)
         .gte('occasion_date', monthStart.toISOString().split('T')[0])
@@ -83,25 +92,47 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
       
       if (giftsError) {
         console.error('Error fetching scheduled gifts:', giftsError);
-        return recipientsWithEventsThisMonth.length;
+        return { count: opportunitiesList.length, opportunities: opportunitiesList, allScheduled: false };
       }
 
       console.log('Scheduled gifts this month:', scheduledGifts?.length || 0);
 
-      // Count recipients who don't have gifts scheduled for their events this month
-      const recipientsWithScheduledGifts = new Set(scheduledGifts?.map(gift => gift.recipient_id) || []);
-      const unscheduledCount = recipientsWithEventsThisMonth.filter(
-        recipient => !recipientsWithScheduledGifts.has(recipient.id)
-      ).length;
+      // Filter out opportunities that already have scheduled gifts
+      const scheduledSet = new Set(
+        scheduledGifts?.map(gift => `${gift.recipient_id}-${gift.occasion}`) || []
+      );
+      
+      const unscheduledOpportunities = opportunitiesList.filter(
+        opp => !scheduledSet.has(`${opp.recipientId}-${opp.occasion}`)
+      );
 
-      console.log('Unscheduled opportunities:', unscheduledCount);
-      return unscheduledCount;
+      // Sort by date
+      unscheduledOpportunities.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+      const allScheduled = unscheduledOpportunities.length === 0 && opportunitiesList.length > 0;
+
+      console.log('Unscheduled opportunities:', unscheduledOpportunities.length);
+      return { 
+        count: unscheduledOpportunities.length, 
+        opportunities: unscheduledOpportunities,
+        allScheduled
+      };
     },
     enabled: !!user?.id
   });
 
-  const opportunityCount = monthlyOpportunities || 0;
-  const fullText = `You have ${opportunityCount} chance${opportunityCount !== 1 ? 's' : ''} to be thoughtful this month 🎁`;
+  const data = monthlyOpportunities || { count: 0, opportunities: [], allScheduled: false };
+  const opportunityCount = data.count;
+  const opportunities = data.opportunities;
+  const allScheduled = data.allScheduled;
+  
+  const fullText = allScheduled 
+    ? "You're all set for this month 🎉"
+    : `You have ${opportunityCount} chance${opportunityCount !== 1 ? 's' : ''} to be thoughtful this month 🎁`;
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
 
   useEffect(() => {
     console.log('MonthlyOpportunitiesOverlay mounted, opportunity count:', opportunityCount, 'isLoading:', isLoading);
@@ -166,24 +197,61 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
           <span className="animate-pulse">|</span>
         </h1>
         
-        {/* Large opportunity count that fades in */}
+        {/* Content that fades in */}
         <div className={`transition-opacity duration-1000 ${showCount ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="relative w-32 h-32 mx-auto">
-            {/* Background circle */}
-            <div className="w-32 h-32 rounded-full border-8 border-brand-charcoal/10 flex items-center justify-center">
-              <div className="text-4xl font-bold text-brand-charcoal">
-                {opportunityCount}
+          {allScheduled ? (
+            // All scheduled state
+            <div className="space-y-4">
+              <div className="text-6xl">🎉</div>
+              <p className="text-lg text-brand-charcoal/70">
+                Every special moment is covered.
+              </p>
+            </div>
+          ) : opportunityCount > 0 ? (
+            // Unscheduled opportunities
+            <div className="space-y-6">
+              <div className="relative w-32 h-32 mx-auto">
+                {/* Background circle */}
+                <div className="w-32 h-32 rounded-full border-8 border-brand-charcoal/10 flex items-center justify-center">
+                  <div className="text-4xl font-bold text-brand-charcoal">
+                    {opportunityCount}
+                  </div>
+                </div>
+                
+                {/* Decorative elements */}
+                <div className="absolute -top-2 -right-2 text-2xl">🎁</div>
+                <div className="absolute -bottom-2 -left-2 text-2xl">💝</div>
+              </div>
+              
+              <div className="space-y-3">
+                <p className="text-lg text-brand-charcoal/70">
+                  Don't miss these special moments
+                </p>
+                
+                {/* Show up to 3 opportunities with names and dates */}
+                <div className="space-y-2 text-brand-charcoal">
+                  {opportunities.slice(0, 3).map((opp, index) => (
+                    <div key={`${opp.recipientId}-${opp.occasion}`} className="text-sm">
+                      <span className="font-medium">{opp.recipientName}</span> - {opp.occasion} on {formatDate(opp.date)}
+                    </div>
+                  ))}
+                  {opportunities.length > 3 && (
+                    <div className="text-sm text-brand-charcoal/60">
+                      +{opportunities.length - 3} more
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-            
-            {/* Decorative elements */}
-            <div className="absolute -top-2 -right-2 text-2xl">🎁</div>
-            <div className="absolute -bottom-2 -left-2 text-2xl">💝</div>
-          </div>
-          
-          <p className="mt-4 text-lg text-brand-charcoal/70">
-            {opportunityCount > 0 ? "Don't miss these special moments" : "You're all set for this month!"}
-          </p>
+          ) : (
+            // No opportunities this month
+            <div className="space-y-4">
+              <div className="text-6xl">🌟</div>
+              <p className="text-lg text-brand-charcoal/70">
+                No special occasions this month.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
