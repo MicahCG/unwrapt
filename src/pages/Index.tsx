@@ -7,12 +7,14 @@ import LoginPage from '@/components/auth/LoginPage';
 import OnboardingFlow from '@/components/OnboardingFlow';
 import OnboardingIntro from '@/components/OnboardingIntro';
 import Dashboard from '@/components/Dashboard';
+import MonthlyOpportunitiesOverlay from '@/components/MonthlyOpportunitiesOverlay';
 
 const Index = () => {
   const { user, loading } = useAuth();
   const [showIntro, setShowIntro] = useState(true);
   const [isFirstVisit, setIsFirstVisit] = useState(true);
   const [showLoginPage, setShowLoginPage] = useState(false);
+  const [showOpportunitiesOverlay, setShowOpportunitiesOverlay] = useState(false);
 
   useEffect(() => {
     // Check if this is a first visit (no user and hasn't seen intro)
@@ -66,6 +68,14 @@ const Index = () => {
     refetchOnWindowFocus: true
   });
 
+  // Show opportunities overlay when user first logs in and has completed onboarding
+  useEffect(() => {
+    if (user && hasCompletedOnboarding) {
+      // Always show the overlay for authenticated users with completed onboarding
+      setShowOpportunitiesOverlay(true);
+    }
+  }, [user, hasCompletedOnboarding]);
+
   console.log('🔧 Index: Render state:', { 
     hasUser: !!user, 
     loading, 
@@ -106,9 +116,20 @@ const Index = () => {
     );
   }
 
-  // If user has completed onboarding, show Dashboard
+  // If user has completed onboarding
   if (hasCompletedOnboarding) {
-    console.log('🔧 Index: User completed onboarding, showing dashboard');
+    console.log('🔧 Index: User completed onboarding');
+    
+    // Show opportunities overlay first if it hasn't been shown yet
+    if (showOpportunitiesOverlay) {
+      return (
+        <MonthlyOpportunitiesOverlay 
+          onComplete={() => setShowOpportunitiesOverlay(false)} 
+        />
+      );
+    }
+    
+    // Then show dashboard
     return <Dashboard />;
   }
 
