@@ -209,10 +209,11 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("❌ Error verifying payment:", error);
+    // Sanitize error message to prevent information leakage
+    const sanitizedError = error.message?.includes('Stripe') ? 'Payment verification failed' : 'An error occurred';
     return new Response(JSON.stringify({ 
-      error: error.message,
-      success: false,
-      details: error.stack 
+      error: sanitizedError,
+      success: false
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,

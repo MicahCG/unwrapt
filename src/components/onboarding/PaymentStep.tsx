@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CreditCard, ArrowRight, Shield } from 'lucide-react';
+import { sanitizeInput } from '@/utils/inputSanitization';
 
 interface PaymentStepProps {
   onNext: (data: any) => void;
@@ -30,15 +31,19 @@ const PaymentStep: React.FC<PaymentStepProps> = ({ onNext }) => {
   const [isValid, setIsValid] = useState(false);
 
   const handleInputChange = (field: string, value: string) => {
-    const updatedData = { ...paymentData, [field]: value };
+    // Sanitize input to prevent XSS
+    const sanitizedValue = field === 'nameOnCard' ? sanitizeInput(value) : value;
+    const updatedData = { ...paymentData, [field]: sanitizedValue };
     setPaymentData(updatedData);
     validateForm(updatedData);
   };
 
   const handleAddressChange = (field: string, value: string) => {
+    // Sanitize address input
+    const sanitizedValue = sanitizeInput(value);
     const updatedData = {
       ...paymentData,
-      billingAddress: { ...paymentData.billingAddress, [field]: value }
+      billingAddress: { ...paymentData.billingAddress, [field]: sanitizedValue }
     };
     setPaymentData(updatedData);
     validateForm(updatedData);

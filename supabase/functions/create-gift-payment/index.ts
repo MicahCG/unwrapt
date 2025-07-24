@@ -7,6 +7,40 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Input sanitization utilities
+const sanitizeInput = (input: string): string => {
+  if (!input || typeof input !== 'string') return '';
+  return input
+    .replace(/[<>]/g, '')
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+=/gi, '')
+    .replace(/script/gi, '')
+    .trim();
+};
+
+// Rate limiting for payment attempts
+const rateLimitStore = new Map<string, { count: number; lastAttempt: number }>();
+const PAYMENT_RATE_LIMIT = { maxRequests: 3, windowMs: 600000 }; // 3 attempts per 10 minutes
+
+const isRateLimited = (userId: string): boolean => {
+  const now = Date.now();
+  const userLimit = rateLimitStore.get(userId) || { count: 0, lastAttempt: 0 };
+  
+  // Reset if window has passed
+  if (now - userLimit.lastAttempt > PAYMENT_RATE_LIMIT.windowMs) {
+    userLimit.count = 0;
+  }
+  
+  if (userLimit.count >= PAYMENT_RATE_LIMIT.maxRequests) {
+    return true;
+  }
+  
+  userLimit.count++;
+  userLimit.lastAttempt = now;
+  rateLimitStore.set(userId, userLimit);
+  return false;
+};
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -27,9 +61,21 @@ serve(async (req) => {
     const user = data.user;
     if (!user?.email) throw new Error("User not authenticated or email not available");
 
+    // Check rate limiting
+    if (isRateLimited(user.id)) {
+      return new Response(JSON.stringify({ 
+        error: "Rate limit exceeded. Please try again later.",
+        success: false 
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 429,
+      });
+    }
+
     console.log(`💳 Creating payment for user: ${user.email}`);
 
-    // Parse request body
+    // Parse and sanitize request body
+    const body = await req.json();
     const { 
       scheduledGiftId, 
       giftDetails, 
@@ -37,7 +83,21 @@ serve(async (req) => {
       productPrice,
       productImage,
       variantId 
-    } = await req.json();
+    } = body;
+
+    // Input validation and sanitization
+    if (!scheduledGiftId || typeof scheduledGiftId !== 'string') {
+      throw new Error("Invalid scheduled gift ID");
+    }
+    
+    if (!productPrice || typeof productPrice !== 'number' || productPrice <= 0) {
+      throw new Error("Invalid product price");
+    }
+
+    // Sanitize string inputs
+    const sanitizedGiftType = sanitizeInput(giftDetails?.giftType || '');
+    const sanitizedOccasion = sanitizeInput(giftDetails?.occasion || '');
+    const sanitizedRecipientName = sanitizeInput(giftDetails?.recipientName || '');
     
     console.log(`💳 Payment request details:`, {
       scheduledGiftId,

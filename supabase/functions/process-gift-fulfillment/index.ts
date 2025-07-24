@@ -41,8 +41,12 @@ serve(async (req) => {
 
     console.log(`🎁 Process-gift-fulfillment: Processing gift fulfillment for: ${scheduledGiftId}`);
 
-    // Check if this is a test gift ID (for testing purposes)
-    const isTestGift = scheduledGiftId.includes('test') || scheduledGiftId.length < 25;
+    // Sanitize input
+    const sanitizedGiftId = scheduledGiftId.replace(/[^a-zA-Z0-9\-_]/g, '');
+    
+    // Only allow test mode in development environments
+    const isDevelopment = Deno.env.get("DENO_DEPLOYMENT_ID") === undefined;
+    const isTestGift = isDevelopment && (sanitizedGiftId.includes('test') || sanitizedGiftId.length < 25);
     
     if (isTestGift) {
       console.log('🧪 Process-gift-fulfillment: Test mode detected, using mock data');
