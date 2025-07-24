@@ -7,7 +7,7 @@ interface OnboardingIntroProps {
 const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
   const [currentScreen, setCurrentScreen] = useState(0);
   const [displayedText, setDisplayedText] = useState('');
-  const [showEffortlessly, setShowEffortlessly] = useState(false);
+  
   const [isVisible, setIsVisible] = useState(true);
   const [isCompleting, setIsCompleting] = useState(false);
 
@@ -25,7 +25,6 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
     const currentText = screens[currentScreen];
     let currentIndex = 0;
     setDisplayedText('');
-    setShowEffortlessly(false);
 
     const typewriterInterval = setInterval(() => {
       if (currentIndex < currentText.length) {
@@ -34,17 +33,13 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
       } else {
         clearInterval(typewriterInterval);
         
-        // If this is the last screen, show "Effortlessly" after a brief pause
+        // If this is the last screen, complete after a brief pause
         if (currentScreen === screens.length - 1) {
           setTimeout(() => {
-            setShowEffortlessly(true);
-            // Start completion process
-            setTimeout(() => {
-              setIsCompleting(true);
-              setIsVisible(false);
-              setTimeout(onComplete, 300);
-            }, 800);
-          }, 800);
+            setIsCompleting(true);
+            setIsVisible(false);
+            setTimeout(onComplete, 500);
+          }, 1200);
         } else {
           // Move to next screen after text completion + pause
           const pauseTime = currentScreen === 0 ? 1000 : 2000;
@@ -72,19 +67,10 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
       }}
     >
       <div className="text-center max-w-2xl px-8">
-        <div className={`transition-opacity duration-500 ${currentScreen === screens.length - 1 && showEffortlessly ? 'opacity-0' : 'opacity-100'}`}>
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-light text-brand-charcoal tracking-tight leading-tight whitespace-pre-line">
-            {displayedText}
-            <span className="animate-pulse">|</span>
-          </h1>
-        </div>
-        {currentScreen === screens.length - 1 && (
-          <div className={`transition-opacity duration-1000 ${showEffortlessly ? 'opacity-100' : 'opacity-0'}`}>
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-brand-charcoal tracking-tight">
-              Effortlessly.
-            </h2>
-          </div>
-        )}
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-light text-brand-charcoal tracking-tight leading-tight whitespace-pre-line">
+          {displayedText}
+          <span className="animate-pulse">|</span>
+        </h1>
       </div>
     </div>
   );
