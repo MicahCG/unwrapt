@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { CreditCard, Package, Heart, MapPin } from 'lucide-react';
+import { CreditCard, Package, Heart, MapPin, ChevronLeft } from 'lucide-react';
 import { useShopifyProductTypes } from '@/hooks/useShopifyProductTypes';
 import { useShopifyProduct } from '@/hooks/useShopifyProduct';
 import { cleanName } from '@/lib/utils';
@@ -26,6 +26,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   const { toast } = useToast();
   const { data: productTypesData, isLoading: isLoadingProductTypes } = useShopifyProductTypes();
   
+  const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
     occasion: '',
     occasion_date: '',
@@ -63,6 +64,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
   React.useEffect(() => {
     if (isOpen) {
+      setCurrentStep(1);
       // Check if this is a holiday preset
       if (recipient._holidayPreset) {
         setFormData(prev => ({
@@ -134,20 +136,35 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     }
   };
 
-  const isFormValid = () => {
+  const isStep1Valid = () => {
     return formData.occasion && 
            formData.occasion_date && 
            formData.gift_type && 
-           productData && // Ensure we have product data
-           formData.street &&
+           productData; // Ensure we have product data
+  };
+
+  const isStep2Valid = () => {
+    return formData.street &&
            formData.city &&
            formData.state &&
            formData.zip_code;
   };
 
+  const handleNextStep = () => {
+    if (currentStep === 1 && isStep1Valid()) {
+      setCurrentStep(2);
+    }
+  };
+
+  const handlePrevStep = () => {
+    if (currentStep === 2) {
+      setCurrentStep(1);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isFormValid() || !productData) return;
+    if (!isStep1Valid() || !isStep2Valid() || !productData) return;
     
     setIsLoading(true);
 
@@ -265,257 +282,303 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     }
   };
 
+  const handleClose = () => {
+    setCurrentStep(1);
+    onClose();
+  };
+
   // Get product types from Shopify or use fallback
   const productTypes = productTypesData?.productTypes || [];
 
+  const renderStep1 = () => (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="occasion" className="text-brand-charcoal">Occasion *</Label>
+        <Select 
+          value={formData.occasion} 
+          onValueChange={(value) => setFormData(prev => ({ ...prev, occasion: value }))}
+        >
+          <SelectTrigger className="text-brand-charcoal border-brand-cream">
+            <SelectValue placeholder="Select occasion" />
+          </SelectTrigger>
+          <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
+            <SelectItem value="Birthday">Birthday</SelectItem>
+            <SelectItem value="Anniversary">Anniversary</SelectItem>
+            <SelectItem value="Christmas">Christmas</SelectItem>
+            <SelectItem value="Valentine's Day">Valentine's Day</SelectItem>
+            <SelectItem value="Mother's Day">Mother's Day</SelectItem>
+            <SelectItem value="Father's Day">Father's Day</SelectItem>
+            <SelectItem value="Graduation">Graduation</SelectItem>
+            <SelectItem value="Other">Other</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="occasion_date" className="text-brand-charcoal">Occasion Date *</Label>
+        <Input
+          id="occasion_date"
+          type="date"
+          value={formData.occasion_date}
+          onChange={(e) => setFormData(prev => ({ ...prev, occasion_date: e.target.value }))}
+          required
+          className="text-brand-charcoal border-brand-cream"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="gift_type" className="text-brand-charcoal">Gift Type *</Label>
+        <Select 
+          value={formData.gift_type} 
+          onValueChange={(value) => setFormData(prev => ({ ...prev, gift_type: value }))}
+          disabled={isLoadingProductTypes}
+        >
+          <SelectTrigger className="text-brand-charcoal border-brand-cream">
+            <SelectValue placeholder={isLoadingProductTypes ? "Loading gift types..." : "Select gift type"} />
+          </SelectTrigger>
+          <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
+            {productTypes.map((type: string) => (
+              <SelectItem key={type} value={type}>
+                {type}
+              </SelectItem>
+            ))}
+            {productTypes.length === 0 && !isLoadingProductTypes && (
+              <SelectItem value="no-types-available" disabled>No gift types available</SelectItem>
+            )}
+          </SelectContent>
+        </Select>
+        {productTypesData?.success === false && (
+          <p className="text-xs text-brand-charcoal/60">
+            Using fallback options - Shopify connection unavailable
+          </p>
+        )}
+      </div>
+
+      {formData.gift_type && productData && (
+        <Card className="bg-brand-cream/30 border-brand-cream">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2 mb-3">
+              <Package className="h-4 w-4 text-brand-charcoal" />
+              <span className="font-medium text-sm text-brand-charcoal">Gift Preview</span>
+            </div>
+            <div className="flex space-x-3">
+              <img
+                src={productData.image}
+                alt={`${formData.gift_type} gift`}
+                className="w-20 h-20 object-cover rounded-lg"
+              />
+              <div className="flex-1">
+                <p className="text-sm text-brand-charcoal font-medium mb-1">
+                  {productData.title}
+                </p>
+                <p className="text-xs text-brand-charcoal/70">
+                  {getGiftDescription(formData.gift_type, cleanName(recipient.name))}
+                </p>
+                <p className="text-lg text-brand-gold font-bold mt-2">
+                  ${productData.price.toFixed(2)}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {formData.gift_type && isLoadingProduct && (
+        <div className="bg-brand-cream/30 border-brand-cream p-4 rounded-lg">
+          <div className="animate-pulse flex space-x-3">
+            <div className="w-20 h-20 bg-brand-cream rounded-lg"></div>
+            <div className="flex-1">
+              <div className="h-4 bg-brand-cream rounded mb-2"></div>
+              <div className="h-3 bg-brand-cream rounded mb-2"></div>
+              <div className="h-5 bg-brand-cream rounded w-20"></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {formData.gift_type && (
+        <Card className="bg-gradient-to-br from-brand-cream/20 to-brand-cream/40 border-brand-cream">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2 mb-3">
+              <Heart className="h-4 w-4 text-brand-charcoal" />
+              <span className="font-medium text-sm text-brand-charcoal">Note Preview</span>
+            </div>
+            <div className="bg-white p-3 rounded border border-brand-cream/50 shadow-sm">
+              <p className="text-sm text-brand-charcoal mb-3 leading-relaxed">
+                {getSenderName()} was thinking about you on your special day and decided to send you some {formData.gift_type.toLowerCase()}. We hope you enjoy!
+              </p>
+              <div className="border-t pt-2 mt-2">
+                <p className="text-xs text-brand-charcoal/60 italic">
+                  This gift was curated and sent through Unwrapt - Making thoughtfulness effortless ✨ unwrapt.io
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="flex justify-end space-x-2 pt-4">
+        <Button 
+          type="button" 
+          variant="outline" 
+          onClick={handleClose} 
+          className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream"
+        >
+          Cancel
+        </Button>
+        <Button 
+          type="button" 
+          onClick={handleNextStep}
+          disabled={!isStep1Valid() || isLoadingProduct} 
+          className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+        >
+          {isLoadingProduct ? 'Loading...' : 'Continue'}
+        </Button>
+      </div>
+    </div>
+  );
+
+  const renderStep2 = () => (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="flex items-center space-x-2 mb-4">
+        <MapPin className="h-4 w-4 text-brand-charcoal" />
+        <span className="font-medium text-sm text-brand-charcoal">Shipping Address *</span>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="street" className="text-brand-charcoal">Street Address *</Label>
+        <Input
+          id="street"
+          placeholder="123 Main Street"
+          value={formData.street}
+          onChange={(e) => setFormData(prev => ({ ...prev, street: e.target.value }))}
+          required
+          className="text-brand-charcoal border-brand-cream"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="city" className="text-brand-charcoal">City *</Label>
+          <Input
+            id="city"
+            placeholder="City"
+            value={formData.city}
+            onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+            required
+            className="text-brand-charcoal border-brand-cream"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="state" className="text-brand-charcoal">State *</Label>
+          <Input
+            id="state"
+            placeholder="State"
+            value={formData.state}
+            onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
+            required
+            className="text-brand-charcoal border-brand-cream"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="zip_code" className="text-brand-charcoal">ZIP Code *</Label>
+          <Input
+            id="zip_code"
+            placeholder="12345"
+            value={formData.zip_code}
+            onChange={(e) => setFormData(prev => ({ ...prev, zip_code: e.target.value }))}
+            required
+            className="text-brand-charcoal border-brand-cream"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="country" className="text-brand-charcoal">Country *</Label>
+          <Select 
+            value={formData.country} 
+            onValueChange={(value) => setFormData(prev => ({ ...prev, country: value }))}
+          >
+            <SelectTrigger className="text-brand-charcoal border-brand-cream">
+              <SelectValue placeholder="Select country" />
+            </SelectTrigger>
+            <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
+              <SelectItem value="United States">United States</SelectItem>
+              <SelectItem value="Canada">Canada</SelectItem>
+              <SelectItem value="United Kingdom">United Kingdom</SelectItem>
+              <SelectItem value="Australia">Australia</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="bg-brand-cream/50 p-3 rounded-lg border border-brand-cream">
+        <p className="text-sm text-brand-charcoal/80">
+          📦 Deliveries are sent 3 days before occasion
+        </p>
+      </div>
+
+      {productData && (
+        <div className="bg-brand-cream p-3 rounded-lg border border-brand-cream">
+          <div className="flex items-center space-x-2 mb-1">
+            <CreditCard className="h-4 w-4 text-brand-charcoal" />
+            <span className="font-medium text-sm text-brand-charcoal">Payment Required</span>
+          </div>
+          <p className="text-xs text-brand-charcoal/70">
+            You'll pay ${productData.price.toFixed(2)} to schedule this gift
+          </p>
+        </div>
+      )}
+
+      <div className="flex justify-between space-x-2 pt-4">
+        <Button 
+          type="button" 
+          variant="outline" 
+          onClick={handlePrevStep}
+          className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream"
+        >
+          <ChevronLeft className="w-4 h-4 mr-1" />
+          Back
+        </Button>
+        <div className="flex space-x-2">
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={handleClose} 
+            disabled={isLoading}
+            className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream"
+          >
+            Cancel
+          </Button>
+          <Button 
+            type="submit" 
+            disabled={isLoading || !isStep2Valid()} 
+            className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+          >
+            {isLoading ? 'Processing...' : 
+             productData ? `Schedule & Pay $${productData.price.toFixed(2)}` : 
+             'Schedule & Pay for Gift'}
+          </Button>
+        </div>
+      </div>
+    </form>
+  );
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[500px] bg-white border-brand-cream text-brand-charcoal max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-brand-charcoal">Schedule Gift for {cleanName(recipient.name)}</DialogTitle>
+          <DialogTitle className="text-brand-charcoal">
+            {currentStep === 1 ? `Schedule Gift for ${cleanName(recipient.name)}` : 'Shipping Address'}
+          </DialogTitle>
+          <div className="flex space-x-2 mt-2">
+            <div className={`h-2 rounded-full flex-1 ${currentStep >= 1 ? 'bg-brand-charcoal' : 'bg-brand-cream'}`} />
+            <div className={`h-2 rounded-full flex-1 ${currentStep >= 2 ? 'bg-brand-charcoal' : 'bg-brand-cream'}`} />
+          </div>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="occasion" className="text-brand-charcoal">Occasion *</Label>
-            <Select 
-              value={formData.occasion} 
-              onValueChange={(value) => setFormData(prev => ({ ...prev, occasion: value }))}
-            >
-              <SelectTrigger className="text-brand-charcoal border-brand-cream">
-                <SelectValue placeholder="Select occasion" />
-              </SelectTrigger>
-              <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
-                <SelectItem value="Birthday">Birthday</SelectItem>
-                <SelectItem value="Anniversary">Anniversary</SelectItem>
-                <SelectItem value="Christmas">Christmas</SelectItem>
-                <SelectItem value="Valentine's Day">Valentine's Day</SelectItem>
-                <SelectItem value="Mother's Day">Mother's Day</SelectItem>
-                <SelectItem value="Father's Day">Father's Day</SelectItem>
-                <SelectItem value="Graduation">Graduation</SelectItem>
-                <SelectItem value="Other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="occasion_date" className="text-brand-charcoal">Occasion Date *</Label>
-            <Input
-              id="occasion_date"
-              type="date"
-              value={formData.occasion_date}
-              onChange={(e) => setFormData(prev => ({ ...prev, occasion_date: e.target.value }))}
-              required
-              className="text-brand-charcoal border-brand-cream"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="gift_type" className="text-brand-charcoal">Gift Type *</Label>
-            <Select 
-              value={formData.gift_type} 
-              onValueChange={(value) => setFormData(prev => ({ ...prev, gift_type: value }))}
-              disabled={isLoadingProductTypes}
-            >
-              <SelectTrigger className="text-brand-charcoal border-brand-cream">
-                <SelectValue placeholder={isLoadingProductTypes ? "Loading gift types..." : "Select gift type"} />
-              </SelectTrigger>
-              <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
-                {productTypes.map((type: string) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-                {productTypes.length === 0 && !isLoadingProductTypes && (
-                  <SelectItem value="no-types-available" disabled>No gift types available</SelectItem>
-                )}
-              </SelectContent>
-            </Select>
-            {productTypesData?.success === false && (
-              <p className="text-xs text-brand-charcoal/60">
-                Using fallback options - Shopify connection unavailable
-              </p>
-            )}
-          </div>
-
-          {formData.gift_type && productData && (
-            <Card className="bg-brand-cream/30 border-brand-cream">
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2 mb-3">
-                  <Package className="h-4 w-4 text-brand-charcoal" />
-                  <span className="font-medium text-sm text-brand-charcoal">Gift Preview</span>
-                </div>
-                <div className="flex space-x-3">
-                  <img
-                    src={productData.image}
-                    alt={`${formData.gift_type} gift`}
-                    className="w-20 h-20 object-cover rounded-lg"
-                  />
-                  <div className="flex-1">
-                    <p className="text-sm text-brand-charcoal font-medium mb-1">
-                      {productData.title}
-                    </p>
-                    <p className="text-xs text-brand-charcoal/70">
-                      {getGiftDescription(formData.gift_type, cleanName(recipient.name))}
-                    </p>
-                    <p className="text-lg text-brand-gold font-bold mt-2">
-                      ${productData.price.toFixed(2)}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {formData.gift_type && isLoadingProduct && (
-            <div className="bg-brand-cream/30 border-brand-cream p-4 rounded-lg">
-              <div className="animate-pulse flex space-x-3">
-                <div className="w-20 h-20 bg-brand-cream rounded-lg"></div>
-                <div className="flex-1">
-                  <div className="h-4 bg-brand-cream rounded mb-2"></div>
-                  <div className="h-3 bg-brand-cream rounded mb-2"></div>
-                  <div className="h-5 bg-brand-cream rounded w-20"></div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {formData.gift_type && (
-            <Card className="bg-gradient-to-br from-brand-cream/20 to-brand-cream/40 border-brand-cream">
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2 mb-3">
-                  <Heart className="h-4 w-4 text-brand-charcoal" />
-                  <span className="font-medium text-sm text-brand-charcoal">Note Preview</span>
-                </div>
-                <div className="bg-white p-3 rounded border border-brand-cream/50 shadow-sm">
-                  <p className="text-sm text-brand-charcoal mb-3 leading-relaxed">
-                    {getSenderName()} was thinking about you on your special day and decided to send you some {formData.gift_type.toLowerCase()}. We hope you enjoy!
-                  </p>
-                  <div className="border-t pt-2 mt-2">
-                    <p className="text-xs text-brand-charcoal/60 italic">
-                      This gift was curated and sent through Unwrapt - Making thoughtfulness effortless ✨ unwrapt.io
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <div className="space-y-4 pt-4 border-t">
-            <div className="flex items-center space-x-2 mb-3">
-              <MapPin className="h-4 w-4 text-brand-charcoal" />
-              <span className="font-medium text-sm text-brand-charcoal">Shipping Address *</span>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="street" className="text-brand-charcoal">Street Address *</Label>
-              <Input
-                id="street"
-                placeholder="123 Main Street"
-                value={formData.street}
-                onChange={(e) => setFormData(prev => ({ ...prev, street: e.target.value }))}
-                required
-                className="text-brand-charcoal border-brand-cream"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="city" className="text-brand-charcoal">City *</Label>
-                <Input
-                  id="city"
-                  placeholder="City"
-                  value={formData.city}
-                  onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
-                  required
-                  className="text-brand-charcoal border-brand-cream"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="state" className="text-brand-charcoal">State *</Label>
-                <Input
-                  id="state"
-                  placeholder="State"
-                  value={formData.state}
-                  onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
-                  required
-                  className="text-brand-charcoal border-brand-cream"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="zip_code" className="text-brand-charcoal">ZIP Code *</Label>
-                <Input
-                  id="zip_code"
-                  placeholder="12345"
-                  value={formData.zip_code}
-                  onChange={(e) => setFormData(prev => ({ ...prev, zip_code: e.target.value }))}
-                  required
-                  className="text-brand-charcoal border-brand-cream"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="country" className="text-brand-charcoal">Country *</Label>
-                <Select 
-                  value={formData.country} 
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, country: value }))}
-                >
-                  <SelectTrigger className="text-brand-charcoal border-brand-cream">
-                    <SelectValue placeholder="Select country" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
-                    <SelectItem value="United States">United States</SelectItem>
-                    <SelectItem value="Canada">Canada</SelectItem>
-                    <SelectItem value="United Kingdom">United Kingdom</SelectItem>
-                    <SelectItem value="Australia">Australia</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-brand-cream/50 p-3 rounded-lg border border-brand-cream">
-            <p className="text-sm text-brand-charcoal/80">
-              📦 Deliveries are sent 3 days before occasion
-            </p>
-          </div>
-
-          {productData && (
-            <div className="bg-brand-cream p-3 rounded-lg border border-brand-cream">
-              <div className="flex items-center space-x-2 mb-1">
-                <CreditCard className="h-4 w-4 text-brand-charcoal" />
-                <span className="font-medium text-sm text-brand-charcoal">Payment Required</span>
-              </div>
-              <p className="text-xs text-brand-charcoal/70">
-                You'll pay ${productData.price.toFixed(2)} to schedule this gift
-              </p>
-            </div>
-          )}
-
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={onClose} 
-              disabled={isLoading}
-              className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream"
-            >
-              Cancel
-            </Button>
-            <Button 
-              type="submit" 
-              disabled={isLoading || !isFormValid() || isLoadingProduct} 
-              className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
-            >
-              {isLoading ? 'Processing...' : 
-               isLoadingProduct ? 'Loading product...' :
-               productData ? `Schedule & Pay $${productData.price.toFixed(2)}` : 
-               'Schedule & Pay for Gift'}
-            </Button>
-          </div>
-        </form>
+        {currentStep === 1 ? renderStep1() : renderStep2()}
       </DialogContent>
     </Dialog>
   );
