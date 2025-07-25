@@ -351,9 +351,13 @@ const Landing = () => {
             About Unwrapt
           </h2>
           
-          {/* Animated Gift Drawing */}
-          <div className="mb-12">
-            <AnimatedGiftDrawing />
+          {/* Premium Gift Box Image */}
+          <div className="mb-12 flex justify-center">
+            <img 
+              src="/lovable-uploads/c47adb17-4c8f-490e-b3ae-dbe289573fe8.png" 
+              alt="Premium Unwrapt gift box"
+              className="max-w-md w-full h-auto animate-fade-in"
+            />
           </div>
           
           <div className="space-y-6 text-lg text-gray-700 leading-relaxed font-light">
