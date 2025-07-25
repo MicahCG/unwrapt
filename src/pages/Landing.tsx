@@ -152,7 +152,7 @@ const Landing = () => {
                   <div className="flex items-center justify-center gap-3 animate-fade-in" style={{ animationDelay: '0.2s' }}>
                     <div className="w-2 h-2 bg-brand-gold rounded-full animate-pulse" />
                     <p className="text-xl md:text-2xl text-slate-800">
-                      Unwrapt automatically schedules and delivers personalized gifts for birthdays, anniversaries, and holidays.
+                      Automate your gift giving
                     </p>
                     <div className="w-2 h-2 bg-brand-peach rounded-full animate-pulse" style={{ animationDelay: '0.5s' }} />
                   </div>
