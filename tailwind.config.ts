@@ -75,7 +75,10 @@ export default {
 				charcoal: '#4A4A4A',
 				cream: '#F5F2ED',
 				'cream-light': '#F8F6F1',
-				gold: '#F5F2ED' // Changed to match the light brown/tan
+				gold: '#D4A574',     // Warm golden beige
+				peach: '#F2D5C4',    // Soft peach
+				blush: '#F5E6E8',    // Soft blush pink
+				beige: '#E8D5C4'     // Golden beige
 			},
 			
 			// Override ALL color ranges that might conflict

@@ -98,12 +98,9 @@ const Landing = () => {
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <div className="min-h-screen relative overflow-hidden bg-soft-gradient">
       {/* 3D Animated Background */}
       <AnimatedBackground3D />
-      
-      {/* Animated Background with Muted Confetti */}
-      <div className="absolute inset-0 bg-gradient-to-br from-white via-brand-cream/20 to-brand-peach/10" />
       
       {/* Abstract Animated Background Shapes */}
       <AnimatedShape 

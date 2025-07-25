@@ -189,6 +189,51 @@
   .progress-fill[data-progress*="10"] { width: 10%; }
 }
 
+/* Soft textured gradient backgrounds */
+@layer utilities {
+  .bg-soft-gradient {
+    background: radial-gradient(
+      ellipse at center,
+      hsl(32, 28%, 92%) 0%,     /* Warm cream center */
+      hsl(15, 45%, 88%) 25%,    /* Soft peach */
+      hsl(350, 30%, 90%) 50%,   /* Soft blush pink */
+      hsl(35, 35%, 85%) 75%,    /* Golden beige */
+      hsl(32, 28%, 80%) 100%    /* Deeper cream edges */
+    );
+    background-attachment: fixed;
+    position: relative;
+  }
+  
+  .bg-soft-gradient::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+      radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0);
+    background-size: 20px 20px;
+    opacity: 0.3;
+    pointer-events: none;
+  }
+  
+  .bg-soft-gradient::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+      linear-gradient(45deg, transparent 48%, rgba(255,255,255,0.1) 50%, transparent 52%),
+      linear-gradient(-45deg, transparent 48%, rgba(255,255,255,0.05) 50%, transparent 52%);
+    background-size: 40px 40px;
+    opacity: 0.4;
+    pointer-events: none;
+  }
+}
+
 /* Dialog and modal overlays */
 .dialog-overlay {
   background-color: rgba(74, 74, 74, 0.6) !important;
