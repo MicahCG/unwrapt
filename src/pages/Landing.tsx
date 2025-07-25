@@ -379,7 +379,7 @@ const Landing = () => {
         
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-            Ready to become the most 
+            Ready to become the most{" "}
             <span className="text-brand-gold">thoughtful person</span> you know?
           </h2>
           <p className="text-xl text-gray-300 mb-12 max-w-2xl mx-auto">
