@@ -14,7 +14,7 @@ const Landing = () => {
   const [typewriterText, setTypewriterText] = useState('');
   const [showContent, setShowContent] = useState(false);
 
-  const fullText = "Never forget a special moment again";
+  const fullText = "You'll never miss a moment that matters.";
 
   const handleGetStarted = (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,10 +151,22 @@ const Landing = () => {
             
             {showContent && (
               <>
-                <p className="text-xl md:text-2xl text-slate-800 mb-12 max-w-3xl mx-auto animate-fade-in">
-                  Unwrapt automatically schedules and delivers personalized gifts for birthdays, 
-                  anniversaries, and holidays. Be thoughtful without the stress.
-                </p>
+                <div className="mb-12 max-w-3xl mx-auto space-y-4">
+                  <div className="flex items-center justify-center gap-3 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+                    <div className="w-2 h-2 bg-brand-gold rounded-full animate-pulse" />
+                    <p className="text-xl md:text-2xl text-slate-800">
+                      Unwrapt automatically schedules and delivers personalized gifts for birthdays, anniversaries, and holidays.
+                    </p>
+                    <div className="w-2 h-2 bg-brand-peach rounded-full animate-pulse" style={{ animationDelay: '0.5s' }} />
+                  </div>
+                  <div className="flex items-center justify-center gap-3 animate-fade-in" style={{ animationDelay: '0.4s' }}>
+                    <Sparkles className="w-5 h-5 text-brand-gold animate-spin" style={{ animationDuration: '3s' }} />
+                    <p className="text-xl md:text-2xl text-slate-800 font-medium">
+                      Be thoughtful without the stress.
+                    </p>
+                    <Heart className="w-5 h-5 text-brand-peach animate-pulse" />
+                  </div>
+                </div>
                 
                 {/* Email Input with CTA */}
                 <form onSubmit={handleGetStarted} className="max-w-lg mx-auto mb-8 animate-fade-in" style={{ animationDelay: '0.5s' }}>
