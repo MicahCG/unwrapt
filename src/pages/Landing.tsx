@@ -14,7 +14,7 @@ const Landing = () => {
   const [typewriterText, setTypewriterText] = useState('');
   const [showContent, setShowContent] = useState(false);
 
-  const fullText = "You'll never miss a moment that matters.";
+  const fullText = "You'll never miss a moment";
 
   const handleGetStarted = (e: React.FormEvent) => {
     e.preventDefault();
