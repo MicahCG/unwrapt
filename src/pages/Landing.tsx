@@ -27,7 +27,7 @@ const Landing = () => {
   const CyclingTypewriter = () => (
     <div className="flex items-center justify-center gap-3 animate-fade-in" style={{ animationDelay: '0.2s' }}>
       <Sparkles className="w-5 h-5 text-brand-gold animate-spin" style={{ animationDuration: '3s' }} />
-      <p className="text-xl md:text-2xl text-slate-800 font-medium min-h-[40px] flex items-center">
+      <p className="text-xl md:text-2xl text-slate-800/70 font-medium min-h-[40px] flex items-center">
         {cyclingText}
         <span className="animate-pulse ml-1">|</span>
       </p>
@@ -99,45 +99,50 @@ const Landing = () => {
   useEffect(() => {
     if (!showContent) return;
     
+    let timeoutId: NodeJS.Timeout;
     let charIndex = 0;
     let isDeleting = false;
     let currentPhraseIndex = 0;
     
-    const typeSpeed = 100;
-    const deleteSpeed = 50;
-    const pauseTime = 2000;
+    const typeSpeed = 80;
+    const deleteSpeed = 40;
+    const pauseTime = 3000;
     
     const typeEffect = () => {
       const currentPhrase = cyclingPhrases[currentPhraseIndex];
       
       if (isDeleting) {
-        setCyclingText(currentPhrase.substring(0, charIndex - 1));
+        setCyclingText(currentPhrase.substring(0, charIndex));
         charIndex--;
         
-        if (charIndex === 0) {
+        if (charIndex < 0) {
           isDeleting = false;
+          charIndex = 0;
           currentPhraseIndex = (currentPhraseIndex + 1) % cyclingPhrases.length;
-          setTimeout(typeEffect, typeSpeed);
+          timeoutId = setTimeout(typeEffect, typeSpeed);
         } else {
-          setTimeout(typeEffect, deleteSpeed);
+          timeoutId = setTimeout(typeEffect, deleteSpeed);
         }
       } else {
         setCyclingText(currentPhrase.substring(0, charIndex + 1));
         charIndex++;
         
-        if (charIndex === currentPhrase.length) {
+        if (charIndex > currentPhrase.length) {
           isDeleting = true;
-          setTimeout(typeEffect, pauseTime);
+          charIndex = currentPhrase.length;
+          timeoutId = setTimeout(typeEffect, pauseTime);
         } else {
-          setTimeout(typeEffect, typeSpeed);
+          timeoutId = setTimeout(typeEffect, typeSpeed);
         }
       }
     };
     
-    const timer = setTimeout(typeEffect, 500);
+    timeoutId = setTimeout(typeEffect, 1000);
     
-    return () => clearTimeout(timer);
-  }, [showContent, cyclingPhrases]);
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [showContent]);
 
   useEffect(() => {
     const interval = setInterval(() => {
