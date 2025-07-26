@@ -233,7 +233,7 @@ const Landing = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <div className="text-center">
             {/* Typewriter Headline */}
-            <h1 className="text-5xl md:text-7xl font-bold text-brand-charcoal mb-8 min-h-[200px] md:min-h-[280px] flex items-center justify-center">
+            <h1 className="text-5xl md:text-7xl font-bold text-[#453a3a] mb-8 min-h-[200px] md:min-h-[280px] flex items-center justify-center">
               <span className="block text-center">
                 {typewriterText}
                 <span className="animate-pulse">|</span>
