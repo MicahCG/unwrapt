@@ -13,8 +13,27 @@ const Landing = () => {
   const [hoveredStat, setHoveredStat] = useState<number | null>(null);
   const [typewriterText, setTypewriterText] = useState('');
   const [showContent, setShowContent] = useState(false);
+  const [cyclingText, setCyclingText] = useState('');
+  const [cyclingIndex, setCyclingIndex] = useState(0);
 
   const fullText = "You'll never miss a moment";
+  const cyclingPhrases = [
+    "Be thoughtful without the stress",
+    "Automate your gift giving", 
+    "Find niche gifts for people you love"
+  ];
+
+  // Cycling Typewriter Component
+  const CyclingTypewriter = () => (
+    <div className="flex items-center justify-center gap-3 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+      <Sparkles className="w-5 h-5 text-brand-gold animate-spin" style={{ animationDuration: '3s' }} />
+      <p className="text-xl md:text-2xl text-slate-800 font-medium min-h-[40px] flex items-center">
+        {cyclingText}
+        <span className="animate-pulse ml-1">|</span>
+      </p>
+      <Heart className="w-5 h-5 text-brand-peach animate-pulse" />
+    </div>
+  );
 
   const handleGetStarted = (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,6 +94,50 @@ const Landing = () => {
 
     return () => clearInterval(timer);
   }, []);
+
+  // Cycling typewriter effect
+  useEffect(() => {
+    if (!showContent) return;
+    
+    let charIndex = 0;
+    let isDeleting = false;
+    let currentPhraseIndex = 0;
+    
+    const typeSpeed = 100;
+    const deleteSpeed = 50;
+    const pauseTime = 2000;
+    
+    const typeEffect = () => {
+      const currentPhrase = cyclingPhrases[currentPhraseIndex];
+      
+      if (isDeleting) {
+        setCyclingText(currentPhrase.substring(0, charIndex - 1));
+        charIndex--;
+        
+        if (charIndex === 0) {
+          isDeleting = false;
+          currentPhraseIndex = (currentPhraseIndex + 1) % cyclingPhrases.length;
+          setTimeout(typeEffect, typeSpeed);
+        } else {
+          setTimeout(typeEffect, deleteSpeed);
+        }
+      } else {
+        setCyclingText(currentPhrase.substring(0, charIndex + 1));
+        charIndex++;
+        
+        if (charIndex === currentPhrase.length) {
+          isDeleting = true;
+          setTimeout(typeEffect, pauseTime);
+        } else {
+          setTimeout(typeEffect, typeSpeed);
+        }
+      }
+    };
+    
+    const timer = setTimeout(typeEffect, 500);
+    
+    return () => clearTimeout(timer);
+  }, [showContent, cyclingPhrases]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -148,21 +211,8 @@ const Landing = () => {
             
             {showContent && (
               <>
-                <div className="mb-12 max-w-3xl mx-auto space-y-4">
-                  <div className="flex items-center justify-center gap-3 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                    <div className="w-2 h-2 bg-brand-gold rounded-full animate-pulse" />
-                    <p className="text-xl md:text-2xl text-slate-800">
-                      Automate your gift giving
-                    </p>
-                    <div className="w-2 h-2 bg-brand-peach rounded-full animate-pulse" style={{ animationDelay: '0.5s' }} />
-                  </div>
-                  <div className="flex items-center justify-center gap-3 animate-fade-in" style={{ animationDelay: '0.4s' }}>
-                    <Sparkles className="w-5 h-5 text-brand-gold animate-spin" style={{ animationDuration: '3s' }} />
-                    <p className="text-xl md:text-2xl text-slate-800 font-medium">
-                      Be thoughtful without the stress.
-                    </p>
-                    <Heart className="w-5 h-5 text-brand-peach animate-pulse" />
-                  </div>
+                <div className="mb-12 max-w-3xl mx-auto">
+                  <CyclingTypewriter />
                 </div>
                 
                 {/* Email Input with CTA */}
