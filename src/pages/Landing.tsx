@@ -37,13 +37,28 @@ const Landing = () => {
 
   const handleGetStarted = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email) {
+    
+    // Get email from form data to ensure we have the actual value
+    const formData = new FormData(e.target as HTMLFormElement);
+    const emailValue = formData.get('email') as string || email;
+    
+    console.log('Email value being sent:', emailValue); // Debug log
+    
+    if (emailValue && emailValue.trim()) {
       try {
         // Store email for later use in app
-        sessionStorage.setItem('userEmail', email);
+        sessionStorage.setItem('userEmail', emailValue);
         
         // Send email to make.com webhook
         const webhookUrl = 'https://hook.us2.make.com/cjsyb77bay61w4lrcauvbno5dmvdo7ca';
+        
+        const payload = {
+          email: emailValue.trim(),
+          timestamp: new Date().toISOString(),
+          source: 'landing_page',
+        };
+        
+        console.log('Sending payload:', payload); // Debug log
         
         await fetch(webhookUrl, {
           method: 'POST',
@@ -51,11 +66,7 @@ const Landing = () => {
             'Content-Type': 'application/json',
           },
           mode: 'no-cors', // Handle CORS for external webhook
-          body: JSON.stringify({
-            email: email,
-            timestamp: new Date().toISOString(),
-            source: 'landing_page',
-          }),
+          body: JSON.stringify(payload),
         });
         
         setIsSubmitted(true);
@@ -251,6 +262,7 @@ const Landing = () => {
                   <div className="flex gap-4">
                     <Input
                       type="email"
+                      name="email"
                       placeholder="Enter your email address"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
