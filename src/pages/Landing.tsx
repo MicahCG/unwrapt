@@ -54,6 +54,7 @@ const Landing = () => {
         
         const payload = {
           email: emailValue.trim(),
+          from: "welcome@unwrapt.io",
           timestamp: new Date().toISOString(),
           source: 'landing_page',
         };
