@@ -233,7 +233,7 @@ const Landing = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <div className="text-center">
             {/* Typewriter Headline */}
-            <h1 className="text-5xl md:text-7xl font-bold text-brand-charcoal mb-6 min-h-[200px] md:min-h-[280px] flex items-center justify-center">
+            <h1 className="text-5xl md:text-7xl font-bold text-brand-charcoal mb-8 min-h-[200px] md:min-h-[280px] flex items-center justify-center">
               <span className="block text-center">
                 {typewriterText}
                 <span className="animate-pulse">|</span>
@@ -242,12 +242,12 @@ const Landing = () => {
             
             {showContent && (
               <>
-                <div className="mb-12 max-w-3xl mx-auto">
+                <div className="mb-8 max-w-3xl mx-auto">
                   <CyclingTypewriter />
                 </div>
                 
                 {/* Email Input with CTA */}
-                <form onSubmit={handleGetStarted} className="max-w-lg mx-auto mb-8 animate-fade-in" style={{ animationDelay: '0.5s' }}>
+                <form onSubmit={handleGetStarted} className="max-w-lg mx-auto mb-6 animate-fade-in" style={{ animationDelay: '0.5s' }}>
                   <div className="flex gap-4">
                     <Input
                       type="email"
