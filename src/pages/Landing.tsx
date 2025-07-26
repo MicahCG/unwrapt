@@ -52,9 +52,7 @@ const Landing = () => {
           },
           mode: 'no-cors', // Handle CORS for external webhook
           body: JSON.stringify({
-            email: email,
-            timestamp: new Date().toISOString(),
-            source: 'landing_page',
+            email: email
           }),
         });
         
