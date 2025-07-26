@@ -35,17 +35,43 @@ const Landing = () => {
     </div>
   );
 
-  const handleGetStarted = (e: React.FormEvent) => {
+  const handleGetStarted = async (e: React.FormEvent) => {
     e.preventDefault();
     if (email) {
-      // Store email for later use in app
-      sessionStorage.setItem('userEmail', email);
-      setIsSubmitted(true);
-      
-      // Redirect to app subdomain
-      setTimeout(() => {
-        window.location.href = 'https://app.unwrapt.io';
-      }, 1500);
+      try {
+        // Store email for later use in app
+        sessionStorage.setItem('userEmail', email);
+        
+        // Send email to make.com webhook
+        const webhookUrl = 'YOUR_MAKE_COM_WEBHOOK_URL'; // You'll need to replace this
+        
+        await fetch(webhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          mode: 'no-cors', // Handle CORS for external webhook
+          body: JSON.stringify({
+            email: email,
+            timestamp: new Date().toISOString(),
+            source: 'landing_page',
+          }),
+        });
+        
+        setIsSubmitted(true);
+        
+        // Redirect to app subdomain
+        setTimeout(() => {
+          window.location.href = 'https://app.unwrapt.io';
+        }, 1500);
+      } catch (error) {
+        console.error('Error sending email to webhook:', error);
+        // Still proceed with the flow even if webhook fails
+        setIsSubmitted(true);
+        setTimeout(() => {
+          window.location.href = 'https://app.unwrapt.io';
+        }, 1500);
+      }
     }
   };
 
