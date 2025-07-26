@@ -43,7 +43,7 @@ const Landing = () => {
         sessionStorage.setItem('userEmail', email);
         
         // Send email to make.com webhook
-        const webhookUrl = 'Yhttps://hook.us2.make.com/cjsyb77bay61w4lrcauvbno5dmvdo7ca'; // You'll need to replace this
+        const webhookUrl = 'https://hook.us2.make.com/cjsyb77bay61w4lrcauvbno5dmvdo7ca';
         
         await fetch(webhookUrl, {
           method: 'POST',
