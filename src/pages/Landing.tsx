@@ -45,15 +45,15 @@ const Landing = () => {
         // Send email to make.com webhook
         const webhookUrl = 'https://hook.us2.make.com/cjsyb77bay61w4lrcauvbno5dmvdo7ca';
         
+        const payload = { email };
+        
         await fetch(webhookUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           mode: 'no-cors', // Handle CORS for external webhook
-          body: JSON.stringify({
-            email: email
-          }),
+          body: JSON.stringify(payload),
         });
         
         setIsSubmitted(true);
