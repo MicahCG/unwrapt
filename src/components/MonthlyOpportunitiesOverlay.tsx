@@ -20,12 +20,15 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
   const currentYear = now.getFullYear();
   const monthStart = new Date(currentYear, currentMonth, 1);
   const monthEnd = new Date(currentYear, currentMonth + 1, 0);
+  
+  // Get next 2 weeks dates
+  const twoWeeksFromNow = new Date(now.getTime() + (14 * 24 * 60 * 60 * 1000));
 
-  // Fetch recipients with events this month that don't have scheduled gifts
+  // Fetch recipients with events this month or next 2 weeks that don't have scheduled gifts
   const { data: monthlyOpportunities, isLoading } = useQuery({
     queryKey: ['monthly-opportunities', user?.id, currentMonth, currentYear],
     queryFn: async () => {
-      if (!user?.id) return { count: 0, opportunities: [], allScheduled: false };
+      if (!user?.id) return { count: 0, opportunities: [], allScheduled: false, timeframe: 'month', noCoverage: false };
       
       console.log('Fetching monthly opportunities...');
       
@@ -37,21 +40,21 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
       
       if (recipientsError) {
         console.error('Error fetching recipients:', recipientsError);
-        return { count: 0, opportunities: [], allScheduled: false };
+        return { count: 0, opportunities: [], allScheduled: false, timeframe: 'month', noCoverage: false };
       }
 
-      if (!recipients) return { count: 0, opportunities: [], allScheduled: false };
+      if (!recipients) return { count: 0, opportunities: [], allScheduled: false, timeframe: 'month', noCoverage: false };
 
       console.log('Recipients found:', recipients.length);
 
-      // Filter recipients who have events this month and build opportunities list
-      const opportunitiesList = [];
+      // First, check for opportunities this month
+      const monthlyOpportunitiesList = [];
       recipients.forEach(recipient => {
         if (recipient.birthday) {
           const birthday = new Date(recipient.birthday);
           const birthdayThisYear = new Date(currentYear, birthday.getMonth(), birthday.getDate());
           if (birthdayThisYear >= monthStart && birthdayThisYear <= monthEnd) {
-            opportunitiesList.push({
+            monthlyOpportunitiesList.push({
               recipientId: recipient.id,
               recipientName: recipient.name,
               occasion: 'birthday',
@@ -64,7 +67,7 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
           const anniversary = new Date(recipient.anniversary);
           const anniversaryThisYear = new Date(currentYear, anniversary.getMonth(), anniversary.getDate());
           if (anniversaryThisYear >= monthStart && anniversaryThisYear <= monthEnd) {
-            opportunitiesList.push({
+            monthlyOpportunitiesList.push({
               recipientId: recipient.id,
               recipientName: recipient.name,
               occasion: 'anniversary',
@@ -74,61 +77,149 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
         }
       });
 
-      console.log('Total opportunities this month:', opportunitiesList.length);
+      console.log('Total opportunities this month:', monthlyOpportunitiesList.length);
 
-      if (opportunitiesList.length === 0) {
-        return { count: 0, opportunities: [], allScheduled: false };
+      // If we have monthly opportunities, check if they're scheduled
+      if (monthlyOpportunitiesList.length > 0) {
+        const recipientIds = [...new Set(monthlyOpportunitiesList.map(o => o.recipientId))];
+        const { data: scheduledGifts, error: giftsError } = await supabase
+          .from('scheduled_gifts')
+          .select('recipient_id, occasion_date, occasion')
+          .eq('user_id', user.id)
+          .in('recipient_id', recipientIds)
+          .gte('occasion_date', monthStart.toISOString().split('T')[0])
+          .lte('occasion_date', monthEnd.toISOString().split('T')[0]);
+        
+        if (giftsError) {
+          console.error('Error fetching scheduled gifts:', giftsError);
+          return { count: monthlyOpportunitiesList.length, opportunities: monthlyOpportunitiesList, allScheduled: false, timeframe: 'month', noCoverage: false };
+        }
+
+        console.log('Scheduled gifts this month:', scheduledGifts?.length || 0);
+
+        const scheduledSet = new Set(
+          scheduledGifts?.map(gift => `${gift.recipient_id}-${gift.occasion}`) || []
+        );
+        
+        const unscheduledMonthlyOpportunities = monthlyOpportunitiesList.filter(
+          opp => !scheduledSet.has(`${opp.recipientId}-${opp.occasion}`)
+        );
+
+        unscheduledMonthlyOpportunities.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+        const allScheduled = unscheduledMonthlyOpportunities.length === 0 && monthlyOpportunitiesList.length > 0;
+
+        console.log('Unscheduled monthly opportunities:', unscheduledMonthlyOpportunities.length);
+        return { 
+          count: unscheduledMonthlyOpportunities.length, 
+          opportunities: unscheduledMonthlyOpportunities,
+          allScheduled,
+          timeframe: 'month',
+          noCoverage: false
+        };
       }
 
-      // Get scheduled gifts for this month
-      const recipientIds = [...new Set(opportunitiesList.map(o => o.recipientId))];
-      const { data: scheduledGifts, error: giftsError } = await supabase
-        .from('scheduled_gifts')
-        .select('recipient_id, occasion_date, occasion')
-        .eq('user_id', user.id)
-        .in('recipient_id', recipientIds)
-        .gte('occasion_date', monthStart.toISOString().split('T')[0])
-        .lte('occasion_date', monthEnd.toISOString().split('T')[0]);
-      
-      if (giftsError) {
-        console.error('Error fetching scheduled gifts:', giftsError);
-        return { count: opportunitiesList.length, opportunities: opportunitiesList, allScheduled: false };
+      // No monthly opportunities, check next 2 weeks
+      console.log('No monthly opportunities, checking next 2 weeks...');
+      const twoWeekOpportunitiesList = [];
+      recipients.forEach(recipient => {
+        if (recipient.birthday) {
+          const birthday = new Date(recipient.birthday);
+          const birthdayThisYear = new Date(currentYear, birthday.getMonth(), birthday.getDate());
+          if (birthdayThisYear > now && birthdayThisYear <= twoWeeksFromNow) {
+            twoWeekOpportunitiesList.push({
+              recipientId: recipient.id,
+              recipientName: recipient.name,
+              occasion: 'birthday',
+              date: birthdayThisYear
+            });
+          }
+        }
+        
+        if (recipient.anniversary) {
+          const anniversary = new Date(recipient.anniversary);
+          const anniversaryThisYear = new Date(currentYear, anniversary.getMonth(), anniversary.getDate());
+          if (anniversaryThisYear > now && anniversaryThisYear <= twoWeeksFromNow) {
+            twoWeekOpportunitiesList.push({
+              recipientId: recipient.id,
+              recipientName: recipient.name,
+              occasion: 'anniversary',
+              date: anniversaryThisYear
+            });
+          }
+        }
+      });
+
+      console.log('Total opportunities in next 2 weeks:', twoWeekOpportunitiesList.length);
+
+      // If we have 2-week opportunities, check if they're scheduled
+      if (twoWeekOpportunitiesList.length > 0) {
+        const recipientIds = [...new Set(twoWeekOpportunitiesList.map(o => o.recipientId))];
+        const { data: scheduledGifts, error: giftsError } = await supabase
+          .from('scheduled_gifts')
+          .select('recipient_id, occasion_date, occasion')
+          .eq('user_id', user.id)
+          .in('recipient_id', recipientIds)
+          .gte('occasion_date', now.toISOString().split('T')[0])
+          .lte('occasion_date', twoWeeksFromNow.toISOString().split('T')[0]);
+        
+        if (giftsError) {
+          console.error('Error fetching scheduled gifts for 2 weeks:', giftsError);
+          return { count: twoWeekOpportunitiesList.length, opportunities: twoWeekOpportunitiesList, allScheduled: false, timeframe: 'twoWeeks', noCoverage: false };
+        }
+
+        const scheduledSet = new Set(
+          scheduledGifts?.map(gift => `${gift.recipient_id}-${gift.occasion}`) || []
+        );
+        
+        const unscheduledTwoWeekOpportunities = twoWeekOpportunitiesList.filter(
+          opp => !scheduledSet.has(`${opp.recipientId}-${opp.occasion}`)
+        );
+
+        unscheduledTwoWeekOpportunities.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+        const allScheduled = unscheduledTwoWeekOpportunities.length === 0 && twoWeekOpportunitiesList.length > 0;
+
+        console.log('Unscheduled 2-week opportunities:', unscheduledTwoWeekOpportunities.length);
+        return { 
+          count: unscheduledTwoWeekOpportunities.length, 
+          opportunities: unscheduledTwoWeekOpportunities,
+          allScheduled,
+          timeframe: 'twoWeeks',
+          noCoverage: false
+        };
       }
 
-      console.log('Scheduled gifts this month:', scheduledGifts?.length || 0);
-
-      // Filter out opportunities that already have scheduled gifts
-      const scheduledSet = new Set(
-        scheduledGifts?.map(gift => `${gift.recipient_id}-${gift.occasion}`) || []
-      );
-      
-      const unscheduledOpportunities = opportunitiesList.filter(
-        opp => !scheduledSet.has(`${opp.recipientId}-${opp.occasion}`)
-      );
-
-      // Sort by date
-      unscheduledOpportunities.sort((a, b) => a.date.getTime() - b.date.getTime());
-
-      const allScheduled = unscheduledOpportunities.length === 0 && opportunitiesList.length > 0;
-
-      console.log('Unscheduled opportunities:', unscheduledOpportunities.length);
-      return { 
-        count: unscheduledOpportunities.length, 
-        opportunities: unscheduledOpportunities,
-        allScheduled
-      };
+      // No opportunities in either timeframe
+      console.log('No opportunities found in month or next 2 weeks');
+      return { count: 0, opportunities: [], allScheduled: false, timeframe: 'month', noCoverage: true };
     },
     enabled: !!user?.id
   });
 
-  const data = monthlyOpportunities || { count: 0, opportunities: [], allScheduled: false };
+  const data = monthlyOpportunities || { count: 0, opportunities: [], allScheduled: false, timeframe: 'month', noCoverage: false };
   const opportunityCount = data.count;
   const opportunities = data.opportunities;
   const allScheduled = data.allScheduled;
+  const timeframe = data.timeframe;
+  const noCoverage = data.noCoverage;
   
-  const fullText = allScheduled 
-    ? "You're all set for this month 🎉"
-    : `You have ${opportunityCount} chance${opportunityCount !== 1 ? 's' : ''} to be thoughtful this month 🎁`;
+  const getFullText = () => {
+    if (noCoverage) {
+      return "You're covered for this month! 🌟";
+    }
+    if (allScheduled) {
+      return timeframe === 'twoWeeks' 
+        ? "You're all set for the next 2 weeks 🎉"
+        : "You're all set for this month 🎉";
+    }
+    if (timeframe === 'twoWeeks') {
+      return `You have ${opportunityCount} chance${opportunityCount !== 1 ? 's' : ''} to be thoughtful in the next 2 weeks 🎁`;
+    }
+    return `You have ${opportunityCount} chance${opportunityCount !== 1 ? 's' : ''} to be thoughtful this month 🎁`;
+  };
+  
+  const fullText = getFullText();
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -244,11 +335,16 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
               </div>
             </div>
           ) : (
-            // No opportunities this month
+            // No opportunities - either covered for month or actually no occasions
             <div className="space-y-4">
               <div className="text-6xl">🌟</div>
               <p className="text-lg text-brand-charcoal/70">
-                No special occasions this month.
+                {noCoverage 
+                  ? "Take a well-deserved break from gift planning."
+                  : timeframe === 'twoWeeks' 
+                    ? "No special occasions in the next 2 weeks." 
+                    : "No special occasions this month."
+                }
               </p>
             </div>
           )}
