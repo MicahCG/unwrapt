@@ -461,7 +461,11 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
                 </Button>
               )}
               <div className="flex items-center">
-                <Logo variant="icon" size="md" className="mr-2" />
+                <img 
+                  src="/lovable-uploads/cb711389-9d80-4fff-ad80-5ea0ea7bb878.png" 
+                  alt="Unwrapt" 
+                  className="h-8 w-8 mr-2"
+                />
                 <span className="font-bold text-lg text-brand-charcoal">Unwrapt</span>
               </div>
             </div>
