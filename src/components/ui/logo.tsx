@@ -21,7 +21,7 @@ export const Logo: React.FC<LogoProps> = ({
   // Use the new logo for both icon and full variants
   return (
     <img 
-      src="/lovable-uploads/86b1a2c3-840f-4d89-9c0a-f798d92ee632.png" 
+      src="/lovable-uploads/06605ca2-e67b-4de3-a587-8dc2cb96206d.png" 
       alt="Unwrapt" 
       className={`${sizeClasses[size]} ${className}`}
     />
