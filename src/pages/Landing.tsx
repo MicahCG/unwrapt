@@ -259,7 +259,7 @@ const Landing = () => {
                       type="submit"
                       className="bg-slate-700 hover:bg-slate-600 text-white px-8 h-14 text-lg hover:scale-105 transition-all duration-300 group hover:shadow-2xl hover:shadow-slate-500/25"
                     >
-                      Get Started
+                      Join the Waitlist
                       <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform duration-200" />
                     </Button>
                   </div>
