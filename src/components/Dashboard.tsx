@@ -62,14 +62,15 @@ const Dashboard = () => {
   });
 
   useEffect(() => {
-    // Check if this is a new session
-    const hasShownWelcome = sessionStorage.getItem('welcomeShown');
-    console.log('Dashboard mounted, hasShownWelcome:', hasShownWelcome);
+    // Check if welcome has been shown today
+    const today = new Date().toDateString();
+    const welcomeShownDate = localStorage.getItem('welcomeShownDate');
+    console.log('Dashboard mounted, welcomeShownDate:', welcomeShownDate, 'today:', today);
     
-    if (!hasShownWelcome) {
-      console.log('First time visit, showing welcome overlay');
+    if (welcomeShownDate !== today) {
+      console.log('First time visit today, showing welcome overlay');
       setShowWelcome(true);
-      sessionStorage.setItem('welcomeShown', 'true');
+      localStorage.setItem('welcomeShownDate', today);
     }
   }, []);
 
