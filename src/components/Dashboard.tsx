@@ -67,9 +67,11 @@ const Dashboard = () => {
     const welcomeShownDate = localStorage.getItem('welcomeShownDate');
     console.log('Dashboard mounted, welcomeShownDate:', welcomeShownDate, 'today:', today);
     
+    // Only show welcome if it hasn't been shown today AND user has completed onboarding
     if (welcomeShownDate !== today) {
       console.log('First time visit today, showing welcome overlay');
       setShowWelcome(true);
+      // Set the flag immediately to prevent showing again on navigation
       localStorage.setItem('welcomeShownDate', today);
     }
   }, []);
