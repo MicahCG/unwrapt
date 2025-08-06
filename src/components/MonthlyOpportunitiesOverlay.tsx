@@ -52,7 +52,13 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
       recipients.forEach(recipient => {
         if (recipient.birthday) {
           const birthday = new Date(recipient.birthday);
-          const birthdayThisYear = new Date(currentYear, birthday.getMonth(), birthday.getDate());
+          let birthdayThisYear = new Date(currentYear, birthday.getMonth(), birthday.getDate());
+          
+          // If birthday has passed this year, check next year
+          if (birthdayThisYear < now) {
+            birthdayThisYear = new Date(currentYear + 1, birthday.getMonth(), birthday.getDate());
+          }
+          
           if (birthdayThisYear >= monthStart && birthdayThisYear <= monthEnd) {
             monthlyOpportunitiesList.push({
               recipientId: recipient.id,
@@ -65,7 +71,13 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
         
         if (recipient.anniversary) {
           const anniversary = new Date(recipient.anniversary);
-          const anniversaryThisYear = new Date(currentYear, anniversary.getMonth(), anniversary.getDate());
+          let anniversaryThisYear = new Date(currentYear, anniversary.getMonth(), anniversary.getDate());
+          
+          // If anniversary has passed this year, check next year
+          if (anniversaryThisYear < now) {
+            anniversaryThisYear = new Date(currentYear + 1, anniversary.getMonth(), anniversary.getDate());
+          }
+          
           if (anniversaryThisYear >= monthStart && anniversaryThisYear <= monthEnd) {
             monthlyOpportunitiesList.push({
               recipientId: recipient.id,
@@ -125,7 +137,13 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
       recipients.forEach(recipient => {
         if (recipient.birthday) {
           const birthday = new Date(recipient.birthday);
-          const birthdayThisYear = new Date(currentYear, birthday.getMonth(), birthday.getDate());
+          let birthdayThisYear = new Date(currentYear, birthday.getMonth(), birthday.getDate());
+          
+          // If birthday has passed this year, check next year
+          if (birthdayThisYear < now) {
+            birthdayThisYear = new Date(currentYear + 1, birthday.getMonth(), birthday.getDate());
+          }
+          
           if (birthdayThisYear > now && birthdayThisYear <= twoWeeksFromNow) {
             twoWeekOpportunitiesList.push({
               recipientId: recipient.id,
@@ -138,7 +156,13 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
         
         if (recipient.anniversary) {
           const anniversary = new Date(recipient.anniversary);
-          const anniversaryThisYear = new Date(currentYear, anniversary.getMonth(), anniversary.getDate());
+          let anniversaryThisYear = new Date(currentYear, anniversary.getMonth(), anniversary.getDate());
+          
+          // If anniversary has passed this year, check next year
+          if (anniversaryThisYear < now) {
+            anniversaryThisYear = new Date(currentYear + 1, anniversary.getMonth(), anniversary.getDate());
+          }
+          
           if (anniversaryThisYear > now && anniversaryThisYear <= twoWeeksFromNow) {
             twoWeekOpportunitiesList.push({
               recipientId: recipient.id,
