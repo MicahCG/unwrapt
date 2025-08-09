@@ -54,8 +54,8 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
           const birthday = new Date(recipient.birthday);
           let birthdayThisYear = new Date(currentYear, birthday.getMonth(), birthday.getDate());
           
-          // If birthday has passed this year, check next year
-          if (birthdayThisYear < now) {
+          // If birthday has passed this year, use next year's date
+          if (birthdayThisYear <= now) {
             birthdayThisYear = new Date(currentYear + 1, birthday.getMonth(), birthday.getDate());
           }
           
@@ -73,8 +73,8 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
           const anniversary = new Date(recipient.anniversary);
           let anniversaryThisYear = new Date(currentYear, anniversary.getMonth(), anniversary.getDate());
           
-          // If anniversary has passed this year, check next year
-          if (anniversaryThisYear < now) {
+          // If anniversary has passed this year, use next year's date
+          if (anniversaryThisYear <= now) {
             anniversaryThisYear = new Date(currentYear + 1, anniversary.getMonth(), anniversary.getDate());
           }
           
@@ -139,8 +139,8 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
           const birthday = new Date(recipient.birthday);
           let birthdayThisYear = new Date(currentYear, birthday.getMonth(), birthday.getDate());
           
-          // If birthday has passed this year, check next year
-          if (birthdayThisYear < now) {
+          // If birthday has passed this year, use next year's date
+          if (birthdayThisYear <= now) {
             birthdayThisYear = new Date(currentYear + 1, birthday.getMonth(), birthday.getDate());
           }
           
@@ -158,8 +158,8 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
           const anniversary = new Date(recipient.anniversary);
           let anniversaryThisYear = new Date(currentYear, anniversary.getMonth(), anniversary.getDate());
           
-          // If anniversary has passed this year, check next year
-          if (anniversaryThisYear < now) {
+          // If anniversary has passed this year, use next year's date
+          if (anniversaryThisYear <= now) {
             anniversaryThisYear = new Date(currentYear + 1, anniversary.getMonth(), anniversary.getDate());
           }
           
