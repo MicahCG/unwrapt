@@ -1,1 +1,7 @@
 project_id = "zxsswxzpzjimrrpcrrto"
+
+[functions.shopify-collections]
+verify_jwt = false
+
+[functions.shopify-webhook]
+verify_jwt = false

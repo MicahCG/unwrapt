@@ -107,6 +107,7 @@ const InterestBasedProductSelector: React.FC<InterestBasedProductSelectorProps> 
                   interests={category.id === 'all' ? recipientInterests : [category.id]}
                   onProductSelect={onProductSelect}
                   selectedProduct={selectedProduct}
+                  key={`${category.id}-${activeTab}`} // Force re-render when tab changes
                 />
               </div>
             </TabsContent>

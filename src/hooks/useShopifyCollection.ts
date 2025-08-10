@@ -60,6 +60,8 @@ export const useShopifyCollection = (interest: string | null, limit: number = 20
           return [];
         }
 
+        console.log('Raw response data:', data);
+
         const response: CollectionResponse = data;
         
         if (!response.success) {
@@ -80,6 +82,8 @@ export const useShopifyCollection = (interest: string | null, limit: number = 20
             }
           }
           
+          // Temporary fallback for testing - remove once collections are set up
+          console.warn('Collection empty or not found, using fallback for testing');
           return [];
         }
 
