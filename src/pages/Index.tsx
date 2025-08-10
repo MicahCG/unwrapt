@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQuery } from '@tanstack/react-query';
@@ -7,24 +6,23 @@ import LoginPage from '@/components/auth/LoginPage';
 import OnboardingFlow from '@/components/OnboardingFlow';
 import OnboardingIntro from '@/components/OnboardingIntro';
 import Dashboard from '@/components/Dashboard';
-import MonthlyOpportunitiesOverlay from '@/components/MonthlyOpportunitiesOverlay';
 
 const Index = () => {
   const { user, loading } = useAuth();
-  const [showIntro, setShowIntro] = useState(true);
-  const [isFirstVisit, setIsFirstVisit] = useState(true);
+  const [showIntro, setShowIntro] = useState(false);
   const [showLoginPage, setShowLoginPage] = useState(false);
-  const [showOpportunitiesOverlay, setShowOpportunitiesOverlay] = useState(false);
 
   useEffect(() => {
-    // Check if this is a first visit (no user and hasn't seen intro)
-    const hasSeenIntro = sessionStorage.getItem('introShown');
-    if (hasSeenIntro) {
-      setShowIntro(false);
-      setIsFirstVisit(false);
-      setShowLoginPage(true);
+    // Only show intro for users without accounts on their first visit
+    if (!user && !loading) {
+      const hasSeenIntro = localStorage.getItem('hasSeenIntro');
+      if (!hasSeenIntro) {
+        setShowIntro(true);
+      } else {
+        setShowLoginPage(true);
+      }
     }
-  }, []);
+  }, [user, loading]);
 
   // Check if user has completed onboarding by looking for existing recipients
   const { data: hasCompletedOnboarding, isLoading: checkingOnboarding } = useQuery({
@@ -68,20 +66,14 @@ const Index = () => {
     refetchOnWindowFocus: true
   });
 
-  // Show opportunities overlay when user first logs in and has completed onboarding
-  useEffect(() => {
-    if (user && hasCompletedOnboarding) {
-      // Always show the overlay for authenticated users with completed onboarding
-      setShowOpportunitiesOverlay(true);
-    }
-  }, [user, hasCompletedOnboarding]);
-
   console.log('🔧 Index: Render state:', { 
     hasUser: !!user, 
     loading, 
     checkingOnboarding, 
     hasCompletedOnboarding,
-    userId: user?.id 
+    userId: user?.id,
+    showIntro,
+    showLoginPage
   });
 
   if (loading || checkingOnboarding) {
@@ -94,54 +86,48 @@ const Index = () => {
 
   const handleIntroComplete = () => {
     setShowIntro(false);
-    sessionStorage.setItem('introShown', 'true');
+    localStorage.setItem('hasSeenIntro', 'true');
     // Add a small delay before showing login page to create smooth transition
     setTimeout(() => {
       setShowLoginPage(true);
     }, 100);
   };
 
-  if (!user) {
-    console.log('🔧 Index: No user, showing login page');
+  // If user is authenticated, go directly to their appropriate flow
+  if (user) {
+    console.log('🔧 Index: User authenticated, checking onboarding status');
     
-    // Show intro for first-time visitors
-    if (showIntro && isFirstVisit) {
-      return <OnboardingIntro onComplete={handleIntroComplete} />;
+    // If user has completed onboarding, show dashboard directly
+    if (hasCompletedOnboarding) {
+      console.log('🔧 Index: User completed onboarding, showing dashboard');
+      return <Dashboard />;
     }
-    
+
+    // Otherwise, show onboarding flow
+    console.log('🔧 Index: User needs onboarding, showing onboarding flow');
     return (
-      <div className={`transition-opacity duration-500 ${showLoginPage || !isFirstVisit ? 'opacity-100' : 'opacity-0'}`}>
-        <LoginPage />
-      </div>
+      <OnboardingFlow 
+        onBack={() => {
+          // This won't be called since we're starting from the authenticated state
+          console.log('Back from onboarding');
+        }} 
+      />
     );
   }
 
-  // If user has completed onboarding
-  if (hasCompletedOnboarding) {
-    console.log('🔧 Index: User completed onboarding');
-    
-    // Show opportunities overlay first if it hasn't been shown yet
-    if (showOpportunitiesOverlay) {
-      return (
-        <MonthlyOpportunitiesOverlay 
-          onComplete={() => setShowOpportunitiesOverlay(false)} 
-        />
-      );
-    }
-    
-    // Then show dashboard
-    return <Dashboard />;
+  // For non-authenticated users
+  console.log('🔧 Index: No user, determining what to show');
+  
+  // Show intro for first-time visitors
+  if (showIntro) {
+    return <OnboardingIntro onComplete={handleIntroComplete} />;
   }
-
-  // Otherwise, show onboarding flow
-  console.log('🔧 Index: User needs onboarding, showing onboarding flow');
+  
+  // Show login page for returning visitors or after intro
   return (
-    <OnboardingFlow 
-      onBack={() => {
-        // This won't be called since we're starting from the authenticated state
-        console.log('Back from onboarding');
-      }} 
-    />
+    <div className={`transition-opacity duration-500 ${showLoginPage ? 'opacity-100' : 'opacity-0'}`}>
+      <LoginPage />
+    </div>
   );
 };
 
