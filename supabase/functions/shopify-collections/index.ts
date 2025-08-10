@@ -171,38 +171,57 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
+      console.error(`Failed to fetch from Shopify: ${response.status} ${response.statusText}`);
       throw new Error(`Failed to fetch collection: ${response.statusText}`);
     }
 
-    const { data, errors } = await response.json();
+    const responseText = await response.text();
+    console.log('Raw Shopify response:', responseText);
+    
+    let data, errors;
+    try {
+      const parsed = JSON.parse(responseText);
+      data = parsed.data;
+      errors = parsed.errors;
+    } catch (parseError) {
+      console.error('Failed to parse Shopify response:', parseError);
+      throw new Error('Invalid JSON response from Shopify');
+    }
     
     if (errors) {
       console.error('GraphQL errors:', errors);
       throw new Error(`GraphQL errors: ${JSON.stringify(errors)}`);
     }
 
+    console.log('Parsed data:', JSON.stringify(data, null, 2));
+
     let collection;
     let productsData;
 
     if (data?.collectionByHandle) {
       // We got a specific collection
+      console.log('Using collection data');
       collection = data.collectionByHandle;
       productsData = collection.products;
     } else if (data?.products) {
       // We got all products
+      console.log('Using all products data');
       collection = { title: 'All Products' };
       productsData = data.products;
     } else {
-      console.log(`No products found for query`);
+      console.log('No products found in response. Available keys:', Object.keys(data || {}));
       return new Response(JSON.stringify({
         success: false,
         products: [],
-        message: `No products found`
+        message: `No products found`,
+        debug: data
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
     }
+
+    console.log(`Processing ${productsData.edges.length} product edges`);
     const products: ShopifyProduct[] = [];
 
     for (const edge of productsData.edges) {
@@ -213,7 +232,10 @@ serve(async (req) => {
         .map((v: any) => v.node)
         .filter((variant: any) => variant.availableForSale && variant.quantityAvailable > 0);
 
+      console.log(`Product ${product.title}: ${availableVariants.length} available variants`);
+
       if (availableVariants.length === 0) {
+        console.log(`Skipping ${product.title} - no available variants`);
         continue; // Skip products with no available variants
       }
 
