@@ -1,0 +1,238 @@
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+interface ShopifyProduct {
+  id: string;
+  title: string;
+  handle: string;
+  featuredImage: string | null;
+  price: number;
+  compareAtPrice: number | null;
+  availableForSale: boolean;
+  totalInventory: number;
+  variantId: string;
+  tags: string[];
+  metafields: {
+    category?: string;
+    rank?: number;
+    badge?: string;
+  };
+}
+
+interface CollectionRequest {
+  collectionHandle: string;
+  limit?: number;
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { collectionHandle, limit = 20 }: CollectionRequest = await req.json();
+
+    if (!collectionHandle) {
+      throw new Error("Collection handle is required");
+    }
+
+    const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
+    const shopifyToken = Deno.env.get("SHOPIFY_STOREFRONT_ACCESS_TOKEN");
+    
+    if (!shopifyStore || !shopifyToken) {
+      console.log("Shopify credentials not configured, returning empty collection");
+      return new Response(JSON.stringify({
+        success: false,
+        products: [],
+        message: "Shopify not configured"
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
+    const cleanStoreUrl = shopifyStore.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const shopifyGraphQLUrl = `https://${cleanStoreUrl}/api/2024-01/graphql.json`;
+
+    console.log(`Fetching products from collection: ${collectionHandle}`);
+
+    // GraphQL query to fetch collection products with metafields
+    const query = `
+      query getCollectionProducts($handle: String!, $first: Int!) {
+        collectionByHandle(handle: $handle) {
+          id
+          title
+          products(first: $first) {
+            edges {
+              node {
+                id
+                title
+                handle
+                featuredImage {
+                  url
+                }
+                tags
+                variants(first: 50) {
+                  edges {
+                    node {
+                      id
+                      availableForSale
+                      quantityAvailable
+                      price {
+                        amount
+                      }
+                      compareAtPrice {
+                        amount
+                      }
+                    }
+                  }
+                }
+                metafields(identifiers: [
+                  {namespace: "unwrapt", key: "category"},
+                  {namespace: "unwrapt", key: "rank"},
+                  {namespace: "unwrapt", key: "badge"}
+                ]) {
+                  namespace
+                  key
+                  value
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const response = await fetch(shopifyGraphQLUrl, {
+      method: 'POST',
+      headers: {
+        'X-Shopify-Storefront-Access-Token': shopifyToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query,
+        variables: {
+          handle: collectionHandle,
+          first: limit
+        }
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch collection: ${response.statusText}`);
+    }
+
+    const { data, errors } = await response.json();
+    
+    if (errors) {
+      console.error('GraphQL errors:', errors);
+      throw new Error(`GraphQL errors: ${JSON.stringify(errors)}`);
+    }
+
+    if (!data?.collectionByHandle) {
+      console.log(`Collection not found: ${collectionHandle}`);
+      return new Response(JSON.stringify({
+        success: false,
+        products: [],
+        message: `Collection '${collectionHandle}' not found`
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
+    const collection = data.collectionByHandle;
+    const products: ShopifyProduct[] = [];
+
+    for (const edge of collection.products.edges) {
+      const product = edge.node;
+      
+      // Find available variants
+      const availableVariants = product.variants.edges
+        .map((v: any) => v.node)
+        .filter((variant: any) => variant.availableForSale && variant.quantityAvailable > 0);
+
+      if (availableVariants.length === 0) {
+        continue; // Skip products with no available variants
+      }
+
+      // Get the first available variant
+      const firstVariant = availableVariants[0];
+      
+      // Calculate total inventory
+      const totalInventory = product.variants.edges
+        .map((v: any) => v.node.quantityAvailable || 0)
+        .reduce((sum: number, qty: number) => sum + qty, 0);
+
+      // Process metafields
+      const metafields: any = {};
+      for (const metafield of product.metafields) {
+        if (metafield.namespace === 'unwrapt') {
+          if (metafield.key === 'rank') {
+            metafields.rank = parseInt(metafield.value) || 999;
+          } else {
+            metafields[metafield.key] = metafield.value;
+          }
+        }
+      }
+
+      products.push({
+        id: product.id,
+        title: product.title,
+        handle: product.handle,
+        featuredImage: product.featuredImage?.url || null,
+        price: parseFloat(firstVariant.price.amount),
+        compareAtPrice: firstVariant.compareAtPrice ? parseFloat(firstVariant.compareAtPrice.amount) : null,
+        availableForSale: true,
+        totalInventory,
+        variantId: firstVariant.id,
+        tags: product.tags,
+        metafields
+      });
+    }
+
+    // Sort products by rank (ascending), then by inventory (descending), then by newest
+    products.sort((a, b) => {
+      const rankA = a.metafields.rank || 999;
+      const rankB = b.metafields.rank || 999;
+      
+      if (rankA !== rankB) {
+        return rankA - rankB;
+      }
+      
+      if (a.totalInventory !== b.totalInventory) {
+        return b.totalInventory - a.totalInventory;
+      }
+      
+      return 0; // Keep original order for same rank and inventory
+    });
+
+    console.log(`Found ${products.length} available products in collection ${collectionHandle}`);
+
+    return new Response(JSON.stringify({
+      success: true,
+      products,
+      collectionHandle,
+      collectionTitle: collection.title
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
+
+  } catch (error) {
+    console.error('Error fetching Shopify collection:', error);
+    
+    return new Response(JSON.stringify({ 
+      success: false,
+      products: [],
+      error: error.message
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
+  }
+});
