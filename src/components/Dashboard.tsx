@@ -65,7 +65,9 @@ const Dashboard = () => {
     // Check if welcome has been shown today
     const today = new Date().toDateString();
     const welcomeShownDate = localStorage.getItem('welcomeShownDate');
-    console.log('Dashboard mounted, welcomeShownDate:', welcomeShownDate, 'today:', today);
+    const opportunitiesShownDate = localStorage.getItem('opportunitiesShownDate');
+    
+    console.log('Dashboard mounted, welcomeShownDate:', welcomeShownDate, 'opportunitiesShownDate:', opportunitiesShownDate, 'today:', today);
     
     // Only show welcome if it hasn't been shown today AND user has completed onboarding
     if (welcomeShownDate !== today) {
@@ -73,6 +75,11 @@ const Dashboard = () => {
       setShowWelcome(true);
       // Set the flag immediately to prevent showing again on navigation
       localStorage.setItem('welcomeShownDate', today);
+    } else if (opportunitiesShownDate !== today) {
+      // If welcome was already shown today, but opportunities haven't been shown, show them directly
+      console.log('Welcome already shown today, showing opportunities overlay');
+      setShowMonthlyOpportunities(true);
+      localStorage.setItem('opportunitiesShownDate', today);
     }
   }, []);
 
@@ -87,6 +94,9 @@ const Dashboard = () => {
   const handleWelcomeComplete = () => {
     console.log('Welcome overlay completed, showing monthly opportunities');
     setShowWelcome(false);
+    // Set the opportunities flag so they show after welcome
+    const today = new Date().toDateString();
+    localStorage.setItem('opportunitiesShownDate', today);
     // Small delay to ensure smooth transition
     setTimeout(() => {
       setShowMonthlyOpportunities(true);
