@@ -60,12 +60,14 @@ serve(async (req) => {
 
     console.log(`Fetching products from collection: ${collectionHandle}`);
 
-    // GraphQL query to fetch collection products with metafields
-    const query = `
-      query getCollectionProducts($handle: String!, $first: Int!) {
-        collectionByHandle(handle: $handle) {
-          id
-          title
+    // GraphQL query to fetch all products first, then try specific collection
+    let query;
+    let variables;
+
+    if (collectionHandle === 'gifts-all' || !collectionHandle) {
+      // Get all products from the store
+      query = `
+        query getAllProducts($first: Int!) {
           products(first: $first) {
             edges {
               node {
@@ -104,8 +106,57 @@ serve(async (req) => {
             }
           }
         }
-      }
-    `;
+      `;
+      variables = { first: limit };
+    } else {
+      // Try to get products from specific collection
+      query = `
+        query getCollectionProducts($handle: String!, $first: Int!) {
+          collectionByHandle(handle: $handle) {
+            id
+            title
+            products(first: $first) {
+              edges {
+                node {
+                  id
+                  title
+                  handle
+                  featuredImage {
+                    url
+                  }
+                  tags
+                  variants(first: 50) {
+                    edges {
+                      node {
+                        id
+                        availableForSale
+                        quantityAvailable
+                        price {
+                          amount
+                        }
+                        compareAtPrice {
+                          amount
+                        }
+                      }
+                    }
+                  }
+                  metafields(identifiers: [
+                    {namespace: "unwrapt", key: "category"},
+                    {namespace: "unwrapt", key: "rank"},
+                    {namespace: "unwrapt", key: "badge"}
+                  ]) {
+                    namespace
+                    key
+                    value
+                  }
+                }
+              }
+            }
+          }
+        }
+      `;
+      variables = { handle: collectionHandle, first: limit };
+    }
 
     const response = await fetch(shopifyGraphQLUrl, {
       method: 'POST',
@@ -115,10 +166,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         query,
-        variables: {
-          handle: collectionHandle,
-          first: limit
-        }
+        variables
       }),
     });
 
@@ -133,22 +181,31 @@ serve(async (req) => {
       throw new Error(`GraphQL errors: ${JSON.stringify(errors)}`);
     }
 
-    if (!data?.collectionByHandle) {
-      console.log(`Collection not found: ${collectionHandle}`);
+    let collection;
+    let productsData;
+
+    if (data?.collectionByHandle) {
+      // We got a specific collection
+      collection = data.collectionByHandle;
+      productsData = collection.products;
+    } else if (data?.products) {
+      // We got all products
+      collection = { title: 'All Products' };
+      productsData = data.products;
+    } else {
+      console.log(`No products found for query`);
       return new Response(JSON.stringify({
         success: false,
         products: [],
-        message: `Collection '${collectionHandle}' not found`
+        message: `No products found`
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
     }
-
-    const collection = data.collectionByHandle;
     const products: ShopifyProduct[] = [];
 
-    for (const edge of collection.products.edges) {
+    for (const edge of productsData.edges) {
       const product = edge.node;
       
       // Find available variants
@@ -211,12 +268,12 @@ serve(async (req) => {
       return 0; // Keep original order for same rank and inventory
     });
 
-    console.log(`Found ${products.length} available products in collection ${collectionHandle}`);
+    console.log(`Found ${products.length} available products from query`);
 
     return new Response(JSON.stringify({
       success: true,
       products,
-      collectionHandle,
+      collectionHandle: collectionHandle || 'all',
       collectionTitle: collection.title
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
