@@ -43,12 +43,20 @@ serve(async (req) => {
     const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
     const shopifyToken = Deno.env.get("SHOPIFY STOREFRONT API TOKEN");
     
+    console.log('Environment check:');
+    console.log('SHOPIFY_STORE_URL:', shopifyStore ? 'SET' : 'NOT SET');
+    console.log('SHOPIFY STOREFRONT API TOKEN:', shopifyToken ? 'SET' : 'NOT SET');
+    
     if (!shopifyStore || !shopifyToken) {
       console.log("Shopify credentials not configured, returning empty collection");
       return new Response(JSON.stringify({
         success: false,
         products: [],
-        message: "Shopify not configured"
+        message: "Shopify not configured",
+        debug: {
+          store: shopifyStore ? 'SET' : 'NOT SET',
+          token: shopifyToken ? 'SET' : 'NOT SET'
+        }
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
