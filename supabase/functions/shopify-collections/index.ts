@@ -82,12 +82,45 @@ serve(async (req) => {
 
     console.log(`Fetching products from collection: ${collectionHandle}`);
 
+    console.log(`Attempting to fetch from Shopify with handle: ${collectionHandle}`);
+    
+    // Try a simple query first to test API access
+    const testQuery = `
+      query testProducts {
+        products(first: 5) {
+          edges {
+            node {
+              id
+              title
+              status
+              availableForSale
+            }
+          }
+        }
+      }
+    `;
+    
+    console.log('Testing basic product access...');
+    const testResponse = await fetch(shopifyGraphQLUrl, {
+      method: 'POST',
+      headers: {
+        'X-Shopify-Storefront-Access-Token': shopifyToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: testQuery
+      }),
+    });
+    
+    const testResult = await testResponse.text();
+    console.log('Test query result:', testResult);
+    
     // GraphQL query to fetch all products first, then try specific collection
     let query;
     let variables;
 
     if (collectionHandle === 'gifts-all' || !collectionHandle) {
-      // Get all products from the store
+      // Get all products from the store - simplified query
       query = `
         query getAllProducts($first: Int!) {
           products(first: $first) {
@@ -96,11 +129,13 @@ serve(async (req) => {
                 id
                 title
                 handle
+                status
+                availableForSale
                 featuredImage {
                   url
                 }
                 tags
-                variants(first: 50) {
+                variants(first: 10) {
                   edges {
                     node {
                       id
@@ -114,15 +149,6 @@ serve(async (req) => {
                       }
                     }
                   }
-                }
-                metafields(identifiers: [
-                  {namespace: "unwrapt", key: "category"},
-                  {namespace: "unwrapt", key: "rank"},
-                  {namespace: "unwrapt", key: "badge"}
-                ]) {
-                  namespace
-                  key
-                  value
                 }
               }
             }
