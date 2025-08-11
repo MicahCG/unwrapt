@@ -275,34 +275,34 @@ serve(async (req) => {
     for (const edge of productsData.edges) {
       const product = edge.node;
       
-      // Find available variants
-      const availableVariants = product.variants.edges
-        .map((v: any) => v.node)
-        .filter((variant: any) => variant.availableForSale && variant.quantityAvailable > 0);
+      // Get all variants (not just available ones)
+      const allVariants = product.variants.edges.map((v: any) => v.node);
 
-      console.log(`Product ${product.title}: ${availableVariants.length} available variants`);
+      console.log(`Product ${product.title}: ${allVariants.length} total variants`);
 
-      if (availableVariants.length === 0) {
-        console.log(`Skipping ${product.title} - no available variants`);
-        continue; // Skip products with no available variants
+      if (allVariants.length === 0) {
+        console.log(`Skipping ${product.title} - no variants`);
+        continue;
       }
 
-      // Get the first available variant
-      const firstVariant = availableVariants[0];
+      // Get the first variant (regardless of availability)
+      const firstVariant = allVariants[0];
       
-      // Calculate total inventory
+      // Calculate total inventory (can be 0)
       const totalInventory = product.variants.edges
         .map((v: any) => v.node.quantityAvailable || 0)
         .reduce((sum: number, qty: number) => sum + qty, 0);
 
       // Process metafields
       const metafields: any = {};
-      for (const metafield of product.metafields) {
-        if (metafield.namespace === 'unwrapt') {
-          if (metafield.key === 'rank') {
-            metafields.rank = parseInt(metafield.value) || 999;
-          } else {
-            metafields[metafield.key] = metafield.value;
+      if (product.metafields) {
+        for (const metafield of product.metafields) {
+          if (metafield.namespace === 'unwrapt') {
+            if (metafield.key === 'rank') {
+              metafields.rank = parseInt(metafield.value) || 999;
+            } else {
+              metafields[metafield.key] = metafield.value;
+            }
           }
         }
       }
@@ -314,7 +314,7 @@ serve(async (req) => {
         featuredImage: product.featuredImage?.url || null,
         price: parseFloat(firstVariant.price.amount),
         compareAtPrice: firstVariant.compareAtPrice ? parseFloat(firstVariant.compareAtPrice.amount) : null,
-        availableForSale: true,
+        availableForSale: firstVariant.availableForSale || false,
         totalInventory,
         variantId: firstVariant.id,
         tags: product.tags,
