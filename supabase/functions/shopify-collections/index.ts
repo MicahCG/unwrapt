@@ -84,36 +84,52 @@ serve(async (req) => {
 
     console.log(`Attempting to fetch from Shopify with handle: ${collectionHandle}`);
     
-    // Try a simple query first to test API access
-    const testQuery = `
-      query testProducts {
+    // Test what publications/channels are available
+    const channelQuery = `
+      query {
+        publications(first: 10) {
+          edges {
+            node {
+              id
+              name
+            }
+          }
+        }
         products(first: 5) {
           edges {
             node {
               id
               title
               status
-              availableForSale
+              publishedAt
+              publications(first: 10) {
+                edges {
+                  node {
+                    id
+                    name
+                  }
+                }
+              }
             }
           }
         }
       }
     `;
     
-    console.log('Testing basic product access...');
-    const testResponse = await fetch(shopifyGraphQLUrl, {
+    console.log('Checking publications and product visibility...');
+    const channelResponse = await fetch(shopifyGraphQLUrl, {
       method: 'POST',
       headers: {
         'X-Shopify-Storefront-Access-Token': shopifyToken,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        query: testQuery
+        query: channelQuery
       }),
     });
     
-    const testResult = await testResponse.text();
-    console.log('Test query result:', testResult);
+    const channelResult = await channelResponse.text();
+    console.log('Channel/Publication result:', channelResult);
     
     // GraphQL query to fetch all products first, then try specific collection
     let query;
