@@ -41,7 +41,7 @@ serve(async (req) => {
     }
 
     const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
-    const shopifyToken = Deno.env.get("SHOPIFY_STOREFRONT_ACCESS_TOKEN");
+    const shopifyToken = Deno.env.get("SHOPIFY STOREFRONT API TOKEN");
     
     if (!shopifyStore || !shopifyToken) {
       console.log("Shopify credentials not configured, returning empty collection");
