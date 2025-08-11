@@ -48,6 +48,19 @@ export const useShopifyCollection = (interest: string | null, limit: number = 20
       try {
         console.log(`Fetching collection: ${collectionHandle} for interest: ${interest}`);
         
+        // First, test the debug endpoint
+        const debugResponse = await fetch(`https://zxsswxzpzjimrrpcrrto.supabase.co/functions/v1/shopify-collections?debug=true`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp4c3N3eHpwemppbXJycGNycnRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgyNzUxNzQsImV4cCI6MjA2Mzg1MTE3NH0.ibhP9oc8-zV7NGwrGU7t2HVWn6esdl2qtWBosPGgvEc`
+          }
+        });
+        
+        if (debugResponse.ok) {
+          const debugData = await debugResponse.json();
+          console.log('Debug data:', debugData);
+        }
+        
         const { data, error } = await supabase.functions.invoke('shopify-collections', {
           body: { 
             collectionHandle,

@@ -34,11 +34,25 @@ serve(async (req) => {
   }
 
   try {
-    const { collectionHandle, limit = 20 }: CollectionRequest = await req.json();
-
-    if (!collectionHandle) {
-      throw new Error("Collection handle is required");
+    // Debug endpoint - check if request is for debugging
+    if (req.url.includes('debug=true')) {
+      const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
+      const shopifyToken = Deno.env.get("SHOPIFY STOREFRONT API TOKEN");
+      
+      return new Response(JSON.stringify({
+        debug: true,
+        secrets: {
+          SHOPIFY_STORE_URL: shopifyStore ? 'SET' : 'NOT SET',
+          'SHOPIFY STOREFRONT API TOKEN': shopifyToken ? 'SET' : 'NOT SET'
+        },
+        allEnvKeys: Object.keys(Deno.env.toObject()).filter(key => key.includes('SHOPIFY'))
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
     }
+
+    const { collectionHandle, limit = 20 }: CollectionRequest = await req.json();
 
     const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
     const shopifyToken = Deno.env.get("SHOPIFY STOREFRONT API TOKEN");
