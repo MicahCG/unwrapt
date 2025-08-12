@@ -43,7 +43,7 @@ serve(async (req) => {
         debug: true,
         secrets: {
           SHOPIFY_STORE_URL: shopifyStore ? 'SET' : 'NOT SET',
-          'SHOPIFY STOREFRONT API TOKEN': shopifyToken ? 'SET' : 'NOT SET'
+          'SHOPIFY_STOREFRONT_API_TOKEN': shopifyToken ? 'SET' : 'NOT SET'
         },
         allEnvKeys: Object.keys(Deno.env.toObject()).filter(key => key.includes('SHOPIFY'))
       }), {
@@ -80,6 +80,7 @@ serve(async (req) => {
     const cleanStoreUrl = shopifyStore.replace(/^https?:\/\//, '').replace(/\/$/, '');
     const shopifyGraphQLUrl = `https://${cleanStoreUrl}/api/2024-01/graphql.json`;
 
+    console.log(`Using Shopify GraphQL URL: ${shopifyGraphQLUrl}`);
     console.log(`Fetching products from collection: ${collectionHandle}`);
 
     console.log(`Attempting to fetch from Shopify with handle: ${collectionHandle}`);
