@@ -7,7 +7,7 @@ interface ShopifyProduct {
   handle: string;
   price: number;
   currency: string;
-  image: string;
+  featuredImage: string | null; // Fixed: Use featuredImage instead of image
   productType: string;
   variantId: string;
   inventory: number;
@@ -57,7 +57,7 @@ serve(async (req) => {
           handle: 'premium-gift-box',
           price: 49.99,
           currency: 'USD',
-          image: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400',
+          featuredImage: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400',
           productType: 'Gift Box',
           variantId: 'variant-1',
           inventory: 10,
@@ -73,7 +73,7 @@ serve(async (req) => {
           handle: 'artisan-coffee-bundle',
           price: 34.99,
           currency: 'USD',
-          image: 'https://images.unsplash.com/photo-1447933601403-0c6688de566e?w=400',
+          featuredImage: 'https://images.unsplash.com/photo-1447933601403-0c6688de566e?w=400',
           productType: 'Coffee',
           variantId: 'variant-2',
           inventory: 15,
@@ -186,7 +186,7 @@ serve(async (req) => {
         handle: product.handle,
         price: parseFloat(product.priceRange?.minVariantPrice?.amount || '0'),
         currency: product.priceRange?.minVariantPrice?.currencyCode || 'USD',
-        image: product.featuredImage?.url || '',
+        featuredImage: product.featuredImage?.url || null, // Fixed: Use featuredImage instead of image
         productType: product.productType || '',
         variantId: variant?.id || '',
         inventory: variant?.quantityAvailable || 0,
@@ -221,7 +221,7 @@ serve(async (req) => {
         handle: 'premium-gift-box',
         price: 49.99,
         currency: 'USD',
-        image: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400',
+        featuredImage: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400',
         productType: 'Gift Box',
         variantId: 'variant-1',
         inventory: 10,
@@ -237,7 +237,7 @@ serve(async (req) => {
         handle: 'artisan-coffee-bundle',
         price: 34.99,
         currency: 'USD',
-        image: 'https://images.unsplash.com/photo-1447933601403-0c6688de566e?w=400',
+        featuredImage: 'https://images.unsplash.com/photo-1447933601403-0c6688de566e?w=400',
         productType: 'Coffee',
         variantId: 'variant-2',
         inventory: 15,
@@ -253,7 +253,7 @@ serve(async (req) => {
         handle: 'luxury-candle-set',
         price: 39.99,
         currency: 'USD',
-        image: 'https://images.unsplash.com/photo-1602874801007-62a0d9ab7c9b?w=400',
+        featuredImage: 'https://images.unsplash.com/photo-1602874801007-62a0d9ab7c9b?w=400',
         productType: 'Candles',
         variantId: 'variant-3',
         inventory: 8,
