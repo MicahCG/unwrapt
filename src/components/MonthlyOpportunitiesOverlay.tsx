@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -10,9 +11,11 @@ interface MonthlyOpportunitiesOverlayProps {
 
 const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = ({ onComplete }) => {
   const { user } = useAuth();
+  const { data: profile } = useUserProfile();
   const [displayedText, setDisplayedText] = useState('');
   const [isVisible, setIsVisible] = useState(true);
   const [showCount, setShowCount] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(true);
 
   // Get current month's start and end dates
   const now = new Date();
@@ -228,7 +231,12 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
   const timeframe = data.timeframe;
   const noCoverage = data.noCoverage;
   
-  const getFullText = () => {
+  const getWelcomeText = () => {
+    const firstName = profile?.full_name?.split(' ')[0] || 'there';
+    return `Welcome back, ${firstName}`;
+  };
+
+  const getOpportunitiesText = () => {
     if (noCoverage) {
       return "You're covered for this month! 🌟";
     }
@@ -243,7 +251,8 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
     return `You have ${opportunityCount} chance${opportunityCount !== 1 ? 's' : ''} to be thoughtful this month 🎁`;
   };
   
-  const fullText = getFullText();
+  const welcomeText = getWelcomeText();
+  const opportunitiesText = getOpportunitiesText();
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -255,24 +264,41 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
     // Don't do anything while loading
     if (isLoading) return;
 
+    // First show welcome message
     let currentIndex = 0;
-    const typewriterInterval = setInterval(() => {
-      if (currentIndex < fullText.length) {
-        setDisplayedText(fullText.substring(0, currentIndex + 1));
+    const welcomeInterval = setInterval(() => {
+      if (currentIndex < welcomeText.length) {
+        setDisplayedText(welcomeText.substring(0, currentIndex + 1));
         currentIndex++;
       } else {
-        clearInterval(typewriterInterval);
-        setShowCount(true);
-        // Auto-dismiss after showing for a bit
+        clearInterval(welcomeInterval);
+        // Pause before showing opportunities
         setTimeout(() => {
-          setIsVisible(false);
-          setTimeout(onComplete, 500);
-        }, 3000);
+          setShowWelcome(false);
+          setDisplayedText('');
+          
+          // Now show opportunities text
+          let oppIndex = 0;
+          const opportunitiesInterval = setInterval(() => {
+            if (oppIndex < opportunitiesText.length) {
+              setDisplayedText(opportunitiesText.substring(0, oppIndex + 1));
+              oppIndex++;
+            } else {
+              clearInterval(opportunitiesInterval);
+              setShowCount(true);
+              // Auto-dismiss after showing for a bit
+              setTimeout(() => {
+                setIsVisible(false);
+                setTimeout(onComplete, 500);
+              }, 3000);
+            }
+          }, 60);
+        }, 1000);
       }
     }, 60);
 
-    return () => clearInterval(typewriterInterval);
-  }, [fullText, opportunityCount, onComplete, isLoading]);
+    return () => clearInterval(welcomeInterval);
+  }, [welcomeText, opportunitiesText, opportunityCount, onComplete, isLoading]);
 
   // Show loading state
   if (isLoading) {
@@ -312,8 +338,8 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
           <span className="animate-pulse">|</span>
         </h1>
         
-        {/* Content that fades in */}
-        <div className={`transition-opacity duration-1000 ${showCount ? 'opacity-100' : 'opacity-0'}`}>
+        {/* Content that fades in - only show for opportunities, not welcome */}
+        <div className={`transition-opacity duration-1000 ${showCount && !showWelcome ? 'opacity-100' : 'opacity-0'}`}>
           {allScheduled ? (
             // All scheduled state
             <div className="space-y-4">

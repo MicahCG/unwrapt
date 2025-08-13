@@ -7,7 +7,7 @@ import UserMenu from '@/components/auth/UserMenu';
 import TestDataManager from '@/components/TestDataManager';
 import UpcomingGiftsManager from '@/components/UpcomingGiftsManager';
 import DashboardRecipients from '@/components/DashboardRecipients';
-import WelcomeOverlay from '@/components/WelcomeOverlay';
+
 import MonthlyOpportunitiesOverlay from '@/components/MonthlyOpportunitiesOverlay';
 import GiftScheduledSuccess from '@/components/GiftScheduledSuccess';
 import { Logo } from '@/components/ui/logo';
@@ -18,7 +18,6 @@ import { supabase } from '@/integrations/supabase/client';
 const Dashboard = () => {
   const { user } = useAuth();
   const { data: profile } = useUserProfile();
-  const [showWelcome, setShowWelcome] = useState(false);
   const [showMonthlyOpportunities, setShowMonthlyOpportunities] = useState(false);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [successRecipient, setSuccessRecipient] = useState(null);
@@ -62,22 +61,15 @@ const Dashboard = () => {
   });
 
   useEffect(() => {
-    // Check if welcome has been shown today
+    // Check if opportunities have been shown today
     const today = new Date().toDateString();
-    const welcomeShownDate = localStorage.getItem('welcomeShownDate');
     const opportunitiesShownDate = localStorage.getItem('opportunitiesShownDate');
     
-    console.log('Dashboard mounted, welcomeShownDate:', welcomeShownDate, 'opportunitiesShownDate:', opportunitiesShownDate, 'today:', today);
+    console.log('Dashboard mounted, opportunitiesShownDate:', opportunitiesShownDate, 'today:', today);
     
-    // Only show welcome if it hasn't been shown today AND user has completed onboarding
-    if (welcomeShownDate !== today) {
-      console.log('First time visit today, showing welcome overlay');
-      setShowWelcome(true);
-      // Set the flag immediately to prevent showing again on navigation
-      localStorage.setItem('welcomeShownDate', today);
-    } else if (opportunitiesShownDate !== today) {
-      // If welcome was already shown today, but opportunities haven't been shown, show them directly
-      console.log('Welcome already shown today, showing opportunities overlay');
+    // Show opportunities if they haven't been shown today
+    if (opportunitiesShownDate !== today) {
+      console.log('First time visit today, showing opportunities overlay with welcome');
       setShowMonthlyOpportunities(true);
       localStorage.setItem('opportunitiesShownDate', today);
     }
@@ -85,23 +77,11 @@ const Dashboard = () => {
 
   useEffect(() => {
     // Show success animation if we have a recent gift and no other overlays are showing
-    if (recentGift && !showWelcome && !showMonthlyOpportunities) {
+    if (recentGift && !showMonthlyOpportunities) {
       setSuccessRecipient(recentGift);
       setShowSuccessAnimation(true);
     }
-  }, [recentGift, showWelcome, showMonthlyOpportunities]);
-
-  const handleWelcomeComplete = () => {
-    console.log('Welcome overlay completed, showing monthly opportunities');
-    setShowWelcome(false);
-    // Set the opportunities flag so they show after welcome
-    const today = new Date().toDateString();
-    localStorage.setItem('opportunitiesShownDate', today);
-    // Small delay to ensure smooth transition
-    setTimeout(() => {
-      setShowMonthlyOpportunities(true);
-    }, 100);
-  };
+  }, [recentGift, showMonthlyOpportunities]);
 
   const handleMonthlyOpportunitiesComplete = () => {
     console.log('Monthly opportunities overlay completed');
@@ -114,14 +94,10 @@ const Dashboard = () => {
     sessionStorage.removeItem('giftScheduledSuccess');
   };
 
-  console.log('Dashboard render state:', { showWelcome, showMonthlyOpportunities, showSuccessAnimation });
+  console.log('Dashboard render state:', { showMonthlyOpportunities, showSuccessAnimation });
 
   return (
     <>
-      {showWelcome && (
-        <WelcomeOverlay onComplete={handleWelcomeComplete} />
-      )}
-      
       {showMonthlyOpportunities && (
         <MonthlyOpportunitiesOverlay onComplete={handleMonthlyOpportunitiesComplete} />
       )}
