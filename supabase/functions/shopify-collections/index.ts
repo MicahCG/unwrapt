@@ -118,20 +118,35 @@ serve(async (req) => {
       }
     `;
     
-    console.log('Checking publications and product visibility...');
-    const channelResponse = await fetch(shopifyGraphQLUrl, {
-      method: 'POST',
-      headers: {
-        'X-Shopify-Storefront-Access-Token': shopifyToken,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query: channelQuery
-      }),
-    });
     
-    const channelResult = await channelResponse.text();
-    console.log('Channel/Publication result:', channelResult);
+    console.log('Testing basic Shopify connection...');
+    try {
+      const testResponse = await fetch(shopifyGraphQLUrl, {
+        method: 'POST',
+        headers: {
+          'X-Shopify-Storefront-Access-Token': shopifyToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: `query { shop { name } }`
+        }),
+      });
+      
+      console.log('Test response status:', testResponse.status);
+      console.log('Test response headers:', JSON.stringify(Object.fromEntries(testResponse.headers.entries())));
+      
+      if (!testResponse.ok) {
+        const errorText = await testResponse.text();
+        console.error('Shopify test connection failed:', errorText);
+        throw new Error(`Shopify connection test failed: ${testResponse.status} - ${errorText}`);
+      }
+      
+      const testResult = await testResponse.json();
+      console.log('Test connection result:', JSON.stringify(testResult));
+    } catch (testError) {
+      console.error('Connection test error:', testError);
+      throw testError;
+    }
     
     // GraphQL query to fetch all products first, then try specific collection
     let query;
