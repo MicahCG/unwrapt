@@ -58,88 +58,93 @@ const InterestBasedProductSelector: React.FC<InterestBasedProductSelectorProps> 
   );
 
   return (
-    <Card className={className}>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Heart className="w-5 h-5" />
-          Choose the Perfect Gift
-        </CardTitle>
-        {recipientInterests.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            <span className="text-sm text-muted-foreground">Based on interests:</span>
-            {recipientInterests.map((interest, index) => (
-              <Badge key={index} variant="outline" className="text-xs">
-                {interest}
-              </Badge>
-            ))}
+    <div className={`space-y-6 ${className}`}>
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <Heart className="w-5 h-5 text-primary" />
           </div>
-        )}
-      </CardHeader>
-      
-      <CardContent>
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
-            {relevantInterests.map((category) => {
-              const Icon = category.icon;
-              return (
-                <TabsTrigger 
-                  key={category.id} 
-                  value={category.id}
-                  className="flex items-center gap-2"
-                >
-                  <Icon className="w-4 h-4" />
-                  <span className="hidden sm:inline">{category.label}</span>
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
-
-          {relevantInterests.map((category) => (
-            <TabsContent key={category.id} value={category.id} className="mt-6">
-              <div className="space-y-4">
-                <div className="text-center">
-                  <h3 className="font-medium">{category.label}</h3>
-                  <p className="text-sm text-muted-foreground">{category.description}</p>
-                </div>
-                
-                <ProductSelector
-                  selectedInterest={category.id === 'all' ? undefined : category.id}
-                  interests={category.id === 'all' ? recipientInterests : [category.id]}
-                  onProductSelect={onProductSelect}
-                  selectedProduct={selectedProduct}
-                  key={`${category.id}-${activeTab}`} // Force re-render when tab changes
-                />
+          <div>
+            <h3 className="text-lg font-semibold text-foreground">Choose the Perfect Gift</h3>
+            {recipientInterests.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                <span className="text-sm text-muted-foreground">Based on interests:</span>
+                {recipientInterests.map((interest, index) => (
+                  <Badge key={index} variant="secondary" className="text-xs bg-primary/10 text-primary border-none">
+                    {interest}
+                  </Badge>
+                ))}
               </div>
-            </TabsContent>
-          ))}
-        </Tabs>
+            )}
+          </div>
+        </div>
+      </div>
+      
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 bg-muted/50 p-1 h-auto">
+          {relevantInterests.map((category) => {
+            const Icon = category.icon;
+            return (
+              <TabsTrigger 
+                key={category.id} 
+                value={category.id}
+                className="flex flex-col items-center gap-2 py-3 px-4 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md transition-all"
+              >
+                <Icon className="w-5 h-5" />
+                <span className="text-sm font-medium">{category.label}</span>
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
 
-        {selectedProduct && (
-          <div className="mt-6 p-4 bg-muted rounded-lg">
-            <div className="flex items-center gap-4">
-              {selectedProduct.featuredImage && (
+        {relevantInterests.map((category) => (
+          <TabsContent key={category.id} value={category.id} className="mt-8 space-y-6">
+            <div className="text-center space-y-2">
+              <h4 className="text-xl font-semibold text-foreground">{category.label}</h4>
+              <p className="text-muted-foreground">{category.description}</p>
+            </div>
+            
+            <ProductSelector
+              selectedInterest={category.id === 'all' ? undefined : category.id}
+              interests={category.id === 'all' ? recipientInterests : [category.id]}
+              onProductSelect={onProductSelect}
+              selectedProduct={selectedProduct}
+              key={`${category.id}-${activeTab}`}
+              className="border-none shadow-none"
+            />
+          </TabsContent>
+        ))}
+      </Tabs>
+
+      {selectedProduct && (
+        <div className="mt-8 p-6 bg-gradient-to-br from-primary/5 to-primary/10 rounded-xl border border-primary/20">
+          <div className="flex items-start gap-6">
+            {selectedProduct.featuredImage && (
+              <div className="flex-shrink-0">
                 <img
                   src={selectedProduct.featuredImage}
                   alt={selectedProduct.title}
-                  className="w-16 h-16 rounded-lg object-cover"
+                  className="w-24 h-24 rounded-lg object-cover shadow-md"
                 />
-              )}
-              <div className="flex-1">
-                <h4 className="font-medium">{selectedProduct.title}</h4>
-                <p className="text-lg font-semibold text-primary">
+              </div>
+            )}
+            <div className="flex-1 space-y-3">
+              <div>
+                <h4 className="text-lg font-semibold text-foreground">{selectedProduct.title}</h4>
+                <p className="text-2xl font-bold text-primary">
                   ${selectedProduct.price.toFixed(2)}
                 </p>
-                {selectedProduct.metafields.badge && (
-                  <Badge variant="secondary" className="mt-1">
-                    {selectedProduct.metafields.badge}
-                  </Badge>
-                )}
               </div>
+              {selectedProduct.metafields.badge && (
+                <Badge variant="secondary" className="bg-primary/20 text-primary border-primary/30">
+                  {selectedProduct.metafields.badge}
+                </Badge>
+              )}
             </div>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </div>
+      )}
+    </div>
   );
 };
 

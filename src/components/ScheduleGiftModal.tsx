@@ -321,12 +321,13 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         />
       </div>
 
-      <div className="space-y-4">
-        <Label className="text-brand-charcoal">Choose Gift *</Label>
+      <div className="space-y-6">
+        <Label className="text-lg font-semibold text-brand-charcoal">Choose Gift *</Label>
         <InterestBasedProductSelector
           recipientInterests={recipient.interests || []}
           onProductSelect={setSelectedProduct}
           selectedProduct={selectedProduct}
+          className="min-h-[400px]"
         />
       </div>
 

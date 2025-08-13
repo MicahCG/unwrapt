@@ -98,49 +98,49 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
   }
 
   return (
-    <Card className={className}>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Package className="w-5 h-5" />
-            {selectedInterest ? `${selectedInterest} Gifts` : 'Curated Gifts'}
-            <Badge variant="secondary">{products.length}</Badge>
-          </CardTitle>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={handleRetry}
-            className="gap-2"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </Button>
-        </div>
-        {selectedInterest && (
-          <p className="text-sm text-muted-foreground">
-            Showing products for {selectedInterest}
-          </p>
-        )}
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {products.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onSelect={onProductSelect}
-              isSelected={selectedProduct?.id === product.id}
-            />
-          ))}
-        </div>
-        
-        {products.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground">
-            No products available for this selection
+    <div className={className}>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <Package className="w-5 h-5 text-primary" />
+          <div>
+            <h4 className="font-semibold text-foreground">
+              {selectedInterest ? `${selectedInterest} Gifts` : 'Curated Gifts'}
+            </h4>
+            <p className="text-sm text-muted-foreground">
+              {products.length} {products.length === 1 ? 'item' : 'items'} available
+            </p>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </div>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={handleRetry}
+          className="gap-2 hover:bg-primary/10"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Refresh
+        </Button>
+      </div>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {products.map((product) => (
+          <ProductCard
+            key={product.id}
+            product={product}
+            onSelect={onProductSelect}
+            isSelected={selectedProduct?.id === product.id}
+            className="hover:shadow-lg transition-all duration-200"
+          />
+        ))}
+      </div>
+      
+      {products.length === 0 && (
+        <div className="text-center py-12">
+          <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">No products available for this selection</p>
+        </div>
+      )}
+    </div>
   );
 };
 
