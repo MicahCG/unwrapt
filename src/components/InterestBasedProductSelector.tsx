@@ -20,7 +20,7 @@ const InterestBasedProductSelector: React.FC<InterestBasedProductSelectorProps> 
   selectedProduct,
   className = ""
 }) => {
-  const [activeTab, setActiveTab] = useState('interests');
+  const [activeTab, setActiveTab] = useState('all');
 
   // Available interest categories
   const interestCategories = [
