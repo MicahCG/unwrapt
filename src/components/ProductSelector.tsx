@@ -99,16 +99,16 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
 
   return (
     <div className={className}>
-      <div className="flex items-center justify-between mb-6 p-4 rounded-xl bg-gradient-to-r from-background/60 to-background/40 backdrop-blur-sm border border-white/20 shadow-lg">
+      <div className="flex items-center justify-between mb-6 p-4 rounded-xl bg-white/90 backdrop-blur-sm border border-gray-200 shadow-lg">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 backdrop-blur-sm border border-white/20">
+          <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
             <Package className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h4 className="font-semibold text-foreground">
+            <h4 className="font-semibold text-gray-900">
               {selectedInterest ? `${selectedInterest} Gifts` : 'Curated Gifts'}
             </h4>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-gray-600">
               {products.length} {products.length === 1 ? 'item' : 'items'} available
             </p>
           </div>
@@ -117,7 +117,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
           variant="ghost" 
           size="sm" 
           onClick={handleRetry}
-          className="gap-2 hover:bg-gradient-to-r hover:from-primary/10 hover:to-accent/10 backdrop-blur-sm border border-white/20"
+          className="gap-2 hover:bg-gray-100 border border-gray-200 text-gray-700"
         >
           <RefreshCw className="w-4 h-4" />
           Refresh
@@ -137,9 +137,9 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
       </div>
       
       {products.length === 0 && (
-        <div className="text-center py-12 p-6 rounded-xl bg-gradient-to-br from-background/60 to-background/40 backdrop-blur-sm border border-white/20 shadow-lg">
-          <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground">No products available for this selection</p>
+        <div className="text-center py-12 p-6 rounded-xl bg-white/90 backdrop-blur-sm border border-gray-200 shadow-lg">
+          <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">No products available for this selection</p>
         </div>
       )}
     </div>

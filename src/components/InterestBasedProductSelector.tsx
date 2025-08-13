@@ -60,20 +60,20 @@ const InterestBasedProductSelector: React.FC<InterestBasedProductSelectorProps> 
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Background gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-50/30 via-transparent to-blue-50/20 pointer-events-none" />
       
       <div className="relative space-y-4">
         <div className="flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 backdrop-blur-sm border border-white/20 shadow-lg">
+          <div className="p-3 rounded-xl bg-white/90 backdrop-blur-sm border border-gray-200 shadow-md">
             <Heart className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-foreground">Choose the Perfect Gift</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Choose the Perfect Gift</h3>
             {recipientInterests.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2">
-                <span className="text-sm text-muted-foreground">Based on interests:</span>
+                <span className="text-sm text-gray-600">Based on interests:</span>
                 {recipientInterests.map((interest, index) => (
-                  <Badge key={index} variant="secondary" className="text-xs bg-gradient-to-r from-primary/20 to-accent/20 text-primary border border-white/30 backdrop-blur-sm">
+                  <Badge key={index} variant="secondary" className="text-xs bg-blue-50 text-blue-700 border border-blue-200">
                     {interest}
                   </Badge>
                 ))}
@@ -84,14 +84,14 @@ const InterestBasedProductSelector: React.FC<InterestBasedProductSelectorProps> 
       </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full relative">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 bg-gradient-to-r from-background/80 to-background/60 backdrop-blur-md border border-white/20 shadow-lg p-1 h-auto">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 bg-white/90 backdrop-blur-md border border-gray-200 shadow-lg p-1 h-auto rounded-lg">
           {relevantInterests.map((category) => {
             const Icon = category.icon;
             return (
               <TabsTrigger 
                 key={category.id} 
                 value={category.id}
-                className="flex flex-col items-center gap-2 py-3 px-4 data-[state=active]:bg-gradient-to-br data-[state=active]:from-primary/20 data-[state=active]:to-accent/20 data-[state=active]:shadow-md data-[state=active]:border data-[state=active]:border-white/30 data-[state=active]:backdrop-blur-sm rounded-lg transition-all duration-300 hover:bg-white/10"
+                className="flex flex-col items-center gap-2 py-3 px-4 data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-primary/20 rounded-lg transition-all duration-300 hover:bg-gray-50 text-gray-700 data-[state=active]:text-primary"
               >
                 <Icon className="w-5 h-5" />
                 <span className="text-sm font-medium">{category.label}</span>
@@ -102,9 +102,9 @@ const InterestBasedProductSelector: React.FC<InterestBasedProductSelectorProps> 
 
         {relevantInterests.map((category) => (
           <TabsContent key={category.id} value={category.id} className="mt-8 space-y-6">
-            <div className="text-center space-y-2 p-6 rounded-xl bg-gradient-to-br from-background/60 to-background/40 backdrop-blur-sm border border-white/20 shadow-lg">
-              <h4 className="text-xl font-semibold text-foreground">{category.label}</h4>
-              <p className="text-muted-foreground">{category.description}</p>
+            <div className="text-center space-y-2 p-6 rounded-xl bg-white/90 backdrop-blur-sm border border-gray-200 shadow-lg">
+              <h4 className="text-xl font-semibold text-gray-900">{category.label}</h4>
+              <p className="text-gray-600">{category.description}</p>
             </div>
             
             <ProductSelector
@@ -120,7 +120,7 @@ const InterestBasedProductSelector: React.FC<InterestBasedProductSelectorProps> 
       </Tabs>
 
       {selectedProduct && (
-        <div className="mt-8 p-6 bg-gradient-to-br from-primary/10 via-accent/5 to-transparent backdrop-blur-md rounded-xl border border-white/20 shadow-lg">
+        <div className="mt-8 p-6 bg-white/95 backdrop-blur-md rounded-xl border border-gray-200 shadow-lg">
           <div className="flex items-start gap-6">
             {selectedProduct.featuredImage && (
               <div className="flex-shrink-0">
@@ -128,21 +128,20 @@ const InterestBasedProductSelector: React.FC<InterestBasedProductSelectorProps> 
                   <img
                     src={selectedProduct.featuredImage}
                     alt={selectedProduct.title}
-                    className="w-24 h-24 rounded-lg object-cover shadow-md"
+                    className="w-24 h-24 rounded-lg object-cover shadow-md border border-gray-200"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-tr from-transparent to-white/10 rounded-lg" />
                 </div>
               </div>
             )}
             <div className="flex-1 space-y-3">
               <div>
-                <h4 className="text-lg font-semibold text-foreground">{selectedProduct.title}</h4>
-                <p className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                <h4 className="text-lg font-semibold text-gray-900">{selectedProduct.title}</h4>
+                <p className="text-2xl font-bold text-gray-900">
                   ${selectedProduct.price.toFixed(2)}
                 </p>
               </div>
               {selectedProduct.metafields.badge && (
-                <Badge variant="secondary" className="bg-gradient-to-r from-primary/20 to-accent/20 text-primary border border-white/30 backdrop-blur-sm">
+                <Badge variant="secondary" className="bg-blue-50 text-blue-700 border border-blue-200">
                   {selectedProduct.metafields.badge}
                 </Badge>
               )}
