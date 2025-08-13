@@ -10,6 +10,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { CreditCard, Package, Heart, MapPin, ChevronLeft } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { useProductsForInterests } from '@/hooks/useShopifyCollection';
 import InterestBasedProductSelector from './InterestBasedProductSelector';
 import { cleanName } from '@/lib/utils';
@@ -27,6 +28,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedInterests, setSelectedInterests] = useState<string[]>(recipient?.interests || []);
   const [formData, setFormData] = useState({
     occasion: '',
     occasion_date: '',
@@ -63,6 +65,8 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   React.useEffect(() => {
     if (isOpen) {
       setCurrentStep(1);
+      setSelectedInterests(recipient?.interests || []);
+      
       // Check if this is a holiday preset
       if (recipient._holidayPreset) {
         setFormData(prev => ({
@@ -322,13 +326,46 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
       </div>
 
       <div className="space-y-6">
-        <Label className="text-lg font-semibold text-brand-charcoal">Choose Gift *</Label>
-        <InterestBasedProductSelector
-          recipientInterests={recipient.interests || []}
-          onProductSelect={setSelectedProduct}
-          selectedProduct={selectedProduct}
-          className="min-h-[400px]"
-        />
+        <div className="space-y-4">
+          <Label className="text-lg font-semibold text-brand-charcoal">Recipient's Interests</Label>
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600">Select interests to see curated gifts:</p>
+            <div className="flex flex-wrap gap-2">
+              {['Coffee', 'Tea', 'Wine', 'Sweet Treats', 'Self Care'].map((interest) => (
+                <Badge
+                  key={interest}
+                  variant={selectedInterests.includes(interest) ? "default" : "outline"}
+                  className={`cursor-pointer transition-colors ${
+                    selectedInterests.includes(interest)
+                      ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => {
+                    setSelectedInterests(prev => 
+                      prev.includes(interest) 
+                        ? prev.filter(i => i !== interest)
+                        : [...prev, interest]
+                    );
+                    setSelectedProduct(null); // Reset selected product when interests change
+                  }}
+                >
+                  {interest}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        <div className="space-y-2">
+          <Label className="text-lg font-semibold text-brand-charcoal">Choose Gift *</Label>
+          <InterestBasedProductSelector
+            recipientInterests={selectedInterests}
+            onProductSelect={setSelectedProduct}
+            selectedProduct={selectedProduct}
+            className="min-h-[400px]"
+            key={selectedInterests.join(',')} // Force re-render when interests change
+          />
+        </div>
       </div>
 
       {selectedProduct && (
