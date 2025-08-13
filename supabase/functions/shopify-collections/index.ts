@@ -55,7 +55,7 @@ serve(async (req) => {
     const { collectionHandle, limit = 20 }: CollectionRequest = await req.json();
 
     const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
-    const shopifyToken = Deno.env.get("SHOPIFY_STOREFRONT_API_TOKEN") || Deno.env.get("SHOPIFY STOREFRONT API TOKEN");
+    const shopifyToken = Deno.env.get("SHOPIFY STOREFRONT API TOKEN");
     
     console.log('Environment check:');
     console.log('SHOPIFY_STORE_URL:', shopifyStore ? 'SET' : 'NOT SET');
