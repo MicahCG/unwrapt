@@ -171,22 +171,22 @@ const UpcomingGiftsManager = () => {
           ))}
         </div>
       ) : (
-        <Card className="w-full min-h-[400px] bg-gradient-to-br from-white via-brand-cream/10 to-brand-cream/20 border-brand-cream/30 shadow-sm">
+        <Card className="w-full min-h-[400px] bg-white/40 backdrop-blur-md border border-white/30 shadow-xl">
           <CardContent className="flex flex-col items-center justify-center h-full py-12 px-4 sm:px-6 text-center space-y-6">
             {/* Animated Gift Icon */}
             <div className="relative">
-              <div className="w-20 h-20 bg-black rounded-full flex items-center justify-center animate-pulse shadow-lg">
-                <Sparkles className="h-10 w-10 text-brand-gold animate-bounce" />
+              <div className="w-20 h-20 bg-white/20 backdrop-blur-sm border border-white/40 rounded-full flex items-center justify-center animate-pulse shadow-lg">
+                <Sparkles className="h-10 w-10 text-gray-600 animate-bounce" />
               </div>
-              <div className="absolute -top-1 -right-1 w-6 h-6 bg-brand-gold/60 rounded-full animate-ping"></div>
+              <div className="absolute -top-1 -right-1 w-6 h-6 bg-gray-400/60 rounded-full animate-ping"></div>
             </div>
             
             {/* Main Message */}
             <div className="space-y-3 max-w-sm">
-              <h3 className="text-xl font-semibold text-brand-charcoal">
+              <h3 className="text-xl font-semibold text-gray-800">
                 Ready to spread some joy?
               </h3>
-              <p className="text-brand-charcoal/70 leading-relaxed">
+              <p className="text-gray-600 leading-relaxed">
                 Start your thoughtful gifting journey by scheduling your first gift. We'll handle the rest!
               </p>
             </div>
@@ -194,7 +194,7 @@ const UpcomingGiftsManager = () => {
             {/* CTA Button */}
             <Button
               size="lg"
-              className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 transition-all duration-200 hover:scale-105 shadow-lg hover:shadow-xl"
+              className="bg-white/30 backdrop-blur-sm border border-white/40 text-gray-800 hover:bg-white/40 transition-all duration-200 hover:scale-105 shadow-lg hover:shadow-xl"
               onClick={() => setShowRecipientSelection(true)}
             >
               <Plus className="h-5 w-5 mr-2" />
@@ -202,7 +202,7 @@ const UpcomingGiftsManager = () => {
             </Button>
             
             {/* Supporting Text */}
-            <p className="text-xs text-brand-charcoal/50 max-w-xs">
+            <p className="text-xs text-gray-500 max-w-xs">
               Choose from curated gifts and we'll deliver at the perfect time
             </p>
           </CardContent>
