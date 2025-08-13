@@ -50,12 +50,8 @@ const InterestBasedProductSelector: React.FC<InterestBasedProductSelectorProps> 
     }
   ];
 
-  // Determine which interests are relevant
-  const relevantInterests = interestCategories.filter(category => 
-    category.id === 'all' || recipientInterests.some(interest => 
-      interest.toLowerCase().includes(category.id) || category.id === 'all'
-    )
-  );
+  // Show all categories for filtering
+  const relevantInterests = interestCategories;
 
   return (
     <div className={`space-y-6 ${className}`}>
