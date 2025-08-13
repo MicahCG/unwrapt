@@ -102,7 +102,6 @@ serve(async (req) => {
             node {
               id
               title
-              status
               publishedAt
               publications(first: 10) {
                 edges {
@@ -162,7 +161,6 @@ serve(async (req) => {
                 id
                 title
                 handle
-                status
                 availableForSale
                 featuredImage {
                   url
@@ -182,6 +180,15 @@ serve(async (req) => {
                       }
                     }
                   }
+                }
+                metafields(identifiers: [
+                  {namespace: "unwrapt", key: "category"},
+                  {namespace: "unwrapt", key: "rank"},
+                  {namespace: "unwrapt", key: "badge"}
+                ]) {
+                  namespace
+                  key
+                  value
                 }
               }
             }
