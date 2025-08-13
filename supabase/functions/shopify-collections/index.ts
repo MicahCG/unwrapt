@@ -55,11 +55,11 @@ serve(async (req) => {
     const { collectionHandle, limit = 20 }: CollectionRequest = await req.json();
 
     const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
-    const shopifyToken = Deno.env.get("SHOPIFY_STOREFRONT_API_TOKEN");
+    const shopifyToken = Deno.env.get("SHOPIFY_STOREFRONT_API_TOKEN") || Deno.env.get("SHOPIFY STOREFRONT API TOKEN");
     
     console.log('Environment check:');
     console.log('SHOPIFY_STORE_URL:', shopifyStore ? 'SET' : 'NOT SET');
-    console.log('SHOPIFY STOREFRONT API TOKEN:', shopifyToken ? 'SET' : 'NOT SET');
+    console.log('SHOPIFY_STOREFRONT_API_TOKEN:', shopifyToken ? 'SET' : 'NOT SET');
     
     if (!shopifyStore || !shopifyToken) {
       console.log("Shopify credentials not configured, returning empty collection");
@@ -82,6 +82,7 @@ serve(async (req) => {
 
     console.log(`Using Shopify GraphQL URL: ${shopifyGraphQLUrl}`);
     console.log(`Fetching products from collection: ${collectionHandle}`);
+    console.log(`Shopify token length: ${shopifyToken ? shopifyToken.length : 'undefined'}`);
 
     console.log(`Attempting to fetch from Shopify with handle: ${collectionHandle}`);
     
