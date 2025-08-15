@@ -249,23 +249,57 @@ const PaymentSuccess = () => {
 
   return (
     <>
-      <ConfettiAnimation isActive={showConfetti} duration={5000} startDelay={0} />
-      <ConfettiAnimation isActive={showVerificationConfetti} duration={5500} startDelay={0} />
-      <div className="min-h-screen bg-brand-cream flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              <div className={`p-4 rounded-full ${verificationComplete ? 'bg-green-100' : hasSessionId ? 'bg-brand-gold/20' : 'bg-red-100'}`}>
+      <ConfettiAnimation isActive={showConfetti} duration={8000} startDelay={0} />
+      <ConfettiAnimation isActive={showVerificationConfetti} duration={8000} startDelay={500} />
+      
+      {/* Animated glassmorphism background */}
+      <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
+        {/* Animated gradient background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-400/20 via-pink-400/20 to-blue-400/20 animate-pulse" />
+        <div className="absolute inset-0 bg-gradient-to-tr from-cyan-400/10 via-emerald-400/10 to-yellow-400/10" 
+             style={{
+               animation: 'gradientShift 8s ease-in-out infinite',
+             }} />
+        
+        {/* Floating orbs */}
+        <div className="absolute top-20 left-20 w-32 h-32 bg-purple-400/30 rounded-full blur-xl animate-bounce" 
+             style={{ animationDelay: '0s', animationDuration: '4s' }} />
+        <div className="absolute top-40 right-32 w-24 h-24 bg-pink-400/30 rounded-full blur-xl animate-bounce" 
+             style={{ animationDelay: '1s', animationDuration: '5s' }} />
+        <div className="absolute bottom-32 left-32 w-20 h-20 bg-cyan-400/30 rounded-full blur-xl animate-bounce" 
+             style={{ animationDelay: '2s', animationDuration: '6s' }} />
+        <div className="absolute bottom-20 right-20 w-28 h-28 bg-emerald-400/30 rounded-full blur-xl animate-bounce" 
+             style={{ animationDelay: '3s', animationDuration: '7s' }} />
+
+        {/* Main card with glassmorphism */}
+        <Card className="w-full max-w-md relative backdrop-blur-xl bg-white/10 border-white/20 shadow-2xl">
+          <style>{`
+            @keyframes gradientShift {
+              0%, 100% { transform: rotate(0deg) scale(1); }
+              33% { transform: rotate(120deg) scale(1.1); }
+              66% { transform: rotate(240deg) scale(0.9); }
+            }
+          `}</style>
+          
+          <CardHeader className="text-center pb-4">
+            <div className="flex justify-center mb-6">
+              <div className={`p-6 rounded-full backdrop-blur-md border-2 transition-all duration-500 ${
+                verificationComplete 
+                  ? 'bg-emerald-500/20 border-emerald-400/40 animate-pulse' 
+                  : hasSessionId 
+                    ? 'bg-amber-500/20 border-amber-400/40' 
+                    : 'bg-red-500/20 border-red-400/40'
+              }`}>
                 {verificationComplete ? (
-                  <CheckCircle className="h-12 w-12 text-green-600" />
+                  <CheckCircle className="h-16 w-16 text-emerald-400 drop-shadow-lg" />
                 ) : hasSessionId ? (
-                  <Gift className="h-12 w-12 text-brand-gold" />
+                  <Gift className="h-16 w-16 text-amber-400 drop-shadow-lg" />
                 ) : (
-                  <Gift className="h-12 w-12 text-red-600" />
+                  <Gift className="h-16 w-16 text-red-400 drop-shadow-lg" />
                 )}
               </div>
             </div>
-            <CardTitle className="text-2xl text-brand-charcoal">
+            <CardTitle className="text-3xl font-bold text-white drop-shadow-lg">
               {testMode 
                 ? 'Test Complete!' 
                 : verificationComplete 
@@ -277,8 +311,8 @@ const PaymentSuccess = () => {
             </CardTitle>
           </CardHeader>
           
-          <CardContent className="space-y-4 text-center">
-            <p className="text-brand-charcoal/70">
+          <CardContent className="space-y-6 text-center">
+            <p className="text-white/80 text-lg leading-relaxed drop-shadow-md">
               {testMode 
                 ? 'Payment verification test completed. Check console logs and Supabase function logs for details.'
                 : verificationComplete 
@@ -291,16 +325,16 @@ const PaymentSuccess = () => {
             
             {/* Debug info section - only show if no session ID */}
             {!hasSessionId && !testMode && (
-              <div className="bg-gray-100 p-3 rounded text-left text-xs text-gray-600">
-                <p><strong>Debug Info:</strong></p>
-                <p>URL: {window.location.href}</p>
-                <p>Params: {JSON.stringify(Object.fromEntries(searchParams.entries()))}</p>
+              <div className="bg-black/20 backdrop-blur-sm p-4 rounded-lg border border-white/10">
+                <p className="text-white/60 text-xs"><strong>Debug Info:</strong></p>
+                <p className="text-white/60 text-xs break-all">URL: {window.location.href}</p>
+                <p className="text-white/60 text-xs break-all">Params: {JSON.stringify(Object.fromEntries(searchParams.entries()))}</p>
               </div>
             )}
             
             {(verificationComplete || hasSessionId) && (
-              <div className="bg-brand-gold/10 p-4 rounded-lg">
-                <p className="text-sm text-brand-charcoal">
+              <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 backdrop-blur-sm p-6 rounded-xl border border-amber-400/30">
+                <p className="text-white drop-shadow-md flex items-center justify-center gap-2">
                   🎁 We'll curate the perfect gift and handle delivery at just the right time
                 </p>
               </div>
@@ -310,7 +344,7 @@ const PaymentSuccess = () => {
               <Button 
                 onClick={runManualTest}
                 variant="outline"
-                className="w-full mb-2"
+                className="w-full mb-4 bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm"
               >
                 <TestTube className="w-4 h-4 mr-2" />
                 Run Another Test
@@ -321,7 +355,7 @@ const PaymentSuccess = () => {
               <Button 
                 onClick={handleRetryVerification}
                 variant="outline"
-                className="w-full mb-2"
+                className="w-full mb-4 bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm"
               >
                 Retry Verification
               </Button>
@@ -329,10 +363,11 @@ const PaymentSuccess = () => {
 
             <Button 
               size="lg" 
-              className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+              className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0 shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
               onClick={handleGoToDashboard}
             >
-              Go to Dashboard
+              <Gift className="w-5 h-5 mr-3" />
+              Schedule Next Gift
             </Button>
           </CardContent>
         </Card>
