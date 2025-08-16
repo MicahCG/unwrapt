@@ -48,6 +48,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log("🚀 Starting create-gift-payment function");
+    
     // Create Supabase client using the anon key for user authentication
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -55,11 +57,26 @@ serve(async (req) => {
     );
 
     // Retrieve authenticated user
-    const authHeader = req.headers.get("Authorization")!;
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("❌ No Authorization header found");
+      throw new Error("No authorization header provided");
+    }
+    
     const token = authHeader.replace("Bearer ", "");
-    const { data } = await supabaseClient.auth.getUser(token);
+    console.log("🔐 Attempting to get user with token");
+    
+    const { data, error: userError } = await supabaseClient.auth.getUser(token);
+    if (userError) {
+      console.error("❌ Error getting user:", userError);
+      throw new Error(`Authentication failed: ${userError.message}`);
+    }
+    
     const user = data.user;
-    if (!user?.email) throw new Error("User not authenticated or email not available");
+    if (!user?.email) {
+      console.error("❌ User not authenticated or email not available");
+      throw new Error("User not authenticated or email not available");
+    }
 
     // Check rate limiting
     if (isRateLimited(user.id)) {
@@ -75,7 +92,9 @@ serve(async (req) => {
     console.log(`💳 Creating payment for user: ${user.email}`);
 
     // Parse and sanitize request body
+    console.log("📝 Parsing request body");
     const body = await req.json();
+    console.log("📝 Request body parsed successfully:", Object.keys(body));
     const { 
       scheduledGiftId, 
       giftDetails, 
@@ -266,7 +285,11 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("💳 Error creating payment:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error("💳 Error stack:", error.stack);
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      details: error.stack 
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });
