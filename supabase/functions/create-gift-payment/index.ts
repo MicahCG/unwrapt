@@ -131,8 +131,14 @@ serve(async (req) => {
     }
 
     // Initialize Stripe using direct API calls instead of the library
+    console.log("🔍 Checking for Stripe secret key...");
+    console.log("🔍 Available env vars:", Object.keys(Deno.env.toObject()));
     const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
+    console.log("🔍 Stripe secret key exists:", !!stripeSecretKey);
+    console.log("🔍 Stripe secret key length:", stripeSecretKey?.length || 0);
+    
     if (!stripeSecretKey) {
+      console.error("❌ Stripe secret key not found in environment variables");
       throw new Error("Stripe secret key not configured");
     }
 
