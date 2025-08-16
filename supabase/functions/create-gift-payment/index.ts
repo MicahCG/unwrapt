@@ -133,13 +133,21 @@ serve(async (req) => {
     // Initialize Stripe using direct API calls instead of the library
     console.log("🔍 Checking for Stripe secret key...");
     console.log("🔍 Available env vars:", Object.keys(Deno.env.toObject()));
-    const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
+    
+    // Try different variations of the secret name
+    const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY") || 
+                           Deno.env.get("STRIPE_SECRET") || 
+                           Deno.env.get("stripe_secret_key");
+                           
     console.log("🔍 Stripe secret key exists:", !!stripeSecretKey);
     console.log("🔍 Stripe secret key length:", stripeSecretKey?.length || 0);
+    console.log("🔍 Trying STRIPE_SECRET_KEY:", !!Deno.env.get("STRIPE_SECRET_KEY"));
+    console.log("🔍 Trying STRIPE_SECRET:", !!Deno.env.get("STRIPE_SECRET"));
     
     if (!stripeSecretKey) {
       console.error("❌ Stripe secret key not found in environment variables");
-      throw new Error("Stripe secret key not configured");
+      console.error("❌ Available environment variables:", Object.keys(Deno.env.toObject()));
+      throw new Error("Stripe secret key not configured - please check Supabase secrets");
     }
 
     // Check if a Stripe customer record exists for this user
