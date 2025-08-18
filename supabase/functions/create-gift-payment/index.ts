@@ -256,6 +256,8 @@ serve(async (req) => {
     }
 
     // Create a one-time payment session
+    console.log("💳 About to call Stripe API with data:", sessionData.toString().substring(0, 200) + "...");
+    
     const sessionResponse = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',
       headers: {
@@ -265,13 +267,17 @@ serve(async (req) => {
       body: sessionData.toString(),
     });
 
+    console.log(`💳 Stripe API response status: ${sessionResponse.status}`);
+    
     if (!sessionResponse.ok) {
       const errorData = await sessionResponse.text();
-      console.error('Stripe session creation failed:', errorData);
-      throw new Error(`Failed to create Stripe session: ${sessionResponse.status}`);
+      console.error('💳 Stripe session creation failed:', errorData);
+      console.error('💳 Request data that failed:', sessionData.toString());
+      throw new Error(`Failed to create Stripe session: ${sessionResponse.status} - ${errorData}`);
     }
 
     const session = await sessionResponse.json();
+    console.log(`💳 Stripe session created successfully: ${session.id}`);
 
     console.log(`💳 Created Stripe checkout session: ${session.id}`);
     console.log(`💳 Success URL configured: ${cleanOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}`);
