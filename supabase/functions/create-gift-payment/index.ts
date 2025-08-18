@@ -95,6 +95,8 @@ serve(async (req) => {
     console.log("📝 Parsing request body");
     const body = await req.json();
     console.log("📝 Request body parsed successfully:", Object.keys(body));
+    console.log("📝 Full body content:", JSON.stringify(body, null, 2));
+    
     const { 
       scheduledGiftId, 
       giftDetails, 
@@ -112,23 +114,26 @@ serve(async (req) => {
     if (!productPrice || typeof productPrice !== 'number' || productPrice <= 0) {
       throw new Error("Invalid product price");
     }
+    
+    if (!giftDetails || typeof giftDetails !== 'object') {
+      throw new Error("Invalid gift details");
+    }
 
-    // Sanitize string inputs
-    const sanitizedGiftType = sanitizeInput(giftDetails?.giftType || '');
-    const sanitizedOccasion = sanitizeInput(giftDetails?.occasion || '');
-    const sanitizedRecipientName = sanitizeInput(giftDetails?.recipientName || '');
+    // Sanitize string inputs with fallbacks
+    const sanitizedGiftType = sanitizeInput(giftDetails?.giftType || 'Gift');
+    const sanitizedOccasion = sanitizeInput(giftDetails?.occasion || 'Special Occasion');
+    const sanitizedRecipientName = sanitizeInput(giftDetails?.recipientName || 'Recipient');
     
     console.log(`💳 Payment request details:`, {
       scheduledGiftId,
       productPrice,
       hasShippingAddress: !!shippingAddress,
       hasProductImage: !!productImage,
-      variantId
+      variantId,
+      giftType: sanitizedGiftType,
+      occasion: sanitizedOccasion,
+      recipientName: sanitizedRecipientName
     });
-    
-    if (!scheduledGiftId || !productPrice) {
-      throw new Error("Missing required fields: scheduledGiftId and productPrice");
-    }
 
     // Initialize Stripe
     console.log("🔍 Checking for Stripe secret key...");
@@ -201,14 +206,14 @@ serve(async (req) => {
       'success_url': `${cleanOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
       'cancel_url': `${cleanOrigin}/`,
       'line_items[0][price_data][currency]': 'usd',
-      'line_items[0][price_data][product_data][name]': `Gift: ${giftDetails.giftType} for ${giftDetails.recipientName}`,
-      'line_items[0][price_data][product_data][description]': `${giftDetails.occasion} gift`,
+      'line_items[0][price_data][product_data][name]': `Gift: ${sanitizedGiftType} for ${sanitizedRecipientName}`,
+      'line_items[0][price_data][product_data][description]': `${sanitizedOccasion} gift`,
       'line_items[0][price_data][unit_amount]': Math.round(productPrice * 100).toString(),
       'line_items[0][quantity]': '1',
       'metadata[scheduled_gift_id]': scheduledGiftId,
       'metadata[user_id]': user.id,
-      'metadata[gift_type]': giftDetails.giftType,
-      'metadata[occasion]': giftDetails.occasion,
+      'metadata[gift_type]': sanitizedGiftType,
+      'metadata[occasion]': sanitizedOccasion,
       'metadata[variant_id]': variantId || '',
     });
 
