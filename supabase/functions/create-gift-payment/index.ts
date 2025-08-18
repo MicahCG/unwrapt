@@ -155,7 +155,7 @@ serve(async (req) => {
     }
     
     console.log("✅ Stripe secret key validated, starts with:", stripeSecretKey.substring(0, 7));
-    console.log("🔄 Function redeployed with enhanced secret debugging");
+    console.log("🔄 Function redeployed with enhanced secret debugging - v2");
 
     // Check if a Stripe customer record exists for this user
     let customerId;
