@@ -135,27 +135,42 @@ serve(async (req) => {
       recipientName: sanitizedRecipientName
     });
 
-    // Initialize Stripe
+    // Initialize Stripe with enhanced environment debugging
     console.log("🔍 Checking for Stripe secret key...");
     console.log("🔍 Available environment variables:", Object.keys(Deno.env.toObject()).filter(key => key.includes('STRIPE')));
     
-    const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
-    console.log("🔍 Raw stripe key value:", stripeSecretKey ? `${stripeSecretKey.substring(0, 7)}...` : 'null/undefined');
+    // Try multiple approaches to get the secret key
+    let stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
+    console.log("🔍 First attempt - Raw stripe key value:", stripeSecretKey ? `${stripeSecretKey.substring(0, 7)}...` : 'null/undefined');
     
+    // If first attempt fails, try accessing environment differently
     if (!stripeSecretKey || stripeSecretKey.trim() === '') {
-      console.error("❌ Stripe secret key is empty or null");
+      console.log("🔄 First attempt failed, trying alternative environment access...");
+      const envObject = Deno.env.toObject();
+      stripeSecretKey = envObject["STRIPE_SECRET_KEY"] || envObject["STRIPE_SECRET_KEY "] || null;
+      console.log("🔍 Second attempt - Alternative access:", stripeSecretKey ? `${stripeSecretKey.substring(0, 7)}...` : 'null/undefined');
+    }
+    
+    // Final validation
+    if (!stripeSecretKey || stripeSecretKey.trim() === '') {
+      console.error("❌ Stripe secret key is empty or null after all attempts");
       console.error("❌ All env vars:", Object.keys(Deno.env.toObject()));
-      throw new Error("Stripe secret key not configured");
+      console.error("❌ Full env object keys:", JSON.stringify(Object.keys(Deno.env.toObject())));
+      throw new Error("Stripe secret key not configured - propagation issue detected");
     }
     
     // Validate Stripe key format
-    if (!stripeSecretKey.startsWith('sk_')) {
-      console.error("❌ Invalid Stripe secret key format");
+    const trimmedKey = stripeSecretKey.trim();
+    if (!trimmedKey.startsWith('sk_')) {
+      console.error("❌ Invalid Stripe secret key format, key starts with:", trimmedKey.substring(0, 7));
       throw new Error("Invalid Stripe secret key format");
     }
     
-    console.log("✅ Stripe secret key validated, starts with:", stripeSecretKey.substring(0, 7));
-    console.log("🔄 Function redeployed with enhanced secret debugging - v2");
+    console.log("✅ Stripe secret key validated, starts with:", trimmedKey.substring(0, 7));
+    console.log("🔄 Function redeployed with propagation fix - v3");
+    
+    // Use the trimmed key for Stripe initialization
+    stripeSecretKey = trimmedKey;
 
     // Check if a Stripe customer record exists for this user
     let customerId;
