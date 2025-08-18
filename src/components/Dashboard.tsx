@@ -14,6 +14,7 @@ import { Logo } from '@/components/ui/logo';
 import { ResponsiveContainer, ResponsiveHeader, ResponsiveNavigation, ResponsiveActions } from '@/components/ui/responsive-container';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { StripeSecretTest } from './StripeSecretTest';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -127,6 +128,11 @@ const Dashboard = () => {
           </div>
         </ResponsiveActions>
       </ResponsiveHeader>
+
+      {/* Stripe Secret Test */}
+      <div className="mb-6 sm:mb-8">
+        <StripeSecretTest />
+      </div>
 
       {/* Development Test Data Manager */}
       {process.env.NODE_ENV === 'development' && (
