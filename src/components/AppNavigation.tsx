@@ -71,6 +71,12 @@ const AppNavigation = () => {
       description: 'Account and preferences' 
     },
     { 
+      title: 'Testing', 
+      path: '/testing', 
+      icon: Settings, 
+      description: 'Diagnostic tools and tests' 
+    },
+    { 
       title: 'Onboarding', 
       path: '/onboarding', 
       icon: UserPlus, 

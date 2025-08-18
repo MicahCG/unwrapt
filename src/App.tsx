@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Toaster } from "@/components/ui/toaster";
+import Testing from './pages/Testing';
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -46,12 +47,12 @@ function App() {
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/gift-history" element={<GiftHistory />} />
-              <Route path="/history" element={<Navigate to="/gift-history" replace />} />
-              <Route path="/wishlist" element={<Wishlist />} />
-              <Route path="/payment/success" element={<PaymentSuccess />} />
-              <Route path="/payment-success" element={<Navigate to="/payment/success" replace />} />
-              <Route path="/testing" element={<ProductionTesting />} />
-              <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/history" element={<Navigate to="/gift-history" replace />} />
+          <Route path="/wishlist" element={<Wishlist />} />
+          <Route path="/testing" element={<Testing />} />
+          <Route path="/payment/success" element={<PaymentSuccess />} />
+          <Route path="/payment-success" element={<Navigate to="/payment/success" replace />} />
+          <Route path="/onboarding" element={<Onboarding />} />
               <Route path="/auth/callback" element={<OAuthCallback />} />
               <Route path="/auth/calendar/callback" element={<CalendarOAuthCallback />} />
               <Route path="*" element={<NotFound />} />
