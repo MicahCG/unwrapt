@@ -137,10 +137,17 @@ serve(async (req) => {
 
     // Initialize Stripe
     console.log("🔍 Checking for Stripe secret key...");
+    console.log("🔍 All environment variables:", Object.keys(Deno.env.toObject()));
+    
     const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
+    console.log("🔍 STRIPE_SECRET_KEY exists:", !!stripeSecretKey);
+    console.log("🔍 STRIPE_SECRET_KEY type:", typeof stripeSecretKey);
+    console.log("🔍 STRIPE_SECRET_KEY length:", stripeSecretKey?.length || 0);
+    console.log("🔍 STRIPE_SECRET_KEY first 7 chars:", stripeSecretKey?.substring(0, 7) || 'none');
     
     if (!stripeSecretKey) {
       console.error("❌ Stripe secret key not found");
+      console.error("❌ Available env vars:", Object.keys(Deno.env.toObject()));
       throw new Error("Stripe secret key not configured - please check Supabase secrets");
     }
     
