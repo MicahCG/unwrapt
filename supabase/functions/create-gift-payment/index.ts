@@ -139,18 +139,19 @@ serve(async (req) => {
     console.log("🔍 Checking for Stripe secret key...");
     
     const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
-    console.log("🔍 STRIPE_SECRET_KEY exists:", !!stripeSecretKey);
-    console.log("🔍 STRIPE_SECRET_KEY value is:", stripeSecretKey === null ? 'null' : stripeSecretKey === undefined ? 'undefined' : stripeSecretKey === '' ? 'empty string' : 'has value');
-    console.log("🔍 STRIPE_SECRET_KEY length:", stripeSecretKey?.length || 0);
-    console.log("🔍 STRIPE_SECRET_KEY first 7 chars:", stripeSecretKey?.substring(0, 7) || 'none');
     
     if (!stripeSecretKey || stripeSecretKey.trim() === '') {
-      console.error("❌ Stripe secret key is empty or null");
-      console.error("❌ Raw value:", JSON.stringify(stripeSecretKey));
-      throw new Error("Stripe secret key not configured - please check Supabase secrets");
+      console.error("❌ Stripe secret key is empty");
+      throw new Error("Stripe secret key not configured");
     }
     
-    console.log("✅ Stripe secret key found, length:", stripeSecretKey.length);
+    // Validate Stripe key format
+    if (!stripeSecretKey.startsWith('sk_')) {
+      console.error("❌ Invalid Stripe secret key format");
+      throw new Error("Invalid Stripe secret key format");
+    }
+    
+    console.log("✅ Stripe secret key validated, starts with:", stripeSecretKey.substring(0, 7));
 
     // Check if a Stripe customer record exists for this user
     let customerId;
