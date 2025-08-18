@@ -209,6 +209,7 @@ serve(async (req) => {
     console.log(`💳 Request origin: ${origin} -> cleaned: ${cleanOrigin}`);
 
     // Create checkout session data
+    console.log(`💳 Creating session with price: $${productPrice} (${Math.round(productPrice * 100)} cents)`);
     const sessionData = new URLSearchParams({
       'mode': 'payment',
       'success_url': `${cleanOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
