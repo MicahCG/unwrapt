@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.shopify-webhook]
 verify_jwt = false
+
+[functions.test-stripe-secret]
+verify_jwt = false
