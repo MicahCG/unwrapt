@@ -137,11 +137,14 @@ serve(async (req) => {
 
     // Initialize Stripe
     console.log("🔍 Checking for Stripe secret key...");
+    console.log("🔍 Available environment variables:", Object.keys(Deno.env.toObject()).filter(key => key.includes('STRIPE')));
     
     const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
+    console.log("🔍 Raw stripe key value:", stripeSecretKey ? `${stripeSecretKey.substring(0, 7)}...` : 'null/undefined');
     
     if (!stripeSecretKey || stripeSecretKey.trim() === '') {
-      console.error("❌ Stripe secret key is empty");
+      console.error("❌ Stripe secret key is empty or null");
+      console.error("❌ All env vars:", Object.keys(Deno.env.toObject()));
       throw new Error("Stripe secret key not configured");
     }
     
@@ -152,7 +155,7 @@ serve(async (req) => {
     }
     
     console.log("✅ Stripe secret key validated, starts with:", stripeSecretKey.substring(0, 7));
-    console.log("🔄 Function redeployed with updated secret key handling");
+    console.log("🔄 Function redeployed with enhanced secret debugging");
 
     // Check if a Stripe customer record exists for this user
     let customerId;
