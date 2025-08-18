@@ -130,25 +130,16 @@ serve(async (req) => {
       throw new Error("Missing required fields: scheduledGiftId and productPrice");
     }
 
-    // Initialize Stripe using direct API calls instead of the library
+    // Initialize Stripe
     console.log("🔍 Checking for Stripe secret key...");
-    console.log("🔍 Available env vars:", Object.keys(Deno.env.toObject()));
-    
-    // Try different variations of the secret name
-    const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY") || 
-                           Deno.env.get("STRIPE_SECRET") || 
-                           Deno.env.get("stripe_secret_key");
-                           
-    console.log("🔍 Stripe secret key exists:", !!stripeSecretKey);
-    console.log("🔍 Stripe secret key length:", stripeSecretKey?.length || 0);
-    console.log("🔍 Trying STRIPE_SECRET_KEY:", !!Deno.env.get("STRIPE_SECRET_KEY"));
-    console.log("🔍 Trying STRIPE_SECRET:", !!Deno.env.get("STRIPE_SECRET"));
+    const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
     
     if (!stripeSecretKey) {
-      console.error("❌ Stripe secret key not found in environment variables");
-      console.error("❌ Available environment variables:", Object.keys(Deno.env.toObject()));
+      console.error("❌ Stripe secret key not found");
       throw new Error("Stripe secret key not configured - please check Supabase secrets");
     }
+    
+    console.log("✅ Stripe secret key found, length:", stripeSecretKey.length);
 
     // Check if a Stripe customer record exists for this user
     let customerId;

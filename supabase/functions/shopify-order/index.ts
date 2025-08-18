@@ -48,6 +48,20 @@ serve(async (req) => {
     }
 
     console.log(`🛒 Processing ${testMode ? 'TEST' : 'LIVE'} order for gift: ${scheduledGiftId}`);
+    
+    // Check environment variables
+    const shopifyStoreUrl = Deno.env.get("SHOPIFY_STORE_URL");
+    const shopifyToken = Deno.env.get("SHOPIFY_ADMIN_API_TOKEN");
+    const shopifyStorefrontToken = Deno.env.get("SHOPIFY_STOREFRONT_API_TOKEN");
+    
+    console.log("🔍 Environment check:");
+    console.log("SHOPIFY_STORE_URL:", !!shopifyStoreUrl);
+    console.log("SHOPIFY_ADMIN_API_TOKEN:", !!shopifyToken);
+    console.log("SHOPIFY_STOREFRONT_API_TOKEN:", !!shopifyStorefrontToken);
+    
+    if (!shopifyStoreUrl || !shopifyToken || !shopifyStorefrontToken) {
+      throw new Error("Missing required Shopify environment variables");
+    }
 
     // For test mode, create mock data if gift doesn't exist
     let giftData;
@@ -156,7 +170,7 @@ serve(async (req) => {
     } else {
       // Get Shopify configuration
       const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
-      const shopifyToken = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
+      const shopifyToken = Deno.env.get("SHOPIFY_ADMIN_API_TOKEN");
       
       if (!shopifyStore || !shopifyToken) {
         throw new Error("Shopify credentials not configured for live orders");
@@ -218,7 +232,7 @@ serve(async (req) => {
     if (!testMode && orderResult && orderResult.line_items && orderResult.line_items.length > 0) {
       try {
         const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
-        const shopifyToken = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
+        const shopifyToken = Deno.env.get("SHOPIFY_ADMIN_API_TOKEN");
         const cleanStoreUrl = shopifyStore.replace(/^https?:\/\//, '').replace(/\/$/, '');
         const shopifyApiUrl = `https://${cleanStoreUrl}/admin/api/2024-01`;
         
@@ -321,7 +335,7 @@ serve(async (req) => {
 // Dynamic product selection function
 async function selectProductFromInterests(interests: string[], giftType?: string) {
   const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
-  const shopifyToken = Deno.env.get("SHOPIFY_STOREFRONT_ACCESS_TOKEN");
+  const shopifyToken = Deno.env.get("SHOPIFY_STOREFRONT_API_TOKEN");
   
   if (!shopifyStore || !shopifyToken) {
     console.log('⚠️ Shopify Storefront API not configured');
