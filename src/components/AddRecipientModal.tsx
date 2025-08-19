@@ -10,7 +10,7 @@ import { Plus, X, UserPlus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
-import { sanitizeInput, sanitizeEmail, sanitizePhoneNumber, sanitizeTextArea } from '@/utils/inputSanitization';
+import { sanitizeInput, sanitizeEmail, sanitizePhoneNumber, sanitizeTextArea, sanitizeAddress } from '@/utils/inputSanitization';
 import { ErrorHandler } from '@/utils/errorHandler';
 import { rateLimiter, RATE_LIMITS } from '@/utils/rateLimiter';
 
@@ -73,6 +73,12 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
         break;
       case 'notes':
         sanitizedValue = sanitizeTextArea(value);
+        break;
+      case 'street':
+      case 'city':
+      case 'state':
+      case 'country':
+        sanitizedValue = sanitizeAddress(value);
         break;
       default:
         sanitizedValue = sanitizeInput(value);
