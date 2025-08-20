@@ -206,9 +206,9 @@ serve(async (req) => {
       zip: recipient.zip_code
     });
 
-    // Create Shopify order using Supabase function invocation
+    // Create Shopify order using direct HTTP call
     console.log('🎁 Process-gift-fulfillment: Preparing to call shopify-order function...');
-    
+
     const recipientAddress = {
       first_name: recipient.name.split(' ')[0] || 'Gift',
       last_name: recipient.name.split(' ').slice(1).join(' ') || 'Recipient',
@@ -222,27 +222,40 @@ serve(async (req) => {
 
     console.log('🎁 Process-gift-fulfillment: Recipient address prepared:', recipientAddress);
 
-    console.log('🎁 Process-gift-fulfillment: Calling shopify-order function...');
-    
+    // Get the origin for the function call
+    const origin = req.headers.get("origin") || 
+                   req.headers.get("referer")?.replace(/\/[^\/]*$/, '') || 
+                   'https://preview--unwrapt.lovable.app';
+
+    const cleanOrigin = origin.replace(/\/$/, '');
+
+    console.log(`🎁 Process-gift-fulfillment: Calling shopify-order at: ${cleanOrigin}/functions/shopify-order`);
+
     // Add timeout for the shopify-order call
-    const orderResult = await Promise.race([
-      supabaseService.functions.invoke('shopify-order', {
-        body: {
+    const orderResponse = await Promise.race([
+      fetch(`${cleanOrigin}/functions/shopify-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+        },
+        body: JSON.stringify({
           scheduledGiftId,
           recipientAddress
-        }
+        })
       }),
       new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Shopify order creation timeout after 25 seconds')), 25000)
       )
-    ]);
+    ]) as Response;
 
-    console.log('🎁 Process-gift-fulfillment: Shopify order result:', orderResult);
+    console.log(`🎁 Process-gift-fulfillment: Shopify order response status: ${orderResponse.status}`);
 
-    if (orderResult.error) {
-      console.error('🎁 Process-gift-fulfillment: Shopify order creation failed:', orderResult.error);
+    if (!orderResponse.ok) {
+      const errorText = await orderResponse.text();
+      console.error('🎁 Process-gift-fulfillment: Shopify order HTTP error:', orderResponse.status, errorText);
       return new Response(JSON.stringify({ 
-        error: `Order creation failed: ${orderResult.error.message || orderResult.error}`,
+        error: `Order creation failed: HTTP ${orderResponse.status} - ${errorText}`,
         success: false
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -250,10 +263,13 @@ serve(async (req) => {
       });
     }
 
-    if (!orderResult.data?.success) {
-      console.error('🎁 Process-gift-fulfillment: Shopify order creation failed:', orderResult.data?.error);
+    const orderResult = await orderResponse.json();
+    console.log('🎁 Process-gift-fulfillment: Shopify order result:', orderResult);
+
+    if (!orderResult.success) {
+      console.error('🎁 Process-gift-fulfillment: Shopify order creation failed:', orderResult.error);
       return new Response(JSON.stringify({ 
-        error: `Order creation failed: ${orderResult.data?.error || 'Unknown error'}`,
+        error: `Order creation failed: ${orderResult.error || 'Unknown error'}`,
         success: false
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -284,7 +300,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       message: "Gift fulfillment processed successfully",
-      orderDetails: orderResult.data
+      orderDetails: orderResult
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
