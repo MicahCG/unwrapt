@@ -192,19 +192,15 @@ serve(async (req) => {
             )
           ]) as Response;
 
-          console.log(`🔗 Fulfillment response status: ${fulfillmentResponse.status}`);
-
           if (!fulfillmentResponse.ok) {
             const errorText = await fulfillmentResponse.text();
             console.error('❌ Fulfillment HTTP error:', fulfillmentResponse.status, errorText);
-            // Log but don't fail the payment verification
           } else {
             const fulfillmentResult = await fulfillmentResponse.json();
             console.log('✅ Fulfillment result:', fulfillmentResult);
             
             if (!fulfillmentResult.success) {
               console.error('❌ Fulfillment failed:', fulfillmentResult.error);
-              // Log but don't fail the payment verification
             } else {
               console.log('🎉 Shopify order created successfully!');
             }
