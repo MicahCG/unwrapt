@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.test-stripe-secret]
 verify_jwt = false
+
+[functions.create-gift-payment]
+verify_jwt = false
