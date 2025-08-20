@@ -134,6 +134,7 @@ serve(async (req) => {
 
     // Try to get products dynamically from Shopify collections
     try {
+      console.log('🛍️ Starting dynamic product selection...');
       const dynamicProduct = await selectProductFromInterests(
         giftData.recipients?.interests || [],
         giftData.gift_type
@@ -154,12 +155,20 @@ serve(async (req) => {
           productName = fallbackProduct.title;
           console.log(`🎯 Selected fallback product: ${productName}`);
         } else {
-          throw new Error('No products available in any collection');
+          console.log('❌ No products found in any collection, using hardcoded fallback');
+          // Use a hardcoded variant as absolute fallback
+          selectedVariantId = 'gid://shopify/ProductVariant/51056282272063'; // Ocean Driftwood Candle
+          matchReason = 'hardcoded fallback';
+          productName = 'Ocean Driftwood Coconut Candle';
         }
       }
     } catch (error) {
-      console.error('❌ Error in product selection:', error);
-      throw new Error(`Product selection failed: ${error.message}`);
+      console.error('❌ Error in product selection:', error.message);
+      console.log('🔄 Using hardcoded fallback product...');
+      // Use hardcoded variant as absolute fallback
+      selectedVariantId = 'gid://shopify/ProductVariant/51056282272063'; // Ocean Driftwood Candle
+      matchReason = 'error fallback';
+      productName = 'Ocean Driftwood Coconut Candle';
     }
 
     if (!selectedVariantId) {
@@ -496,6 +505,9 @@ async function selectProductFromInterests(interests: string[], giftType?: string
       }
     `;
 
+    console.log(`🌐 Making GraphQL request to: ${shopifyGraphQLUrl}`);
+    console.log(`🔑 Using collection handle: ${collectionHandle}`);
+
     const response = await fetch(shopifyGraphQLUrl, {
       method: 'POST',
       headers: {
@@ -508,15 +520,20 @@ async function selectProductFromInterests(interests: string[], giftType?: string
       }),
     });
 
+    console.log(`📡 GraphQL Response status: ${response.status} ${response.statusText}`);
+
     if (!response.ok) {
-      throw new Error(`GraphQL request failed: ${response.statusText}`);
+      throw new Error(`GraphQL request failed: ${response.status} ${response.statusText}`);
     }
 
     const { data, errors } = await response.json();
     
     if (errors) {
+      console.error('❌ GraphQL errors:', JSON.stringify(errors, null, 2));
       throw new Error(`GraphQL errors: ${JSON.stringify(errors)}`);
     }
+
+    console.log(`📦 Collection data:`, JSON.stringify(data?.collectionByHandle, null, 2));
 
     if (!data?.collectionByHandle?.products?.edges?.length) {
       console.log(`No products found in collection: ${collectionHandle}`);
