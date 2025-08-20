@@ -65,21 +65,32 @@ serve(async (req) => {
 
       console.log('🎁 Process-gift-fulfillment: Calling shopify-order in test mode...');
       
-      const orderResult = await supabaseService.functions.invoke('shopify-order', {
-        body: {
+      // Get the origin for the function call
+      const origin = req.headers.get("origin") || 
+                     req.headers.get("referer")?.replace(/\/[^\/]*$/, '') || 
+                     'https://preview--unwrapt.lovable.app';
+      
+      const cleanOrigin = origin.replace(/\/$/, '');
+      
+      const orderResponse = await fetch(`${cleanOrigin}/functions/shopify-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+        },
+        body: JSON.stringify({
           scheduledGiftId,
           recipientAddress: testRecipientAddress,
           testMode: true
-        }
+        })
       });
 
-      console.log('🎁 Process-gift-fulfillment: Shopify order test result:', orderResult);
-
-      if (orderResult.error) {
-        console.error('🎁 Process-gift-fulfillment: Shopify order test failed:', orderResult.error);
+      if (!orderResponse.ok) {
+        const errorText = await orderResponse.text();
+        console.error('🎁 Process-gift-fulfillment: Shopify order HTTP error:', orderResponse.status, errorText);
         return new Response(JSON.stringify({
           success: false,
-          error: `Test order creation failed: ${orderResult.error.message || orderResult.error}`,
+          error: `Test order creation failed: HTTP ${orderResponse.status} - ${errorText}`,
           testMode: true
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -87,11 +98,27 @@ serve(async (req) => {
         });
       }
 
-      if (!orderResult.data?.success) {
-        console.error('🎁 Process-gift-fulfillment: Shopify order test not successful:', orderResult.data);
+      const orderResult = await orderResponse.json();
+
+      console.log('🎁 Process-gift-fulfillment: Shopify order test result:', orderResult);
+
+      if (orderResult.error) {
+        console.error('🎁 Process-gift-fulfillment: Shopify order test failed:', orderResult.error);
         return new Response(JSON.stringify({
           success: false,
-          error: `Test order creation failed: ${orderResult.data?.error || 'Unknown error'}`,
+          error: `Test order creation failed: ${orderResult.error}`,
+          testMode: true
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+        });
+      }
+
+      if (!orderResult.success) {
+        console.error('🎁 Process-gift-fulfillment: Shopify order test not successful:', orderResult.error);
+        return new Response(JSON.stringify({
+          success: false,
+          error: `Test order creation failed: ${orderResult.error || 'Unknown error'}`,
           testMode: true
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -105,7 +132,7 @@ serve(async (req) => {
         success: true,
         message: "Test gift fulfillment processed successfully",
         testMode: true,
-        orderDetails: orderResult.data
+        orderDetails: orderResult
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
