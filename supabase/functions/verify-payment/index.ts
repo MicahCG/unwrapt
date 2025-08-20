@@ -168,42 +168,30 @@ serve(async (req) => {
         // Trigger gift fulfillment for ALL real gifts (including onboarding)
         console.log('🚀 Triggering Shopify order creation...');
         try {
-          // Get the origin for the function call
-          const origin = req.headers.get("origin") || 
-                         req.headers.get("referer")?.replace(/\/[^\/]*$/, '') || 
-                         'https://preview--unwrapt.lovable.app';
+          console.log(`🔗 Calling fulfillment function via Supabase client`);
           
-          const cleanOrigin = origin.replace(/\/$/, '');
-          
-          console.log(`🔗 Calling fulfillment function at: ${cleanOrigin}/functions/process-gift-fulfillment`);
-          
-          // Use direct HTTP call instead of supabase function invocation
-          const fulfillmentResponse = await Promise.race([
-            fetch(`${cleanOrigin}/functions/process-gift-fulfillment`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-              },
-              body: JSON.stringify({ scheduledGiftId })
+          // Use Supabase function invocation instead of direct HTTP call
+          const fulfillmentResult = await Promise.race([
+            supabaseService.functions.invoke('process-gift-fulfillment', {
+              body: { scheduledGiftId }
             }),
             new Promise((_, reject) => 
               setTimeout(() => reject(new Error('Fulfillment timeout after 30 seconds')), 30000)
             )
-          ]) as Response;
+          ]);
 
-          if (!fulfillmentResponse.ok) {
-            const errorText = await fulfillmentResponse.text();
-            console.error('❌ Fulfillment HTTP error:', fulfillmentResponse.status, errorText);
-          } else {
-            const fulfillmentResult = await fulfillmentResponse.json();
-            console.log('✅ Fulfillment result:', fulfillmentResult);
+          if (fulfillmentResult.error) {
+            console.error('❌ Fulfillment function error:', fulfillmentResult.error);
+          } else if (fulfillmentResult.data) {
+            console.log('✅ Fulfillment result:', fulfillmentResult.data);
             
-            if (!fulfillmentResult.success) {
-              console.error('❌ Fulfillment failed:', fulfillmentResult.error);
+            if (!fulfillmentResult.data.success) {
+              console.error('❌ Fulfillment failed:', fulfillmentResult.data.error);
             } else {
               console.log('🎉 Shopify order created successfully!');
             }
+          } else {
+            console.log('✅ Fulfillment completed successfully');
           }
         } catch (fulfillmentError) {
           console.error('❌ Error triggering fulfillment:', fulfillmentError);

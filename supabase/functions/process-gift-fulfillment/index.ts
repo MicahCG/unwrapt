@@ -65,40 +65,14 @@ serve(async (req) => {
 
       console.log('🎁 Process-gift-fulfillment: Calling shopify-order in test mode...');
       
-      // Get the origin for the function call
-      const origin = req.headers.get("origin") || 
-                     req.headers.get("referer")?.replace(/\/[^\/]*$/, '') || 
-                     'https://preview--unwrapt.lovable.app';
-      
-      const cleanOrigin = origin.replace(/\/$/, '');
-      
-      const orderResponse = await fetch(`${cleanOrigin}/functions/shopify-order`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-        },
-        body: JSON.stringify({
+      // Use Supabase function invocation instead of direct HTTP call
+      const orderResult = await supabaseService.functions.invoke('shopify-order', {
+        body: {
           scheduledGiftId,
           recipientAddress: testRecipientAddress,
           testMode: true
-        })
+        }
       });
-
-      if (!orderResponse.ok) {
-        const errorText = await orderResponse.text();
-        console.error('🎁 Process-gift-fulfillment: Shopify order HTTP error:', orderResponse.status, errorText);
-        return new Response(JSON.stringify({
-          success: false,
-          error: `Test order creation failed: HTTP ${orderResponse.status} - ${errorText}`,
-          testMode: true
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 500,
-        });
-      }
-
-      const orderResult = await orderResponse.json();
 
       console.log('🎁 Process-gift-fulfillment: Shopify order test result:', orderResult);
 
@@ -114,11 +88,11 @@ serve(async (req) => {
         });
       }
 
-      if (!orderResult.success) {
-        console.error('🎁 Process-gift-fulfillment: Shopify order test not successful:', orderResult.error);
+      if (!orderResult.data || !orderResult.data.success) {
+        console.error('🎁 Process-gift-fulfillment: Shopify order test not successful:', orderResult.data?.error);
         return new Response(JSON.stringify({
           success: false,
-          error: `Test order creation failed: ${orderResult.error || 'Unknown error'}`,
+          error: `Test order creation failed: ${orderResult.data?.error || 'Unknown error'}`,
           testMode: true
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -132,7 +106,7 @@ serve(async (req) => {
         success: true,
         message: "Test gift fulfillment processed successfully",
         testMode: true,
-        orderDetails: orderResult
+        orderDetails: orderResult.data
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
@@ -249,40 +223,27 @@ serve(async (req) => {
 
     console.log('🎁 Process-gift-fulfillment: Recipient address prepared:', recipientAddress);
 
-    // Get the origin for the function call
-    const origin = req.headers.get("origin") || 
-                   req.headers.get("referer")?.replace(/\/[^\/]*$/, '') || 
-                   'https://preview--unwrapt.lovable.app';
+    console.log(`🎁 Process-gift-fulfillment: Calling shopify-order via Supabase client`);
 
-    const cleanOrigin = origin.replace(/\/$/, '');
-
-    console.log(`🎁 Process-gift-fulfillment: Calling shopify-order at: ${cleanOrigin}/functions/shopify-order`);
-
-    // Add timeout for the shopify-order call
-    const orderResponse = await Promise.race([
-      fetch(`${cleanOrigin}/functions/shopify-order`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-        },
-        body: JSON.stringify({
+    // Use Supabase function invocation instead of direct HTTP call  
+    const orderResult = await Promise.race([
+      supabaseService.functions.invoke('shopify-order', {
+        body: {
           scheduledGiftId,
           recipientAddress
-        })
+        }
       }),
       new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Shopify order creation timeout after 25 seconds')), 25000)
       )
-    ]) as Response;
+    ]);
 
-    console.log(`🎁 Process-gift-fulfillment: Shopify order response status: ${orderResponse.status}`);
+    console.log(`🎁 Process-gift-fulfillment: Shopify order result:`, orderResult);
 
-    if (!orderResponse.ok) {
-      const errorText = await orderResponse.text();
-      console.error('🎁 Process-gift-fulfillment: Shopify order HTTP error:', orderResponse.status, errorText);
+    if (orderResult.error) {
+      console.error('🎁 Process-gift-fulfillment: Shopify order function error:', orderResult.error);
       return new Response(JSON.stringify({ 
-        error: `Order creation failed: HTTP ${orderResponse.status} - ${errorText}`,
+        error: `Order creation failed: ${orderResult.error}`,
         success: false
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -290,13 +251,10 @@ serve(async (req) => {
       });
     }
 
-    const orderResult = await orderResponse.json();
-    console.log('🎁 Process-gift-fulfillment: Shopify order result:', orderResult);
-
-    if (!orderResult.success) {
-      console.error('🎁 Process-gift-fulfillment: Shopify order creation failed:', orderResult.error);
+    if (!orderResult.data || !orderResult.data.success) {
+      console.error('🎁 Process-gift-fulfillment: Shopify order creation failed:', orderResult.data?.error);
       return new Response(JSON.stringify({ 
-        error: `Order creation failed: ${orderResult.error || 'Unknown error'}`,
+        error: `Order creation failed: ${orderResult.data?.error || 'Unknown error'}`,
         success: false
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -327,7 +285,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       message: "Gift fulfillment processed successfully",
-      orderDetails: orderResult
+      orderDetails: orderResult.data
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
