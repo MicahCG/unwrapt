@@ -7,12 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Legacy hard-coded variants (deprecated - kept for fallback)
-const LEGACY_PRODUCT_VARIANTS = {
-  OCEAN_DRIFTWOOD_COCONUT_CANDLE: 51056282272063,
-  LAVENDER_FIELDS_COFFEE: 51056282075455,
-  TRUFFLE_CHOCOLATE: 51056285221183
-};
+// Remove legacy hardcoded variants - using fully dynamic selection now
 
 interface ShopifyOrderRequest {
   scheduledGiftId: string;
@@ -117,11 +112,26 @@ serve(async (req) => {
       testMode
     });
 
-    // NEW: Dynamic product selection using collections
-    let selectedVariantId: string | number = LEGACY_PRODUCT_VARIANTS.OCEAN_DRIFTWOOD_COCONUT_CANDLE; // Default fallback
-    let matchReason = 'default fallback';
-    let productName = 'Ocean Driftwood Coconut Candle';
-    
+    console.log('🔍 Environment check:');
+    console.log(`SHOPIFY_ADMIN_API_TOKEN: ${!!Deno.env.get("SHOPIFY_ADMIN_API_TOKEN")}`);
+    console.log(`SHOPIFY_STOREFRONT_API_TOKEN: ${!!Deno.env.get("SHOPIFY_STOREFRONT_API_TOKEN")}`);
+    console.log(`SHOPIFY_STORE_URL: ${!!Deno.env.get("SHOPIFY_STORE_URL")}`);
+
+    console.log(`🎁 Gift data:`, JSON.stringify({
+      id: giftData.id,
+      recipient: giftData.recipients?.name,
+      interests: giftData.recipients?.interests,
+      price_range: giftData.price_range,
+      gift_type: giftData.gift_type,
+      payment_status: giftData.payment_status,
+      testMode
+    }, null, 2));
+
+    // Product selection variables
+    let selectedVariantId;
+    let matchReason = 'default';
+    let productName = 'Gift Item';
+
     // Try to get products dynamically from Shopify collections
     try {
       const dynamicProduct = await selectProductFromInterests(
@@ -135,23 +145,26 @@ serve(async (req) => {
         productName = dynamicProduct.title;
         console.log(`🎯 Selected dynamic product: ${productName} (${matchReason})`);
       } else {
-        console.log('⚠️ No dynamic product found, using legacy selection');
-        // Fall back to legacy selection logic
-        const legacyResult = selectLegacyProduct(giftData);
-        selectedVariantId = legacyResult.selectedVariantId;
-        matchReason = legacyResult.matchReason;
-        productName = legacyResult.productName;
+        console.log('⚠️ No dynamic product found, trying gifts-all collection');
+        // Try the default gifts-all collection as fallback
+        const fallbackProduct = await selectProductFromInterests([], undefined);
+        if (fallbackProduct) {
+          selectedVariantId = fallbackProduct.variantId;
+          matchReason = 'fallback - gifts-all collection';
+          productName = fallbackProduct.title;
+          console.log(`🎯 Selected fallback product: ${productName}`);
+        } else {
+          throw new Error('No products available in any collection');
+        }
       }
     } catch (error) {
-      console.error('❌ Error in dynamic product selection:', error);
-      // Fall back to legacy selection
-      const legacyResult = selectLegacyProduct(giftData);
-      selectedVariantId = legacyResult.selectedVariantId;
-      matchReason = legacyResult.matchReason;
-      productName = legacyResult.productName;
+      console.error('❌ Error in product selection:', error);
+      throw new Error(`Product selection failed: ${error.message}`);
     }
 
-    console.log(`🎯 Final selected variant ID: ${selectedVariantId} (${matchReason})`);
+    if (!selectedVariantId) {
+      throw new Error('No product variant selected - unable to create order');
+    }
 
     // Default product price - will be updated if we can fetch from Shopify
     let variantPrice = "25.00";
@@ -330,16 +343,10 @@ if (testMode) {
       }
     }
     
-     // Fallback to variant-specific image URLs if no Shopify image was retrieved
-     if (!productImageUrl) {
-       const LEGACY_VARIANT_IMAGES = {
-         [LEGACY_PRODUCT_VARIANTS.OCEAN_DRIFTWOOD_COCONUT_CANDLE]: "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&h=300&fit=crop&q=80",
-         [LEGACY_PRODUCT_VARIANTS.LAVENDER_FIELDS_COFFEE]: "https://images.unsplash.com/photo-1581090464777-f3220bbe1b8b?w=400&h=300&fit=crop", 
-         [LEGACY_PRODUCT_VARIANTS.TRUFFLE_CHOCOLATE]: "https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=400&h=300&fit=crop"
-       };
-       
-       productImageUrl = LEGACY_VARIANT_IMAGES[selectedVariantId as number] || "https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop";
-       console.log(`📷 Using fallback image for variant ${selectedVariantId}: ${productImageUrl}`);
+     // Get product image URL from Shopify if possible
+     if (!productImageUrl && !testMode) {
+       productImageUrl = "https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop";
+       console.log(`📷 Using default fallback image: ${productImageUrl}`);
      }
 
     // Update the scheduled gift with order information (only if not test mode with mock data)
@@ -571,59 +578,3 @@ async function selectProductFromInterests(interests: string[], giftType?: string
   }
 }
 
-// Legacy product selection fallback
-function selectLegacyProduct(giftData: any) {
-  let selectedVariantId = LEGACY_PRODUCT_VARIANTS.OCEAN_DRIFTWOOD_COCONUT_CANDLE;
-  let matchReason = 'legacy default';
-  let productName = 'Ocean Driftwood Coconut Candle';
-
-  // Check if gift type is specified first
-  if (giftData.gift_type) {
-    const giftTypeLower = giftData.gift_type.toLowerCase();
-    
-    if (giftTypeLower.includes('coffee') || giftTypeLower.includes('lavender')) {
-      selectedVariantId = LEGACY_PRODUCT_VARIANTS.LAVENDER_FIELDS_COFFEE;
-      matchReason = `legacy gift type: ${giftData.gift_type}`;
-      productName = 'Lavender Fields Coffee';
-    } else if (giftTypeLower.includes('chocolate') || giftTypeLower.includes('truffle')) {
-      selectedVariantId = LEGACY_PRODUCT_VARIANTS.TRUFFLE_CHOCOLATE;
-      matchReason = `legacy gift type: ${giftData.gift_type}`;
-      productName = 'Truffle Chocolate';
-    }
-  }
-
-  // Check recipient interests if using default and interests exist
-  if (selectedVariantId === LEGACY_PRODUCT_VARIANTS.OCEAN_DRIFTWOOD_COCONUT_CANDLE && 
-      giftData.recipients?.interests && Array.isArray(giftData.recipients.interests)) {
-    
-    const interests = giftData.recipients.interests.map((i: string) => i.toLowerCase());
-    
-    // Check for coffee/lavender interests
-    const coffeeInterests = interests.filter((interest: string) => 
-      interest.includes('coffee') || 
-      interest.includes('caffeine') || 
-      interest.includes('lavender')
-    );
-    
-    if (coffeeInterests.length > 0) {
-      selectedVariantId = LEGACY_PRODUCT_VARIANTS.LAVENDER_FIELDS_COFFEE;
-      matchReason = `legacy recipient interests: ${coffeeInterests.join(', ')}`;
-      productName = 'Lavender Fields Coffee';
-    } else {
-      // Check for chocolate interests
-      const chocolateInterests = interests.filter((interest: string) => 
-        interest.includes('chocolate') || 
-        interest.includes('truffle') || 
-        interest.includes('sweet')
-      );
-      
-      if (chocolateInterests.length > 0) {
-        selectedVariantId = LEGACY_PRODUCT_VARIANTS.TRUFFLE_CHOCOLATE;
-        matchReason = `legacy recipient interests: ${chocolateInterests.join(', ')}`;
-        productName = 'Truffle Chocolate';
-      }
-    }
-  }
-
-  return { selectedVariantId, matchReason, productName };
-}
