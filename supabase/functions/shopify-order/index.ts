@@ -138,7 +138,7 @@ serve(async (req) => {
         console.log('⚠️ No dynamic product found, using legacy selection');
         // Fall back to legacy selection logic
         const legacyResult = selectLegacyProduct(giftData);
-        selectedVariantId = legacyResult.variantId;
+        selectedVariantId = legacyResult.selectedVariantId;
         matchReason = legacyResult.matchReason;
         productName = legacyResult.productName;
       }
@@ -146,7 +146,7 @@ serve(async (req) => {
       console.error('❌ Error in dynamic product selection:', error);
       // Fall back to legacy selection
       const legacyResult = selectLegacyProduct(giftData);
-      selectedVariantId = legacyResult.variantId;
+      selectedVariantId = legacyResult.selectedVariantId;
       matchReason = legacyResult.matchReason;
       productName = legacyResult.productName;
     }
