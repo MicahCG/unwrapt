@@ -114,17 +114,22 @@ serve(async (req) => {
 
     // Production mode - get gift and recipient details
     console.log('🎁 Process-gift-fulfillment: Querying database for gift data...');
+
+    // First get the gift data
     const { data: giftData, error: giftError } = await supabaseService
       .from('scheduled_gifts')
-      .select(`
-        *,
-        recipients (name, email, phone, street, city, state, zip_code, country)
-      `)
+      .select('*')
       .eq('id', scheduledGiftId)
       .eq('payment_status', 'paid')
       .single();
 
-    console.log('🎁 Process-gift-fulfillment: Database query result:', { giftData, giftError });
+    console.log('🎁 Process-gift-fulfillment: Gift query result:', { 
+      found: !!giftData, 
+      id: giftData?.id,
+      payment_status: giftData?.payment_status,
+      recipient_id: giftData?.recipient_id,
+      error: giftError 
+    });
 
     if (giftError || !giftData) {
       console.error('🎁 Process-gift-fulfillment: Gift query error:', giftError);
@@ -137,20 +142,55 @@ serve(async (req) => {
       });
     }
 
-    console.log(`🎁 Process-gift-fulfillment: Found gift data:`, {
+    // Then get the recipient data separately to avoid relationship issues
+    const { data: recipientData, error: recipientError } = await supabaseService
+      .from('recipients')
+      .select('name, email, phone, street, city, state, zip_code, country, interests')
+      .eq('id', giftData.recipient_id)
+      .single();
+
+    console.log('🎁 Process-gift-fulfillment: Recipient query result:', { 
+      found: !!recipientData,
+      name: recipientData?.name,
+      hasAddress: !!(recipientData?.street && recipientData?.city),
+      error: recipientError 
+    });
+
+    if (recipientError || !recipientData) {
+      console.error('🎁 Process-gift-fulfillment: Recipient query error:', recipientError);
+      return new Response(JSON.stringify({ 
+        error: "Recipient not found",
+        success: false
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 404,
+      });
+    }
+
+    // Combine the data (simulate the original structure)
+    giftData.recipients = recipientData;
+
+    console.log(`🎁 Process-gift-fulfillment: Combined gift data:`, {
       id: giftData.id,
       recipient: giftData.recipients?.name,
-      paymentStatus: giftData.payment_status
+      paymentStatus: giftData.payment_status,
+      hasAddress: !!(giftData.recipients?.street && giftData.recipients?.city)
     });
 
     // Prepare recipient address from stored data
     const recipient = giftData.recipients;
-    console.log('🎁 Process-gift-fulfillment: Recipient data:', recipient);
+    console.log('🎁 Process-gift-fulfillment: Recipient data for address:', {
+      name: recipient?.name,
+      street: recipient?.street,
+      city: recipient?.city,
+      state: recipient?.state,
+      zip: recipient?.zip_code
+    });
 
     if (!recipient || !recipient.street) {
       console.error('🎁 Process-gift-fulfillment: Missing recipient address:', recipient);
       return new Response(JSON.stringify({ 
-        error: "Recipient address not found",
+        error: "Recipient address not found - please ensure the recipient has a complete address",
         success: false
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
