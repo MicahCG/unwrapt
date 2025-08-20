@@ -157,73 +157,142 @@ serve(async (req) => {
     let variantPrice = "25.00";
 
     // Create Shopify order (skip in test mode)
-    let orderResult;
+let orderResult;
+
+if (testMode) {
+  // Return test results without creating actual order
+  orderResult = {
+    id: 'test-order-' + Date.now(),
+    name: '#TEST-' + Math.floor(Math.random() * 10000),
+    test: true
+  };
+  console.log('🧪 TEST MODE: Skipping actual order creation');
+} else {
+  // Get Shopify configuration
+  const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
+  const shopifyToken = Deno.env.get("SHOPIFY_ADMIN_API_TOKEN");
+  
+  if (!shopifyStore || !shopifyToken) {
+    throw new Error("Shopify credentials not configured for live orders");
+  }
+
+  const cleanStoreUrl = shopifyStore.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  const shopifyApiUrl = `https://${cleanStoreUrl}/admin/api/2024-01`;
+
+  console.log(`🛒 Creating order via: ${shopifyApiUrl}/orders.json`);
+  console.log(`🎯 Using variant ID: ${selectedVariantId}`);
+
+  // First, validate the variant exists and get its price
+  let variantPrice = "25.00"; // Default fallback
+  
+  try {
+    console.log(`🔍 Validating variant ID: ${selectedVariantId}`);
     
-    if (testMode) {
-      // Return test results without creating actual order
-      orderResult = {
-        id: 'test-order-' + Date.now(),
-        name: '#TEST-' + Math.floor(Math.random() * 10000),
-        test: true
-      };
-      console.log('🧪 TEST MODE: Skipping actual order creation');
-    } else {
-      // Get Shopify configuration
-      const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
-      const shopifyToken = Deno.env.get("SHOPIFY_ADMIN_API_TOKEN");
+    const variantResponse = await fetch(`${shopifyApiUrl}/variants/${selectedVariantId}.json`, {
+      headers: {
+        'X-Shopify-Access-Token': shopifyToken,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!variantResponse.ok) {
+      const errorText = await variantResponse.text();
+      console.error(`❌ Variant ${selectedVariantId} not found:`, errorText);
       
-      if (!shopifyStore || !shopifyToken) {
-        throw new Error("Shopify credentials not configured for live orders");
+      if (variantResponse.status === 404) {
+        throw new Error(`Product variant ${selectedVariantId} not found in Shopify store. Please check your product setup.`);
       }
-
-      const cleanStoreUrl = shopifyStore.replace(/^https?:\/\//, '').replace(/\/$/, '');
-      const shopifyApiUrl = `https://${cleanStoreUrl}/admin/api/2024-01`;
-
-      console.log(`🛒 Creating order via: ${shopifyApiUrl}/orders.json`);
-
-      const orderData = {
-        order: {
-          line_items: [
-            {
-              variant_id: selectedVariantId,
-              quantity: 1,
-            }
-          ],
-          shipping_address: {
-            ...recipientAddress,
-            country_code: recipientAddress.country === 'United States' ? 'US' : recipientAddress.country
-          },
-          billing_address: {
-            ...recipientAddress,
-            country_code: recipientAddress.country === 'United States' ? 'US' : recipientAddress.country
-          },
-          email: giftData.recipients?.email || "gift@unwrapt.com",
-          phone: recipientAddress.phone || giftData.recipients?.phone,
-          note: `Gift from Unwrapt - Occasion: ${giftData.occasion}. Recipient interests: ${giftData.recipients?.interests?.join(', ') || 'none'}. Selected product: ${productName}. Match reason: ${matchReason}. ${giftData.gift_description || ''}`,
-          tags: "unwrapt-gift",
-          financial_status: "paid",
-        }
-      };
-
-      const orderResponse = await fetch(`${shopifyApiUrl}/orders.json`, {
-        method: 'POST',
-        headers: {
-          'X-Shopify-Access-Token': shopifyToken,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(orderData),
-      });
-
-      if (!orderResponse.ok) {
-        const errorData = await orderResponse.text();
-        console.error('❌ Shopify order creation failed:', errorData);
-        throw new Error(`Failed to create Shopify order: ${errorData}`);
-      }
-
-      const { order } = await orderResponse.json();
-      orderResult = order;
-      console.log(`✅ Successfully created Shopify order: ${order.name} (ID: ${order.id})`);
+      throw new Error(`Failed to validate variant ${selectedVariantId}: ${errorText}`);
     }
+
+    const { variant } = await variantResponse.json();
+    variantPrice = variant.price;
+    
+    console.log(`✅ Variant validated:`, {
+      id: variant.id,
+      title: variant.title,
+      price: variant.price,
+      available: variant.available,
+      inventory_quantity: variant.inventory_quantity
+    });
+
+    // Check if variant is available
+    if (!variant.available) {
+      throw new Error(`Product variant ${selectedVariantId} is not available for sale`);
+    }
+
+  } catch (variantError) {
+    console.error('❌ Error validating variant:', variantError);
+    throw variantError;
+  }
+
+  // Create the order with proper price
+  const orderData = {
+    order: {
+      line_items: [
+        {
+          variant_id: selectedVariantId,
+          quantity: 1,
+          price: variantPrice, // 🔥 This was missing and causing the error!
+        }
+      ],
+      shipping_address: {
+        ...recipientAddress,
+        country_code: recipientAddress.country === 'United States' ? 'US' : recipientAddress.country
+      },
+      billing_address: {
+        ...recipientAddress,
+        country_code: recipientAddress.country === 'United States' ? 'US' : recipientAddress.country
+      },
+      email: giftData.recipients?.email || "gift@unwrapt.com",
+      phone: recipientAddress.phone || giftData.recipients?.phone,
+      note: `Gift from Unwrapt - Occasion: ${giftData.occasion}. Recipient interests: ${giftData.recipients?.interests?.join(', ') || 'none'}. Selected product: ${productName}. Match reason: ${matchReason}. ${giftData.gift_description || ''}`,
+      tags: "unwrapt-gift",
+      financial_status: "paid",
+      send_receipt: false, // Don't send Shopify receipt to customer
+      send_fulfillment_receipt: false, // Don't send fulfillment receipt
+    }
+  };
+
+  console.log(`🛒 Creating order with data:`, JSON.stringify(orderData, null, 2));
+
+  const orderResponse = await fetch(`${shopifyApiUrl}/orders.json`, {
+    method: 'POST',
+    headers: {
+      'X-Shopify-Access-Token': shopifyToken,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(orderData),
+  });
+
+  console.log(`🛒 Shopify API response status: ${orderResponse.status}`);
+
+  if (!orderResponse.ok) {
+    const errorData = await orderResponse.text();
+    console.error('❌ Shopify order creation failed:');
+    console.error('❌ Status:', orderResponse.status);
+    console.error('❌ Response:', errorData);
+    console.error('❌ Request data that failed:', JSON.stringify(orderData, null, 2));
+    
+    // Try to parse the error for more details
+    try {
+      const parsedError = JSON.parse(errorData);
+      console.error('❌ Parsed Shopify error:', JSON.stringify(parsedError, null, 2));
+      
+      if (parsedError.errors) {
+        throw new Error(`Shopify API error: ${JSON.stringify(parsedError.errors)}`);
+      }
+    } catch (parseError) {
+      console.error('❌ Could not parse Shopify error response');
+    }
+    
+    throw new Error(`Failed to create Shopify order: ${orderResponse.status} - ${errorData}`);
+  }
+
+  const { order } = await orderResponse.json();
+  orderResult = order;
+  console.log(`✅ Successfully created Shopify order: ${order.name} (ID: ${order.id})`);
+}
 
     // Get product image URL based on selected variant
     let productImageUrl = null;
