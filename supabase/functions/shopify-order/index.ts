@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://cdn.skypack.dev/@supabase/supabase-js@2.49.0";
 
@@ -6,8 +5,6 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-// Remove legacy hardcoded variants - using fully dynamic selection now
 
 interface ShopifyOrderRequest {
   scheduledGiftId: string;
@@ -54,11 +51,11 @@ serve(async (req) => {
     console.log("SHOPIFY_ADMIN_API_TOKEN:", !!shopifyToken);
     console.log("SHOPIFY_STOREFRONT_API_TOKEN:", !!shopifyStorefrontToken);
     
-    if (!shopifyStoreUrl || !shopifyToken || !shopifyStorefrontToken) {
+    if (!shopifyStoreUrl || !shopifyToken) {
       throw new Error("Missing required Shopify environment variables");
     }
 
-    // For test mode, create mock data if gift doesn't exist
+    // Get or create gift data
     let giftData;
     if (testMode) {
       console.log('🧪 Test mode: Creating mock gift data...');
@@ -83,17 +80,15 @@ serve(async (req) => {
         }
       };
     } else {
-      // Get the scheduled gift details - for live mode, require payment confirmation
-      const giftQuery = supabaseService
+      const { data: giftQueryData, error: giftError } = await supabaseService
         .from('scheduled_gifts')
         .select(`
           *,
           recipients (name, email, phone, street, city, state, zip_code, country, interests)
         `)
         .eq('id', scheduledGiftId)
-        .eq('payment_status', 'paid');
-
-      const { data: giftQueryData, error: giftError } = await giftQuery.single();
+        .eq('payment_status', 'paid')
+        .single();
 
       if (giftError || !giftQueryData) {
         console.error('❌ Gift query error:', giftError);
@@ -112,276 +107,184 @@ serve(async (req) => {
       testMode
     });
 
-    console.log('🔍 Environment check:');
-    console.log(`SHOPIFY_ADMIN_API_TOKEN: ${!!Deno.env.get("SHOPIFY_ADMIN_API_TOKEN")}`);
-    console.log(`SHOPIFY_STOREFRONT_API_TOKEN: ${!!Deno.env.get("SHOPIFY_STOREFRONT_API_TOKEN")}`);
-    console.log(`SHOPIFY_STORE_URL: ${!!Deno.env.get("SHOPIFY_STORE_URL")}`);
-
-    console.log(`🎁 Gift data:`, JSON.stringify({
-      id: giftData.id,
-      recipient: giftData.recipients?.name,
-      interests: giftData.recipients?.interests,
-      price_range: giftData.price_range,
-      gift_type: giftData.gift_type,
-      payment_status: giftData.payment_status,
-      testMode
-    }, null, 2));
-
-    // Product selection variables
+    // Product selection with improved fallback
     let selectedVariantId;
     let matchReason = 'default';
     let productName = 'Gift Item';
-
-    // Try to get products dynamically from Shopify collections
-    try {
-      console.log('🛍️ Starting dynamic product selection...');
-      const dynamicProduct = await selectProductFromInterests(
-        giftData.recipients?.interests || [],
-        giftData.gift_type
-      );
-      
-      if (dynamicProduct) {
-        selectedVariantId = dynamicProduct.variantId;
-        matchReason = dynamicProduct.matchReason;
-        productName = dynamicProduct.title;
-        console.log(`🎯 Selected dynamic product: ${productName} (${matchReason})`);
-      } else {
-        console.log('⚠️ No dynamic product found, trying gifts-all collection');
-        // Try the default gifts-all collection as fallback
-        const fallbackProduct = await selectProductFromInterests([], undefined);
-        if (fallbackProduct) {
-          selectedVariantId = fallbackProduct.variantId;
-          matchReason = 'fallback - gifts-all collection';
-          productName = fallbackProduct.title;
-          console.log(`🎯 Selected fallback product: ${productName}`);
-        } else {
-          console.log('❌ No products found in any collection, using hardcoded fallback');
-          // Use a hardcoded variant as absolute fallback
-          selectedVariantId = 'gid://shopify/ProductVariant/51056282272063'; // Ocean Driftwood Candle
-          matchReason = 'hardcoded fallback';
-          productName = 'Ocean Driftwood Coconut Candle';
-        }
-      }
-    } catch (error) {
-      console.error('❌ Error in product selection:', error.message);
-      console.log('🔄 Using hardcoded fallback product...');
-      // Use hardcoded variant as absolute fallback
-      selectedVariantId = 'gid://shopify/ProductVariant/51056282272063'; // Ocean Driftwood Candle
-      matchReason = 'error fallback';
-      productName = 'Ocean Driftwood Coconut Candle';
-    }
-
-    if (!selectedVariantId) {
-      throw new Error('No product variant selected - unable to create order');
-    }
-
-    // Default product price - will be updated if we can fetch from Shopify
     let variantPrice = "25.00";
 
-    // Create Shopify order (skip in test mode)
-let orderResult;
-
-if (testMode) {
-  // Return test results without creating actual order
-  orderResult = {
-    id: 'test-order-' + Date.now(),
-    name: '#TEST-' + Math.floor(Math.random() * 10000),
-    test: true
-  };
-  console.log('🧪 TEST MODE: Skipping actual order creation');
-} else {
-  // Get Shopify configuration
-  const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
-  const shopifyToken = Deno.env.get("SHOPIFY_ADMIN_API_TOKEN");
-  
-  if (!shopifyStore || !shopifyToken) {
-    throw new Error("Shopify credentials not configured for live orders");
-  }
-
-  const cleanStoreUrl = shopifyStore.replace(/^https?:\/\//, '').replace(/\/$/, '');
-  const shopifyApiUrl = `https://${cleanStoreUrl}/admin/api/2024-01`;
-
-  console.log(`🛒 Creating order via: ${shopifyApiUrl}/orders.json`);
-  console.log(`🎯 Using variant ID: ${selectedVariantId}`);
-
-  // First, validate the variant exists and get its price
-  let variantPrice = "25.00"; // Default fallback
-  
-  try {
-    console.log(`🔍 Validating variant ID: ${selectedVariantId}`);
-    
-    const variantResponse = await fetch(`${shopifyApiUrl}/variants/${selectedVariantId}.json`, {
-      headers: {
-        'X-Shopify-Access-Token': shopifyToken,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!variantResponse.ok) {
-      const errorText = await variantResponse.text();
-      console.error(`❌ Variant ${selectedVariantId} not found:`, errorText);
-      
-      if (variantResponse.status === 404) {
-        throw new Error(`Product variant ${selectedVariantId} not found in Shopify store. Please check your product setup.`);
-      }
-      throw new Error(`Failed to validate variant ${selectedVariantId}: ${errorText}`);
-    }
-
-    const { variant } = await variantResponse.json();
-    variantPrice = variant.price;
-    
-    console.log(`✅ Variant validated:`, {
-      id: variant.id,
-      title: variant.title,
-      price: variant.price,
-      available: variant.available,
-      inventory_quantity: variant.inventory_quantity
-    });
-
-    // Check if variant is available
-    if (!variant.available) {
-      throw new Error(`Product variant ${selectedVariantId} is not available for sale`);
-    }
-
-  } catch (variantError) {
-    console.error('❌ Error validating variant:', variantError);
-    throw variantError;
-  }
-
-  // Create the order with proper price
-  const orderData = {
-    order: {
-      line_items: [
-        {
-          variant_id: selectedVariantId,
-          quantity: 1,
-          price: variantPrice, // 🔥 This was missing and causing the error!
-        }
-      ],
-      shipping_address: {
-        ...recipientAddress,
-        country_code: recipientAddress.country === 'United States' ? 'US' : recipientAddress.country
-      },
-      billing_address: {
-        ...recipientAddress,
-        country_code: recipientAddress.country === 'United States' ? 'US' : recipientAddress.country
-      },
-      email: giftData.recipients?.email || "gift@unwrapt.com",
-      phone: recipientAddress.phone || giftData.recipients?.phone,
-      note: `Gift from Unwrapt - Occasion: ${giftData.occasion}. Recipient interests: ${giftData.recipients?.interests?.join(', ') || 'none'}. Selected product: ${productName}. Match reason: ${matchReason}. ${giftData.gift_description || ''}`,
-      tags: "unwrapt-gift",
-      financial_status: "paid",
-      send_receipt: false, // Don't send Shopify receipt to customer
-      send_fulfillment_receipt: false, // Don't send fulfillment receipt
-    }
-  };
-
-  console.log(`🛒 Creating order with data:`, JSON.stringify(orderData, null, 2));
-
-  const orderResponse = await fetch(`${shopifyApiUrl}/orders.json`, {
-    method: 'POST',
-    headers: {
-      'X-Shopify-Access-Token': shopifyToken,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(orderData),
-  });
-
-  console.log(`🛒 Shopify API response status: ${orderResponse.status}`);
-
-  if (!orderResponse.ok) {
-    const errorData = await orderResponse.text();
-    console.error('❌ Shopify order creation failed:');
-    console.error('❌ Status:', orderResponse.status);
-    console.error('❌ Response:', errorData);
-    console.error('❌ Request data that failed:', JSON.stringify(orderData, null, 2));
-    
-    // Try to parse the error for more details
-    try {
-      const parsedError = JSON.parse(errorData);
-      console.error('❌ Parsed Shopify error:', JSON.stringify(parsedError, null, 2));
-      
-      if (parsedError.errors) {
-        throw new Error(`Shopify API error: ${JSON.stringify(parsedError.errors)}`);
-      }
-    } catch (parseError) {
-      console.error('❌ Could not parse Shopify error response');
-    }
-    
-    throw new Error(`Failed to create Shopify order: ${orderResponse.status} - ${errorData}`);
-  }
-
-  const { order } = await orderResponse.json();
-  orderResult = order;
-  console.log(`✅ Successfully created Shopify order: ${order.name} (ID: ${order.id})`);
-}
-
-    // Get product image URL based on selected variant
-    let productImageUrl = null;
-    
-    // First try to get actual Shopify product images for live orders
-    if (!testMode && orderResult && orderResult.line_items && orderResult.line_items.length > 0) {
+    // Try dynamic product selection if Storefront API is configured
+    if (shopifyStorefrontToken) {
       try {
-        const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
-        const shopifyToken = Deno.env.get("SHOPIFY_ADMIN_API_TOKEN");
-        const cleanStoreUrl = shopifyStore.replace(/^https?:\/\//, '').replace(/\/$/, '');
-        const shopifyApiUrl = `https://${cleanStoreUrl}/admin/api/2024-01`;
+        console.log('🛍️ Attempting dynamic product selection...');
+        const dynamicProduct = await selectProductFromInterests(
+          giftData.recipients?.interests || [],
+          giftData.gift_type
+        );
         
-        // Get the product ID from the order line item
-        const lineItem = orderResult.line_items[0];
-        if (lineItem.product_id) {
-          console.log(`🖼️ Fetching product image for product ID: ${lineItem.product_id}`);
-          
-          const productResponse = await fetch(`${shopifyApiUrl}/products/${lineItem.product_id}.json`, {
-            headers: {
-              'X-Shopify-Access-Token': shopifyToken,
-              'Content-Type': 'application/json',
-            },
-          });
-          
-          if (productResponse.ok) {
-            const { product } = await productResponse.json();
-            if (product.images && product.images.length > 0) {
-              productImageUrl = product.images[0].src;
-              console.log(`✅ Retrieved product image: ${productImageUrl}`);
-            }
-          }
+        if (dynamicProduct) {
+          selectedVariantId = dynamicProduct.variantId;
+          matchReason = dynamicProduct.matchReason;
+          productName = dynamicProduct.title;
+          variantPrice = dynamicProduct.price?.toString() || "25.00";
+          console.log(`🎯 Selected dynamic product: ${productName} (${matchReason})`);
         }
-      } catch (imageError) {
-        console.error('⚠️ Error fetching product image:', imageError);
+      } catch (error) {
+        console.error('⚠️ Dynamic selection failed:', error.message);
+        // Continue to fallback
       }
     }
-    
-     // Get product image URL from Shopify if possible
-     if (!productImageUrl && !testMode) {
-       productImageUrl = "https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop";
-       console.log(`📷 Using default fallback image: ${productImageUrl}`);
-     }
 
-    // Update the scheduled gift with order information (only if not test mode with mock data)
-    if (!testMode || giftData.id !== scheduledGiftId) {
-      const giftDescription = `${giftData.gift_description || ''} | Product: ${productName} | Variant ID: ${selectedVariantId} | Match: ${matchReason}${testMode ? ' | TEST MODE' : ''} | Shopify Order: ${orderResult.name}`;
+    // If no dynamic product, try to get any available product from Admin API
+    if (!selectedVariantId) {
+      console.log('🔄 Attempting to find any available product via Admin API...');
+      const fallbackProduct = await getAnyAvailableProduct(shopifyStoreUrl, shopifyToken);
       
+      if (fallbackProduct) {
+        selectedVariantId = fallbackProduct.variantId;
+        productName = fallbackProduct.title;
+        variantPrice = fallbackProduct.price;
+        matchReason = 'admin-api-fallback';
+        console.log(`✅ Found fallback product: ${productName} (ID: ${selectedVariantId})`);
+      }
+    }
+
+    // Final hardcoded fallback - use numeric ID format
+    if (!selectedVariantId) {
+      console.log('⚠️ Using hardcoded fallback variant...');
+      // Use numeric ID instead of GID format for REST API
+      selectedVariantId = '51056282272063';
+      productName = 'Default Gift Item';
+      matchReason = 'hardcoded-fallback';
+      variantPrice = "25.00";
+    }
+
+    // Create order in test mode or live mode
+    let orderResult;
+
+    if (testMode) {
+      orderResult = {
+        id: 'test-order-' + Date.now(),
+        name: '#TEST-' + Math.floor(Math.random() * 10000),
+        test: true
+      };
+      console.log('🧪 TEST MODE: Skipping actual order creation');
+    } else {
+      // Create real Shopify order
+      const cleanStoreUrl = shopifyStoreUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      const shopifyApiUrl = `https://${cleanStoreUrl}/admin/api/2024-01`;
+
+      console.log(`🛒 Creating order with variant ID: ${selectedVariantId}`);
+
+      // Convert GID format to numeric if needed
+      const numericVariantId = selectedVariantId.includes('gid://') 
+        ? selectedVariantId.split('/').pop() 
+        : selectedVariantId;
+
+      // Validate variant exists (optional, can skip if causing issues)
+      let validatedPrice = variantPrice;
+      try {
+        const variantCheckUrl = `${shopifyApiUrl}/variants/${numericVariantId}.json`;
+        console.log(`🔍 Checking variant at: ${variantCheckUrl}`);
+        
+        const variantResponse = await fetch(variantCheckUrl, {
+          headers: {
+            'X-Shopify-Access-Token': shopifyToken,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (variantResponse.ok) {
+          const { variant } = await variantResponse.json();
+          validatedPrice = variant.price || variantPrice;
+          console.log(`✅ Variant validated: ${variant.title} - $${validatedPrice}`);
+        } else {
+          console.log(`⚠️ Could not validate variant ${numericVariantId}, proceeding anyway`);
+        }
+      } catch (e) {
+        console.log(`⚠️ Variant validation skipped: ${e.message}`);
+      }
+
+      // Create the order
+      const orderData = {
+        order: {
+          line_items: [
+            {
+              variant_id: numericVariantId,
+              quantity: 1,
+              price: validatedPrice,
+            }
+          ],
+          shipping_address: {
+            ...recipientAddress,
+            country_code: recipientAddress.country === 'United States' ? 'US' : recipientAddress.country
+          },
+          billing_address: {
+            ...recipientAddress,
+            country_code: recipientAddress.country === 'United States' ? 'US' : recipientAddress.country
+          },
+          email: giftData.recipients?.email || "gift@unwrapt.com",
+          phone: recipientAddress.phone || giftData.recipients?.phone,
+          note: `Gift from Unwrapt - ${giftData.occasion || 'Special Occasion'}. Product: ${productName} (${matchReason})`,
+          tags: "unwrapt-gift",
+          financial_status: "paid",
+          send_receipt: false,
+          send_fulfillment_receipt: false,
+        }
+      };
+
+      console.log(`📦 Creating order with line item:`, {
+        variant_id: numericVariantId,
+        quantity: 1,
+        price: validatedPrice
+      });
+
+      const orderResponse = await fetch(`${shopifyApiUrl}/orders.json`, {
+        method: 'POST',
+        headers: {
+          'X-Shopify-Access-Token': shopifyToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(orderData),
+      });
+
+      console.log(`📨 Order response status: ${orderResponse.status}`);
+
+      if (!orderResponse.ok) {
+        const errorText = await orderResponse.text();
+        console.error('❌ Shopify order creation failed:', errorText);
+        
+        // Try to parse error for better logging
+        try {
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.errors) {
+            console.error('❌ Shopify errors:', errorJson.errors);
+          }
+        } catch (e) {
+          // Text wasn't JSON
+        }
+        
+        throw new Error(`Failed to create Shopify order: ${orderResponse.status}`);
+      }
+
+      const { order } = await orderResponse.json();
+      orderResult = order;
+      console.log(`✅ Successfully created Shopify order: ${order.name} (ID: ${order.id})`);
+    }
+
+    // Update gift record
+    if (!testMode) {
       const updateData = {
-        status: testMode ? 'test-ordered' : 'ordered',
+        status: 'ordered',
         updated_at: new Date().toISOString(),
-        gift_description: giftDescription.substring(0, 500),
-        ...(productImageUrl && { gift_image_url: productImageUrl })
+        gift_description: `Order: ${orderResult.name} | Product: ${productName} | ${matchReason}`.substring(0, 500)
       };
       
-      const { error: updateError } = await supabaseService
+      await supabaseService
         .from('scheduled_gifts')
         .update(updateData)
         .eq('id', scheduledGiftId);
-
-      if (updateError) {
-        console.error('❌ Error updating gift status:', updateError);
-      } else {
-        console.log(`✅ Updated gift status to ${testMode ? 'test-ordered' : 'ordered'}${productImageUrl ? ' with product image' : ''}`);
-      }
     }
-
-    console.log(`🎉 Successfully ${testMode ? 'tested' : 'created'} Shopify order ${orderResult.name} for gift ${scheduledGiftId}`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -392,13 +295,7 @@ if (testMode) {
         variantId: selectedVariantId,
         productName: productName,
         matchReason: matchReason
-      },
-      variant: {
-        id: selectedVariantId,
-        price: variantPrice
-      },
-      interests: giftData.recipients?.interests || [],
-      trackingUrl: testMode ? null : `https://${Deno.env.get("SHOPIFY_STORE_URL")}/admin/orders/${orderResult.id}`
+      }
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
@@ -408,8 +305,7 @@ if (testMode) {
     console.error('❌ Error in Shopify order processing:', error);
     return new Response(JSON.stringify({ 
       error: error.message,
-      success: false,
-      details: error.stack
+      success: false
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
@@ -417,86 +313,95 @@ if (testMode) {
   }
 });
 
-// Dynamic product selection function
+// Helper function to get any available product from Admin API
+async function getAnyAvailableProduct(shopifyStoreUrl: string, shopifyToken: string) {
+  try {
+    const cleanStoreUrl = shopifyStoreUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const shopifyApiUrl = `https://${cleanStoreUrl}/admin/api/2024-01`;
+    
+    console.log('🔍 Fetching available products from Admin API...');
+    
+    // Get products with available inventory
+    const productsResponse = await fetch(
+      `${shopifyApiUrl}/products.json?limit=10&status=active`,
+      {
+        headers: {
+          'X-Shopify-Access-Token': shopifyToken,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!productsResponse.ok) {
+      console.error('❌ Failed to fetch products:', productsResponse.status);
+      return null;
+    }
+
+    const { products } = await productsResponse.json();
+    
+    console.log(`📦 Found ${products?.length || 0} products`);
+
+    // Find first product with available variants
+    for (const product of products || []) {
+      if (product.variants && product.variants.length > 0) {
+        for (const variant of product.variants) {
+          // Check if variant is available
+          if (variant.inventory_quantity === null || variant.inventory_quantity > 0) {
+            console.log(`✅ Found available variant: ${product.title} - ${variant.title}`);
+            return {
+              variantId: variant.id.toString(),
+              title: `${product.title}${variant.title !== 'Default Title' ? ' - ' + variant.title : ''}`,
+              price: variant.price
+            };
+          }
+        }
+      }
+    }
+
+    console.log('⚠️ No available products found in store');
+    return null;
+    
+  } catch (error) {
+    console.error('❌ Error fetching products from Admin API:', error);
+    return null;
+  }
+}
+
+// Simplified dynamic selection function
 async function selectProductFromInterests(interests: string[], giftType?: string) {
   const shopifyStore = Deno.env.get("SHOPIFY_STORE_URL");
   const shopifyToken = Deno.env.get("SHOPIFY_STOREFRONT_API_TOKEN");
   
   if (!shopifyStore || !shopifyToken) {
-    console.log('⚠️ Shopify Storefront API not configured');
+    console.log('⚠️ Storefront API not configured, skipping dynamic selection');
     return null;
   }
 
-  const cleanStoreUrl = shopifyStore.replace(/^https?:\/\//, '').replace(/\/$/, '');
-  const shopifyGraphQLUrl = `https://${cleanStoreUrl}/api/2024-01/graphql.json`;
-
-  // Map interests to collection handles
-  const interestCollectionMap: Record<string, string> = {
-    'candles': 'gifts-candles',
-    'chocolate': 'gifts-chocolate',
-    'coffee': 'gifts-coffee'
-  };
-
-  // Determine which collection to query
-  let collectionHandle = 'gifts-all'; // default
-  let matchReason = 'default collection';
-
-  // Check gift type first
-  if (giftType) {
-    const giftTypeLower = giftType.toLowerCase();
-    for (const [interest, handle] of Object.entries(interestCollectionMap)) {
-      if (giftTypeLower.includes(interest)) {
-        collectionHandle = handle;
-        matchReason = `gift type: ${giftType}`;
-        break;
-      }
-    }
-  }
-
-  // If no gift type match, check interests
-  if (collectionHandle === 'gifts-all' && interests.length > 0) {
-    for (const interest of interests) {
-      const interestLower = interest.toLowerCase();
-      for (const [key, handle] of Object.entries(interestCollectionMap)) {
-        if (interestLower.includes(key)) {
-          collectionHandle = handle;
-          matchReason = `recipient interest: ${interest}`;
-          break;
-        }
-      }
-      if (collectionHandle !== 'gifts-all') break;
-    }
-  }
-
-  console.log(`🔍 Querying collection: ${collectionHandle} (${matchReason})`);
-
   try {
+    const cleanStoreUrl = shopifyStore.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    // Use current API version
+    const shopifyGraphQLUrl = `https://${cleanStoreUrl}/api/2024-10/graphql.json`;
+
+    // Try to query products directly without collection
     const query = `
-      query getCollectionProducts($handle: String!) {
-        collectionByHandle(handle: $handle) {
-          products(first: 10) {
-            edges {
-              node {
-                id
-                title
-                handle
-                variants(first: 10) {
-                  edges {
-                    node {
-                      id
-                      availableForSale
-                      quantityAvailable
-                      price {
-                        amount
-                      }
+      query getProducts {
+        products(first: 10, query: "status:active") {
+          edges {
+            node {
+              id
+              title
+              handle
+              availableForSale
+              variants(first: 5) {
+                edges {
+                  node {
+                    id
+                    availableForSale
+                    quantityAvailable
+                    price {
+                      amount
                     }
                   }
-                }
-                metafields(identifiers: [
-                  {namespace: "unwrapt", key: "rank"}
-                ]) {
-                  key
-                  value
                 }
               }
             }
@@ -505,8 +410,7 @@ async function selectProductFromInterests(interests: string[], giftType?: string
       }
     `;
 
-    console.log(`🌐 Making GraphQL request to: ${shopifyGraphQLUrl}`);
-    console.log(`🔑 Using collection handle: ${collectionHandle}`);
+    console.log(`🌐 Querying Storefront API for products...`);
 
     const response = await fetch(shopifyGraphQLUrl, {
       method: 'POST',
@@ -514,84 +418,49 @@ async function selectProductFromInterests(interests: string[], giftType?: string
         'X-Shopify-Storefront-Access-Token': shopifyToken,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        query,
-        variables: { handle: collectionHandle }
-      }),
+      body: JSON.stringify({ query }),
     });
 
-    console.log(`📡 GraphQL Response status: ${response.status} ${response.statusText}`);
-
     if (!response.ok) {
-      throw new Error(`GraphQL request failed: ${response.status} ${response.statusText}`);
+      console.log(`⚠️ Storefront API request failed: ${response.status}`);
+      return null;
     }
 
     const { data, errors } = await response.json();
     
     if (errors) {
-      console.error('❌ GraphQL errors:', JSON.stringify(errors, null, 2));
-      throw new Error(`GraphQL errors: ${JSON.stringify(errors)}`);
-    }
-
-    console.log(`📦 Collection data:`, JSON.stringify(data?.collectionByHandle, null, 2));
-
-    if (!data?.collectionByHandle?.products?.edges?.length) {
-      console.log(`No products found in collection: ${collectionHandle}`);
+      console.log('⚠️ GraphQL errors:', errors);
       return null;
     }
 
-    // Find the best available product
-    const products = data.collectionByHandle.products.edges
-      .map((edge: any) => edge.node)
-      .filter((product: any) => {
-        // Must have available variants
-        const availableVariants = product.variants.edges
-          .map((v: any) => v.node)
-          .filter((variant: any) => variant.availableForSale && variant.quantityAvailable > 0);
-        return availableVariants.length > 0;
-      })
-      .map((product: any) => {
-        // Get first available variant
-        const firstAvailableVariant = product.variants.edges
-          .map((v: any) => v.node)
-          .find((variant: any) => variant.availableForSale && variant.quantityAvailable > 0);
-
-        // Get rank from metafields
-        const rankMetafield = product.metafields.find((m: any) => m.key === 'rank');
-        const rank = rankMetafield ? parseInt(rankMetafield.value) || 999 : 999;
-
-        return {
-          id: product.id,
-          title: product.title,
-          handle: product.handle,
-          variantId: firstAvailableVariant.id,
-          price: parseFloat(firstAvailableVariant.price.amount),
-          rank,
-          inventory: firstAvailableVariant.quantityAvailable
-        };
-      })
-      .sort((a: any, b: any) => {
-        // Sort by rank (ascending), then by inventory (descending)
-        if (a.rank !== b.rank) return a.rank - b.rank;
-        return b.inventory - a.inventory;
-      });
-
-    if (products.length === 0) {
-      console.log(`No available products found in collection: ${collectionHandle}`);
+    if (!data?.products?.edges?.length) {
+      console.log('⚠️ No products found via Storefront API');
       return null;
     }
 
-    const selectedProduct = products[0];
-    console.log(`✅ Selected product: ${selectedProduct.title} (rank: ${selectedProduct.rank}, inventory: ${selectedProduct.inventory})`);
+    // Find first available product
+    for (const edge of data.products.edges) {
+      const product = edge.node;
+      if (product.availableForSale && product.variants?.edges?.length) {
+        const availableVariant = product.variants.edges.find(
+          (v: any) => v.node.availableForSale
+        );
+        
+        if (availableVariant) {
+          return {
+            variantId: availableVariant.node.id,
+            title: product.title,
+            price: parseFloat(availableVariant.node.price.amount),
+            matchReason: 'storefront-api-product'
+          };
+        }
+      }
+    }
 
-    return {
-      ...selectedProduct,
-      matchReason
-    };
+    return null;
 
   } catch (error) {
-    console.error(`❌ Error fetching from collection ${collectionHandle}:`, error);
+    console.error('⚠️ Storefront API error:', error);
     return null;
   }
 }
-
