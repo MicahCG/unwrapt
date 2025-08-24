@@ -1,24 +1,96 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Gift, Clock, Heart, Star, Calendar, TrendingUp, Sparkles, Coffee, Book, Music, ArrowRight, Zap } from 'lucide-react';
+import { Gift, Clock, Heart, CheckCircle, Star, Calendar, Users, TrendingUp, Sparkles, Coffee, Book, Music, ArrowRight, Zap, Shield } from 'lucide-react';
+import AnimatedBackground3D from '@/components/AnimatedBackground3D';
+import AnimatedGiftDrawing from '@/components/AnimatedGiftDrawing';
 
 const Landing = () => {
+  const [email, setEmail] = useState('');
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [activeGiftType, setActiveGiftType] = useState(0);
   const [hoveredStat, setHoveredStat] = useState<number | null>(null);
   const [typewriterText, setTypewriterText] = useState('');
   const [showContent, setShowContent] = useState(false);
   const [cyclingText, setCyclingText] = useState('');
+  const [cyclingIndex, setCyclingIndex] = useState(0);
 
-  const fullText = "Automate your gifts. Celebrate every moment.";
+  const fullText = "Never forget a birthday, anniversary, or milestone again.";
   const cyclingPhrases = [
     "Be thoughtful without the stress",
     "Automate your gift giving", 
     "Find niche gifts for people you love"
   ];
 
-  const handleGetStarted = () => {
-    window.location.href = 'https://app.unwrapt.io';
+  // Cycling Typewriter Component
+  const CyclingTypewriter = () => (
+    <div className="flex items-center justify-center gap-3 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+      <Sparkles className="w-5 h-5 text-brand-gold animate-spin" style={{ animationDuration: '3s' }} />
+      <p className="text-xl md:text-2xl text-slate-800/70 font-medium min-h-[40px] flex items-center">
+        {cyclingText}
+        <span className="animate-pulse ml-1">|</span>
+      </p>
+      <Heart className="w-5 h-5 text-brand-peach animate-pulse" />
+    </div>
+  );
+
+  const handleGetStarted = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (email) {
+      try {
+        // Store email for later use in app
+        sessionStorage.setItem('userEmail', email);
+        
+        // Send email to make.com webhook
+        const webhookUrl = 'https://hook.us2.make.com/cjsyb77bay61w4lrcauvbno5dmvdo7ca';
+        
+        const payload = { email };
+        
+        await fetch(webhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          mode: 'no-cors', // Handle CORS for external webhook
+          body: JSON.stringify(payload),
+        });
+        
+        setIsSubmitted(true);
+        
+        // Redirect to app subdomain
+        setTimeout(() => {
+          window.location.href = 'https://app.unwrapt.io';
+        }, 1500);
+      } catch (error) {
+        console.error('Error sending email to webhook:', error);
+        // Still proceed with the flow even if webhook fails
+        setIsSubmitted(true);
+        setTimeout(() => {
+          window.location.href = 'https://app.unwrapt.io';
+        }, 1500);
+      }
+    }
   };
+
+  // Animated background shapes
+  const AnimatedShape = ({ delay = 0, duration = 20, className = "" }) => (
+    <div 
+      className={`absolute opacity-10 animate-pulse ${className}`}
+      style={{
+        animationDelay: `${delay}s`,
+        animationDuration: `${duration}s`
+      }}
+    />
+  );
+
+  // Gift categories with rotating content
+  const giftCategories = [
+    { icon: Coffee, name: "Coffee & Tea", desc: "Premium blends for the caffeine lover" },
+    { icon: Book, name: "Books", desc: "Bestsellers and personalized reads" },
+    { icon: Music, name: "Experiences", desc: "Concert tickets and unique adventures" },
+    { icon: Sparkles, name: "Jewelry", desc: "Thoughtful pieces for special moments" },
+  ];
 
   // Statistics about gift giving
   const giftStats = [
@@ -96,20 +168,70 @@ const Landing = () => {
     };
   }, [showContent]);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveGiftType((prev) => (prev + 1) % giftCategories.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (isSubmitted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-brand-cream via-white to-brand-peach flex items-center justify-center">
+        <Card className="max-w-md mx-auto text-center p-8">
+          <CardContent className="space-y-4">
+            <CheckCircle className="w-16 h-16 text-brand-gold mx-auto" />
+            <h2 className="text-2xl font-bold text-brand-charcoal">Almost there!</h2>
+            <p className="text-gray-600">Redirecting you to get started...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen relative overflow-hidden bg-white">
-      {/* Subtle light accents */}
-      <div className="absolute top-20 left-10 w-96 h-96 bg-slate-50 rounded-full opacity-30 animate-pulse" style={{ animationDuration: '4s' }} />
-      <div className="absolute top-40 right-20 w-64 h-64 bg-blue-50 rounded-full opacity-40 animate-pulse" style={{ animationDuration: '5s', animationDelay: '1s' }} />
-      <div className="absolute bottom-32 left-1/4 w-80 h-80 bg-purple-50 rounded-full opacity-20 animate-pulse" style={{ animationDuration: '6s', animationDelay: '2s' }} />
+    <div className="min-h-screen relative overflow-hidden bg-soft-gradient">
+      {/* 3D Animated Background */}
+      <AnimatedBackground3D />
+      
+      {/* Abstract Animated Background Shapes */}
+      <AnimatedShape 
+        delay={0} 
+        duration={25} 
+        className="w-32 h-32 bg-gradient-to-br from-brand-gold/15 to-brand-peach/15 rounded-full top-20 left-10 animate-bounce" 
+      />
+      <AnimatedShape 
+        delay={2} 
+        duration={30} 
+        className="w-20 h-20 bg-gradient-to-r from-brand-peach/10 to-brand-gold/10 rounded-lg top-40 right-20 rotate-45 animate-spin" 
+      />
+      <AnimatedShape 
+        delay={4} 
+        duration={35} 
+        className="w-24 h-24 bg-gradient-to-bl from-brand-gold/8 to-brand-cream/15 rounded-full bottom-40 left-1/4 animate-pulse" 
+      />
+      <AnimatedShape 
+        delay={1} 
+        duration={28} 
+        className="w-16 h-16 bg-brand-peach/8 top-1/3 right-1/3 transform rotate-12 animate-bounce" 
+      />
+      <AnimatedShape 
+        delay={3} 
+        duration={32} 
+        className="w-28 h-28 bg-gradient-to-tr from-brand-gold/6 to-brand-peach/6 rounded-full top-1/2 left-1/2 animate-pulse" 
+      />
+      <AnimatedShape 
+        delay={5} 
+        duration={22} 
+        className="w-40 h-40 bg-brand-cream/10 rounded-full bottom-20 right-10 animate-bounce" 
+      />
 
       {/* 1. Full-Screen Hero Section */}
       <section className="min-h-screen flex items-center relative z-10">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 w-full text-center">
-          {/* Clean container */}
-          <div className="p-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+          <div className="text-center">
             {/* Typewriter Headline */}
-            <h1 className="text-5xl md:text-7xl font-bold text-slate-900 mb-8 min-h-[200px] md:min-h-[280px] flex items-center justify-center">
+            <h1 className="text-5xl md:text-7xl font-bold text-[#453a3a] mb-8 min-h-[200px] md:min-h-[280px] flex items-center justify-center">
               <span className="block text-center">
                 {typewriterText}
                 <span className="animate-pulse">|</span>
@@ -118,25 +240,39 @@ const Landing = () => {
             
             {showContent && (
               <>
-                <div className="mb-12 max-w-3xl mx-auto">
-                  <div className="flex items-center justify-center gap-3 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                    <Sparkles className="w-5 h-5 text-blue-600 animate-spin" style={{ animationDuration: '3s' }} />
-                    <p className="text-xl md:text-2xl text-slate-600 font-medium min-h-[40px] flex items-center">
-                      {cyclingText}
-                      <span className="animate-pulse ml-1">|</span>
-                    </p>
-                    <Heart className="w-5 h-5 text-pink-600 animate-pulse" />
-                  </div>
+                <div className="mb-8 max-w-3xl mx-auto">
+                  <CyclingTypewriter />
                 </div>
                 
-                {/* Single CTA Button */}
-                <div className="animate-fade-in" style={{ animationDelay: '0.5s' }}>
+                {/* Email Input with CTA */}
+                <form onSubmit={handleGetStarted} className="max-w-lg mx-auto mb-6 animate-fade-in" style={{ animationDelay: '0.5s' }}>
+                  <div className="flex gap-4">
+                    <Input
+                      type="email"
+                      placeholder="Enter your email address"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      className="flex-1 h-14 text-lg transition-all duration-300 focus:scale-105 focus:shadow-lg"
+                    />
+                    <Button 
+                      type="submit"
+                      className="bg-slate-700 hover:bg-slate-600 text-white px-8 h-14 text-lg hover:scale-105 transition-all duration-300 group hover:shadow-2xl hover:shadow-slate-500/25"
+                    >
+                      Join the Waitlist
+                      <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform duration-200" />
+                    </Button>
+                  </div>
+                </form>
+                
+                {/* Skip Button for Logged Users */}
+                <div className="animate-fade-in" style={{ animationDelay: '1s' }}>
                   <Button 
-                    onClick={handleGetStarted}
-                    className="bg-slate-900 text-white hover:bg-slate-800 px-12 py-6 text-xl font-bold rounded-full hover:scale-105 transition-all duration-300 group hover:shadow-xl"
+                    onClick={() => window.location.href = 'https://app.unwrapt.io'}
+                    variant="ghost"
+                    className="text-brand-charcoal hover:text-brand-gold transition-colors duration-200"
                   >
-                    Automate Your Gifts
-                    <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform duration-200" />
+                    Skip to App →
                   </Button>
                 </div>
               </>
@@ -172,6 +308,7 @@ const Landing = () => {
                   key={index}
                   className="group p-6 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl border-2 border-gray-100 hover:border-brand-gold/30 animate-fade-in"
                   style={{ animationDelay: `${index * 0.1}s` }}
+                  onClick={() => setActiveGiftType(index)}
                 >
                   <CardContent className="text-center space-y-3 p-0">
                     <div className="w-12 h-12 mx-auto bg-brand-gold/10 rounded-full flex items-center justify-center group-hover:bg-brand-gold/20 transition-colors duration-300">
