@@ -288,7 +288,7 @@ const UserMenu: React.FC = () => {
 
   const handleTermsClick = () => {
     console.log('🔧 UserMenu: Navigating to terms of service');
-    navigate('/termsofservice');
+    navigate('/terms');
   };
 
   const handleSignOut = async () => {

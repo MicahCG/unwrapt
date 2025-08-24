@@ -38,7 +38,7 @@ function App() {
               {/* Landing page route - only on main domain */}
               <Route path="/landing" element={<Landing />} />
               <Route path="/privacy" element={<Privacy />} />
-              <Route path="/termsofservice" element={<TermsOfService />} />
+              <Route path="/terms" element={<TermsOfService />} />
               <Route path="/" element={window.location.hostname === 'unwrapt.io' ? <Landing /> : <Index />} />
               
               {/* App flow routes - primarily on app subdomain */}
