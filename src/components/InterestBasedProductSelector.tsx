@@ -1,9 +1,6 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Package, Heart, Coffee, Flame, ChefHat } from 'lucide-react';
+import { Heart } from 'lucide-react';
 import ProductSelector from './ProductSelector';
 import { ShopifyProduct } from '@/hooks/useShopifyCollection';
 
@@ -20,39 +17,6 @@ const InterestBasedProductSelector: React.FC<InterestBasedProductSelectorProps> 
   selectedProduct,
   className = ""
 }) => {
-  const [activeTab, setActiveTab] = useState('all');
-
-  // Available interest categories
-  const interestCategories = [
-    {
-      id: 'candles',
-      label: 'Candles',
-      icon: Flame,
-      description: 'Scented candles and aromatherapy'
-    },
-    {
-      id: 'coffee',
-      label: 'Coffee',
-      icon: Coffee,
-      description: 'Coffee blends and accessories'
-    },
-    {
-      id: 'chocolate',
-      label: 'Chocolate',
-      icon: ChefHat,
-      description: 'Artisan chocolates and treats'
-    },
-    {
-      id: 'all',
-      label: 'All Gifts',
-      icon: Package,
-      description: 'Browse our full collection'
-    }
-  ];
-
-  // Show all categories for filtering
-  const relevantInterests = interestCategories;
-
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Background gradient overlay */}
@@ -79,41 +43,14 @@ const InterestBasedProductSelector: React.FC<InterestBasedProductSelectorProps> 
         </div>
       </div>
       
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full relative">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 bg-white/90 backdrop-blur-md border border-gray-200 shadow-lg p-1 h-auto rounded-lg">
-          {relevantInterests.map((category) => {
-            const Icon = category.icon;
-            return (
-              <TabsTrigger 
-                key={category.id} 
-                value={category.id}
-                className="flex flex-col items-center gap-2 py-3 px-4 data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-primary/20 rounded-lg transition-all duration-300 hover:bg-gray-50 text-gray-700 data-[state=active]:text-primary"
-              >
-                <Icon className="w-5 h-5" />
-                <span className="text-sm font-medium">{category.label}</span>
-              </TabsTrigger>
-            );
-          })}
-        </TabsList>
-
-        {relevantInterests.map((category) => (
-          <TabsContent key={category.id} value={category.id} className="mt-8 space-y-6">
-            <div className="text-center space-y-2 p-6 rounded-xl bg-white/90 backdrop-blur-sm border border-gray-200 shadow-lg">
-              <h4 className="text-xl font-semibold text-gray-900">{category.label}</h4>
-              <p className="text-gray-600">{category.description}</p>
-            </div>
-            
-            <ProductSelector
-              selectedInterest={category.id === 'all' ? undefined : category.id}
-              interests={category.id === 'all' ? recipientInterests : [category.id]}
-              onProductSelect={onProductSelect}
-              selectedProduct={selectedProduct}
-              key={`${category.id}-${activeTab}`}
-              className="border-none shadow-none"
-            />
-          </TabsContent>
-        ))}
-      </Tabs>
+      <div className="mt-8 space-y-6">
+        <ProductSelector
+          interests={recipientInterests}
+          onProductSelect={onProductSelect}
+          selectedProduct={selectedProduct}
+          className="border-none shadow-none"
+        />
+      </div>
 
       {selectedProduct && (
         <div className="mt-8 p-6 bg-white/95 backdrop-blur-md rounded-xl border border-gray-200 shadow-lg">
