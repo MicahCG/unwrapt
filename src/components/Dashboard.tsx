@@ -42,10 +42,18 @@ const Dashboard = () => {
         return null;
       }
       
-      // Fetch the recipient data
+      // Fetch the recipient data and their recent scheduled gift
       const { data: recipient, error } = await supabase
         .from('recipients')
-        .select('*')
+        .select(`
+          *,
+          scheduled_gifts:scheduled_gifts(
+            id,
+            gift_description,
+            status,
+            created_at
+          )
+        `)
         .eq('id', recipientId)
         .eq('user_id', user.id)
         .single();
@@ -55,7 +63,15 @@ const Dashboard = () => {
         return null;
       }
       
-      return recipient;
+      // Find the most recent scheduled gift
+      const recentScheduledGift = recipient.scheduled_gifts
+        ?.filter(gift => gift.created_at)
+        ?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())?.[0];
+      
+      return {
+        ...recipient,
+        recentGift: recentScheduledGift
+      };
     },
     enabled: !!user?.id
   });

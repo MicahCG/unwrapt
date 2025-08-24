@@ -17,6 +17,15 @@ const GiftScheduledSuccess: React.FC<GiftScheduledSuccessProps> = ({
 }) => {
   const [phase, setPhase] = useState<'initial' | 'success' | 'moving'>('initial');
 
+  // Extract order number from gift description
+  const extractOrderNumber = (description?: string) => {
+    if (!description) return null;
+    const orderMatch = description.match(/Order: ([^|]+)/);
+    return orderMatch?.[1]?.trim() || null;
+  };
+
+  const orderNumber = extractOrderNumber(recipient?.recentGift?.gift_description);
+
   useEffect(() => {
     if (!isVisible) return;
     
@@ -103,6 +112,11 @@ const GiftScheduledSuccess: React.FC<GiftScheduledSuccessProps> = ({
                     <Check className="h-3 w-3 mr-1" />
                     Gift Scheduled
                   </Badge>
+                  {orderNumber && (
+                    <div className="mt-2 text-xs font-mono text-brand-charcoal/70 bg-white/60 px-2 py-1 rounded border">
+                      Order: {orderNumber}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
