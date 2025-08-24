@@ -35,12 +35,6 @@ const AppNavigation = () => {
       description: 'Main dashboard overview' 
     },
     { 
-      title: 'Calendar View', 
-      path: '/calendar', 
-      icon: Calendar, 
-      description: 'See all occasions in calendar format' 
-    },
-    { 
       title: 'Gift History', 
       path: '/gift-history', 
       icon: Package, 

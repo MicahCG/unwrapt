@@ -10,7 +10,7 @@ import { AuthProvider } from "@/components/auth/AuthProvider";
 import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import AppStart from "./pages/AppStart";
-import CalendarView from "./pages/CalendarView";
+
 import Settings from "./pages/Settings";
 import Analytics from "./pages/Analytics";
 import Notifications from "./pages/Notifications";
@@ -42,7 +42,7 @@ function App() {
               <Route path="/app" element={<AppStart />} />
               
               {/* Main app routes */}
-              <Route path="/calendar" element={<CalendarView />} />
+              
               <Route path="/settings" element={<Settings />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/notifications" element={<Notifications />} />
