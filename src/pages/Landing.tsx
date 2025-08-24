@@ -244,35 +244,14 @@ const Landing = () => {
                   <CyclingTypewriter />
                 </div>
                 
-                {/* Email Input with CTA */}
-                <form onSubmit={handleGetStarted} className="max-w-lg mx-auto mb-6 animate-fade-in" style={{ animationDelay: '0.5s' }}>
-                  <div className="flex gap-4">
-                    <Input
-                      type="email"
-                      placeholder="Enter your email address"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className="flex-1 h-14 text-lg transition-all duration-300 focus:scale-105 focus:shadow-lg"
-                    />
-                    <Button 
-                      type="submit"
-                      className="bg-slate-700 hover:bg-slate-600 text-white px-8 h-14 text-lg hover:scale-105 transition-all duration-300 group hover:shadow-2xl hover:shadow-slate-500/25"
-                    >
-                      Join the Waitlist
-                      <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform duration-200" />
-                    </Button>
-                  </div>
-                </form>
-                
-                {/* Skip Button for Logged Users */}
-                <div className="animate-fade-in" style={{ animationDelay: '1s' }}>
+                {/* Get Started CTA */}
+                <div className="animate-fade-in" style={{ animationDelay: '0.5s' }}>
                   <Button 
                     onClick={() => window.location.href = 'https://app.unwrapt.io'}
-                    variant="ghost"
-                    className="text-brand-charcoal hover:text-brand-gold transition-colors duration-200"
+                    className="bg-slate-700 hover:bg-slate-600 text-white px-12 h-16 text-xl hover:scale-105 transition-all duration-300 group hover:shadow-2xl hover:shadow-slate-500/25"
                   >
-                    Skip to App →
+                    Get Started
+                    <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform duration-200" />
                   </Button>
                 </div>
               </>
