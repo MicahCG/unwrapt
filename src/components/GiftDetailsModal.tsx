@@ -3,9 +3,11 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Gift, DollarSign, User, Clock, TestTube2, X } from 'lucide-react';
-import ShopifyTestModal from './ShopifyTestModal';
+import { Calendar, Gift, DollarSign, User, Clock, Mail } from 'lucide-react';
 import { cleanName } from '@/lib/utils';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface GiftDetailsModalProps {
   gift: any;
@@ -15,8 +17,9 @@ interface GiftDetailsModalProps {
 }
 
 const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClose, onDelete }) => {
-  const [testingGift, setTestingGift] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const { user } = useAuth();
+  const { toast } = useToast();
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -57,15 +60,51 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClo
     return imageMap[gift.gift_type?.toLowerCase()] || 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop';
   };
 
-  const handleCancelGift = async () => {
-    setIsDeleting(true);
+  const handleContactSupport = async () => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to contact support.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSendingEmail(true);
     try {
-      await onDelete(gift.id);
-      onClose();
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('No active session found');
+      }
+
+      await supabase.functions.invoke('send-support-email', {
+        body: {
+          giftId: gift.id,
+          recipientName: gift.recipients?.name || 'Unknown',
+          occasionDate: gift.occasion_date,
+          giftType: gift.gift_type || 'Unknown',
+          userEmail: user.email,
+          userName: user.user_metadata?.full_name || user.email
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        }
+      });
+
+      toast({
+        title: "Support Request Sent",
+        description: "Our team will contact you shortly about your order.",
+      });
     } catch (error) {
-      console.error('Error canceling gift:', error);
+      console.error('Error sending support email:', error);
+      toast({
+        title: "Failed to Send Request",
+        description: "Please try again or contact team@unwrapt.io directly.",
+        variant: "destructive"
+      });
     } finally {
-      setIsDeleting(false);
+      setIsSendingEmail(false);
     }
   };
 
@@ -176,46 +215,37 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClo
               )}
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex justify-between items-center pt-4 border-t">
-              <Button
-                variant="outline"
-                onClick={handleCancelGift}
-                disabled={isDeleting}
-                className="btn-danger"
-              >
-                <X className="h-4 w-4 mr-2" />
-                {isDeleting ? 'Canceling...' : 'Cancel Gift'}
-              </Button>
-
-              <div className="flex space-x-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setTestingGift(gift)}
-                  className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream"
-                >
-                  <TestTube2 className="h-4 w-4 mr-2" />
-                  Test Shopify
-                </Button>
-                <Button
-                  onClick={onClose}
-                  className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
-                >
-                  Close
-                </Button>
+            {/* Support Section */}
+            <div className="pt-4 border-t space-y-4">
+              <div>
+                <h4 className="text-lg font-medium text-brand-charcoal mb-2">
+                  Questions/Issues about this order?
+                </h4>
+                <p className="text-sm text-brand-charcoal/70 mb-4">
+                  Contact our support team for any questions or concerns about your gift order.
+                </p>
+                <div className="flex justify-between items-center">
+                  <Button
+                    variant="outline"
+                    onClick={handleContactSupport}
+                    disabled={isSendingEmail}
+                    className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream"
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    {isSendingEmail ? 'Sending...' : 'Contact Support'}
+                  </Button>
+                  <Button
+                    onClick={onClose}
+                    className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+                  >
+                    Close
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
         </DialogContent>
       </Dialog>
-
-      {testingGift && (
-        <ShopifyTestModal
-          gift={testingGift}
-          isOpen={!!testingGift}
-          onClose={() => setTestingGift(null)}
-        />
-      )}
     </>
   );
 };
