@@ -219,7 +219,7 @@ serve(async (req) => {
     // Get the origin URL for redirect URLs with fallback and cleanup
     const origin = req.headers.get("origin") || 
                   req.headers.get("referer")?.replace(/\/[^\/]*$/, '') || 
-                  'https://preview--unwrapt.lovable.app';
+                  'https://app.unwrapt.io';
     
     // Ensure the origin doesn't end with a slash for consistent URL building
     const cleanOrigin = origin.replace(/\/$/, '');
