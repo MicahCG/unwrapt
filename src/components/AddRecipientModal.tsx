@@ -9,7 +9,7 @@ import { Plus, X, UserPlus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
-import { sanitizeInput, sanitizeEmail, sanitizePhoneNumber, sanitizeAddress } from '@/utils/inputSanitization';
+import { sanitizeInput, sanitizeAddress } from '@/utils/inputSanitization';
 import { ErrorHandler } from '@/utils/errorHandler';
 import { rateLimiter, RATE_LIMITS } from '@/utils/rateLimiter';
 
@@ -43,8 +43,6 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
   
   const [formData, setFormData] = useState({
     name: '',
-    email: '',
-    phone: '',
     relationship: '',
     birthday: '',
     anniversary: '',
@@ -63,12 +61,6 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
     
     // Apply appropriate sanitization based on field type
     switch (field) {
-      case 'email':
-        sanitizedValue = sanitizeEmail(value);
-        break;
-      case 'phone':
-        sanitizedValue = sanitizePhoneNumber(value);
-        break;
       case 'street':
       case 'city':
       case 'state':
@@ -109,10 +101,6 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
   const validateForm = (): string | null => {
     if (!formData.name.trim()) {
       return ErrorHandler.handleValidationError('name', formData.name);
-    }
-    
-    if (formData.email && !formData.email.includes('@')) {
-      return ErrorHandler.handleValidationError('email', formData.email);
     }
     
     return null;
@@ -161,8 +149,8 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
           {
             user_id: user.id,
             name: formData.name,
-            email: formData.email || null,
-            phone: formData.phone || null,
+            email: null,
+            phone: null,
             relationship: formData.relationship || null,
             birthday: formData.birthday || null,
             anniversary: formData.anniversary || null,
@@ -188,8 +176,6 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
       // Reset form
       setFormData({
         name: '',
-        email: '',
-        phone: '',
         relationship: '',
         birthday: '',
         anniversary: '',
@@ -257,30 +243,6 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
                 onChange={(e) => handleInputChange('relationship', e.target.value)}
                 placeholder="e.g., Friend, Family, Colleague"
                 maxLength={50}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-                placeholder="Enter email address"
-                maxLength={100}
-              />
-            </div>
-            <div>
-              <Label htmlFor="phone">Phone</Label>
-              <Input
-                id="phone"
-                value={formData.phone}
-                onChange={(e) => handleInputChange('phone', e.target.value)}
-                placeholder="Enter phone number"
-                maxLength={20}
               />
             </div>
           </div>
