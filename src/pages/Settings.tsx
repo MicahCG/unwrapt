@@ -52,7 +52,6 @@ const Settings = () => {
   
   // Notification preferences
   const [emailReminders, setEmailReminders] = useState(true);
-  const [smsAlerts, setSmsAlerts] = useState(false);
   const [marketingEmails, setMarketingEmails] = useState(true);
   const [savingsAlerts, setSavingsAlerts] = useState(true);
   
@@ -160,7 +159,7 @@ const Settings = () => {
                   className="flex-1"
                 />
               </div>
-              <p className="text-sm text-brand-charcoal/60">For SMS notifications</p>
+              <p className="text-sm text-brand-charcoal/60">Optional contact information</p>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-2 pt-2">
@@ -219,17 +218,6 @@ const Settings = () => {
                   </div>
                 </div>
                 <Switch checked={emailReminders} onCheckedChange={setEmailReminders} />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <Phone className="h-4 w-4 text-brand-charcoal/60" />
-                  <div>
-                    <Label>SMS Alerts</Label>
-                    <p className="text-sm text-brand-charcoal/60">Critical updates via text message</p>
-                  </div>
-                </div>
-                <Switch checked={smsAlerts} onCheckedChange={setSmsAlerts} />
               </div>
 
               <div className="flex items-center justify-between">
