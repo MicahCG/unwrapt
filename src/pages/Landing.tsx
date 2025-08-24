@@ -2,16 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Gift, Clock, Heart, Star, Calendar, TrendingUp, Sparkles, Coffee, Book, Music, ArrowRight, Zap } from 'lucide-react';
-import AnimatedBackground3D from '@/components/AnimatedBackground3D';
-import AnimatedGiftDrawing from '@/components/AnimatedGiftDrawing';
 
 const Landing = () => {
-  const [activeGiftType, setActiveGiftType] = useState(0);
   const [hoveredStat, setHoveredStat] = useState<number | null>(null);
   const [typewriterText, setTypewriterText] = useState('');
   const [showContent, setShowContent] = useState(false);
   const [cyclingText, setCyclingText] = useState('');
-  const [cyclingIndex, setCyclingIndex] = useState(0);
 
   const fullText = "Automate your gifts. Celebrate every moment.";
   const cyclingPhrases = [
@@ -20,40 +16,9 @@ const Landing = () => {
     "Find niche gifts for people you love"
   ];
 
-  // Cycling Typewriter Component
-  const CyclingTypewriter = () => (
-    <div className="flex items-center justify-center gap-3 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-      <Sparkles className="w-5 h-5 text-brand-gold animate-spin" style={{ animationDuration: '3s' }} />
-      <p className="text-xl md:text-2xl text-slate-800/70 font-medium min-h-[40px] flex items-center">
-        {cyclingText}
-        <span className="animate-pulse ml-1">|</span>
-      </p>
-      <Heart className="w-5 h-5 text-brand-peach animate-pulse" />
-    </div>
-  );
-
   const handleGetStarted = () => {
     window.location.href = 'https://app.unwrapt.io';
   };
-
-  // Animated background shapes
-  const AnimatedShape = ({ delay = 0, duration = 20, className = "" }) => (
-    <div 
-      className={`absolute opacity-10 animate-pulse ${className}`}
-      style={{
-        animationDelay: `${delay}s`,
-        animationDuration: `${duration}s`
-      }}
-    />
-  );
-
-  // Gift categories with rotating content
-  const giftCategories = [
-    { icon: Coffee, name: "Coffee & Tea", desc: "Premium blends for the caffeine lover" },
-    { icon: Book, name: "Books", desc: "Bestsellers and personalized reads" },
-    { icon: Music, name: "Experiences", desc: "Concert tickets and unique adventures" },
-    { icon: Sparkles, name: "Jewelry", desc: "Thoughtful pieces for special moments" },
-  ];
 
   // Statistics about gift giving
   const giftStats = [
@@ -131,57 +96,55 @@ const Landing = () => {
     };
   }, [showContent]);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveGiftType((prev) => (prev + 1) % giftCategories.length);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      {/* Clean gradient background inspired by Lovable */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-700 to-orange-500 opacity-90" />
+    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50">
+      {/* Clean minimalist gradient background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50" />
       
-      {/* Subtle pattern overlay */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1)_0%,transparent_50%)] opacity-20" />
+      {/* Glassmorphism floating elements */}
+      <div className="absolute top-20 left-10 w-96 h-96 bg-white/20 backdrop-blur-xl rounded-full opacity-40 animate-pulse" style={{ animationDuration: '4s' }} />
+      <div className="absolute top-40 right-20 w-64 h-64 bg-blue-100/30 backdrop-blur-xl rounded-full opacity-50 animate-pulse" style={{ animationDuration: '5s', animationDelay: '1s' }} />
+      <div className="absolute bottom-32 left-1/4 w-80 h-80 bg-purple-100/20 backdrop-blur-xl rounded-full opacity-30 animate-pulse" style={{ animationDuration: '6s', animationDelay: '2s' }} />
 
       {/* 1. Full-Screen Hero Section */}
       <section className="min-h-screen flex items-center relative z-10">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 w-full text-center">
-          {/* Typewriter Headline */}
-          <h1 className="text-5xl md:text-7xl font-bold text-white mb-8 min-h-[200px] md:min-h-[280px] flex items-center justify-center">
-            <span className="block text-center">
-              {typewriterText}
-              <span className="animate-pulse">|</span>
-            </span>
-          </h1>
-          
-          {showContent && (
-            <>
-              <div className="mb-12 max-w-3xl mx-auto">
-                <div className="flex items-center justify-center gap-3 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                  <Sparkles className="w-5 h-5 text-orange-400 animate-spin" style={{ animationDuration: '3s' }} />
-                  <p className="text-xl md:text-2xl text-white/80 font-medium min-h-[40px] flex items-center">
-                    {cyclingText}
-                    <span className="animate-pulse ml-1">|</span>
-                  </p>
-                  <Heart className="w-5 h-5 text-pink-400 animate-pulse" />
+          {/* Glassmorphism container */}
+          <div className="bg-white/10 backdrop-blur-md rounded-3xl p-12 border border-white/20 shadow-2xl">
+            {/* Typewriter Headline */}
+            <h1 className="text-5xl md:text-7xl font-bold text-slate-800 mb-8 min-h-[200px] md:min-h-[280px] flex items-center justify-center">
+              <span className="block text-center">
+                {typewriterText}
+                <span className="animate-pulse">|</span>
+              </span>
+            </h1>
+            
+            {showContent && (
+              <>
+                <div className="mb-12 max-w-3xl mx-auto">
+                  <div className="flex items-center justify-center gap-3 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+                    <Sparkles className="w-5 h-5 text-blue-500 animate-spin" style={{ animationDuration: '3s' }} />
+                    <p className="text-xl md:text-2xl text-slate-700 font-medium min-h-[40px] flex items-center">
+                      {cyclingText}
+                      <span className="animate-pulse ml-1">|</span>
+                    </p>
+                    <Heart className="w-5 h-5 text-pink-500 animate-pulse" />
+                  </div>
                 </div>
-              </div>
-              
-              {/* Single CTA Button */}
-              <div className="animate-fade-in" style={{ animationDelay: '0.5s' }}>
-                <Button 
-                  onClick={handleGetStarted}
-                  className="bg-white text-slate-900 hover:bg-gray-100 px-12 py-6 text-xl font-bold rounded-full hover:scale-105 transition-all duration-300 group hover:shadow-2xl"
-                >
-                  Automate Your Gifts
-                  <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform duration-200" />
-                </Button>
-              </div>
-            </>
-          )}
+                
+                {/* Single CTA Button */}
+                <div className="animate-fade-in" style={{ animationDelay: '0.5s' }}>
+                  <Button 
+                    onClick={handleGetStarted}
+                    className="bg-slate-800 text-white hover:bg-slate-700 px-12 py-6 text-xl font-bold rounded-full hover:scale-105 transition-all duration-300 group hover:shadow-xl backdrop-blur-sm"
+                  >
+                    Automate Your Gifts
+                    <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform duration-200" />
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </section>
 
@@ -212,7 +175,6 @@ const Landing = () => {
                   key={index}
                   className="group p-6 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl border-2 border-gray-100 hover:border-brand-gold/30 animate-fade-in"
                   style={{ animationDelay: `${index * 0.1}s` }}
-                  onClick={() => setActiveGiftType(index)}
                 >
                   <CardContent className="text-center space-y-3 p-0">
                     <div className="w-12 h-12 mx-auto bg-brand-gold/10 rounded-full flex items-center justify-center group-hover:bg-brand-gold/20 transition-colors duration-300">
