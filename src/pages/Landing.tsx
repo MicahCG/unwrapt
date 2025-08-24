@@ -16,7 +16,7 @@ const Landing = () => {
   const [cyclingText, setCyclingText] = useState('');
   const [cyclingIndex, setCyclingIndex] = useState(0);
 
-  const fullText = "Never forget a birthday, anniversary, or milestone again.";
+  const fullText = "Never forget a birthday again.";
   const cyclingPhrases = [
     "Be thoughtful without the stress",
     "Automate your gift giving", 
