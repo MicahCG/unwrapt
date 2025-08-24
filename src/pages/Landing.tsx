@@ -97,22 +97,19 @@ const Landing = () => {
   }, [showContent]);
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50">
-      {/* Clean minimalist gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50" />
-      
-      {/* Glassmorphism floating elements */}
-      <div className="absolute top-20 left-10 w-96 h-96 bg-white/20 backdrop-blur-xl rounded-full opacity-40 animate-pulse" style={{ animationDuration: '4s' }} />
-      <div className="absolute top-40 right-20 w-64 h-64 bg-blue-100/30 backdrop-blur-xl rounded-full opacity-50 animate-pulse" style={{ animationDuration: '5s', animationDelay: '1s' }} />
-      <div className="absolute bottom-32 left-1/4 w-80 h-80 bg-purple-100/20 backdrop-blur-xl rounded-full opacity-30 animate-pulse" style={{ animationDuration: '6s', animationDelay: '2s' }} />
+    <div className="min-h-screen relative overflow-hidden bg-white">
+      {/* Subtle light accents */}
+      <div className="absolute top-20 left-10 w-96 h-96 bg-slate-50 rounded-full opacity-30 animate-pulse" style={{ animationDuration: '4s' }} />
+      <div className="absolute top-40 right-20 w-64 h-64 bg-blue-50 rounded-full opacity-40 animate-pulse" style={{ animationDuration: '5s', animationDelay: '1s' }} />
+      <div className="absolute bottom-32 left-1/4 w-80 h-80 bg-purple-50 rounded-full opacity-20 animate-pulse" style={{ animationDuration: '6s', animationDelay: '2s' }} />
 
       {/* 1. Full-Screen Hero Section */}
       <section className="min-h-screen flex items-center relative z-10">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 w-full text-center">
-          {/* Glassmorphism container */}
-          <div className="bg-white/10 backdrop-blur-md rounded-3xl p-12 border border-white/20 shadow-2xl">
+          {/* Clean container */}
+          <div className="p-12">
             {/* Typewriter Headline */}
-            <h1 className="text-5xl md:text-7xl font-bold text-slate-800 mb-8 min-h-[200px] md:min-h-[280px] flex items-center justify-center">
+            <h1 className="text-5xl md:text-7xl font-bold text-slate-900 mb-8 min-h-[200px] md:min-h-[280px] flex items-center justify-center">
               <span className="block text-center">
                 {typewriterText}
                 <span className="animate-pulse">|</span>
@@ -123,12 +120,12 @@ const Landing = () => {
               <>
                 <div className="mb-12 max-w-3xl mx-auto">
                   <div className="flex items-center justify-center gap-3 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                    <Sparkles className="w-5 h-5 text-blue-500 animate-spin" style={{ animationDuration: '3s' }} />
-                    <p className="text-xl md:text-2xl text-slate-700 font-medium min-h-[40px] flex items-center">
+                    <Sparkles className="w-5 h-5 text-blue-600 animate-spin" style={{ animationDuration: '3s' }} />
+                    <p className="text-xl md:text-2xl text-slate-600 font-medium min-h-[40px] flex items-center">
                       {cyclingText}
                       <span className="animate-pulse ml-1">|</span>
                     </p>
-                    <Heart className="w-5 h-5 text-pink-500 animate-pulse" />
+                    <Heart className="w-5 h-5 text-pink-600 animate-pulse" />
                   </div>
                 </div>
                 
@@ -136,7 +133,7 @@ const Landing = () => {
                 <div className="animate-fade-in" style={{ animationDelay: '0.5s' }}>
                   <Button 
                     onClick={handleGetStarted}
-                    className="bg-slate-800 text-white hover:bg-slate-700 px-12 py-6 text-xl font-bold rounded-full hover:scale-105 transition-all duration-300 group hover:shadow-xl backdrop-blur-sm"
+                    className="bg-slate-900 text-white hover:bg-slate-800 px-12 py-6 text-xl font-bold rounded-full hover:scale-105 transition-all duration-300 group hover:shadow-xl"
                   >
                     Automate Your Gifts
                     <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform duration-200" />
