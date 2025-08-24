@@ -211,6 +211,11 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
       if (onRecipientAdded) {
         onRecipientAdded();
       }
+      
+      // Refresh the page so user can select the new recipient
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (error: any) {
       console.error('Error adding recipient:', error);
       const friendlyMessage = ErrorHandler.handleApiError(error, 'add-recipient', user.id);
