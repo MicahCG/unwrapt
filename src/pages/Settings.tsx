@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Slider } from '@/components/ui/slider';
 import {
   Select,
   SelectContent,
@@ -29,17 +28,13 @@ import {
   User, 
   Bell, 
   Zap, 
-  CreditCard, 
   Shield,
   Clock,          // Added Clock import
   Download,
   Trash2,
   Phone,
   Mail,
-  Lock,
-  Plus,
-  Edit,
-  Receipt
+  Lock
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -67,9 +62,6 @@ const Settings = () => {
   const [notificationTime, setNotificationTime] = useState('morning'); // Added
   const [allowCancellation, setAllowCancellation] = useState(true); // Added
   const [leadTime, setLeadTime] = useState('3-days'); // Updated format
-  
-  // Payment settings
-  const [spendingLimit, setSpendingLimit] = useState([75]);
 
   const handleSaveProfile = () => {
     // TODO: Implement profile update
@@ -400,70 +392,6 @@ const Settings = () => {
               )}
             </div>
 
-          </CardContent>
-        </Card>
-
-        {/* Payment Section */}
-        <Card className="border-brand-charcoal/10">
-          <CardHeader>
-            <CardTitle className="flex items-center text-brand-charcoal">
-              <CreditCard className="h-5 w-5 mr-2" />
-              Payment
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Payment Methods</Label>
-                <Button size="sm" variant="outline" className="border-brand-charcoal/20">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Card
-                </Button>
-              </div>
-              <div className="p-3 border border-brand-charcoal/10 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-5 bg-gradient-to-r from-blue-600 to-blue-400 rounded"></div>
-                    <div>
-                      <p className="font-medium">•••• •••• •••• 4242</p>
-                      <p className="text-sm text-brand-charcoal/60">Expires 12/25</p>
-                    </div>
-                  </div>
-                  <Button size="sm" variant="ghost">
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Transaction History</Label>
-                <Button size="sm" variant="outline" className="border-brand-charcoal/20">
-                  <Receipt className="h-4 w-4 mr-2" />
-                  View Receipts
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <Label>Spending Limit per Gift</Label>
-              <div className="px-3">
-                <Slider
-                  value={spendingLimit}
-                  onValueChange={setSpendingLimit}
-                  max={200}
-                  min={15}
-                  step={5}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-sm text-brand-charcoal/60 mt-2">
-                  <span>$15</span>
-                  <span className="font-medium">${spendingLimit[0]}</span>
-                  <span>$200+</span>
-                </div>
-              </div>
-            </div>
           </CardContent>
         </Card>
 
