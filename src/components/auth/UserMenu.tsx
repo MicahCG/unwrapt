@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, Settings, Calendar, Loader2, Check, FileText } from 'lucide-react';
+import { LogOut, Settings, Calendar, Loader2, Check, FileText, Shield } from 'lucide-react';
 import { useAuth } from './AuthProvider';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -291,6 +291,11 @@ const UserMenu: React.FC = () => {
     navigate('/terms');
   };
 
+  const handlePrivacyClick = () => {
+    console.log('🔧 UserMenu: Navigating to privacy policy');
+    navigate('/privacy');
+  };
+
   const handleSignOut = async () => {
     console.log('🔧 UserMenu: Signing out');
     await signOut();
@@ -374,6 +379,13 @@ const UserMenu: React.FC = () => {
           >
             <FileText className="mr-2 h-4 w-4" />
             <span>Terms of Service</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem 
+            onClick={handlePrivacyClick}
+            className="text-brand-charcoal hover:bg-brand-cream hover:text-brand-charcoal cursor-pointer"
+          >
+            <Shield className="mr-2 h-4 w-4" />
+            <span>Privacy Policy</span>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem 
