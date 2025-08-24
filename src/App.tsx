@@ -10,7 +10,7 @@ import { AuthProvider } from "@/components/auth/AuthProvider";
 import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import AppStart from "./pages/AppStart";
-
+import Privacy from "./pages/Privacy";
 import Settings from "./pages/Settings";
 import Analytics from "./pages/Analytics";
 import Notifications from "./pages/Notifications";
@@ -36,6 +36,7 @@ function App() {
             <Routes>
               {/* Landing page route - only on main domain */}
               <Route path="/landing" element={<Landing />} />
+              <Route path="/privacy" element={<Privacy />} />
               <Route path="/" element={window.location.hostname === 'unwrapt.io' ? <Landing /> : <Index />} />
               
               {/* App flow routes - primarily on app subdomain */}
