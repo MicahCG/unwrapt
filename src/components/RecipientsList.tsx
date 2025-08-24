@@ -330,6 +330,10 @@ const RecipientsList = () => {
       <AddRecipientModal
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
+        onRecipientAdded={() => {
+          queryClient.invalidateQueries({ queryKey: ['recipients'] });
+          queryClient.invalidateQueries({ queryKey: ['user-metrics'] });
+        }}
       />
     </div>
   );
