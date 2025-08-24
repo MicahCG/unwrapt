@@ -169,7 +169,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     setIsLoading(true);
 
     try {
-      const deliveryDate = new Date(new Date(formData.occasion_date).getTime() - 3 * 24 * 60 * 60 * 1000)
+      const deliveryDate = new Date(new Date(formData.occasion_date).getTime() - 4 * 24 * 60 * 60 * 1000)
         .toISOString().split('T')[0];
 
       // First, update the recipient with the complete address information
@@ -453,7 +453,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
       <div className="bg-brand-cream/50 p-3 rounded-lg border border-brand-cream">
         <p className="text-sm text-brand-charcoal/80">
-          📦 Deliveries are sent 3 days before occasion
+          📦 Deliveries are sent 3-5 days before occasion
         </p>
       </div>
 

@@ -156,7 +156,7 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
       const recipientId = await createOrGetRecipient();
 
       // Create the actual scheduled gift in the database
-      const deliveryDate = new Date(new Date(occasionDate!).getTime() - 3 * 24 * 60 * 60 * 1000)
+      const deliveryDate = new Date(new Date(occasionDate!).getTime() - 4 * 24 * 60 * 60 * 1000)
         .toISOString().split('T')[0];
 
       const { data: giftData, error: giftError } = await supabase
@@ -400,7 +400,7 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
                <div className="mt-4 p-3 bg-white/70 rounded-lg">
                  <div className="flex items-center space-x-2 text-sm text-brand-charcoal/80">
                    <Package className="h-4 w-4" />
-                   <span>We'll handle the purchase and delivery 3 days before the {formatOccasion(occasion)}</span>
+                   <span>We'll handle the purchase and delivery 3-5 days before the {formatOccasion(occasion)}</span>
                  </div>
                </div>
              </div>
@@ -432,7 +432,7 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
         {/* Delivery Info */}
         <div className="bg-brand-cream/50 p-3 rounded-lg border border-brand-cream">
           <p className="text-sm text-brand-charcoal/80">
-            📦 Deliveries are sent 3 days before occasion
+            📦 Deliveries are sent 3-5 days before occasion
           </p>
         </div>
 
