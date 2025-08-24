@@ -4,13 +4,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Plus, X, UserPlus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
-import { sanitizeInput, sanitizeEmail, sanitizePhoneNumber, sanitizeTextArea, sanitizeAddress } from '@/utils/inputSanitization';
+import { sanitizeInput, sanitizeEmail, sanitizePhoneNumber, sanitizeAddress } from '@/utils/inputSanitization';
 import { ErrorHandler } from '@/utils/errorHandler';
 import { rateLimiter, RATE_LIMITS } from '@/utils/rateLimiter';
 
@@ -54,7 +53,6 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
     state: '',
     zip_code: '',
     country: 'United States',
-    notes: '',
     interests: [] as string[]
   });
   
@@ -70,9 +68,6 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
         break;
       case 'phone':
         sanitizedValue = sanitizePhoneNumber(value);
-        break;
-      case 'notes':
-        sanitizedValue = sanitizeTextArea(value);
         break;
       case 'street':
       case 'city':
@@ -176,7 +171,7 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
             state: formData.state || null,
             zip_code: formData.zip_code || null,
             country: formData.country,
-            notes: formData.notes || null,
+            notes: null,
             interests: formData.interests.length > 0 ? formData.interests : null,
           }
         ]);
@@ -203,7 +198,6 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
         state: '',
         zip_code: '',
         country: 'United States',
-        notes: '',
         interests: []
       });
       
@@ -395,17 +389,6 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => handleInputChange('notes', e.target.value)}
-              placeholder="Any additional notes about this recipient"
-              rows={3}
-              maxLength={500}
-            />
-          </div>
 
           <div className="flex justify-end gap-2 pt-4">
             <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
