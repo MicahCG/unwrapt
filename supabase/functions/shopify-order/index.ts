@@ -107,16 +107,66 @@ serve(async (req) => {
       testMode
     });
 
-    // Product selection with improved fallback
+    // CRITICAL FIX: Use the exact product the user selected during payment
     let selectedVariantId;
     let matchReason = 'default';
     let productName = 'Gift Item';
     let variantPrice = "25.00";
 
-    // Try dynamic product selection if Storefront API is configured
-    if (shopifyStorefrontToken) {
+    // First, check if we have the user's specific product selection from payment
+    // This should be stored in the payment metadata or gift data
+    console.log('🔍 Checking for user-selected variant ID...');
+    
+    // Try to get the variant ID from the payment record first
+    let userSelectedVariantId = null;
+    let userSelectedPrice = null;
+    
+    if (!testMode) {
       try {
-        console.log('🛍️ Attempting dynamic product selection...');
+        const { data: paymentData, error: paymentError } = await supabaseService
+          .from('payments')
+          .select('stripe_session_id, amount')
+          .eq('scheduled_gift_id', scheduledGiftId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (paymentData && !paymentError) {
+          console.log('💳 Found payment record, checking Stripe session metadata...');
+          
+          // Get the Stripe session to extract variant_id from metadata
+          const stripeResponse = await fetch(`https://api.stripe.com/v1/checkout/sessions/${paymentData.stripe_session_id}`, {
+            headers: {
+              'Authorization': `Bearer ${Deno.env.get("STRIPE_SECRET_KEY")}`,
+            },
+          });
+          
+          if (stripeResponse.ok) {
+            const stripeSession = await stripeResponse.json();
+            if (stripeSession.metadata?.variant_id) {
+              userSelectedVariantId = stripeSession.metadata.variant_id;
+              userSelectedPrice = (paymentData.amount / 100).toString(); // Convert from cents
+              console.log(`🎯 Found user-selected variant: ${userSelectedVariantId} for $${userSelectedPrice}`);
+            }
+          }
+        }
+      } catch (error) {
+        console.log('⚠️ Could not retrieve payment variant info:', error.message);
+      }
+    }
+
+    // Use the user's exact selection if available
+    if (userSelectedVariantId) {
+      selectedVariantId = userSelectedVariantId;
+      variantPrice = userSelectedPrice || variantPrice;
+      matchReason = 'user-selected-product';
+      productName = giftData.gift_type || 'Selected Gift';
+      console.log(`✅ Using user-selected product: ${productName} (variant: ${selectedVariantId})`);
+    }
+    // Only fall back to dynamic selection if we don't have user's specific choice
+    else if (shopifyStorefrontToken) {
+      try {
+        console.log('🛍️ No user selection found, attempting dynamic product selection...');
         const dynamicProduct = await selectProductFromInterests(
           giftData.recipients?.interests || [],
           giftData.gift_type
