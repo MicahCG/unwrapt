@@ -10,10 +10,10 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useShopifyProductTypes } from '@/hooks/useShopifyProductTypes';
-import { useShopifyProduct } from '@/hooks/useShopifyProduct';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useNavigate } from 'react-router-dom';
+import ProductSelector from '@/components/ProductSelector';
+import { ShopifyProduct } from '@/hooks/useShopifyCollection';
 
 interface GiftScheduleStepProps {
   onNext: (data: any) => void;
@@ -30,12 +30,10 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
 }) => {
   const [occasion, setOccasion] = useState('');
   const [occasionDate, setOccasionDate] = useState<Date>();
-  const [giftType, setGiftType] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState<ShopifyProduct | null>(null);
   const [isValid, setIsValid] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const { toast } = useToast();
-  const { data: productTypesData, isLoading: isLoadingProductTypes } = useShopifyProductTypes();
-  const { data: productData, isLoading: isLoadingProduct } = useShopifyProduct(giftType);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -72,82 +70,14 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
     }
   }, [selectedPersonForGift]);
 
-  // Function to auto-select gift type based on interests
-  const getGiftTypeFromInterests = (interests: string[], productTypes: string[]) => {
-    if (!interests || interests.length === 0 || !productTypes || productTypes.length === 0) return '';
-    
-    // Create interest-to-gift-type mapping
-    const interestMappings: { [key: string]: string[] } = {
-      'coffee': ['coffee', 'beverages', 'food'],
-      'tea': ['tea', 'beverages', 'food'],
-      'wine': ['wine', 'beverages', 'alcohol'],
-      'craft beer': ['beer', 'beverages', 'alcohol'],
-      'cooking': ['kitchen', 'cooking', 'food', 'home'],
-      'baking': ['kitchen', 'baking', 'food', 'home'],
-      'fitness': ['sports', 'fitness', 'health', 'wellness'],
-      'yoga': ['sports', 'fitness', 'health', 'wellness'],
-      'reading': ['books', 'literature', 'education'],
-      'gaming': ['electronics', 'games', 'technology'],
-      'music': ['electronics', 'music', 'entertainment'],
-      'art': ['art', 'crafts', 'creative'],
-      'photography': ['electronics', 'photography', 'technology'],
-      'travel': ['travel', 'accessories', 'luggage'],
-      'gardening': ['garden', 'home', 'plants', 'outdoor'],
-      'technology': ['electronics', 'gadgets', 'technology'],
-      'fashion': ['clothing', 'fashion', 'apparel'],
-      'skincare': ['beauty', 'health', 'skincare', 'cosmetics'],
-      'jewelry': ['jewelry', 'accessories', 'fashion'],
-      'home decor': ['home', 'decor', 'furniture'],
-      'outdoor activities': ['outdoor', 'sports', 'recreation'],
-      'sports': ['sports', 'fitness', 'athletic']
-    };
-
-    // Find the best matching product type
-    for (const interest of interests) {
-      const interestLower = interest.toLowerCase();
-      const mappings = interestMappings[interestLower] || [interestLower];
-      
-      for (const mapping of mappings) {
-        const matchingType = productTypes.find(type => 
-          type.toLowerCase().includes(mapping) || mapping.includes(type.toLowerCase())
-        );
-        if (matchingType) {
-          return matchingType;
-        }
-      }
-    }
-    
-    return '';
-  };
-
-  // Auto-select gift type when product types load and we have interests
-  useEffect(() => {
-    if (productTypesData?.productTypes && interests && interests.length > 0 && !giftType) {
-      const suggestedType = getGiftTypeFromInterests(interests, productTypesData.productTypes);
-      if (suggestedType) {
-        setGiftType(suggestedType);
-      }
-    }
-  }, [productTypesData, interests, giftType]);
-
   // Check form validity
   useEffect(() => {
-    const formValid = occasion && occasionDate && giftType;
+    const formValid = occasion && occasionDate && selectedProduct;
     setIsValid(!!formValid);
-  }, [occasion, occasionDate, giftType]);
+  }, [occasion, occasionDate, selectedProduct]);
 
-  // Gift preview helper functions
-  const getGiftImage = (giftType: string) => {
-    const imageMap = {
-      'lavender fields coffee': 'https://images.unsplash.com/photo-1581090464777-f3220bbe1b8b?w=400&h=300&fit=crop',
-      'truffle chocolate': 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=400&h=300&fit=crop',
-      'ocean driftwood coconut candle': 'https://images.unsplash.com/photo-1482938289607-e9573fc25ebb?w=400&h=300&fit=crop'
-    };
-    return imageMap[giftType.toLowerCase()] || 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop';
-  };
-
-  const getGiftDescription = (giftType: string, recipientName: string) => {
-    return `We'll curate premium ${giftType.toLowerCase()} perfect for ${recipientName}'s interests`;
+  const getGiftDescription = (product: ShopifyProduct, recipientName: string) => {
+    return `${product.title} - perfect for ${recipientName}'s interests`;
   };
 
   const getSenderName = () => {
@@ -215,7 +145,7 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
   };
 
   const handleScheduleWithPayment = async () => {
-    if (!isValid || !productData) return;
+    if (!isValid || !selectedProduct) return;
     
     setIsProcessingPayment(true);
     
@@ -236,8 +166,8 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
           recipient_id: recipientId,
           occasion,
           occasion_date: occasionDate?.toISOString().split('T')[0],
-          gift_type: giftType,
-          price_range: `$${productData.price.toFixed(2)}`, // Store actual price
+          gift_type: selectedProduct.title,
+          price_range: `$${selectedProduct.price.toFixed(2)}`,
           delivery_date: deliveryDate,
           status: 'scheduled',
           payment_status: 'unpaid'
@@ -270,14 +200,14 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
       const { data: paymentData, error: paymentError } = await supabase.functions.invoke('create-gift-payment', {
         body: {
           scheduledGiftId: giftData.id, // 🔥 REAL ID instead of 'onboarding-temp-id'
-          productPrice: productData.price,
-          productImage: productData.image,
+          productPrice: selectedProduct.price,
+          productImage: selectedProduct.featuredImage || 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop',
           giftDetails: {
             recipientName: recipientName || 'your recipient',
             occasion,
-            giftType
+            giftType: selectedProduct.title
           },
-          variantId: productData.variantId,
+          variantId: selectedProduct.variantId,
           shippingAddress
         }
       });
@@ -296,8 +226,8 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
             id: giftData.id, // Store the real ID
             occasion,
             occasionDate: occasionDate?.toISOString().split('T')[0],
-            giftType,
-            price: productData.price,
+            giftType: selectedProduct.title,
+            price: selectedProduct.price,
             recipientId,
             recipientName
           }
@@ -416,97 +346,87 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
             </Popover>
           </div>
 
-          {/* Gift Type */}
-          <div className="space-y-2">
-            <Label htmlFor="giftType" className="text-brand-charcoal">What type of gift? *</Label>
-            <Select value={giftType} onValueChange={setGiftType}>
-              <SelectTrigger className="text-brand-charcoal border-brand-cream">
-                <SelectValue placeholder="Select gift type" />
-              </SelectTrigger>
-              <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
-                {isLoadingProductTypes ? (
-                  <SelectItem value="loading" disabled>Loading gift types...</SelectItem>
-                ) : (
-                  productTypesData?.productTypes?.map((type: string) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
-                    </SelectItem>
-                  )) || <SelectItem value="none" disabled>No gift types available</SelectItem>
-                )}
-              </SelectContent>
-            </Select>
+          {/* Gift Selection */}
+          <div className="space-y-3">
+            <Label className="text-brand-charcoal">Choose a gift *</Label>
             {interests.length > 0 && (
               <p className="text-xs text-brand-charcoal/60">
-                {giftType ? `Great choice! This matches their interest in ${interests.slice(0, 2).join(', ')}${interests.length > 2 ? '...' : ''}` : `We'll suggest based on their interests: ${interests.slice(0, 3).join(', ')}${interests.length > 3 ? '...' : ''}`}
+                {selectedProduct ? `Perfect choice! This matches their interests.` : `We'll show products based on their interests: ${interests.slice(0, 3).join(', ')}${interests.length > 3 ? '...' : ''}`}
               </p>
             )}
+            <ProductSelector
+              interests={interests}
+              onProductSelect={setSelectedProduct}
+              selectedProduct={selectedProduct}
+              className="bg-white/50 backdrop-blur-sm rounded-lg p-4 border border-brand-cream/50"
+            />
           </div>
 
-          {/* Gift Preview Section with Shopify pricing */}
-          {giftType && productData && (
-            <Card className="bg-brand-cream/30 border-brand-cream">
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2 mb-3">
-                  <Package className="h-4 w-4 text-brand-charcoal" />
-                  <span className="font-medium text-sm text-brand-charcoal">Gift Preview</span>
-                </div>
-                <div className="flex space-x-3">
-                  <img
-                    src={productData.image}
-                    alt={`${giftType} gift`}
-                    className="w-20 h-20 object-cover rounded-lg"
-                  />
-                  <div className="flex-1">
-                    <p className="text-sm text-brand-charcoal font-medium mb-1">
-                      {productData.title}
-                    </p>
-                    <p className="text-xs text-brand-charcoal/70">
-                      {getGiftDescription(giftType, recipientName || 'your recipient')}
-                    </p>
-                    <p className="text-lg text-brand-gold font-bold mt-2">
-                      ${productData.price.toFixed(2)}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Loading state for product data */}
-          {giftType && isLoadingProduct && (
-            <div className="bg-brand-cream/30 border-brand-cream p-4 rounded-lg">
-              <div className="animate-pulse flex space-x-3">
-                <div className="w-20 h-20 bg-brand-cream rounded-lg"></div>
-                <div className="flex-1">
-                  <div className="h-4 bg-brand-cream rounded mb-2"></div>
-                  <div className="h-3 bg-brand-cream rounded mb-2"></div>
-                  <div className="h-5 bg-brand-cream rounded w-20"></div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Note Preview Section */}
-          {giftType && (
-            <Card className="bg-gradient-to-br from-brand-cream/20 to-brand-cream/40 border-brand-cream">
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2 mb-3">
-                  <Heart className="h-4 w-4 text-brand-charcoal" />
-                  <span className="font-medium text-sm text-brand-charcoal">Note Preview</span>
-                </div>
-                <div className="bg-white p-3 rounded border border-brand-cream/50 shadow-sm">
-                  <p className="text-sm text-brand-charcoal mb-3 leading-relaxed">
-                    {getSenderName()} was thinking about you on your special day and decided to send you some {giftType.toLowerCase()}. We hope you enjoy!
-                  </p>
-                  <div className="border-t pt-2 mt-2">
-                    <p className="text-xs text-brand-charcoal/60 italic">
-                      This gift was curated and sent through Unwrapt - Making thoughtfulness effortless ✨ unwrapt.io
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+           {/* Gift Preview Section */}
+           {selectedProduct && (
+             <div className="bg-gradient-to-br from-brand-gold/5 to-brand-cream/20 rounded-xl p-6 border border-brand-gold/20">
+               <div className="flex items-start space-x-4">
+                 <div className="flex-shrink-0">
+                   <img
+                     src={selectedProduct.featuredImage || 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop'}
+                     alt={selectedProduct.title}
+                     className="w-20 h-20 object-cover rounded-lg shadow-sm"
+                   />
+                 </div>
+                 
+                 <div className="flex-1 min-w-0">
+                   <div className="flex items-center space-x-2 mb-2">
+                     <h4 className="text-lg font-semibold text-brand-charcoal">
+                       {selectedProduct.title}
+                     </h4>
+                     <Heart className="h-4 w-4 text-red-500 fill-current" />
+                   </div>
+                   
+                   <p className="text-sm text-brand-charcoal/80 mb-3">
+                     {getGiftDescription(selectedProduct, recipientName || 'your recipient')}
+                   </p>
+                   
+                   <div className="flex items-center justify-between">
+                     <div className="text-lg font-bold text-brand-charcoal">
+                       ${selectedProduct.price.toFixed(2)}
+                     </div>
+                     <div className="text-xs text-brand-charcoal/60">
+                       From {getSenderName()}
+                     </div>
+                   </div>
+                 </div>
+               </div>
+               
+               <div className="mt-4 p-3 bg-white/70 rounded-lg">
+                 <div className="flex items-center space-x-2 text-sm text-brand-charcoal/80">
+                   <Package className="h-4 w-4" />
+                   <span>We'll handle the purchase and delivery 3 days before the {formatOccasion(occasion)}</span>
+                 </div>
+               </div>
+             </div>
+           )}
+ 
+           {/* Note Preview Section */}
+           {selectedProduct && (
+             <Card className="bg-gradient-to-br from-brand-cream/20 to-brand-cream/40 border-brand-cream">
+               <CardContent className="p-4">
+                 <div className="flex items-center space-x-2 mb-3">
+                   <Heart className="h-4 w-4 text-brand-charcoal" />
+                   <span className="font-medium text-sm text-brand-charcoal">Note Preview</span>
+                 </div>
+                 <div className="bg-white p-3 rounded border border-brand-cream/50 shadow-sm">
+                   <p className="text-sm text-brand-charcoal mb-3 leading-relaxed">
+                     {getSenderName()} was thinking about you on your special day and decided to send you some {selectedProduct.title.toLowerCase()}. We hope you enjoy!
+                   </p>
+                   <div className="border-t pt-2 mt-2">
+                     <p className="text-xs text-brand-charcoal/60 italic">
+                       This gift was curated and sent through Unwrapt - Making thoughtfulness effortless ✨ unwrapt.io
+                     </p>
+                   </div>
+                 </div>
+               </CardContent>
+             </Card>
+           )}
         </div>
 
         {/* Delivery Info */}
@@ -517,26 +437,26 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
         </div>
 
         {/* Payment Info with dynamic pricing */}
-        {isValid && productData && (
+        {isValid && selectedProduct && (
           <div className="bg-brand-cream p-4 rounded-lg border border-brand-cream">
             <div className="flex items-center space-x-2 mb-2">
               <CreditCard className="h-4 w-4 text-brand-charcoal" />
               <span className="font-medium text-brand-charcoal">Payment Required</span>
             </div>
             <p className="text-sm text-brand-charcoal/70">
-              You'll pay ${productData.price.toFixed(2)} to schedule this gift
+              You'll pay ${selectedProduct.price.toFixed(2)} to schedule this gift
             </p>
           </div>
         )}
 
         {/* Enhanced Gift Summary */}
-        {selectedPersonForGift && isValid && (
+        {selectedPersonForGift && isValid && selectedProduct && (
           <div className="bg-brand-gold/10 p-4 rounded-lg border border-brand-gold/20">
             <h4 className="font-medium text-brand-charcoal mb-3">🎁 Gift Summary</h4>
             <div className="text-sm text-brand-charcoal/80 leading-relaxed">
               <p className="mb-2">
                 You're gifting <span className="font-medium text-brand-charcoal">{recipientName}</span> on their <span className="font-medium text-brand-charcoal">{formatOccasion(occasion)}</span> 
-                {occasionDate && <span> ({format(occasionDate, "MMM d, yyyy")})</span>} with <span className="font-medium text-brand-charcoal">{giftType}</span> for <span className="font-medium text-brand-charcoal">${productData?.price?.toFixed(2)}</span> because you want to show you care.
+                {occasionDate && <span> ({format(occasionDate, "MMM d, yyyy")})</span>} with <span className="font-medium text-brand-charcoal">{selectedProduct.title}</span> for <span className="font-medium text-brand-charcoal">${selectedProduct.price.toFixed(2)}</span> because you want to show you care.
               </p>
               {interests.length > 0 && (
                 <p className="text-xs text-brand-charcoal/60 mt-2">
@@ -559,19 +479,17 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
           size="lg" 
           className="w-full text-lg py-6 bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
           onClick={handleScheduleWithPayment}
-          disabled={!isValid || isProcessingPayment || isLoadingProduct || !productData}
+          disabled={!isValid || isProcessingPayment || !selectedProduct}
         >
           {isProcessingPayment ? (
             "Processing..."
-          ) : isLoadingProduct ? (
-            "Loading product..."
-          ) : productData ? (
+          ) : selectedProduct ? (
             <>
-              Schedule & Pay ${productData.price.toFixed(2)} for This Gift
+              Schedule & Pay ${selectedProduct.price.toFixed(2)} for This Gift
               <ArrowDown className="h-4 w-4 ml-2" />
             </>
           ) : (
-            "Select a gift type to continue"
+            "Select a gift to continue"
           )}
         </Button>
 
