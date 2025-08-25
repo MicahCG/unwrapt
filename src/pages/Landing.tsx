@@ -404,8 +404,8 @@ const Landing = () => {
 
       {/* 5. About Unwrapt */}
       <section className="py-20 bg-gradient-to-r from-brand-peach/10 to-brand-gold/10 relative z-10">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-serif font-light text-brand-charcoal mb-8">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl md:text-4xl font-serif font-light text-brand-charcoal mb-8 text-center">
             About Unwrapt
           </h2>
           
@@ -418,11 +418,13 @@ const Landing = () => {
             />
           </div>
           
-          <div className="space-y-6 text-lg text-gray-700 leading-relaxed font-light">
-            <p>Life gets busy, and it's easy to forget the small gestures that mean the most.</p>
-            <p>Unwrapt was born from the idea that technology should help us be more human, not less.</p>
-            <p>We believe staying connected to the people you care about shouldn't require perfect memory.</p>
-            <p>Our mission: help you be the thoughtful person you want to be, even when life gets overwhelming.</p>
+          <div className="text-left max-w-2xl mx-auto">
+            <p className="text-lg text-gray-700 leading-relaxed font-light">
+              Life gets busy, and it's easy to forget the small gestures that mean the most. 
+              Unwrapt was born from the idea that technology should help us be more human, not less. 
+              We believe staying connected to the people you care about shouldn't require perfect memory. 
+              Our mission: help you be the thoughtful person you want to be, even when life gets overwhelming.
+            </p>
           </div>
         </div>
       </section>
