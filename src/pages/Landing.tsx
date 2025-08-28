@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -457,6 +458,27 @@ const Landing = () => {
           <p className="text-sm text-gray-400 mt-6">No credit card required • Free to start</p>
         </div>
       </section>
+
+      {/* Footer with Privacy and Terms */}
+      <footer className="bg-brand-charcoal border-t border-gray-800 py-8">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-4 sm:gap-8">
+            <Link 
+              to="/privacy" 
+              className="text-gray-400 hover:text-brand-gold transition-colors duration-300 text-sm"
+            >
+              Privacy Policy
+            </Link>
+            <span className="text-gray-600 hidden sm:inline">•</span>
+            <Link 
+              to="/terms" 
+              className="text-gray-400 hover:text-brand-gold transition-colors duration-300 text-sm"
+            >
+              Terms of Service
+            </Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };
