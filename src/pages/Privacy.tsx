@@ -7,10 +7,34 @@ const Privacy = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Immediately scroll to top and prevent browser scroll restoration
+    // Disable scroll restoration and force scroll to top
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+    
+    // Multiple attempts to ensure scroll to top
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
+    
+    // Force scroll after render
+    const immediateTimeout = setTimeout(() => {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }, 0);
+    
+    // Final scroll after brief delay
+    const delayedTimeout = setTimeout(() => {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }, 100);
+    
+    return () => {
+      clearTimeout(immediateTimeout);
+      clearTimeout(delayedTimeout);
+    };
   }, []);
 
   return (
