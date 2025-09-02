@@ -23,6 +23,7 @@ import NotFound from "./pages/NotFound";
 import Onboarding from "./pages/Onboarding";
 import OAuthCallback from "./components/auth/OAuthCallback";
 import CalendarOAuthCallback from "./components/auth/CalendarOAuthCallback";
+import ScrollToTop from "@/components/ScrollToTop";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,7 @@ function App() {
           <Toaster />
           <Sonner />
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <ScrollToTop />
             <Routes>
               {/* Landing page route - only on main domain */}
               <Route path="/landing" element={<Landing />} />
