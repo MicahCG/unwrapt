@@ -7,33 +7,57 @@ const Privacy = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    console.log('🔧 Privacy: Page loaded, attempting scroll to top');
+    
     // Disable scroll restoration and force scroll to top
     if ('scrollRestoration' in window.history) {
       window.history.scrollRestoration = 'manual';
+      console.log('🔧 Privacy: Disabled scroll restoration');
     }
+    
+    // Log initial scroll position
+    console.log('🔧 Privacy: Initial scroll position:', window.scrollY);
     
     // Multiple attempts to ensure scroll to top
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
     
+    console.log('🔧 Privacy: After immediate scroll:', window.scrollY);
+    
     // Force scroll after render
     const immediateTimeout = setTimeout(() => {
+      console.log('🔧 Privacy: Immediate timeout scroll, current position:', window.scrollY);
       window.scrollTo(0, 0);
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
+      console.log('🔧 Privacy: After immediate timeout scroll:', window.scrollY);
     }, 0);
     
     // Final scroll after brief delay
     const delayedTimeout = setTimeout(() => {
+      console.log('🔧 Privacy: Delayed timeout scroll, current position:', window.scrollY);
       window.scrollTo(0, 0);
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
+      console.log('🔧 Privacy: After delayed timeout scroll:', window.scrollY);
     }, 100);
+    
+    // Final check after longer delay
+    const finalTimeout = setTimeout(() => {
+      console.log('🔧 Privacy: Final check, scroll position:', window.scrollY);
+      if (window.scrollY !== 0) {
+        console.log('🔧 Privacy: Position not at top, forcing one more time');
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      }
+    }, 500);
     
     return () => {
       clearTimeout(immediateTimeout);
       clearTimeout(delayedTimeout);
+      clearTimeout(finalTimeout);
     };
   }, []);
 
