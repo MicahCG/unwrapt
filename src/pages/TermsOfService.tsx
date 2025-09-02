@@ -7,7 +7,12 @@ const TermsOfService = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    window.scrollTo(0, 0);
+    // Ensure we scroll to top after the component mounts and renders
+    const timer = setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }, 0);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   return (
