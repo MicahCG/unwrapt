@@ -7,12 +7,10 @@ const Privacy = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Ensure we scroll to top after the component mounts and renders
-    const timer = setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: 'instant' });
-    }, 0);
-    
-    return () => clearTimeout(timer);
+    // Immediately scroll to top and prevent browser scroll restoration
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
   }, []);
 
   return (

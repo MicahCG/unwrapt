@@ -33,7 +33,7 @@ function App() {
         <AuthProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter>
+          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <Routes>
               {/* Landing page route - only on main domain */}
               <Route path="/landing" element={<Landing />} />
