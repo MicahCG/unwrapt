@@ -130,17 +130,11 @@ const Dashboard = () => {
       <ResponsiveContainer>
       <ResponsiveHeader>
         <ResponsiveNavigation>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center">
-              <Logo size="lg" />
-            </div>
-          </div>
+          <Logo size="lg" />
         </ResponsiveNavigation>
 
         <ResponsiveActions>
-          <div className="flex items-center justify-end w-full">
-            <UserMenu />
-          </div>
+          <UserMenu />
         </ResponsiveActions>
       </ResponsiveHeader>
 

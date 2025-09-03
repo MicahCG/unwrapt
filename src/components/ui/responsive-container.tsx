@@ -25,8 +25,7 @@ export const ResponsiveHeader = ({ children, className }: ResponsiveContainerPro
   return (
     <div className={cn(
       "mb-4 sm:mb-6 lg:mb-8",
-      "flex flex-col gap-3 sm:gap-4",
-      "lg:flex-row lg:items-start lg:justify-between",
+      "flex flex-row items-center justify-between",
       className
     )}>
       {children}
@@ -36,7 +35,7 @@ export const ResponsiveHeader = ({ children, className }: ResponsiveContainerPro
 
 export const ResponsiveNavigation = ({ children }: { children: React.ReactNode }) => {
   return (
-    <div className="flex flex-col gap-3 sm:gap-4 w-full lg:flex-1">
+    <div className="flex items-center">
       {children}
     </div>
   );
@@ -44,7 +43,7 @@ export const ResponsiveNavigation = ({ children }: { children: React.ReactNode }
 
 export const ResponsiveActions = ({ children }: { children: React.ReactNode }) => {
   return (
-    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full lg:w-auto lg:flex-shrink-0">
+    <div className="flex items-center">
       {children}
     </div>
   );

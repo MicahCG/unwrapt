@@ -302,19 +302,7 @@ const UserMenu: React.FC = () => {
   };
 
   return (
-    <div className="flex items-center gap-2">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={handleSettingsClick}
-        className="h-10 px-3 text-brand-charcoal hover:bg-brand-cream hover:text-brand-charcoal flex items-center gap-2"
-        title="Settings"
-      >
-        <Settings className="h-5 w-5" />
-        <span className="text-sm">Settings</span>
-      </Button>
-      
-      <DropdownMenu>
+    <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button 
             variant="ghost" 
@@ -397,7 +385,6 @@ const UserMenu: React.FC = () => {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-    </div>
   );
 };
 
