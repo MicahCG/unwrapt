@@ -16,7 +16,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 
-const UserMenu: React.FC = () => {
+interface UserMenuProps {
+  hideSettings?: boolean;
+}
+
+const UserMenu: React.FC<UserMenuProps> = ({ hideSettings = false }) => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -354,13 +358,15 @@ const UserMenu: React.FC = () => {
             </>
           )}
         </DropdownMenuItem>
-          <DropdownMenuItem 
-            onClick={handleSettingsClick}
-            className="text-brand-charcoal hover:bg-brand-cream hover:text-brand-charcoal cursor-pointer"
-          >
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Settings</span>
-          </DropdownMenuItem>
+          {!hideSettings && (
+            <DropdownMenuItem 
+              onClick={handleSettingsClick}
+              className="text-brand-charcoal hover:bg-brand-cream hover:text-brand-charcoal cursor-pointer"
+            >
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Settings</span>
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem 
             onClick={handleTermsClick}
             className="text-brand-charcoal hover:bg-brand-cream hover:text-brand-charcoal cursor-pointer"

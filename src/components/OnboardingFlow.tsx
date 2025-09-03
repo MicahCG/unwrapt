@@ -461,31 +461,13 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
                 </Button>
               )}
               <div className="flex items-center">
-                <img 
-                  src="/lovable-uploads/cb711389-9d80-4fff-ad80-5ea0ea7bb878.png" 
-                  alt="Unwrapt" 
-                  className="h-8 w-8 mr-2"
-                />
-                <span className="font-bold text-lg text-brand-charcoal">Unwrapt</span>
+                <Logo size="md" />
               </div>
             </div>
             
-            <div className="flex items-center space-x-4">
-              {/* Progress Indicator */}
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-brand-charcoal/70">
-                  {getStepTitle()}
-                </span>
-                <div className="w-32 bg-brand-cream-light rounded-full h-2">
-                  <div 
-                    className={`bg-brand-charcoal h-2 rounded-full progress-fill`}
-                    data-progress={`${(currentStep / totalSteps) * 100}%`}
-                  />
-                </div>
-              </div>
-              
-              {/* User Menu */}
-              {user && <UserMenu />}
+            <div className="flex items-center">
+              {/* User Menu - but hide settings in onboarding */}
+              {user && <UserMenu hideSettings={true} />}
             </div>
           </div>
         </div>
@@ -494,6 +476,23 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
+          {/* Progress Indicator - moved to body */}
+          <div className="mb-8">
+            <div className="flex items-center justify-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-brand-charcoal/70">
+                  Step {currentStep} of {totalSteps}
+                </span>
+                <div className="w-32 bg-brand-cream-light rounded-full h-2">
+                  <div 
+                    className="bg-brand-charcoal h-2 rounded-full transition-all duration-300 ease-in-out"
+                    style={{ width: `${(currentStep / totalSteps) * 100}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          
           {renderStep()}
         </div>
       </div>
