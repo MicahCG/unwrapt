@@ -166,23 +166,28 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     e.preventDefault();
     if (!isStep1Valid() || !isStep2Valid() || !selectedProduct) return;
     
-    // Validate user authentication
-    if (!user?.id) {
-      toast({
-        title: "Authentication Error",
-        description: "Please log in to schedule a gift.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
     setIsLoading(true);
 
     try {
+      // Get current user with fresh session data
+      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !currentUser?.id) {
+        console.error('Authentication error:', authError);
+        toast({
+          title: "Authentication Error",
+          description: "Please refresh the page and try again.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      console.log('Processing payment for user:', currentUser.id, 'recipient:', recipient.id);
+
       const deliveryDate = new Date(new Date(formData.occasion_date).getTime() - 4 * 24 * 60 * 60 * 1000)
         .toISOString().split('T')[0];
 
-      // First, update the recipient with the complete address information
+      // First, update the recipient with the complete address information using current user ID
       const { error: recipientUpdateError } = await supabase
         .from('recipients')
         .update({
@@ -194,7 +199,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           updated_at: new Date().toISOString()
         })
         .eq('id', recipient.id)
-        .eq('user_id', user?.id); // Ensure we only update recipient owned by current user
+        .eq('user_id', currentUser.id); // Use freshly fetched user ID
 
       if (recipientUpdateError) {
         console.error('Error updating recipient address:', recipientUpdateError);
@@ -203,11 +208,11 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
       console.log('Successfully updated recipient address for:', cleanName(recipient.name));
 
-      // Then create the scheduled gift with Shopify price
+      // Then create the scheduled gift with Shopify price using current user ID
       const { data: giftData, error: giftError } = await supabase
         .from('scheduled_gifts')
         .insert({
-          user_id: user?.id,
+          user_id: currentUser.id, // Use freshly fetched user ID
           recipient_id: recipient.id,
           occasion: formData.occasion,
           occasion_date: formData.occasion_date,
