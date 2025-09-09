@@ -82,24 +82,35 @@ const UpcomingGiftsManager = () => {
   const handlePayForGift = async (gift: any) => {
     if (!gift) return;
     
+    // Check if recipient has complete shipping address
+    const recipient = gift.recipients;
+    const hasCompleteAddress = recipient?.street && 
+                              recipient?.city && 
+                              recipient?.state && 
+                              recipient?.zip_code;
+    
+    if (!hasCompleteAddress) {
+      // Open ScheduleGiftModal to collect shipping address
+      setSelectedRecipient(recipient);
+      setPayingForGift(null);
+      return;
+    }
+    
     setPayingForGift(gift.id);
     
     try {
       console.log('🎁 Starting payment process for gift:', gift.id);
 
-      // Prepare shipping address if available
-      let shippingAddress = undefined;
-      if (gift.recipients) {
-        shippingAddress = {
-          first_name: gift.recipients.name?.split(' ')[0] || 'Gift',
-          last_name: gift.recipients.name?.split(' ').slice(1).join(' ') || 'Recipient',
-          address1: gift.recipients.street,
-          city: gift.recipients.city,
-          province: gift.recipients.state,
-          country: gift.recipients.country || 'United States',
-          zip: gift.recipients.zip_code,
-        };
-      }
+      // Prepare shipping address
+      const shippingAddress = {
+        first_name: recipient.name?.split(' ')[0] || 'Gift',
+        last_name: recipient.name?.split(' ').slice(1).join(' ') || 'Recipient',
+        address1: recipient.street,
+        city: recipient.city,
+        province: recipient.state,
+        country: recipient.country || 'United States',
+        zip: recipient.zip_code,
+      };
 
       // Extract price from price_range (e.g., "$10.00" -> 10.00)
       const priceMatch = gift.price_range?.match(/\$?(\d+\.?\d*)/);

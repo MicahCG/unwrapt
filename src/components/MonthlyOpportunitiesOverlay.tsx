@@ -113,11 +113,11 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
         console.log('Scheduled gifts this month:', scheduledGifts?.length || 0);
 
         const scheduledSet = new Set(
-          scheduledGifts?.map(gift => `${gift.recipient_id}-${gift.occasion}`) || []
+          scheduledGifts?.map(gift => `${gift.recipient_id}-${gift.occasion.toLowerCase()}`) || []
         );
         
         const unscheduledMonthlyOpportunities = monthlyOpportunitiesList.filter(
-          opp => !scheduledSet.has(`${opp.recipientId}-${opp.occasion}`)
+          opp => !scheduledSet.has(`${opp.recipientId}-${opp.occasion.toLowerCase()}`)
         );
 
         unscheduledMonthlyOpportunities.sort((a, b) => a.date.getTime() - b.date.getTime());
@@ -196,11 +196,11 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
         }
 
         const scheduledSet = new Set(
-          scheduledGifts?.map(gift => `${gift.recipient_id}-${gift.occasion}`) || []
+          scheduledGifts?.map(gift => `${gift.recipient_id}-${gift.occasion.toLowerCase()}`) || []
         );
         
         const unscheduledTwoWeekOpportunities = twoWeekOpportunitiesList.filter(
-          opp => !scheduledSet.has(`${opp.recipientId}-${opp.occasion}`)
+          opp => !scheduledSet.has(`${opp.recipientId}-${opp.occasion.toLowerCase()}`)
         );
 
         unscheduledTwoWeekOpportunities.sort((a, b) => a.date.getTime() - b.date.getTime());
