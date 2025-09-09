@@ -166,6 +166,16 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     e.preventDefault();
     if (!isStep1Valid() || !isStep2Valid() || !selectedProduct) return;
     
+    // Validate user authentication
+    if (!user?.id) {
+      toast({
+        title: "Authentication Error",
+        description: "Please log in to schedule a gift.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setIsLoading(true);
 
     try {
