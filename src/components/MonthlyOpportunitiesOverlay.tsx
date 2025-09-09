@@ -217,9 +217,32 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
         };
       }
 
-      // No opportunities in either timeframe
-      console.log('No opportunities found in month or next 2 weeks');
-      return { count: 0, opportunities: [], allScheduled: false, timeframe: 'month', noCoverage: true };
+      // No opportunities in either timeframe, but check if there are any scheduled gifts this month
+      console.log('No opportunities found in month or next 2 weeks, checking for existing scheduled gifts');
+      
+      // Check if there are any scheduled gifts for this month
+      const { data: existingGifts, error: existingGiftsError } = await supabase
+        .from('scheduled_gifts')
+        .select('id')
+        .eq('user_id', user.id)
+        .gte('occasion_date', monthStart.toISOString().split('T')[0])
+        .lte('occasion_date', monthEnd.toISOString().split('T')[0]);
+      
+      if (existingGiftsError) {
+        console.error('Error checking existing gifts:', existingGiftsError);
+        return { count: 0, opportunities: [], allScheduled: false, timeframe: 'month', noCoverage: false };
+      }
+      
+      const hasScheduledGifts = existingGifts && existingGifts.length > 0;
+      console.log('Has scheduled gifts this month:', hasScheduledGifts);
+      
+      return { 
+        count: 0, 
+        opportunities: [], 
+        allScheduled: false, 
+        timeframe: 'month', 
+        noCoverage: hasScheduledGifts // Only covered if there are actually scheduled gifts
+      };
     },
     enabled: !!user?.id
   });
