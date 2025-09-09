@@ -135,6 +135,12 @@ serve(async (req) => {
       recipientName: sanitizedRecipientName
     });
 
+    // Validate that we have basic gift data
+    if (!sanitizedRecipientName || sanitizedRecipientName === 'Recipient') {
+      console.error('❌ Missing or invalid recipient name in gift details');
+      throw new Error('Invalid recipient information provided');
+    }
+
     // Initialize Stripe with enhanced environment debugging
     console.log("🔍 Checking for Stripe secret key...");
     console.log("🔍 Available environment variables:", Object.keys(Deno.env.toObject()).filter(key => key.includes('STRIPE')));

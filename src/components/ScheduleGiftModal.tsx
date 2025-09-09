@@ -41,6 +41,36 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   
   const [isLoading, setIsLoading] = useState(false);
 
+  // Debug logging for recipient prop
+  React.useEffect(() => {
+    console.log('🔍 ScheduleGiftModal recipient prop changed:', {
+      recipient,
+      isOpen,
+      recipientId: recipient?.id,
+      recipientType: typeof recipient,
+      recipientKeys: recipient ? Object.keys(recipient) : 'N/A'
+    });
+  }, [recipient, isOpen]);
+
+  // Early return if recipient is invalid
+  if (isOpen && (!recipient || !recipient.id)) {
+    console.error('❌ ScheduleGiftModal: Invalid recipient data', { recipient, isOpen });
+    
+    // Show error and close modal
+    React.useEffect(() => {
+      if (isOpen && (!recipient || !recipient.id)) {
+        toast({
+          title: "Error",
+          description: "Recipient information is missing. Please try again.",
+          variant: "destructive"
+        });
+        onClose();
+      }
+    }, [isOpen, recipient, onClose, toast]);
+    
+    return null;
+  }
+
   const getDefaultOccasionDate = () => {
     const today = new Date();
     const currentYear = today.getFullYear();
@@ -182,6 +212,21 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         return;
       }
 
+      // Debug recipient data
+      console.log('Full recipient object:', recipient);
+      console.log('Recipient ID:', recipient?.id);
+      console.log('Recipient type:', typeof recipient?.id);
+      
+      if (!recipient?.id) {
+        console.error('Recipient ID is missing or undefined');
+        toast({
+          title: "Error",
+          description: "Recipient information is incomplete. Please try again.",
+          variant: "destructive"
+        });
+        return;
+      }
+
       console.log('Processing payment for user:', currentUser.id, 'recipient:', recipient.id);
 
       const deliveryDate = new Date(new Date(formData.occasion_date).getTime() - 4 * 24 * 60 * 60 * 1000)
@@ -208,6 +253,8 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
       console.log('Successfully updated recipient address for:', cleanName(recipient.name));
 
+      console.log('Creating scheduled gift with recipient_id:', recipient.id);
+      
       // Then create the scheduled gift with Shopify price using current user ID
       const { data: giftData, error: giftError } = await supabase
         .from('scheduled_gifts')
