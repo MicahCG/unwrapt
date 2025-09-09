@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, Gift, ArrowDown, CreditCard, Package, Heart } from 'lucide-react';
@@ -20,17 +21,22 @@ interface GiftScheduleStepProps {
   recipientName?: string;
   interests?: string[];
   selectedPersonForGift?: any;
+  allowManualRecipientEntry?: boolean;
+  hidePayment?: boolean;
 }
 
 const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ 
   onNext, 
   recipientName, 
   interests = [], 
-  selectedPersonForGift 
+  selectedPersonForGift,
+  allowManualRecipientEntry = false,
+  hidePayment = false
 }) => {
   const [occasion, setOccasion] = useState('');
   const [occasionDate, setOccasionDate] = useState<Date>();
   const [selectedProduct, setSelectedProduct] = useState<ShopifyProduct | null>(null);
+  const [manualRecipientName, setManualRecipientName] = useState('');
   const [isValid, setIsValid] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const { toast } = useToast();
@@ -72,9 +78,10 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
 
   // Check form validity
   useEffect(() => {
-    const formValid = occasion && occasionDate && selectedProduct;
+    const nameRequired = allowManualRecipientEntry ? manualRecipientName : true;
+    const formValid = occasion && occasionDate && selectedProduct && nameRequired;
     setIsValid(!!formValid);
-  }, [occasion, occasionDate, selectedProduct]);
+  }, [occasion, occasionDate, selectedProduct, manualRecipientName, allowManualRecipientEntry]);
 
   const getGiftDescription = (product: ShopifyProduct, recipientName: string) => {
     return `${product.title} - perfect for ${recipientName}'s interests`;
@@ -278,7 +285,7 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
           </div>
         </div>
         <CardTitle className="text-3xl mb-2 text-brand-charcoal">
-          {recipientName ? `Let's schedule ${recipientName}'s gift` : "Let's schedule your first gift"}
+          {recipientName || manualRecipientName ? `Let's schedule ${recipientName || manualRecipientName}'s gift` : "Let's schedule your first gift"}
         </CardTitle>
         <p className="text-brand-charcoal/70">
           {selectedPersonForGift 
@@ -298,6 +305,20 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
       
       <CardContent className="space-y-6">
         <div className="grid gap-4">
+          {/* Manual Recipient Name Input */}
+          {allowManualRecipientEntry && (
+            <div className="space-y-2">
+              <Label htmlFor="recipientName" className="text-brand-charcoal">Recipient Name *</Label>
+              <Input
+                id="recipientName"
+                placeholder="Enter recipient's name"
+                value={manualRecipientName}
+                onChange={(e) => setManualRecipientName(e.target.value)}
+                className="text-brand-charcoal border-brand-cream"
+              />
+            </div>
+          )}
+
           {/* Occasion */}
           <div className="space-y-2">
             <Label htmlFor="occasion" className="text-brand-charcoal">What's the occasion? *</Label>
@@ -475,23 +496,43 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
         </div>
 
         {/* Schedule & Pay Button */}
-        <Button 
-          size="lg" 
-          className="w-full text-lg py-6 bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
-          onClick={handleScheduleWithPayment}
-          disabled={!isValid || isProcessingPayment || !selectedProduct}
-        >
-          {isProcessingPayment ? (
-            "Processing..."
-          ) : selectedProduct ? (
-            <>
-              Schedule & Pay ${selectedProduct.price.toFixed(2)} for This Gift
-              <ArrowDown className="h-4 w-4 ml-2" />
-            </>
-          ) : (
-            "Select a gift to continue"
-          )}
-        </Button>
+        {!hidePayment ? (
+          <Button 
+            size="lg" 
+            className="w-full text-lg py-6 bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+            onClick={handleScheduleWithPayment}
+            disabled={!isValid || isProcessingPayment || !selectedProduct}
+          >
+            {isProcessingPayment ? (
+              "Processing..."
+            ) : selectedProduct ? (
+              <>
+                Schedule & Pay ${selectedProduct.price.toFixed(2)} for This Gift
+                <ArrowDown className="h-4 w-4 ml-2" />
+              </>
+            ) : (
+              "Select a gift to continue"
+            )}
+          </Button>
+        ) : (
+          <Button 
+            size="lg" 
+            className="w-full text-lg py-6 bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+            onClick={() => onNext({ 
+              firstGift: {
+                occasion,
+                occasionDate: occasionDate?.toISOString().split('T')[0],
+                giftType: selectedProduct?.title,
+                priceRange: `$${selectedProduct?.price.toFixed(2)}`,
+              },
+              manualRecipientName: allowManualRecipientEntry ? manualRecipientName : undefined
+            })}
+            disabled={!isValid || !selectedProduct}
+          >
+            Schedule This Gift
+            <ArrowDown className="h-4 w-4 ml-2" />
+          </Button>
+        )}
 
         <div className="text-center">
           <Button 

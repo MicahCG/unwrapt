@@ -297,7 +297,8 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
             </p>
             <Button onClick={() => onNext({
               importedDates: [],
-              calendarConnected: isConnected
+              calendarConnected: isConnected,
+              noRecipientsFound: true
             })}>
               Continue Anyway
             </Button>

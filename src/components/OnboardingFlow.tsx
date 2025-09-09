@@ -30,8 +30,12 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
     if (onboardingData.manualRecipientData) {
       return 2;
     }
+    // For no recipients found: Calendar -> Gift Schedule with manual name entry (2 steps)
+    if (onboardingData.noRecipientsFound) {
+      return 2;
+    }
     // For manual recipient entry without data: Calendar -> Recipient -> Gift Schedule (3 steps)
-    if (onboardingData.manualRecipientAdded || onboardingData.noRecipientsFound) {
+    if (onboardingData.manualRecipientAdded) {
       return 3;
     }
     // For calendar-based flow: Calendar -> Interests -> Gift Schedule (3 steps)
@@ -161,7 +165,31 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
 
         // Create recipient from manual entry or selection
         let selectedRecipient = null;
-        if (updatedData.manualRecipientData) {
+        if (updatedData.manualRecipientName) {
+          // Manual recipient name from no recipients flow
+          const { data: newRecipient, error: recipientError } = await supabase
+            .from('recipients')
+            .insert({
+              user_id: user?.id,
+              name: updatedData.manualRecipientName,
+              email: null,
+              phone: null,
+              address: null,
+              interests: [],
+              birthday: null,
+              anniversary: null,
+              relationship: null,
+            })
+            .select()
+            .single();
+
+          if (recipientError) {
+            console.error('Error saving manual recipient:', recipientError);
+          } else {
+            selectedRecipient = newRecipient;
+            allRecipients.push(newRecipient);
+          }
+        } else if (updatedData.manualRecipientData) {
           // Manual recipient data passed directly from CalendarStep
           const { data: newRecipient, error: recipientError } = await supabase
             .from('recipients')
@@ -341,8 +369,11 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
     // Check if we have manual recipient data (skip recipient entry)
     const hasManualRecipientData = onboardingData.manualRecipientData;
     
-    // Check if we need manual recipient entry flow
-    const isManualRecipientFlow = onboardingData.manualRecipientAdded || onboardingData.noRecipientsFound;
+    // Check if we need manual recipient entry flow (3 steps)
+    const isManualRecipientFlow = onboardingData.manualRecipientAdded;
+    
+    // Check if no recipients found (2 steps: Calendar -> Gift Schedule with manual name)
+    const isNoRecipientsFlow = onboardingData.noRecipientsFound;
     
     if (hasManualRecipientData) {
       // Shortened flow: Calendar -> Gift Schedule (2 steps)
@@ -356,6 +387,32 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
               recipientName={onboardingData.manualRecipientData.fullName}
               interests={[]} // No interests for manual flow
               selectedPersonForGift={{ personName: onboardingData.manualRecipientData.fullName }}
+            />
+          );
+        default:
+          return (
+            <div className="text-center py-8">
+              <h3 className="text-2xl font-bold mb-4 text-brand-charcoal">Step {currentStep} - Coming Soon!</h3>
+              <p className="text-brand-charcoal/70 mb-6">
+                This step is still being built. Check back soon!
+              </p>
+              <Button onClick={handleBack} className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90">Go Back</Button>
+            </div>
+          );
+      }
+    } else if (isNoRecipientsFlow) {
+      // No recipients flow: Calendar -> Gift Schedule with manual name entry (2 steps)
+      switch (currentStep) {
+        case 1:
+          return <CalendarStep onNext={handleStepComplete} onSkip={handleSkip} />;
+        case 2:
+          return (
+            <GiftScheduleStep 
+              onNext={handleStepComplete} 
+              interests={[]} // No interests for no recipients flow
+              selectedPersonForGift={null}
+              allowManualRecipientEntry={true}
+              hidePayment={true}
             />
           );
         default:
