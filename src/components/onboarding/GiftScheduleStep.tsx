@@ -23,6 +23,7 @@ interface GiftScheduleStepProps {
   selectedPersonForGift?: any;
   allowManualRecipientEntry?: boolean;
   hidePayment?: boolean;
+  firstRecipient?: any;
 }
 
 const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ 
@@ -31,7 +32,8 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
   interests = [], 
   selectedPersonForGift,
   allowManualRecipientEntry = false,
-  hidePayment = false
+  hidePayment = false,
+  firstRecipient
 }) => {
   const [occasion, setOccasion] = useState('');
   const [occasionDate, setOccasionDate] = useState<Date>();
@@ -92,8 +94,9 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
   };
 
   // Function to create a recipient record if we don't have one
-  const createOrGetRecipient = async () => {
-    if (!recipientName || !user?.id) {
+  const createOrGetRecipient = async (firstRecipient?: any) => {
+    const targetRecipientName = recipientName || manualRecipientName;
+    if (!targetRecipientName || !user?.id) {
       throw new Error('Missing recipient name or user');
     }
 
@@ -102,7 +105,7 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
       .from('recipients')
       .select('id')
       .eq('user_id', user.id)
-      .eq('name', recipientName)
+      .eq('name', targetRecipientName)
       .limit(1);
 
     if (searchError) {
@@ -118,12 +121,18 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
     // Create new recipient
     const recipientData: any = {
       user_id: user.id,
-      name: recipientName,
+      name: targetRecipientName,
       interests: interests || [],
     };
 
-    // Add address if available from selectedPersonForGift
-    if (selectedPersonForGift?.address) {
+    // Add address from firstRecipient (onboarding flow) or selectedPersonForGift (calendar flow)
+    if (firstRecipient?.street) {
+      recipientData.street = firstRecipient.street;
+      recipientData.city = firstRecipient.city;
+      recipientData.state = firstRecipient.state;
+      recipientData.zip_code = firstRecipient.zipCode;
+      recipientData.country = firstRecipient.country || 'United States';
+    } else if (selectedPersonForGift?.address) {
       recipientData.street = selectedPersonForGift.address.street;
       recipientData.city = selectedPersonForGift.address.city;
       recipientData.state = selectedPersonForGift.address.state;
@@ -132,14 +141,16 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
     }
 
     // Add birthday if available
-    if (selectedPersonForGift?.birthday) {
+    if (firstRecipient?.birthday) {
+      recipientData.birthday = firstRecipient.birthday;
+    } else if (selectedPersonForGift?.birthday) {
       recipientData.birthday = selectedPersonForGift.birthday;
     }
 
     const { data: newRecipient, error: createError } = await supabase
       .from('recipients')
       .insert(recipientData)
-      .select('id')
+      .select('*')
       .single();
 
     if (createError) {
@@ -148,7 +159,7 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
     }
 
     console.log('Created new recipient:', newRecipient.id);
-    return newRecipient.id;
+    return { id: newRecipient.id, address: newRecipient };
   };
 
   const handleScheduleWithPayment = async () => {
@@ -160,7 +171,9 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
       console.log('🎁 Starting onboarding gift creation process...');
 
       // Get or create recipient
-      const recipientId = await createOrGetRecipient();
+      const recipientResult = await createOrGetRecipient(firstRecipient);
+      const recipientId = typeof recipientResult === 'string' ? recipientResult : recipientResult.id;
+      const recipientData = typeof recipientResult === 'object' ? recipientResult.address : null;
 
       // Create the actual scheduled gift in the database
       const deliveryDate = new Date(new Date(occasionDate!).getTime() - 4 * 24 * 60 * 60 * 1000)
@@ -189,18 +202,48 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
 
       console.log('✅ Created scheduled gift with ID:', giftData.id);
 
-      // Prepare shipping address if available
+      // Prepare shipping address from multiple sources
       let shippingAddress = undefined;
-      if (selectedPersonForGift?.address) {
+      const targetName = recipientName || manualRecipientName;
+      
+      if (firstRecipient?.street) {
+        // Use address from onboarding recipient step
         shippingAddress = {
-          first_name: recipientName?.split(' ')[0] || 'Gift',
-          last_name: recipientName?.split(' ').slice(1).join(' ') || 'Recipient',
+          first_name: targetName?.split(' ')[0] || 'Gift',
+          last_name: targetName?.split(' ').slice(1).join(' ') || 'Recipient',
+          address1: firstRecipient.street,
+          city: firstRecipient.city,
+          province: firstRecipient.state,
+          country: firstRecipient.country || 'United States',
+          zip: firstRecipient.zipCode,
+        };
+      } else if (recipientData?.street) {
+        // Use address from database recipient
+        shippingAddress = {
+          first_name: targetName?.split(' ')[0] || 'Gift',
+          last_name: targetName?.split(' ').slice(1).join(' ') || 'Recipient',
+          address1: recipientData.street,
+          city: recipientData.city,
+          province: recipientData.state,
+          country: recipientData.country || 'United States',
+          zip: recipientData.zip_code,
+        };
+      } else if (selectedPersonForGift?.address) {
+        // Use address from calendar data
+        shippingAddress = {
+          first_name: targetName?.split(' ')[0] || 'Gift',
+          last_name: targetName?.split(' ').slice(1).join(' ') || 'Recipient',
           address1: selectedPersonForGift.address.street,
           city: selectedPersonForGift.address.city,
           province: selectedPersonForGift.address.state,
           country: selectedPersonForGift.address.country || 'United States',
           zip: selectedPersonForGift.address.zip,
         };
+      }
+
+      // Validate shipping address before proceeding
+      if (!shippingAddress || !shippingAddress.address1 || !shippingAddress.city) {
+        throw new Error('Missing delivery address. Please ensure all address fields are filled.');
       }
 
       // Create payment session with the REAL gift ID (not temp ID)

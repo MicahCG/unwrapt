@@ -445,6 +445,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
               recipientName={onboardingData.firstRecipient?.fullName}
               interests={[]} // No interests for manual flow - skip interests step
               selectedPersonForGift={onboardingData.firstRecipient ? { personName: onboardingData.firstRecipient?.fullName } : null}
+              firstRecipient={onboardingData.firstRecipient}
             />
           );
         default:
