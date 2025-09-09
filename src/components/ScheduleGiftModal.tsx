@@ -183,11 +183,12 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           country: formData.country,
           updated_at: new Date().toISOString()
         })
-        .eq('id', recipient.id);
+        .eq('id', recipient.id)
+        .eq('user_id', user?.id); // Ensure we only update recipient owned by current user
 
       if (recipientUpdateError) {
         console.error('Error updating recipient address:', recipientUpdateError);
-        throw new Error('Failed to update recipient address');
+        throw new Error(`Failed to update recipient address: ${recipientUpdateError.message}`);
       }
 
       console.log('Successfully updated recipient address for:', cleanName(recipient.name));
