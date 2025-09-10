@@ -84,7 +84,8 @@ serve(async (req) => {
         .from('scheduled_gifts')
         .select(`
           *,
-          recipients (name, email, phone, street, city, state, zip_code, country, interests)
+          recipients (name, email, phone, street, city, state, zip_code, country, interests),
+          user:profiles!user_id (full_name, email)
         `)
         .eq('id', scheduledGiftId)
         .eq('payment_status', 'paid')
@@ -256,6 +257,9 @@ serve(async (req) => {
       }
 
       // Create the order
+      const customerName = giftData.user?.full_name || giftData.user?.email?.split('@')[0] || 'Customer';
+      const customerEmail = giftData.user?.email || "orders@unwrapt.com";
+      
       const orderData = {
         order: {
           line_items: [
@@ -273,13 +277,19 @@ serve(async (req) => {
             ...recipientAddress,
             country_code: recipientAddress.country === 'United States' ? 'US' : recipientAddress.country
           },
-          email: giftData.recipients?.email || "gift@unwrapt.com",
+          customer: {
+            first_name: customerName.split(' ')[0] || customerName,
+            last_name: customerName.split(' ').slice(1).join(' ') || '',
+            email: customerEmail
+          },
+          email: customerEmail,
           phone: recipientAddress.phone || giftData.recipients?.phone,
-          note: `Gift from Unwrapt - ${giftData.occasion || 'Special Occasion'}. Product: ${productName} (${matchReason})`,
+          note: `Gift from ${customerName} via Unwrapt - ${giftData.occasion || 'Special Occasion'}. Recipient: ${giftData.recipients?.name}. Product: ${productName} (${matchReason})`,
           tags: "unwrapt-gift",
           financial_status: "paid",
           send_receipt: false,
           send_fulfillment_receipt: false,
+          contact_email: customerEmail,
         }
       };
 
