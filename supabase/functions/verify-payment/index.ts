@@ -125,16 +125,57 @@ serve(async (req) => {
           console.log('✅ Gift payment status updated successfully');
         }
 
-        // Get gift and recipient details for email
+        // Get gift and recipient details for email and address update
         const { data: giftData } = await supabaseService
           .from("scheduled_gifts")
           .select(`
             *,
-            recipient:recipients(name),
+            recipient:recipients(id, name, street, city, state, zip_code, country),
             user:profiles(email, full_name)
           `)
           .eq("id", scheduledGiftId)
           .single();
+
+        // Extract and save shipping address from Stripe session to recipient
+        if (session.shipping?.address && giftData?.recipient?.id) {
+          const stripeAddress = session.shipping.address;
+          const recipientId = giftData.recipient.id;
+          
+          console.log('📍 Extracting shipping address from Stripe session');
+          console.log('📍 Stripe address:', stripeAddress);
+          
+          // Only update if the recipient doesn't already have a complete address
+          const hasCompleteAddress = giftData.recipient.street && 
+                                   giftData.recipient.city && 
+                                   giftData.recipient.state && 
+                                   giftData.recipient.zip_code;
+          
+          if (!hasCompleteAddress) {
+            console.log('📍 Updating recipient address from Stripe checkout');
+            
+            const { error: addressError } = await supabaseService
+              .from("recipients")
+              .update({
+                street: stripeAddress.line1 + (stripeAddress.line2 ? ` ${stripeAddress.line2}` : ''),
+                city: stripeAddress.city,
+                state: stripeAddress.state,
+                zip_code: stripeAddress.postal_code,
+                country: stripeAddress.country === 'US' ? 'United States' : stripeAddress.country,
+                updated_at: new Date().toISOString()
+              })
+              .eq("id", recipientId);
+
+            if (addressError) {
+              console.error('❌ Error updating recipient address:', addressError);
+            } else {
+              console.log('✅ Recipient address updated successfully from Stripe checkout');
+            }
+          } else {
+            console.log('ℹ️  Recipient already has complete address, skipping update');
+          }
+        } else {
+          console.log('ℹ️  No shipping address found in Stripe session or recipient ID missing');
+        }
 
         // Send payment confirmation email
         if (giftData?.user?.email) {
