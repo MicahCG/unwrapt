@@ -19,9 +19,10 @@ interface ScheduleGiftModalProps {
   recipient: any;
   isOpen: boolean;
   onClose: () => void;
+  payingForGiftId?: string | null;
 }
 
-const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen, onClose }) => {
+const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen, onClose, payingForGiftId }) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -94,7 +95,12 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
   React.useEffect(() => {
     if (isOpen) {
-      setCurrentStep(1);
+      // If we're collecting address for payment, skip to step 2
+      if (payingForGiftId) {
+        setCurrentStep(2);
+      } else {
+        setCurrentStep(1);
+      }
       
       // Check if this is a holiday preset
       if (recipient._holidayPreset) {
@@ -194,7 +200,14 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isStep1Valid() || !isStep2Valid() || !selectedProduct) return;
+    
+    // For address collection mode, only validate address
+    if (payingForGiftId) {
+      if (!isStep2Valid()) return;
+    } else {
+      // For normal gift creation, validate both steps
+      if (!isStep1Valid() || !isStep2Valid() || !selectedProduct) return;
+    }
     
     setIsLoading(true);
 
@@ -212,11 +225,6 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         return;
       }
 
-      // Debug recipient data
-      console.log('Full recipient object:', recipient);
-      console.log('Recipient ID:', recipient?.id);
-      console.log('Recipient type:', typeof recipient?.id);
-      
       if (!recipient?.id) {
         console.error('Recipient ID is missing or undefined');
         toast({
@@ -227,12 +235,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         return;
       }
 
-      console.log('Processing payment for user:', currentUser.id, 'recipient:', recipient.id);
-
-      const deliveryDate = new Date(new Date(formData.occasion_date).getTime() - 4 * 24 * 60 * 60 * 1000)
-        .toISOString().split('T')[0];
-
-      // First, update the recipient with the complete address information using current user ID
+      // Always update the recipient with the complete address information
       const { error: recipientUpdateError } = await supabase
         .from('recipients')
         .update({
@@ -244,14 +247,36 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           updated_at: new Date().toISOString()
         })
         .eq('id', recipient.id)
-        .eq('user_id', currentUser.id); // Use freshly fetched user ID
+        .eq('user_id', currentUser.id);
 
       if (recipientUpdateError) {
-        console.error('Error updating recipient address:', recipientUpdateError);
-        throw new Error(`Failed to update recipient address: ${recipientUpdateError.message}`);
+        console.error('Error updating recipient:', recipientUpdateError);
+        throw recipientUpdateError;
       }
 
-      console.log('Successfully updated recipient address for:', cleanName(recipient.name));
+      if (payingForGiftId) {
+        // Address collection for payment mode - trigger payment flow
+        console.log('Address updated for payment, triggering payment flow...');
+        
+        toast({
+          title: "Address Updated",
+          description: "Now proceeding to payment...",
+        });
+        
+        // Close modal and let parent component handle payment
+        onClose();
+        
+        // Trigger payment flow by dispatching a custom event
+        window.dispatchEvent(new CustomEvent('proceedWithPayment', { 
+          detail: { giftId: payingForGiftId, recipientId: recipient.id } 
+        }));
+        
+        return;
+      }
+
+      // Continue with normal gift creation flow
+      const deliveryDate = new Date(new Date(formData.occasion_date).getTime() - 4 * 24 * 60 * 60 * 1000)
+        .toISOString().split('T')[0];
 
       console.log('Creating scheduled gift with recipient_id:', recipient.id);
       

@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/components/auth/AuthProvider';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useAuth } from '@/components/auth/AuthProvider';
-import { supabase } from '@/integrations/supabase/client';
-import { Calendar, DollarSign, Plus, Sparkles, CreditCard, AlertCircle } from 'lucide-react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Clock, MapPin, CreditCard, Gift, Trash2, Plus, Calendar } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import GiftDetailsModal from './GiftDetailsModal';
 import RecipientSelectionModal from './RecipientSelectionModal';
 import ScheduleGiftModal from './ScheduleGiftModal';
-import { cleanName } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast';
 
 const UpcomingGiftsManager = () => {
   const { user } = useAuth();
@@ -39,10 +38,9 @@ const UpcomingGiftsManager = () => {
       if (error) throw error;
       return data;
     },
-    enabled: !!user
+    enabled: !!user?.id,
   });
 
-  // Fetch unpaid gifts
   const { data: unpaidGifts } = useQuery({
     queryKey: ['unpaid-gifts', user?.id],
     queryFn: async () => {
@@ -54,13 +52,42 @@ const UpcomingGiftsManager = () => {
         `)
         .eq('user_id', user?.id)
         .eq('payment_status', 'unpaid')
-        .order('occasion_date', { ascending: true });
+        .order('delivery_date', { ascending: true });
       
       if (error) throw error;
       return data;
     },
-    enabled: !!user
+    enabled: !!user?.id,
   });
+
+  // Listen for payment event after address collection
+  React.useEffect(() => {
+    const handleProceedWithPayment = async (event: CustomEvent) => {
+      const { giftId } = event.detail;
+      
+      // Find the gift and proceed with payment
+      const gift = unpaidGifts?.find(g => g.id === giftId);
+      if (gift) {
+        // Re-fetch the gift to get updated recipient address
+        const { data: updatedGift } = await supabase
+          .from('scheduled_gifts')
+          .select(`
+            *,
+            recipients (id, name, email, interests, street, city, state, zip_code, country, phone)
+          `)
+          .eq('id', giftId)
+          .single();
+        
+        if (updatedGift) {
+          // Now proceed with payment using the updated gift data
+          await processPayment(updatedGift);
+        }
+      }
+    };
+
+    window.addEventListener('proceedWithPayment', handleProceedWithPayment);
+    return () => window.removeEventListener('proceedWithPayment', handleProceedWithPayment);
+  }, [unpaidGifts]);
 
   const handleDeleteGift = async (giftId: string) => {
     try {
@@ -79,22 +106,9 @@ const UpcomingGiftsManager = () => {
     }
   };
 
-  const handlePayForGift = async (gift: any) => {
-    if (!gift) return;
-    
-    // Check if recipient has complete shipping address
+  // Extract payment logic into a separate function
+  const processPayment = async (gift: any) => {
     const recipient = gift.recipients;
-    const hasCompleteAddress = recipient?.street && 
-                              recipient?.city && 
-                              recipient?.state && 
-                              recipient?.zip_code;
-    
-    if (!hasCompleteAddress) {
-      // Open ScheduleGiftModal to collect shipping address
-      setSelectedRecipient(recipient);
-      setPayingForGift(null);
-      return;
-    }
     
     setPayingForGift(gift.id);
     
@@ -158,6 +172,27 @@ const UpcomingGiftsManager = () => {
     }
   };
 
+  const handlePayForGift = async (gift: any) => {
+    if (!gift) return;
+    
+    // Check if recipient has complete shipping address
+    const recipient = gift.recipients;
+    const hasCompleteAddress = recipient?.street && 
+                              recipient?.city && 
+                              recipient?.state && 
+                              recipient?.zip_code;
+    
+    if (!hasCompleteAddress) {
+      // Set state to indicate we're collecting address for this specific gift payment
+      setSelectedRecipient(recipient);
+      setPayingForGift(gift.id);
+      return;
+    }
+    
+    // If address is complete, proceed directly with payment
+    await processPayment(gift);
+  };
+
   const handleRecipientSelected = (recipient: any) => {
     setSelectedRecipient(recipient);
     setShowRecipientSelection(false);
@@ -174,119 +209,89 @@ const UpcomingGiftsManager = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'scheduled': return 'bg-blue-100 text-blue-800';
+      case 'ordered': return 'bg-yellow-100 text-yellow-800';
       case 'paid': return 'bg-green-100 text-green-800';
-      case 'ordered': return 'bg-purple-100 text-purple-800';
-      case 'delivered': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getGiftImage = (gift: any) => {
-    // First priority: use the stored gift image URL if available
-    if (gift.gift_image_url) {
-      return gift.gift_image_url;
-    }
+    // Priority order: product image, gift image url, fallback
+    if (gift.product_image_url) return gift.product_image_url;
+    if (gift.gift_image_url) return gift.gift_image_url;
     
-    // Second priority: try to get Shopify product image
-    // This will be handled by updating gifts with actual product images when they're created/ordered
+    // Fallback based on gift type
+    const giftType = gift.gift_type?.toLowerCase();
+    if (giftType?.includes('wine')) return 'https://images.unsplash.com/photo-1482938289607-e9573fc25ebb?w=400&h=300&fit=crop';
+    if (giftType?.includes('coffee')) return 'https://images.unsplash.com/photo-1581090464777-f3220bbe1b8b?w=400&h=300&fit=crop';
+    if (giftType?.includes('tea')) return 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=400&h=300&fit=crop';
+    if (giftType?.includes('chocolate') || giftType?.includes('sweet')) return 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=400&h=300&fit=crop';
     
-    // Fallback to type-based mapping for older gifts
-    const imageMap = {
-      'wine': 'https://images.unsplash.com/photo-1482938289607-e9573fc25ebb?w=400&h=300&fit=crop',
-      'tea': 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=400&h=300&fit=crop',
-      'coffee': 'https://images.unsplash.com/photo-1581090464777-f3220bbe1b8b?w=400&h=300&fit=crop',
-      'sweet treats': 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=400&h=300&fit=crop',
-      'self care': 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?w=400&h=300&fit=crop',
-      'candle': 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&h=300&fit=crop&q=80',
-      'ocean driftwood coconut candle': 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&h=300&fit=crop&q=80',
-      'lavender fields coffee': 'https://images.unsplash.com/photo-1581090464777-f3220bbe1b8b?w=400&h=300&fit=crop',
-      'truffle chocolate': 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=400&h=300&fit=crop'
-    };
-    return imageMap[gift.gift_type?.toLowerCase()] || 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop';
+    return 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop';
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6 w-full">
-      {/* Unpaid Gifts Section */}
+    <div className="space-y-8">
+      {/* Gifts Pending Payment Section */}
       {unpaidGifts && unpaidGifts.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center space-x-2">
-            <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
-            <h2 className="text-lg sm:text-xl font-semibold text-brand-charcoal">Gifts Pending Payment</h2>
-          </div>
+        <div>
+          <CardHeader className="px-0 pb-4">
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <CreditCard className="h-5 w-5" />
+              Gifts Pending Payment
+            </CardTitle>
+          </CardHeader>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-4 sm:gap-6">
-            {unpaidGifts.map((gift: any) => (
-              <Card 
-                key={gift.id} 
-                className="hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-red-50 to-red-100/20 border-red-200 w-full"
-              >
-                <CardHeader className="pb-3 px-4 sm:px-6">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <CreditCard className="h-4 w-4 text-red-500" />
-                        <CardTitle className="text-base sm:text-lg text-brand-charcoal truncate">
-                          {cleanName(gift.recipients?.name)}
-                        </CardTitle>
-                      </div>
-                      <Badge className="text-xs bg-red-100 text-red-800">
-                        Payment Required
-                      </Badge>
-                    </div>
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="space-y-4 px-4 sm:px-6">
-                  {/* Gift Image & Details */}
-                  <div className="flex items-center space-x-4">
-                    {gift.gift_type && (
-                      <img
-                        src={getGiftImage(gift)}
-                        alt={`${gift.gift_type} gift`}
-                        className="w-16 h-16 object-cover rounded-lg shadow-sm"
-                      />
-                    )}
+          <div className="space-y-4">
+            {unpaidGifts.map((gift) => (
+              <Card key={gift.id} className="overflow-hidden">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <p className="font-medium text-brand-charcoal text-sm sm:text-base">{gift.occasion}</p>
-                      {gift.gift_type && (
-                        <p className="text-xs sm:text-sm text-brand-charcoal/70 font-medium">{gift.gift_type}</p>
-                      )}
-                      {gift.price_range && (
-                        <p className="text-xs sm:text-sm text-red-600 font-semibold">{gift.price_range}</p>
-                      )}
+                      <div className="flex items-center gap-3 mb-3">
+                        <Gift className="h-5 w-5 text-muted-foreground" />
+                        <h3 className="font-medium text-lg">{gift.recipients?.name}</h3>
+                        <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                          Payment Required
+                        </Badge>
+                      </div>
+                      
+                      <div className="flex items-center gap-4 mb-4">
+                        <img 
+                          src={getGiftImage(gift)} 
+                          alt={gift.gift_type} 
+                          className="w-16 h-16 rounded-lg object-cover"
+                        />
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-1">{gift.occasion}</p>
+                          <p className="font-medium">{gift.gift_type}</p>
+                          <p className="text-sm font-semibold text-green-600">{gift.price_range}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <Calendar className="h-4 w-4 mr-1" />
+                        {formatDate(gift.occasion_date)}
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="flex items-center text-xs sm:text-sm text-brand-charcoal/70">
-                    <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                    {formatDate(gift.occasion_date)}
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      className="flex-1 bg-red-600 text-white hover:bg-red-700"
-                      onClick={() => handlePayForGift(gift)}
-                      disabled={payingForGift === gift.id}
-                    >
-                      {payingForGift === gift.id ? (
-                        "Processing..."
-                      ) : (
-                        <>
-                          <CreditCard className="h-4 w-4 mr-2" />
-                          Pay Now
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setViewingGift(gift)}
-                      className="border-red-200 text-red-600 hover:bg-red-50"
-                    >
-                      View Details
-                    </Button>
+                    
+                    <div className="flex flex-col gap-2">
+                      <Button 
+                        onClick={() => handlePayForGift(gift)}
+                        disabled={!!payingForGift}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Pay Now
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setViewingGift(gift)}
+                      >
+                        View Details
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -295,113 +300,108 @@ const UpcomingGiftsManager = () => {
         </div>
       )}
 
-      {/* Regular Upcoming Gifts Section */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center space-x-2">
-          <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-brand-gold" />
-          <h2 className="text-lg sm:text-xl font-semibold text-brand-charcoal">Upcoming Gifts</h2>
-        </div>
-        {((paidGifts && paidGifts.length > 0) || (unpaidGifts && unpaidGifts.length > 0)) && (
-          <Button
-            className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 w-full sm:w-auto"
+      {/* Upcoming Gifts Section */}
+      <div>
+        <CardHeader className="px-0 pb-4 flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <Gift className="h-5 w-5" />
+            Upcoming Gifts
+          </CardTitle>
+          <Button 
             onClick={() => setShowRecipientSelection(true)}
+            className="bg-primary hover:bg-primary/90"
           >
             <Plus className="h-4 w-4 mr-2" />
-            <span className="sm:hidden">Schedule Gifts</span>
-            <span className="hidden sm:inline">Schedule More Gifts</span>
+            Schedule More Gifts
           </Button>
+        </CardHeader>
+
+        {paidGifts && paidGifts.length > 0 ? (
+          <div className="space-y-4">
+            {paidGifts.map((gift) => (
+              <Card 
+                key={gift.id} 
+                className="cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => setViewingGift(gift)}
+              >
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-3">
+                        <Gift className="h-5 w-5 text-muted-foreground" />
+                        <h3 className="font-medium text-lg">{gift.recipients?.name}</h3>
+                        <Badge className={getStatusColor(gift.status)}>
+                          {gift.status}
+                        </Badge>
+                      </div>
+                      
+                      <div className="flex items-center gap-4 mb-4">
+                        <img 
+                          src={getGiftImage(gift)} 
+                          alt={gift.gift_type} 
+                          className="w-16 h-16 rounded-lg object-cover"
+                        />
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-1">{gift.occasion}</p>
+                          <p className="font-medium">{gift.gift_type}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Delivering {gift.delivery_date ? formatDate(gift.delivery_date) : 'TBD'}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <Calendar className="h-4 w-4 mr-1" />
+                        {formatDate(gift.occasion_date)}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+              <Gift className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="font-semibold mb-2">No upcoming gifts scheduled</h3>
+              <p className="text-sm text-muted-foreground mb-6 max-w-sm">
+                Start scheduling thoughtful gifts for your loved ones' special occasions
+              </p>
+              <Button onClick={() => setShowRecipientSelection(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Schedule Your First Gift
+              </Button>
+            </CardContent>
+          </Card>
         )}
       </div>
 
-      {paidGifts && paidGifts.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-4 sm:gap-6">
-          {paidGifts.map((gift: any) => (
-            <Card 
-              key={gift.id} 
-              className="hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1 bg-gradient-to-br from-white to-brand-cream/20 border-brand-cream w-full"
-              onClick={() => setViewingGift(gift)}
+      {/* Placeholder for no gifts at all */}
+      {(!paidGifts || paidGifts.length === 0) && (!unpaidGifts || unpaidGifts.length === 0) && (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="bg-muted/50 p-4 rounded-full mb-6">
+              <Gift className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h2 className="text-xl font-semibold mb-3">Ready to spread some joy?</h2>
+            <p className="text-muted-foreground mb-6 max-w-md">
+              Schedule thoughtful gifts for birthdays, anniversaries, and special moments. We'll handle the rest!
+            </p>
+            <Button 
+              onClick={() => setShowRecipientSelection(true)}
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
             >
-              <CardHeader className="pb-3 px-4 sm:px-6">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Sparkles className="h-4 w-4 text-brand-gold" />
-                      <CardTitle className="text-base sm:text-lg text-brand-charcoal truncate">
-                        {cleanName(gift.recipients?.name)}
-                      </CardTitle>
-                    </div>
-                    <Badge className={`text-xs ${getStatusColor(gift.status)}`}>
-                      {gift.status}
-                    </Badge>
-                  </div>
-                </div>
-              </CardHeader>
-              
-              <CardContent className="space-y-4 px-4 sm:px-6">
-                {/* Gift Image & Details */}
-                <div className="flex items-center space-x-4">
-                  {gift.gift_type && (
-                    <img
-                      src={getGiftImage(gift)}
-                      alt={`${gift.gift_type} gift`}
-                      className="w-16 h-16 object-cover rounded-lg shadow-sm"
-                    />
-                  )}
-                  <div className="flex-1">
-                    <p className="font-medium text-brand-charcoal text-sm sm:text-base">{gift.occasion}</p>
-                    {gift.gift_type && (
-                      <p className="text-xs sm:text-sm text-brand-charcoal/70 font-medium">{gift.gift_type}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center text-xs sm:text-sm text-brand-charcoal/70">
-                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                  {formatDate(gift.occasion_date)}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        (!unpaidGifts || unpaidGifts.length === 0) && (
-          <Card className="w-full min-h-[400px] bg-white/40 backdrop-blur-md border border-white/30 shadow-xl">
-            <CardContent className="flex flex-col items-center justify-center h-full py-12 px-4 sm:px-6 text-center space-y-6">
-              {/* Animated Gift Icon */}
-              <div className="relative">
-                <div className="w-20 h-20 bg-white/20 backdrop-blur-sm border border-white/40 rounded-full flex items-center justify-center animate-pulse shadow-lg">
-                  <Sparkles className="h-10 w-10 text-gray-600 animate-bounce" />
-                </div>
-                <div className="absolute -top-1 -right-1 w-6 h-6 bg-gray-400/60 rounded-full animate-ping"></div>
-              </div>
-              
-              {/* Main Message */}
-              <div className="space-y-3 max-w-sm">
-                <h3 className="text-xl font-semibold text-gray-800">
-                  Ready to spread some joy?
-                </h3>
-                <p className="text-gray-600 leading-relaxed">
-                  Start your thoughtful gifting journey by scheduling your first gift. We'll handle the rest!
-                </p>
-              </div>
-              
-              {/* CTA Button */}
-              <Button
-                size="lg"
-                className="bg-white/30 backdrop-blur-sm border border-white/40 text-gray-800 hover:bg-white/40 transition-all duration-200 hover:scale-105 shadow-lg hover:shadow-xl"
-                onClick={() => setShowRecipientSelection(true)}
-              >
-                <Plus className="h-5 w-5 mr-2" />
-                Schedule Your First Gift
-              </Button>
-              
-              {/* Supporting Text */}
+              <Plus className="h-4 w-4 mr-2" />
+              Schedule Your First Gift
+            </Button>
+            <div className="mt-6 text-center">
               <p className="text-xs text-gray-500 max-w-xs">
                 Choose from curated gifts and we'll deliver at the perfect time
               </p>
-            </CardContent>
-          </Card>
-        )
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {viewingGift && (
@@ -425,7 +425,11 @@ const UpcomingGiftsManager = () => {
         <ScheduleGiftModal
           recipient={selectedRecipient}
           isOpen={!!selectedRecipient}
-          onClose={() => setSelectedRecipient(null)}
+          onClose={() => {
+            setSelectedRecipient(null);
+            setPayingForGift(null);
+          }}
+          payingForGiftId={payingForGift}
         />
       )}
     </div>
