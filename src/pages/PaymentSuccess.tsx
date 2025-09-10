@@ -143,12 +143,19 @@ const PaymentSuccess = () => {
         setVerificationComplete(true);
         setShowVerificationConfetti(true);
         
-        // If this was from onboarding, invalidate onboarding status
-        if (isFromOnboarding && user?.id) {
-          console.log('🔧 PaymentSuccess: Invalidating onboarding queries');
-          await queryClient.invalidateQueries({ queryKey: ['onboarding-status', user.id] });
-          await queryClient.invalidateQueries({ queryKey: ['recipients', user.id] });
-          await queryClient.invalidateQueries({ queryKey: ['user-metrics', user.id] });
+        // Invalidate gift-related queries to update the UI
+        if (user?.id) {
+          console.log('🔧 PaymentSuccess: Invalidating gift queries to update UI');
+          await queryClient.invalidateQueries({ queryKey: ['upcoming-gifts', user.id] });
+          await queryClient.invalidateQueries({ queryKey: ['unpaid-gifts', user.id] });
+          
+          // If this was from onboarding, also invalidate onboarding status
+          if (isFromOnboarding) {
+            console.log('🔧 PaymentSuccess: Invalidating onboarding queries');
+            await queryClient.invalidateQueries({ queryKey: ['onboarding-status', user.id] });
+            await queryClient.invalidateQueries({ queryKey: ['recipients', user.id] });
+            await queryClient.invalidateQueries({ queryKey: ['user-metrics', user.id] });
+          }
         }
         
         toast({
