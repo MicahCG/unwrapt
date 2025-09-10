@@ -29,7 +29,7 @@ const UpcomingGiftsManager = () => {
         .from('scheduled_gifts')
         .select(`
           *,
-          recipients (name, email, interests, street, city, state, zip_code, country, phone)
+          recipients (id, name, email, interests, street, city, state, zip_code, country, phone)
         `)
         .eq('user_id', user?.id)
         .in('status', ['scheduled', 'ordered', 'paid'])
@@ -50,7 +50,7 @@ const UpcomingGiftsManager = () => {
         .from('scheduled_gifts')
         .select(`
           *,
-          recipients (name, email, interests, street, city, state, zip_code, country, phone)
+          recipients (id, name, email, interests, street, city, state, zip_code, country, phone)
         `)
         .eq('user_id', user?.id)
         .eq('payment_status', 'unpaid')
