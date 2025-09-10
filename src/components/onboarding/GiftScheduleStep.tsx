@@ -241,9 +241,15 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
         };
       }
 
-      // Validate shipping address before proceeding
-      if (!shippingAddress || !shippingAddress.address1 || !shippingAddress.city) {
-        throw new Error('Missing delivery address. Please ensure all address fields are filled.');
+      // Check if we have address info, if not we'll let Stripe collect it
+      let hasCompleteAddress = false;
+      if (shippingAddress && shippingAddress.address1 && shippingAddress.city) {
+        hasCompleteAddress = true;
+        console.log('✅ Using provided address for payment');
+      } else {
+        console.log('ℹ️  Incomplete address - Stripe will collect shipping info');
+        // Set shippingAddress to null so Stripe handles collection
+        shippingAddress = null;
       }
 
       // Create payment session with the REAL gift ID (not temp ID)
