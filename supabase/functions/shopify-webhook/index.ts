@@ -14,6 +14,36 @@ const invalidateCache = async (cacheKey: string) => {
   // invalidate specific React Query cache keys
 };
 
+// Verify Shopify webhook HMAC signature
+async function verifyShopifyWebhook(
+  body: string, 
+  hmacHeader: string, 
+  secret: string
+): Promise<boolean> {
+  try {
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(secret);
+    const messageData = encoder.encode(body);
+    
+    const key = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    
+    const signature = await crypto.subtle.sign('HMAC', key, messageData);
+    const computedHmac = btoa(String.fromCharCode(...new Uint8Array(signature)));
+    
+    // Timing-safe comparison
+    return computedHmac === hmacHeader;
+  } catch (error) {
+    console.error('❌ HMAC verification error:', error);
+    return false;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -29,14 +59,44 @@ serve(async (req) => {
 
     console.log(`📦 Received Shopify webhook: ${topic}`);
 
-    // Verify webhook (you should implement HMAC verification in production)
+    // Verify webhook HMAC signature
     const webhookSecret = Deno.env.get('SHOPIFY_WEBHOOK_SECRET');
-    if (webhookSecret && hmac) {
-      // TODO: Implement HMAC verification for security
-      console.log('🔒 Webhook HMAC verification (TODO: implement)');
+    if (!webhookSecret) {
+      console.error('❌ SHOPIFY_WEBHOOK_SECRET not configured');
+      return new Response(JSON.stringify({ 
+        error: 'Webhook not configured' 
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      });
     }
 
-    const payload = await req.json();
+    if (!hmac) {
+      console.error('❌ Missing HMAC signature');
+      return new Response(JSON.stringify({ 
+        error: 'Invalid request' 
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
+
+    // Get raw body for verification
+    const body = await req.text();
+    const isValid = await verifyShopifyWebhook(body, hmac, webhookSecret);
+    
+    if (!isValid) {
+      console.error('❌ Invalid HMAC signature');
+      return new Response(JSON.stringify({ 
+        error: 'Invalid signature' 
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
+
+    console.log('✅ Webhook signature verified');
+    const payload = JSON.parse(body);
 
     // Handle different webhook types
     switch (topic) {
