@@ -80,12 +80,12 @@ serve(async (req) => {
         }
       };
     } else {
+      // Query gift and recipient data
       const { data: giftQueryData, error: giftError } = await supabaseService
         .from('scheduled_gifts')
         .select(`
           *,
-          recipients (name, email, phone, street, city, state, zip_code, country, interests),
-          user:profiles!user_id (full_name, email)
+          recipients (name, email, phone, street, city, state, zip_code, country, interests)
         `)
         .eq('id', scheduledGiftId)
         .eq('payment_status', 'paid')
@@ -95,7 +95,18 @@ serve(async (req) => {
         console.error('❌ Gift query error:', giftError);
         throw new Error("Gift not found or payment not confirmed");
       }
-      giftData = giftQueryData;
+
+      // Separately query profile data using user_id
+      const { data: profileData } = await supabaseService
+        .from('profiles')
+        .select('full_name, email')
+        .eq('id', giftQueryData.user_id)
+        .single();
+
+      giftData = {
+        ...giftQueryData,
+        user: profileData || null
+      };
     }
 
     console.log(`🎁 Gift data:`, {
