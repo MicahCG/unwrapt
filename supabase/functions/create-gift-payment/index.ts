@@ -1,11 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://cdn.skypack.dev/@supabase/supabase-js@2.49.0";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { corsHeaders } from "../_shared/cors.ts";
 
 // Input sanitization utilities
 const sanitizeInput = (input: string): string => {
@@ -334,10 +330,13 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("💳 Error creating payment:", error);
+    console.error("💳 Error message:", error.message);
     console.error("💳 Error stack:", error.stack);
+    
+    // Return generic error message (detailed errors are in server logs)
     return new Response(JSON.stringify({ 
-      error: error.message,
-      details: error.stack 
+      error: "Failed to create payment session. Please try again or contact support.",
+      success: false
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,

@@ -1,11 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://cdn.skypack.dev/@supabase/supabase-js@2.49.0";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { corsHeaders } from "../_shared/cors.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -293,11 +289,13 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('🎁 Process-gift-fulfillment: Error processing gift fulfillment:', error);
+    console.error('🎁 Process-gift-fulfillment: Error message:', error.message);
     console.error('🎁 Process-gift-fulfillment: Error stack:', error.stack);
+    
+    // Return generic error message (detailed errors are in server logs)
     return new Response(JSON.stringify({ 
-      error: error.message || 'Unknown error occurred',
-      success: false,
-      details: error.stack
+      error: "Failed to process gift fulfillment. Please contact support.",
+      success: false
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,

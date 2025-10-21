@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://cdn.skypack.dev/@supabase/supabase-js@2.49.0";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { corsHeaders } from "../_shared/cors.ts";
 
 interface ShopifyOrderRequest {
   scheduledGiftId: string;
@@ -374,8 +370,12 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('❌ Error in Shopify order processing:', error);
+    console.error('❌ Error message:', error.message);
+    console.error('❌ Error stack:', error.stack);
+    
+    // Return generic error message (detailed errors are in server logs)
     return new Response(JSON.stringify({ 
-      error: error.message,
+      error: "Failed to create Shopify order. Please contact support.",
       success: false
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
