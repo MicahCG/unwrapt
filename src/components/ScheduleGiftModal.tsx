@@ -360,10 +360,16 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         setSelectedProduct(null);
       }
     } catch (error) {
-      console.error('Error scheduling gift:', error);
+      console.error('❌ Error scheduling gift:', error);
+      console.error('❌ Error details:', {
+        message: error?.message,
+        name: error?.name,
+        stack: error?.stack,
+        fullError: JSON.stringify(error, null, 2)
+      });
       toast({
         title: "Error",
-        description: "There was a problem scheduling your gift. Please try again.",
+        description: error?.message || "There was a problem scheduling your gift. Please try again.",
         variant: "destructive"
       });
     } finally {
