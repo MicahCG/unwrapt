@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Check, Calendar, Users, Briefcase, TrendingUp, Gift, Heart, Clock, Sparkles } from 'lucide-react';
 import { GlassButton } from '@/components/GlassButton';
 import { Logo } from '@/components/ui/logo';
-import PremiumGiftBox from '@/components/PremiumGiftBox';
+import giftBoxImage from '@/assets/unwrapt-gift-box.png';
 
 const Landing = () => {
   const [email, setEmail] = useState('');
@@ -90,9 +90,13 @@ const Landing = () => {
               Effortless Gifting for<br />Busy Professionals
             </h1>
             
-            {/* 3D Gift Box */}
+            {/* Gift Box Image */}
             <div className="max-w-2xl mx-auto py-8">
-              <PremiumGiftBox />
+              <img 
+                src={giftBoxImage} 
+                alt="Luxury Unwrapt gift box with elegant packaging" 
+                className="w-full max-w-md mx-auto object-contain"
+              />
             </div>
             
             <p className="font-sans text-lg md:text-xl text-[hsl(var(--charcoal-body))] max-w-2xl mx-auto leading-relaxed">
