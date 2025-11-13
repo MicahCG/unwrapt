@@ -11,6 +11,7 @@ const Landing = () => {
   const [email, setEmail] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showNav, setShowNav] = useState(false);
+  const [showIntro, setShowIntro] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -26,6 +27,9 @@ const Landing = () => {
       try {
         sessionStorage.setItem('userEmail', email);
         
+        // Show the intro animation first
+        setShowIntro(true);
+        
         const webhookUrl = 'https://hook.us2.make.com/cjsyb77bay61w4lrcauvbno5dmvdo7ca';
         await fetch(webhookUrl, {
           method: 'POST',
@@ -34,37 +38,24 @@ const Landing = () => {
           body: JSON.stringify({ email }),
         });
         
-        setIsSubmitted(true);
+        // Wait for intro to complete, then redirect
         setTimeout(() => {
           window.location.href = 'https://app.unwrapt.io';
-        }, 1500);
+        }, 4000); // Intro takes ~2.5s + buffer
       } catch (error) {
         console.error('Error:', error);
-        setIsSubmitted(true);
+        // Still show intro even on error
+        setShowIntro(true);
         setTimeout(() => {
           window.location.href = 'https://app.unwrapt.io';
-        }, 1500);
+        }, 4000);
       }
     }
   };
 
-  if (isSubmitted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--champagne))]">
-        <div className="text-center space-y-6 px-4">
-          <div className="w-20 h-20 mx-auto bg-[hsl(var(--soft-gold))]/20 rounded-full flex items-center justify-center">
-            <Check className="w-10 h-10 text-[hsl(var(--soft-gold))]" />
-          </div>
-          <h2 className="font-serif text-4xl text-[hsl(var(--espresso))]">Welcome to Unwrapt</h2>
-          <p className="text-[hsl(var(--charcoal-body))] text-lg">Redirecting you to the app...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[hsl(var(--champagne))] text-[hsl(var(--espresso))]">
-      <GiftUnwrapIntro />
+      {showIntro && <GiftUnwrapIntro />}
       {/* Sticky Navigation */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         showNav ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'
