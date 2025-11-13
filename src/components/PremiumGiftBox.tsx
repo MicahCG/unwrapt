@@ -254,24 +254,11 @@ const PremiumGiftBox: React.FC = () => {
     <div
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      className="w-full h-[380px] sm:h-[460px] rounded-3xl overflow-hidden relative shadow-[0_20px_60px_rgba(212,175,122,0.18)]"
-      style={{
-        background:
-          'linear-gradient(135deg, #F5EFE6 0%, #E8DCC8 50%, #F5EFE6 100%)',
-      }}
+      className="w-full h-[380px] sm:h-[460px] rounded-3xl overflow-hidden relative"
     >
       <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }}>
         <PremiumScene mousePosition={mousePosition} />
       </Canvas>
-
-      {/* Soft bottom fade */}
-      <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3"
-        style={{
-          background:
-            'linear-gradient(to top, rgba(232,220,200,0.35), transparent)',
-        }}
-      />
     </div>
   );
 };
