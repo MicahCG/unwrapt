@@ -5,6 +5,7 @@ import { GlassButton } from '@/components/GlassButton';
 import { Logo } from '@/components/ui/logo';
 import giftBoxImage from '@/assets/unwrapt-gift-box.png';
 import GiftUnwrapIntro from '@/components/GiftUnwrapIntro';
+import GiftBoxOpeningIntro from '@/components/GiftBoxOpeningIntro';
 import GiftingScenesScroll from '@/components/GiftingScenesScroll';
 
 const Landing = () => {
@@ -55,6 +56,7 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen bg-[hsl(var(--champagne))] text-[hsl(var(--espresso))]">
+      <GiftBoxOpeningIntro />
       {showIntro && <GiftUnwrapIntro />}
       {/* Sticky Navigation */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
