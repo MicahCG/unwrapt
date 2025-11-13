@@ -313,9 +313,10 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
 
         console.log('Onboarding completed successfully');
 
-        // Small delay to ensure toast is visible, then redirect will happen automatically
+        // Small delay to ensure toast is visible, then navigate to dashboard
         setTimeout(() => {
           setIsCompleting(false);
+          onBack(); // This will trigger parent to show dashboard
         }, 1000);
 
       } catch (error) {
