@@ -79,39 +79,60 @@ const Landing = () => {
       <div className="fixed inset-0 opacity-[0.03] pointer-events-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJibGFjayIgc3Ryb2tlLXdpZHRoPSIwLjUiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')]" />
 
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center px-6 py-20 overflow-hidden">
-        {/* Subtle gradient background */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[hsl(var(--champagne))] via-[hsl(var(--soft-almond))]/30 to-[hsl(var(--champagne))]" />
-        
-        <div className="relative z-10 max-w-4xl mx-auto text-center space-y-12">
-          {/* Hero copy */}
-          <div className="space-y-6">
-            <h1 className="font-serif text-5xl md:text-7xl text-[hsl(var(--espresso))] tracking-tight leading-tight">
-              Effortless Gifting for<br />Busy Professionals
+      <section className="relative min-h-screen flex items-center justify-center px-6 py-20 overflow-hidden" style={{ backgroundColor: '#F8F1E6' }}>
+        <div className="relative z-10 w-full max-w-[900px] mx-auto">
+          <div className="hero-frame flex flex-col items-center text-center space-y-8">
+            {/* Hero Headline */}
+            <h1 className="font-serif text-5xl md:text-6xl lg:text-7xl tracking-tight leading-tight" style={{ color: '#8B7355' }}>
+              Effortless Gifting for Busy Professionals
             </h1>
             
-            {/* Gift Box Image */}
-            <div className="max-w-2xl mx-auto py-8">
-              <img 
-                src={giftBoxImage} 
-                alt="Luxury Unwrapt gift box with elegant packaging" 
-                className="w-full max-w-md mx-auto object-contain"
-              />
-            </div>
-            
-            <p className="font-sans text-lg md:text-xl text-[hsl(var(--charcoal-body))] max-w-2xl mx-auto leading-relaxed">
-              Unwrapt remembers every occasion, chooses thoughtful gifts, and sends them automatically — so you deepen relationships without lifting a finger.
+            {/* Subheadline */}
+            <p className="text-lg md:text-xl leading-relaxed max-w-2xl" style={{ color: '#8B7355' }}>
+              Unwrapt remembers every occasion, finds the perfect gift, and delivers it — so you can stay connected without the stress
             </p>
-          </div>
+            
+            {/* Gift Icon */}
+            <img 
+              src={giftBoxImage} 
+              alt="Unwrapt Gift" 
+              className="gift-bow w-40 md:w-48 lg:w-52 object-contain"
+            />
 
-          {/* Hero buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-6">
-            <GlassButton variant="primary" href="/app">
-              Get Started Free
-            </GlassButton>
-            <GlassButton variant="secondary" onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}>
-              How It Works
-            </GlassButton>
+            {/* CTA Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 items-center justify-center pt-4">
+              <button
+                onClick={() => window.location.href = '/app'}
+                className="px-10 py-4 rounded-full font-medium text-lg text-white transition-all duration-300
+                          hover:scale-[1.02]"
+                style={{ 
+                  backgroundColor: '#D4AF7A',
+                  boxShadow: '0 4px 14px rgba(212, 175, 122, 0.25)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(212, 175, 122, 0.45)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = '0 4px 14px rgba(212, 175, 122, 0.25)';
+                }}
+              >
+                Get Started Free
+              </button>
+              
+              <button
+                onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
+                className="px-10 py-4 rounded-full font-medium text-lg transition-all duration-300
+                          hover:scale-[1.02]"
+                style={{ 
+                  backgroundColor: 'rgba(255, 255, 255, 0.35)',
+                  backdropFilter: 'blur(14px)',
+                  border: '1px solid rgba(255, 255, 255, 0.7)',
+                  color: '#6B5444'
+                }}
+              >
+                Learn More
+              </button>
+            </div>
           </div>
         </div>
       </section>
