@@ -4,6 +4,7 @@ import { ArrowRight, Check, Calendar, Users, Briefcase, TrendingUp, Gift, Heart,
 import { GlassButton } from '@/components/GlassButton';
 import { Logo } from '@/components/ui/logo';
 import giftBoxImage from '@/assets/unwrapt-gift-box.png';
+import GiftUnwrapIntro from '@/components/GiftUnwrapIntro';
 
 const Landing = () => {
   const [email, setEmail] = useState('');
@@ -62,6 +63,7 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen bg-[hsl(var(--champagne))] text-[hsl(var(--espresso))]">
+      <GiftUnwrapIntro />
       {/* Sticky Navigation */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         showNav ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'
