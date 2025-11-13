@@ -1,12 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Check, Calendar, Users, Briefcase, TrendingUp, Gift, Heart, Clock, Sparkles } from 'lucide-react';
 import { GlassButton } from '@/components/GlassButton';
 import { LuxuryGiftBox } from '@/components/LuxuryGiftBox';
+import { Logo } from '@/components/ui/logo';
 
 const Landing = () => {
   const [email, setEmail] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [showNav, setShowNav] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowNav(window.scrollY > 100);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const handleGetStarted = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,6 +62,20 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen bg-[hsl(var(--champagne))] text-[hsl(var(--espresso))]">
+      {/* Sticky Navigation */}
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        showNav ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'
+      }`}>
+        <div className="bg-white/25 backdrop-blur-[16px] border-b border-white/60">
+          <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+            <Logo variant="full" size="md" />
+            <GlassButton variant="primary" href="/app">
+              Get Started
+            </GlassButton>
+          </div>
+        </div>
+      </nav>
+
       {/* Subtle texture overlay */}
       <div className="fixed inset-0 opacity-[0.03] pointer-events-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJibGFjayIgc3Ryb2tlLXdpZHRoPSIwLjUiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')]" />
 
@@ -227,88 +251,6 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section className="py-32 px-6">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="font-serif text-4xl md:text-5xl text-[hsl(var(--espresso))] text-center mb-6">
-            Choose Your Plan
-          </h2>
-          <p className="text-center text-[hsl(var(--charcoal-body))] text-lg mb-20">
-            Flexible pricing for individuals and teams
-          </p>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                name: "Essential",
-                price: "$29",
-                period: "/month",
-                features: [
-                  "Up to 10 recipients",
-                  "Automated reminders",
-                  "Basic gift curation",
-                  "Email support"
-                ]
-              },
-              {
-                name: "Professional",
-                price: "$79",
-                period: "/month",
-                features: [
-                  "Up to 50 recipients",
-                  "Advanced AI curation",
-                  "Priority shipping",
-                  "Priority support",
-                  "Custom branding"
-                ],
-                featured: true
-              },
-              {
-                name: "Concierge",
-                price: "$199",
-                period: "/month",
-                features: [
-                  "Unlimited recipients",
-                  "White-glove service",
-                  "Dedicated account manager",
-                  "Custom gift sourcing",
-                  "Team collaboration"
-                ]
-              }
-            ].map((tier, idx) => (
-              <div 
-                key={idx} 
-                className={`relative bg-white/25 backdrop-blur-sm border rounded-2xl p-8 hover:bg-white/35 transition-all duration-300 ${
-                  tier.featured ? 'border-[hsl(var(--soft-gold))]/60 shadow-[0_0_40px_rgba(200,164,106,0.2)]' : 'border-white/50'
-                }`}
-              >
-                {tier.featured && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-[hsl(var(--soft-gold))] text-white text-sm rounded-full">
-                    Most Popular
-                  </div>
-                )}
-                <h3 className="font-serif text-2xl text-[hsl(var(--espresso))] mb-2">{tier.name}</h3>
-                <div className="mb-6">
-                  <span className="font-serif text-4xl text-[hsl(var(--espresso))]">{tier.price}</span>
-                  <span className="text-[hsl(var(--charcoal-body))]">{tier.period}</span>
-                </div>
-                <ul className="space-y-3 mb-8">
-                  {tier.features.map((feature, featureIdx) => (
-                    <li key={featureIdx} className="flex items-start gap-3">
-                      <Check className="w-5 h-5 text-[hsl(var(--soft-gold))] flex-shrink-0 mt-0.5" />
-                      <span className="text-[hsl(var(--charcoal-body))]">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-                <GlassButton variant={tier.featured ? 'primary' : 'secondary'} href="/app" className="w-full">
-                  Get Started
-                </GlassButton>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Final CTA */}
       <section className="py-32 px-6 bg-gradient-to-b from-[hsl(var(--champagne))] to-[hsl(var(--soft-almond))]/50">
         <div className="max-w-3xl mx-auto text-center space-y-8">
@@ -328,7 +270,7 @@ const Landing = () => {
       <footer className="py-16 px-6 border-t border-[hsl(var(--soft-gold))]/20">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="font-serif text-2xl text-[hsl(var(--espresso))]">Unwrapt</div>
+            <Logo variant="full" size="md" />
             <div className="flex gap-8 text-sm text-[hsl(var(--charcoal-body))]">
               <Link to="/privacy" className="hover:text-[hsl(var(--soft-gold))] transition-colors">Privacy</Link>
               <Link to="/terms" className="hover:text-[hsl(var(--soft-gold))] transition-colors">Terms</Link>
