@@ -1,71 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import { Gift, Clock, Heart, CheckCircle, Star, Calendar, Users, TrendingUp, Sparkles, Coffee, Book, Music, ArrowRight, Zap, Shield } from 'lucide-react';
-import AnimatedBackground3D from '@/components/AnimatedBackground3D';
-import AnimatedGiftDrawing from '@/components/AnimatedGiftDrawing';
+import { ArrowRight, Check, Calendar, Users, Briefcase, TrendingUp, Gift, Heart, Clock, Sparkles } from 'lucide-react';
+import { GlassButton } from '@/components/GlassButton';
+import { LuxuryGiftBox } from '@/components/LuxuryGiftBox';
 
 const Landing = () => {
   const [email, setEmail] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [activeGiftType, setActiveGiftType] = useState(0);
-  const [hoveredStat, setHoveredStat] = useState<number | null>(null);
-  const [typewriterText, setTypewriterText] = useState('');
-  const [showContent, setShowContent] = useState(false);
-  const [cyclingText, setCyclingText] = useState('');
-  const [cyclingIndex, setCyclingIndex] = useState(0);
-
-  const fullText = "Never forget a birthday again.";
-  const cyclingPhrases = [
-    "Be thoughtful without the stress",
-    "Automate your gift giving", 
-    "Find niche gifts for people you love"
-  ];
-
-  // Cycling Typewriter Component
-  const CyclingTypewriter = () => (
-    <div className="flex items-center justify-center gap-3 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-      <Sparkles className="w-5 h-5 text-brand-gold animate-spin" style={{ animationDuration: '3s' }} />
-      <p className="text-xl md:text-2xl text-slate-800/70 font-medium min-h-[40px] flex items-center">
-        {cyclingText}
-        <span className="animate-pulse ml-1">|</span>
-      </p>
-      <Heart className="w-5 h-5 text-brand-peach animate-pulse" />
-    </div>
-  );
 
   const handleGetStarted = async (e: React.FormEvent) => {
     e.preventDefault();
     if (email) {
       try {
-        // Store email for later use in app
         sessionStorage.setItem('userEmail', email);
         
-        // Send email to make.com webhook
         const webhookUrl = 'https://hook.us2.make.com/cjsyb77bay61w4lrcauvbno5dmvdo7ca';
-        
-        const payload = { email };
-        
         await fetch(webhookUrl, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          mode: 'no-cors', // Handle CORS for external webhook
-          body: JSON.stringify(payload),
+          headers: { 'Content-Type': 'application/json' },
+          mode: 'no-cors',
+          body: JSON.stringify({ email }),
         });
         
         setIsSubmitted(true);
-        
-        // Redirect to app subdomain
         setTimeout(() => {
           window.location.href = 'https://app.unwrapt.io';
         }, 1500);
       } catch (error) {
-        console.error('Error sending email to webhook:', error);
-        // Still proceed with the flow even if webhook fails
+        console.error('Error:', error);
         setIsSubmitted(true);
         setTimeout(() => {
           window.location.href = 'https://app.unwrapt.io';
@@ -74,408 +36,307 @@ const Landing = () => {
     }
   };
 
-  // Animated background shapes
-  const AnimatedShape = ({ delay = 0, duration = 20, className = "" }) => (
-    <div 
-      className={`absolute opacity-10 animate-pulse ${className}`}
-      style={{
-        animationDelay: `${delay}s`,
-        animationDuration: `${duration}s`
-      }}
-    />
-  );
-
-  // Gift categories with rotating content
-  const giftCategories = [
-    { icon: Coffee, name: "Coffee & Tea", desc: "Premium blends for the caffeine lover" },
-    { icon: Book, name: "Books", desc: "Bestsellers and personalized reads" },
-    { icon: Music, name: "Experiences", desc: "Concert tickets and unique adventures" },
-    { icon: Sparkles, name: "Jewelry", desc: "Thoughtful pieces for special moments" },
-  ];
-
-  // Statistics about gift giving
-  const giftStats = [
-    { value: "12 hours", label: "Average time spent gift shopping per year", icon: Clock },
-    { value: "73%", label: "Of people forget important dates annually", icon: Calendar },
-    { value: "4.2 billion", label: "Missed moments due to busy schedules", icon: Heart },
-    { value: "89%", label: "Feel stressed about gift giving", icon: TrendingUp },
-  ];
-
-  // Typewriter effect
-  useEffect(() => {
-    let index = 0;
-    const timer = setInterval(() => {
-      if (index <= fullText.length) {
-        setTypewriterText(fullText.slice(0, index));
-        index++;
-      } else {
-        clearInterval(timer);
-        // Show rest of content after typewriter is complete
-        setTimeout(() => {
-          setShowContent(true);
-        }, 500);
-      }
-    }, 80);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  // Cycling typewriter effect
-  useEffect(() => {
-    if (!showContent) return;
-    
-    let timeoutId: NodeJS.Timeout;
-    let charIndex = 0;
-    let isDeleting = false;
-    let currentPhraseIndex = 0;
-    
-    const typeSpeed = 80;
-    const deleteSpeed = 40;
-    const pauseTime = 3000;
-    
-    const typeEffect = () => {
-      const currentPhrase = cyclingPhrases[currentPhraseIndex];
-      
-      if (isDeleting) {
-        setCyclingText(currentPhrase.substring(0, charIndex));
-        charIndex--;
-        
-        if (charIndex < 0) {
-          isDeleting = false;
-          charIndex = 0;
-          currentPhraseIndex = (currentPhraseIndex + 1) % cyclingPhrases.length;
-          timeoutId = setTimeout(typeEffect, typeSpeed);
-        } else {
-          timeoutId = setTimeout(typeEffect, deleteSpeed);
-        }
-      } else {
-        setCyclingText(currentPhrase.substring(0, charIndex + 1));
-        charIndex++;
-        
-        if (charIndex > currentPhrase.length) {
-          isDeleting = true;
-          charIndex = currentPhrase.length;
-          timeoutId = setTimeout(typeEffect, pauseTime);
-        } else {
-          timeoutId = setTimeout(typeEffect, typeSpeed);
-        }
-      }
-    };
-    
-    timeoutId = setTimeout(typeEffect, 1000);
-    
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [showContent]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveGiftType((prev) => (prev + 1) % giftCategories.length);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
   if (isSubmitted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-brand-cream via-white to-brand-peach flex items-center justify-center">
-        <Card className="max-w-md mx-auto text-center p-8">
-          <CardContent className="space-y-4">
-            <CheckCircle className="w-16 h-16 text-brand-gold mx-auto" />
-            <h2 className="text-2xl font-bold text-brand-charcoal">Almost there!</h2>
-            <p className="text-gray-600">Redirecting you to get started...</p>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--champagne))]">
+        <div className="text-center space-y-6 px-4">
+          <div className="w-20 h-20 mx-auto bg-[hsl(var(--soft-gold))]/20 rounded-full flex items-center justify-center">
+            <Check className="w-10 h-10 text-[hsl(var(--soft-gold))]" />
+          </div>
+          <h2 className="font-serif text-4xl text-[hsl(var(--espresso))]">Welcome to Unwrapt</h2>
+          <p className="text-[hsl(var(--charcoal-body))] text-lg">Redirecting you to the app...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-soft-gradient">
-      {/* 3D Animated Background */}
-      <AnimatedBackground3D />
-      
-      {/* Abstract Animated Background Shapes */}
-      <AnimatedShape 
-        delay={0} 
-        duration={25} 
-        className="w-32 h-32 bg-gradient-to-br from-brand-gold/15 to-brand-peach/15 rounded-full top-20 left-10 animate-bounce" 
-      />
-      <AnimatedShape 
-        delay={2} 
-        duration={30} 
-        className="w-20 h-20 bg-gradient-to-r from-brand-peach/10 to-brand-gold/10 rounded-lg top-40 right-20 rotate-45 animate-spin" 
-      />
-      <AnimatedShape 
-        delay={4} 
-        duration={35} 
-        className="w-24 h-24 bg-gradient-to-bl from-brand-gold/8 to-brand-cream/15 rounded-full bottom-40 left-1/4 animate-pulse" 
-      />
-      <AnimatedShape 
-        delay={1} 
-        duration={28} 
-        className="w-16 h-16 bg-brand-peach/8 top-1/3 right-1/3 transform rotate-12 animate-bounce" 
-      />
-      <AnimatedShape 
-        delay={3} 
-        duration={32} 
-        className="w-28 h-28 bg-gradient-to-tr from-brand-gold/6 to-brand-peach/6 rounded-full top-1/2 left-1/2 animate-pulse" 
-      />
-      <AnimatedShape 
-        delay={5} 
-        duration={22} 
-        className="w-40 h-40 bg-brand-cream/10 rounded-full bottom-20 right-10 animate-bounce" 
-      />
+    <div className="min-h-screen bg-[hsl(var(--champagne))] text-[hsl(var(--espresso))]">
+      {/* Subtle texture overlay */}
+      <div className="fixed inset-0 opacity-[0.03] pointer-events-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJibGFjayIgc3Ryb2tlLXdpZHRoPSIwLjUiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')]" />
 
-      {/* 1. Full-Screen Hero Section */}
-      <section className="min-h-screen flex items-center relative z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-          <div className="text-center">
-            {/* Typewriter Headline */}
-            <h1 className="text-5xl md:text-7xl font-bold text-[#453a3a] mb-8 min-h-[200px] md:min-h-[280px] flex items-center justify-center">
-              <span className="block text-center">
-                {typewriterText}
-                <span className="animate-pulse">|</span>
-              </span>
+      {/* Hero Section */}
+      <section className="relative min-h-screen flex items-center justify-center px-6 py-20 overflow-hidden">
+        {/* Subtle gradient background */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[hsl(var(--champagne))] via-[hsl(var(--soft-almond))]/30 to-[hsl(var(--champagne))]" />
+        
+        <div className="relative z-10 max-w-4xl mx-auto text-center space-y-12">
+          {/* Hero visual - centered premium gift box */}
+          <div className="mb-16">
+            <LuxuryGiftBox />
+          </div>
+
+          {/* Hero copy */}
+          <div className="space-y-6">
+            <h1 className="font-serif text-5xl md:text-7xl text-[hsl(var(--espresso))] tracking-tight leading-tight">
+              Effortless Gifting for<br />Busy Professionals
             </h1>
-            
-            {showContent && (
-              <>
-                <div className="mb-8 max-w-3xl mx-auto">
-                  <CyclingTypewriter />
-                </div>
-                
-                {/* Get Started CTA */}
-                <div className="animate-fade-in" style={{ animationDelay: '0.5s' }}>
-                  <Button 
-                    onClick={() => window.location.href = 'https://app.unwrapt.io'}
-                    className="bg-slate-700 hover:bg-slate-600 text-white px-12 h-16 text-xl hover:scale-105 transition-all duration-300 group hover:shadow-2xl hover:shadow-slate-500/25"
-                  >
-                    Get Started
-                    <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform duration-200" />
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* 2. Gift Categories Grid */}
-      <section className="py-20 bg-white/90 backdrop-blur-sm relative z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-brand-charcoal mb-4">
-              Perfect Gifts for Every Occasion
-            </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Curated categories to make every moment special
+            <p className="font-sans text-lg md:text-xl text-[hsl(var(--charcoal-body))] max-w-2xl mx-auto leading-relaxed">
+              Unwrapt remembers every occasion, chooses thoughtful gifts, and sends them automatically — so you deepen relationships without lifting a finger.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-            {[
-              { icon: Coffee, name: "Coffee & Tea", desc: "Premium blends" },
-              { icon: Book, name: "Books", desc: "Bestsellers" },
-              { icon: Music, name: "Experiences", desc: "Adventures" },
-              { icon: Sparkles, name: "Jewelry", desc: "Special pieces" },
-              { icon: Gift, name: "Personalized", desc: "Custom gifts" },
-              { icon: Star, name: "Luxury", desc: "Premium items" },
-            ].map((category, index) => {
-              const IconComponent = category.icon;
-              return (
-                <Card 
-                  key={index}
-                  className="group p-6 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl border-2 border-gray-100 hover:border-brand-gold/30 animate-fade-in"
-                  style={{ animationDelay: `${index * 0.1}s` }}
-                  onClick={() => setActiveGiftType(index)}
-                >
-                  <CardContent className="text-center space-y-3 p-0">
-                    <div className="w-12 h-12 mx-auto bg-brand-gold/10 rounded-full flex items-center justify-center group-hover:bg-brand-gold/20 transition-colors duration-300">
-                      <IconComponent className="w-6 h-6 text-brand-gold" />
-                    </div>
-                    <h4 className="font-semibold text-brand-charcoal">{category.name}</h4>
-                    <p className="text-sm text-gray-600">{category.desc}</p>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* 3. Problem Stats */}
-      <section className="py-20 bg-gradient-to-r from-brand-peach/10 to-brand-gold/10 relative z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-brand-charcoal mb-4">
-              The Gift-Giving Challenge
-            </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Real statistics that show why automation matters
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {giftStats.map((stat, index) => {
-              const IconComponent = stat.icon;
-              return (
-                <Card 
-                  key={index}
-                  className={`group text-center p-8 bg-white/80 backdrop-blur-sm border-none shadow-lg cursor-pointer transition-all duration-500 hover:scale-105 hover:shadow-xl animate-fade-in ${
-                    hoveredStat === index ? 'bg-white shadow-2xl' : ''
-                  }`}
-                  style={{ animationDelay: `${index * 0.2}s` }}
-                  onMouseEnter={() => setHoveredStat(index)}
-                  onMouseLeave={() => setHoveredStat(null)}
-                >
-                  <CardContent className="space-y-4 p-0">
-                    <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center transition-all duration-300 ${
-                      hoveredStat === index ? 'bg-brand-gold/20 scale-110' : 'bg-brand-gold/10'
-                    }`}>
-                      <IconComponent className={`w-8 h-8 transition-colors duration-300 ${
-                        hoveredStat === index ? 'text-brand-gold' : 'text-brand-charcoal'
-                      }`} />
-                    </div>
-                    <div className="text-4xl font-bold text-brand-charcoal group-hover:scale-110 transition-transform duration-300">{stat.value}</div>
-                    <p className="text-slate-700 text-sm leading-relaxed font-medium">{stat.label}</p>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* 4. How It Works */}
-      <section className="py-20 bg-white relative z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-brand-charcoal mb-4">
+          {/* Hero buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-6">
+            <GlassButton variant="primary" href="/app">
+              Get Started Free
+            </GlassButton>
+            <GlassButton variant="secondary" onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}>
               How It Works
-            </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Three simple steps to never miss another special occasion
-            </p>
+            </GlassButton>
           </div>
+        </div>
+      </section>
+
+      {/* Value Proposition Section */}
+      <section className="py-32 px-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-12">
+            {[
+              {
+                title: "Never Forget Another Occasion",
+                description: "Birthdays, anniversaries, holidays — we track them all so you never miss a moment that matters."
+              },
+              {
+                title: "Thoughtful Gifts, Automatically Chosen",
+                description: "Our AI selects personalized gifts based on preferences, interests, and your relationship."
+              },
+              {
+                title: "Perfect for Clients, Teams, and Loved Ones",
+                description: "Strengthen professional relationships and personal bonds with effortless, timely gifting."
+              }
+            ].map((item, idx) => (
+              <div key={idx} className="group">
+                <div className="h-px w-12 bg-[hsl(var(--soft-gold))] mb-6 group-hover:w-24 transition-all duration-300" />
+                <h3 className="font-serif text-2xl text-[hsl(var(--espresso))] mb-4">{item.title}</h3>
+                <p className="text-[hsl(var(--charcoal-body))] leading-relaxed">{item.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section id="how-it-works" className="py-32 px-6 bg-[hsl(var(--soft-almond))]/30">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="font-serif text-4xl md:text-5xl text-[hsl(var(--espresso))] text-center mb-20">
+            How It Works
+          </h2>
+          
+          <div className="space-y-16">
+            {[
+              {
+                step: "01",
+                icon: Users,
+                title: "Tell Unwrapt who matters to you",
+                description: "Add friends, family, colleagues, and clients with their important dates and preferences."
+              },
+              {
+                step: "02",
+                icon: Gift,
+                title: "Set budgets and preferences",
+                description: "Choose your gifting style, budget ranges, and let us know any special considerations."
+              },
+              {
+                step: "03",
+                icon: Sparkles,
+                title: "We remember, choose, and ship the perfect gifts",
+                description: "Sit back while we handle everything — from selection to delivery, with your approval."
+              }
+            ].map((item, idx) => (
+              <div key={idx} className="flex gap-8 items-start group">
+                <div className="flex-shrink-0">
+                  <div className="w-20 h-20 rounded-full bg-white/25 backdrop-blur-sm border border-white/60 flex items-center justify-center group-hover:bg-white/35 transition-all duration-300">
+                    <item.icon className="w-8 h-8 text-[hsl(var(--soft-gold))]" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-[hsl(var(--soft-gold))] mb-2 tracking-wider">{item.step}</div>
+                  <h3 className="font-serif text-2xl text-[hsl(var(--espresso))] mb-3">{item.title}</h3>
+                  <p className="text-[hsl(var(--charcoal-body))] leading-relaxed">{item.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Who It's For Section */}
+      <section className="py-32 px-6">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="font-serif text-4xl md:text-5xl text-[hsl(var(--espresso))] text-center mb-6">
+            Built for Professionals
+          </h2>
+          <p className="text-center text-[hsl(var(--charcoal-body))] text-lg mb-20 max-w-2xl mx-auto">
+            Unwrapt is designed for high-achieving professionals who value relationships but lack the time for traditional gift shopping.
+          </p>
+
+          <div className="grid md:grid-cols-4 gap-8">
+            {[
+              { icon: Briefcase, title: "Executives", description: "Maintain client relationships effortlessly" },
+              { icon: Users, title: "Consultants", description: "Show appreciation to key stakeholders" },
+              { icon: TrendingUp, title: "Founders", description: "Build team culture and client loyalty" },
+              { icon: Heart, title: "Client-Facing Professionals", description: "Never miss an important milestone" }
+            ].map((persona, idx) => (
+              <div key={idx} className="text-center group">
+                <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-white/20 backdrop-blur-sm border border-white/40 flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
+                  <persona.icon className="w-7 h-7 text-[hsl(var(--soft-gold))]" />
+                </div>
+                <h3 className="font-serif text-xl text-[hsl(var(--espresso))] mb-3">{persona.title}</h3>
+                <p className="text-sm text-[hsl(var(--charcoal-body))]">{persona.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <section className="py-32 px-6 bg-[hsl(var(--soft-almond))]/30">
+        <div className="max-w-5xl mx-auto">
+          <h2 className="font-serif text-4xl md:text-5xl text-[hsl(var(--espresso))] text-center mb-20">
+            Loved by Professionals
+          </h2>
+
+          <div className="grid md:grid-cols-2 gap-8">
+            {[
+              {
+                quote: "Unwrapt has saved me countless hours and strengthened my client relationships. It's like having a personal concierge.",
+                author: "Sarah M.",
+                role: "Management Consultant"
+              },
+              {
+                quote: "I never realized how much I was missing until Unwrapt started handling my gifting. Game changer for my team culture.",
+                author: "David L.",
+                role: "Tech Founder"
+              }
+            ].map((testimonial, idx) => (
+              <div key={idx} className="bg-white/30 backdrop-blur-sm border border-white/50 rounded-2xl p-8 hover:bg-white/40 transition-all duration-300">
+                <p className="text-[hsl(var(--charcoal-body))] italic mb-6 leading-relaxed">"{testimonial.quote}"</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-[hsl(var(--soft-gold))]/20 flex items-center justify-center text-[hsl(var(--soft-gold))] font-serif text-lg">
+                    {testimonial.author[0]}
+                  </div>
+                  <div>
+                    <div className="font-medium text-[hsl(var(--espresso))]">{testimonial.author}</div>
+                    <div className="text-sm text-[hsl(var(--charcoal-body))]">{testimonial.role}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section className="py-32 px-6">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="font-serif text-4xl md:text-5xl text-[hsl(var(--espresso))] text-center mb-6">
+            Choose Your Plan
+          </h2>
+          <p className="text-center text-[hsl(var(--charcoal-body))] text-lg mb-20">
+            Flexible pricing for individuals and teams
+          </p>
 
           <div className="grid md:grid-cols-3 gap-8">
             {[
               {
-                icon: Heart,
-                title: "Add Your People",
-                description: "Tell us about the important people in your life and their special dates",
-                bgColor: "bg-brand-peach/20"
+                name: "Essential",
+                price: "$29",
+                period: "/month",
+                features: [
+                  "Up to 10 recipients",
+                  "Automated reminders",
+                  "Basic gift curation",
+                  "Email support"
+                ]
               },
               {
-                icon: Zap,
-                title: "Set & Forget",
-                description: "We automatically schedule thoughtful gifts based on their interests",
-                bgColor: "bg-brand-gold/20"
+                name: "Professional",
+                price: "$79",
+                period: "/month",
+                features: [
+                  "Up to 50 recipients",
+                  "Advanced AI curation",
+                  "Priority shipping",
+                  "Priority support",
+                  "Custom branding"
+                ],
+                featured: true
               },
               {
-                icon: Gift,
-                title: "Perfect Delivery",
-                description: "Gifts arrive right on time, making you look thoughtful and caring",
-                bgColor: "bg-brand-cream"
+                name: "Concierge",
+                price: "$199",
+                period: "/month",
+                features: [
+                  "Unlimited recipients",
+                  "White-glove service",
+                  "Dedicated account manager",
+                  "Custom gift sourcing",
+                  "Team collaboration"
+                ]
               }
-            ].map((step, index) => {
-              const IconComponent = step.icon;
-              return (
-                <Card 
-                  key={index} 
-                  className="group text-center p-8 border-none shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 animate-fade-in"
-                  style={{ animationDelay: `${index * 0.2}s` }}
-                >
-                  <CardContent className="space-y-6 p-0">
-                    <div className={`w-20 h-20 ${step.bgColor} rounded-2xl flex items-center justify-center mx-auto group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
-                      <IconComponent className="w-10 h-10 text-brand-charcoal" />
-                    </div>
-                    <div className="space-y-3">
-                      <h3 className="text-2xl font-bold text-brand-charcoal">{step.title}</h3>
-                      <p className="text-gray-600 leading-relaxed">{step.description}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+            ].map((tier, idx) => (
+              <div 
+                key={idx} 
+                className={`relative bg-white/25 backdrop-blur-sm border rounded-2xl p-8 hover:bg-white/35 transition-all duration-300 ${
+                  tier.featured ? 'border-[hsl(var(--soft-gold))]/60 shadow-[0_0_40px_rgba(200,164,106,0.2)]' : 'border-white/50'
+                }`}
+              >
+                {tier.featured && (
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-[hsl(var(--soft-gold))] text-white text-sm rounded-full">
+                    Most Popular
+                  </div>
+                )}
+                <h3 className="font-serif text-2xl text-[hsl(var(--espresso))] mb-2">{tier.name}</h3>
+                <div className="mb-6">
+                  <span className="font-serif text-4xl text-[hsl(var(--espresso))]">{tier.price}</span>
+                  <span className="text-[hsl(var(--charcoal-body))]">{tier.period}</span>
+                </div>
+                <ul className="space-y-3 mb-8">
+                  {tier.features.map((feature, featureIdx) => (
+                    <li key={featureIdx} className="flex items-start gap-3">
+                      <Check className="w-5 h-5 text-[hsl(var(--soft-gold))] flex-shrink-0 mt-0.5" />
+                      <span className="text-[hsl(var(--charcoal-body))]">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+                <GlassButton variant={tier.featured ? 'primary' : 'secondary'} href="/app" className="w-full">
+                  Get Started
+                </GlassButton>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* 5. About Unwrapt */}
-      <section className="py-20 bg-gradient-to-r from-brand-peach/10 to-brand-gold/10 relative z-10">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl md:text-4xl font-serif font-light text-brand-charcoal mb-8 text-center">
-            About Unwrapt
+      {/* Final CTA */}
+      <section className="py-32 px-6 bg-gradient-to-b from-[hsl(var(--champagne))] to-[hsl(var(--soft-almond))]/50">
+        <div className="max-w-3xl mx-auto text-center space-y-8">
+          <h2 className="font-serif text-4xl md:text-5xl text-[hsl(var(--espresso))]">
+            Start your gifting concierge — it only takes 2 minutes
           </h2>
-          
-          {/* Premium Gift Box Image */}
-          <div className="mb-12 flex justify-center">
-            <img 
-              src="/lovable-uploads/c47adb17-4c8f-490e-b3ae-dbe289573fe8.png" 
-              alt="Premium Unwrapt gift box"
-              className="max-w-md w-full h-auto animate-fade-in"
-            />
-          </div>
-          
-          <div className="text-left max-w-2xl mx-auto">
-            <p className="text-lg text-gray-700 leading-relaxed font-light">
-              Life gets busy, and it's easy to forget the small gestures that mean the most. 
-              Unwrapt was born from the idea that technology should help us be more human, not less. 
-              We believe staying connected to the people you care about shouldn't require perfect memory. 
-              Our mission: help you be the thoughtful person you want to be, even when life gets overwhelming.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* 6. Final CTA */}
-      <section className="py-24 bg-brand-charcoal relative overflow-hidden">
-        {/* Subtle animated background elements */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-10 left-10 w-32 h-32 bg-brand-gold rounded-full animate-pulse" />
-          <div className="absolute bottom-10 right-10 w-24 h-24 bg-brand-peach rounded-full animate-bounce" />
-        </div>
-        
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-          <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-            Ready to become the most{" "}
-            <span className="text-brand-gold">thoughtful person</span> you know?
-          </h2>
-          <p className="text-xl text-gray-300 mb-12 max-w-2xl mx-auto">
-            Join thousands who never miss a special moment
+          <p className="text-lg text-[hsl(var(--charcoal-body))]">
+            Join professionals who never miss an important moment
           </p>
-          
-          <Button 
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="group bg-brand-gold hover:bg-brand-gold/90 text-brand-charcoal text-xl px-12 py-4 rounded-full font-bold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-          >
-            Start Your Journey Today
-            <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-2 transition-transform duration-300" />
-          </Button>
-          
-          <p className="text-sm text-gray-400 mt-6">No credit card required • Free to start</p>
+          <GlassButton variant="primary" href="/app">
+            Get Started Free <ArrowRight className="w-5 h-5 ml-2 inline" />
+          </GlassButton>
         </div>
       </section>
 
-      {/* Footer with Privacy and Terms */}
-      <footer className="bg-brand-charcoal border-t border-gray-800 py-8">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row justify-center items-center gap-4 sm:gap-8">
-            <Link 
-              to="/privacy" 
-              className="text-gray-400 hover:text-brand-gold transition-colors duration-300 text-sm"
-            >
-              Privacy Policy
-            </Link>
-            <span className="text-gray-600 hidden sm:inline">•</span>
-            <Link 
-              to="/terms" 
-              className="text-gray-400 hover:text-brand-gold transition-colors duration-300 text-sm"
-            >
-              Terms of Service
-            </Link>
+      {/* Footer */}
+      <footer className="py-16 px-6 border-t border-[hsl(var(--soft-gold))]/20">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="font-serif text-2xl text-[hsl(var(--espresso))]">Unwrapt</div>
+            <div className="flex gap-8 text-sm text-[hsl(var(--charcoal-body))]">
+              <Link to="/privacy" className="hover:text-[hsl(var(--soft-gold))] transition-colors">Privacy</Link>
+              <Link to="/terms" className="hover:text-[hsl(var(--soft-gold))] transition-colors">Terms</Link>
+              <a href="mailto:support@unwrapt.io" className="hover:text-[hsl(var(--soft-gold))] transition-colors">Contact</a>
+            </div>
+          </div>
+          <div className="mt-8 text-center text-sm text-[hsl(var(--charcoal-body))]/60">
+            © 2024 Unwrapt. All rights reserved.
           </div>
         </div>
       </footer>
