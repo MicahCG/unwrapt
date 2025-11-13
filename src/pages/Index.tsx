@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import LoginPage from '@/components/auth/LoginPage';
 import OnboardingFlow from '@/components/OnboardingFlow';
@@ -11,6 +11,7 @@ const Index = () => {
   const { user, loading } = useAuth();
   const [showIntro, setShowIntro] = useState(false);
   const [showLoginPage, setShowLoginPage] = useState(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     // Only show intro for users without accounts on their first visit
@@ -107,9 +108,11 @@ const Index = () => {
     console.log('🔧 Index: User needs onboarding, showing onboarding flow');
     return (
       <OnboardingFlow 
-        onBack={() => {
-          // This won't be called since we're starting from the authenticated state
-          console.log('Back from onboarding');
+        onBack={async () => {
+          // Force refetch of onboarding status to show dashboard
+          console.log('Back from onboarding, refetching status');
+          await queryClient.invalidateQueries({ queryKey: ['onboarding-status', user?.id] });
+          await queryClient.refetchQueries({ queryKey: ['onboarding-status', user?.id] });
         }} 
       />
     );
