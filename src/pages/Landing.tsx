@@ -85,11 +85,6 @@ const Landing = () => {
         <div className="absolute inset-0 bg-gradient-to-b from-[hsl(var(--champagne))] via-[hsl(var(--soft-almond))]/30 to-[hsl(var(--champagne))]" />
         
         <div className="relative z-10 max-w-4xl mx-auto text-center space-y-12">
-          {/* Hero visual - centered premium gift box */}
-          <div className="mb-16">
-            <LuxuryGiftBox />
-          </div>
-
           {/* Hero copy */}
           <div className="space-y-6">
             <h1 className="font-serif text-5xl md:text-7xl text-[hsl(var(--espresso))] tracking-tight leading-tight">
