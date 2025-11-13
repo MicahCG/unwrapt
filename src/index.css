@@ -5,35 +5,44 @@
 
 @layer base {
   :root {
-    --background: 32 28 25; /* HSL Brand cream #F5F2ED */
-    --foreground: 0 0 29; /* HSL Brand charcoal #4A4A4A */
+    /* Luxury Neutral Palette */
+    --champagne: 36 35% 94%;
+    --soft-almond: 32 30% 91%;
+    --soft-gold: 40 42% 60%;
+    --warm-bronze: 35 35% 48%;
+    --shadow-charcoal: 20 6% 23%;
+    --espresso: 25 28% 19%;
+    --charcoal-body: 40 2% 29%;
+    
+    --background: var(--champagne);
+    --foreground: var(--espresso);
 
-    --card: 0 0 100; /* HSL Pure white */
-    --card-foreground: 0 0 29;
+    --card: var(--soft-almond);
+    --card-foreground: var(--espresso);
 
-    --popover: 0 0 100;
-    --popover-foreground: 0 0 29;
+    --popover: var(--soft-almond);
+    --popover-foreground: var(--espresso);
 
-    --primary: 0 0 29; /* HSL Brand charcoal */
-    --primary-foreground: 32 28 25; /* HSL Brand cream */
+    --primary: var(--soft-gold);
+    --primary-foreground: var(--espresso);
 
-    --secondary: 32 28 25; /* HSL Brand cream */
-    --secondary-foreground: 0 0 29; /* HSL Brand charcoal */
+    --secondary: var(--warm-bronze);
+    --secondary-foreground: 60 9.1% 97.8%;
 
-    --muted: 32 28 25; /* HSL Lighter cream */
-    --muted-foreground: 0 0 42; /* HSL Medium gray */
+    --muted: var(--soft-almond);
+    --muted-foreground: var(--charcoal-body);
 
-    --accent: 32 28 25; /* HSL Brand cream */
-    --accent-foreground: 0 0 29;
+    --accent: var(--soft-gold);
+    --accent-foreground: var(--espresso);
 
     --destructive: 0 84 60;
-    --destructive-foreground: 32 28 25;
+    --destructive-foreground: 60 9.1% 97.8%;
 
-    --border: 32 28 25; /* HSL Subtle cream border */
-    --input: 32 28 25;
-    --ring: 0 0 29; /* HSL Brand charcoal */
+    --border: 32 20% 88%;
+    --input: 32 20% 88%;
+    --ring: var(--soft-gold);
 
-    --radius: 0.75rem;
+    --radius: 1.5rem;
 
     --sidebar-background: 0 0 100;
     --sidebar-foreground: 0 0 29;
@@ -82,19 +91,20 @@
   }
 
   html {
-    @apply bg-brand-cream;
     min-height: 100%;
+    background: hsl(var(--champagne));
   }
 
   body {
-    @apply bg-brand-cream text-brand-charcoal;
+    @apply text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
     min-height: 100%;
+    background: hsl(var(--champagne));
   }
 
-  /* Ensure viewport always shows brand colors */
+  /* Ensure viewport always shows luxury colors */
   html, body, #root {
-    background-color: #F5F2ED !important;
+    background: hsl(var(--champagne)) !important;
   }
 }
 
