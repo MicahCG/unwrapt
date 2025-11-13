@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Check, Calendar, Users, Briefcase, TrendingUp, Gift, Heart, Clock, Sparkles } from 'lucide-react';
 import { GlassButton } from '@/components/GlassButton';
-import { LuxuryGiftBox } from '@/components/LuxuryGiftBox';
 import { Logo } from '@/components/ui/logo';
+import PremiumGiftBox from '@/components/PremiumGiftBox';
 
 const Landing = () => {
   const [email, setEmail] = useState('');
@@ -90,6 +90,12 @@ const Landing = () => {
             <h1 className="font-serif text-5xl md:text-7xl text-[hsl(var(--espresso))] tracking-tight leading-tight">
               Effortless Gifting for<br />Busy Professionals
             </h1>
+            
+            {/* 3D Gift Box */}
+            <div className="max-w-2xl mx-auto py-8">
+              <PremiumGiftBox />
+            </div>
+            
             <p className="font-sans text-lg md:text-xl text-[hsl(var(--charcoal-body))] max-w-2xl mx-auto leading-relaxed">
               Unwrapt remembers every occasion, chooses thoughtful gifts, and sends them automatically — so you deepen relationships without lifting a finger.
             </p>
