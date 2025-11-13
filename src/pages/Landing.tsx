@@ -68,7 +68,7 @@ const Landing = () => {
       }`}>
         <div className="bg-white/25 backdrop-blur-[16px] border-b border-white/60">
           <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-            <Logo variant="full" size="md" />
+            <Logo variant="full" size="sm" className="[&>img]:h-6" />
             <GlassButton variant="primary" href="/app">
               Get Started
             </GlassButton>
@@ -265,7 +265,7 @@ const Landing = () => {
       <footer className="py-16 px-6 border-t border-[hsl(var(--soft-gold))]/20">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-            <Logo variant="full" size="md" />
+            <Logo variant="full" size="sm" className="[&>img]:h-6" />
             <div className="flex gap-8 text-sm text-[hsl(var(--charcoal-body))]">
               <Link to="/privacy" className="hover:text-[hsl(var(--soft-gold))] transition-colors">Privacy</Link>
               <Link to="/terms" className="hover:text-[hsl(var(--soft-gold))] transition-colors">Terms</Link>
