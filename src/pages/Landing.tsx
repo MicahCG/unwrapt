@@ -5,6 +5,7 @@ import { GlassButton } from '@/components/GlassButton';
 import { Logo } from '@/components/ui/logo';
 import giftBoxImage from '@/assets/unwrapt-gift-box.png';
 import GiftUnwrapIntro from '@/components/GiftUnwrapIntro';
+import GiftingScenesScroll from '@/components/GiftingScenesScroll';
 
 const Landing = () => {
   const [email, setEmail] = useState('');
@@ -139,33 +140,8 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Value Proposition Section */}
-      <section className="py-32 px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-3 gap-12">
-            {[
-              {
-                title: "Never Forget Another Occasion",
-                description: "Birthdays, anniversaries, holidays — we track them all so you never miss a moment that matters."
-              },
-              {
-                title: "Thoughtful Gifts, Automatically Chosen",
-                description: "Our AI selects personalized gifts based on preferences, interests, and your relationship."
-              },
-              {
-                title: "Perfect for Clients, Teams, and Loved Ones",
-                description: "Strengthen professional relationships and personal bonds with effortless, timely gifting."
-              }
-            ].map((item, idx) => (
-              <div key={idx} className="group">
-                <div className="h-px w-12 bg-[hsl(var(--soft-gold))] mb-6 group-hover:w-24 transition-all duration-300" />
-                <h3 className="font-serif text-2xl text-[hsl(var(--espresso))] mb-4">{item.title}</h3>
-                <p className="text-[hsl(var(--charcoal-body))] leading-relaxed">{item.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Gifting Scenes Scroll Section */}
+      <GiftingScenesScroll />
 
       {/* How It Works Section */}
       <section id="how-it-works" className="py-32 px-6 bg-[hsl(var(--soft-almond))]/30">
