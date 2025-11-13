@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { Clock } from "lucide-react";
 
 const BG = "#F7F0E6";
 const INNER = "#F1E3D0";
@@ -8,15 +9,56 @@ const BROWN = "#5B4633";
 
 export default function GiftUnwrapIntro() {
   const [show, setShow] = useState(true);
+  const [currentScreen, setCurrentScreen] = useState(0);
+  const [displayedText, setDisplayedText] = useState('');
+
+  const screens = [
+    "Life is busy",
+    "Between work, family, and everything in between, it's easy to forget the moments that matter most."
+  ];
 
   useEffect(() => {
     // Check if user prefers reduced motion
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     
-    // Show for shorter time if reduced motion
-    const timer = setTimeout(() => setShow(false), prefersReducedMotion ? 800 : 2100);
-    return () => clearTimeout(timer);
-  }, []);
+    if (prefersReducedMotion) {
+      // Show for shorter time if reduced motion
+      const timer = setTimeout(() => setShow(false), 800);
+      return () => clearTimeout(timer);
+    }
+
+    // Typewriter effect
+    if (currentScreen >= screens.length) {
+      const timer = setTimeout(() => setShow(false), 1000);
+      return () => clearTimeout(timer);
+    }
+
+    const currentText = screens[currentScreen];
+    let currentIndex = 0;
+    setDisplayedText('');
+
+    const typewriterInterval = setInterval(() => {
+      if (currentIndex < currentText.length) {
+        setDisplayedText(currentText.substring(0, currentIndex + 1));
+        currentIndex++;
+      } else {
+        clearInterval(typewriterInterval);
+        
+        // Move to next screen or complete
+        if (currentScreen === screens.length - 1) {
+          setTimeout(() => {
+            setShow(false);
+          }, 1500);
+        } else {
+          setTimeout(() => {
+            setCurrentScreen(prev => prev + 1);
+          }, 1200);
+        }
+      }
+    }, 40);
+
+    return () => clearInterval(typewriterInterval);
+  }, [currentScreen]);
 
   // Check for reduced motion preference
   const prefersReducedMotion = typeof window !== 'undefined' 
@@ -35,19 +77,17 @@ export default function GiftUnwrapIntro() {
             transition={{ duration: 0.4, ease: "easeOut" }}
             style={{ backgroundColor: BG }}
           >
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <span
-                className="font-serif tracking-[0.2em] text-sm md:text-base uppercase"
-                style={{ color: BROWN }}
-              >
-                Unwrapt
-              </span>
-            </motion.div>
+            <div className="text-center space-y-4 px-6 max-w-2xl">
+              <div className="w-16 h-16 mx-auto bg-gray-200 rounded-full flex items-center justify-center mb-6">
+                <Clock className="w-8 h-8" style={{ color: BROWN }} />
+              </div>
+              <h1 className="text-3xl md:text-4xl font-bold" style={{ color: BROWN }}>
+                Life is busy
+              </h1>
+              <p className="text-base md:text-lg" style={{ color: BROWN }}>
+                Between work, family, and everything in between, it&apos;s easy to forget the moments that matter most.
+              </p>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -58,86 +98,59 @@ export default function GiftUnwrapIntro() {
     <AnimatePresence>
       {show && (
         <motion.div
-          className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none"
+          className="fixed inset-0 z-[60] flex items-center justify-center"
           initial={{ opacity: 1 }}
-          animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.45, ease: "easeOut", delay: 1.6 }}
-          style={{ backgroundColor: BG }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          style={{ 
+            backgroundColor: BG,
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+          }}
         >
-          {/* Nested rectangles */}
-          <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
-            {/* Outer frame - largest, starts big */}
-            <motion.div
-              className="absolute rounded-[32px]"
-              style={{
-                border: `16px solid ${GOLD}`,
-                backgroundColor: INNER,
-                width: "120vw",
-                height: "120vh",
-              }}
-              initial={{ scale: 1.2, opacity: 1 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-            />
-
-            {/* Middle frame - zooms in slightly after */}
-            <motion.div
-              className="absolute rounded-[24px]"
-              style={{
-                border: `12px solid ${GOLD}`,
-                backgroundColor: BG,
-                width: "80vw",
-                height: "70vh",
-              }}
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.5, ease: "easeOut", delay: 0.2 }}
-            />
-
-            {/* Inner frame - appears last before collapse */}
-            <motion.div
-              className="absolute rounded-[18px]"
-              style={{
-                border: `8px solid ${GOLD}`,
-                backgroundColor: INNER,
-                width: "40vw",
-                height: "32vh",
-              }}
-              initial={{ scale: 0.6, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.4, ease: "easeOut", delay: 0.35 }}
-            />
-
-            {/* Final collapse to center - the "box snapping open" */}
-            <motion.div
-              className="absolute rounded-[16px]"
-              style={{
-                border: `4px solid ${GOLD}`,
-                backgroundColor: INNER,
-                width: "40vw",
-                height: "32vh",
-              }}
-              initial={{ scale: 1, opacity: 1 }}
-              animate={{ scale: 0.02, opacity: 0 }}
-              transition={{ duration: 0.6, ease: "easeInOut", delay: 0.9 }}
-            />
-
-            {/* Unwrapt wordmark in center */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.4, ease: "easeOut", delay: 0.2 }}
-              className="relative z-10"
-            >
-              <span
-                className="font-serif tracking-[0.2em] text-sm md:text-base uppercase"
-                style={{ color: BROWN }}
+          <div className="max-w-2xl px-8 mx-auto">
+            <div className="bg-white/80 backdrop-blur-md rounded-3xl p-12 shadow-2xl border border-white/60">
+              {/* Icon */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                className="w-20 h-20 mx-auto bg-gray-200 rounded-full flex items-center justify-center mb-8"
               >
-                Unwrapt
-              </span>
-            </motion.div>
+                <Clock className="w-10 h-10" style={{ color: BROWN }} />
+              </motion.div>
+
+              {/* Typewriter text */}
+              <div className="text-center space-y-6">
+                {currentScreen === 0 ? (
+                  <h1 className="text-4xl md:text-5xl font-bold" style={{ color: BROWN }}>
+                    {displayedText}
+                    {displayedText.length < screens[0].length && (
+                      <span className="animate-pulse">|</span>
+                    )}
+                  </h1>
+                ) : (
+                  <>
+                    <h1 className="text-4xl md:text-5xl font-bold" style={{ color: BROWN }}>
+                      Life is busy
+                    </h1>
+                    <p className="text-lg md:text-xl leading-relaxed" style={{ color: BROWN }}>
+                      {displayedText}
+                      {displayedText.length < screens[1].length && (
+                        <span className="animate-pulse">|</span>
+                      )}
+                    </p>
+                  </>
+                )}
+
+                {/* Progress dots */}
+                <div className="flex justify-center gap-2 pt-4">
+                  <div className={`w-2 h-2 rounded-full transition-colors ${currentScreen === 0 ? 'bg-[#D4AF7A]' : 'bg-gray-300'}`} />
+                  <div className={`w-2 h-2 rounded-full transition-colors ${currentScreen === 1 ? 'bg-[#D4AF7A]' : 'bg-gray-300'}`} />
+                  <div className="w-2 h-2 rounded-full bg-gray-300" />
+                </div>
+              </div>
+            </div>
           </div>
         </motion.div>
       )}
