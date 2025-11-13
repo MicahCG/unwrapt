@@ -24,6 +24,7 @@ export const Logo: React.FC<LogoProps> = ({
       src="/lovable-uploads/unwrapt-logo.svg" 
       alt="Unwrapt" 
       className={`${sizeClasses[size]} ${className}`}
+      style={{ filter: 'brightness(0) saturate(100%) invert(20%) sepia(25%) saturate(1088%) hue-rotate(352deg) brightness(95%) contrast(90%)' }}
     />
   );
 };
