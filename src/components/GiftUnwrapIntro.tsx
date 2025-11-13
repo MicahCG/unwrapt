@@ -11,6 +11,7 @@ export default function GiftUnwrapIntro() {
   const [show, setShow] = useState(true);
   const [currentScreen, setCurrentScreen] = useState(0);
   const [displayedText, setDisplayedText] = useState('');
+  const [typingComplete, setTypingComplete] = useState(false);
 
   const screens = [
     "Life is busy",
@@ -36,6 +37,7 @@ export default function GiftUnwrapIntro() {
     const currentText = screens[currentScreen];
     let currentIndex = 0;
     setDisplayedText('');
+    setTypingComplete(false);
 
     const typewriterInterval = setInterval(() => {
       if (currentIndex < currentText.length) {
@@ -44,15 +46,13 @@ export default function GiftUnwrapIntro() {
       } else {
         clearInterval(typewriterInterval);
         
-        // Move to next screen or complete
+        // Move to next screen or mark as complete
         if (currentScreen === screens.length - 1) {
-          setTimeout(() => {
-            setShow(false);
-          }, 1500);
+          setTypingComplete(true);
         } else {
           setTimeout(() => {
             setCurrentScreen(prev => prev + 1);
-          }, 1200);
+          }, 800);
         }
       }
     }, 40);
@@ -131,10 +131,10 @@ export default function GiftUnwrapIntro() {
                   </h1>
                 ) : (
                   <>
-                    <h1 className="text-4xl md:text-5xl font-bold" style={{ color: BROWN }}>
+                    <h1 className="text-4xl md:text-5xl font-bold mb-4" style={{ color: BROWN }}>
                       Life is busy
                     </h1>
-                    <p className="text-lg md:text-xl leading-relaxed" style={{ color: BROWN }}>
+                    <p className="text-lg md:text-xl leading-relaxed text-gray-600">
                       {displayedText}
                       {displayedText.length < screens[1].length && (
                         <span className="animate-pulse">|</span>
@@ -145,10 +145,23 @@ export default function GiftUnwrapIntro() {
 
                 {/* Progress dots */}
                 <div className="flex justify-center gap-2 pt-4">
-                  <div className={`w-2 h-2 rounded-full transition-colors ${currentScreen === 0 ? 'bg-[#D4AF7A]' : 'bg-gray-300'}`} />
-                  <div className={`w-2 h-2 rounded-full transition-colors ${currentScreen === 1 ? 'bg-[#D4AF7A]' : 'bg-gray-300'}`} />
-                  <div className="w-2 h-2 rounded-full bg-gray-300" />
+                  <div className={`w-2 h-2 rounded-full transition-colors ${currentScreen >= 0 ? 'bg-[#D4AF7A]' : 'bg-gray-300'}`} />
+                  <div className={`w-2 h-2 rounded-full transition-colors ${currentScreen >= 1 ? 'bg-[#D4AF7A]' : 'bg-gray-300'}`} />
+                  <div className={`w-2 h-2 rounded-full transition-colors ${typingComplete ? 'bg-[#D4AF7A]' : 'bg-gray-300'}`} />
                 </div>
+
+                {/* Continue button */}
+                {typingComplete && (
+                  <motion.button
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
+                    onClick={() => setShow(false)}
+                    className="mt-6 px-8 py-3 bg-[#5B4633] text-white rounded-full font-medium hover:bg-[#4a3828] transition-colors duration-200"
+                  >
+                    Continue
+                  </motion.button>
+                )}
               </div>
             </div>
           </div>
