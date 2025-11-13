@@ -36,7 +36,7 @@ function GiftBoxMesh({ mousePosition }: { mousePosition: MousePosition }) {
 
   return (
     <Float speed={1.5} rotationIntensity={0.1} floatIntensity={0.2}>
-      <group ref={groupRef} position={[0, 0.5, 0]}>
+      <group ref={groupRef} position={[0, 0, 0]}>
         {/* Main box */}
         <mesh castShadow receiveShadow>
           <boxGeometry args={[2.2, 2.2, 2.2]} />
@@ -192,7 +192,7 @@ function GiftBoxMesh({ mousePosition }: { mousePosition: MousePosition }) {
 function PremiumScene({ mousePosition }: { mousePosition: MousePosition }) {
   return (
     <>
-      <PerspectiveCamera makeDefault position={[0, 1.5, 5.5]} fov={45} />
+      <PerspectiveCamera makeDefault position={[0, 0.8, 5.5]} fov={45} />
 
       {/* Lighting */}
       <ambientLight intensity={0.4} color="#FFF8E7" />
