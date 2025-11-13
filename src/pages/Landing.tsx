@@ -257,11 +257,11 @@ const Landing = () => {
 
       {/* Final CTA */}
       <section className="py-32 px-6 bg-gradient-to-b from-[hsl(var(--champagne))] to-[hsl(var(--soft-almond))]/50">
-        <div className="max-w-3xl mx-auto text-center space-y-8">
-          <h2 className="font-serif text-4xl md:text-5xl text-[hsl(var(--espresso))]">
+        <div className="max-w-3xl mx-auto text-center">
+          <h2 className="font-serif text-4xl md:text-5xl text-[hsl(var(--espresso))] mb-6">
             Start your gifting concierge — it only takes 2 minutes
           </h2>
-          <p className="text-lg text-[hsl(var(--charcoal-body))]">
+          <p className="text-lg text-[hsl(var(--charcoal-body))] mb-10">
             Join professionals who never miss an important moment
           </p>
           <GlassButton variant="primary" href="/app">
