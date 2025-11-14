@@ -294,6 +294,7 @@ export type Database = {
         Args: { user_uuid: string }
         Returns: undefined
       }
+      check_upcoming_gift_events: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
