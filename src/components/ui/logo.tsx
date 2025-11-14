@@ -18,13 +18,12 @@ export const Logo: React.FC<LogoProps> = ({
     lg: variant === 'full' ? 'h-16' : 'h-12 w-12'
   };
 
-  // Use the new logo for both icon and full variants
+  // Use the new gift box icon logo
   return (
     <img 
-      src="/lovable-uploads/unwrapt-logo.svg" 
+      src="/lovable-uploads/unwrapt-logo-icon.png" 
       alt="Unwrapt" 
-      className={`${sizeClasses[size]} ${className}`}
-      style={{ filter: 'brightness(0) saturate(100%) invert(20%) sepia(25%) saturate(1088%) hue-rotate(352deg) brightness(95%) contrast(90%)' }}
+      className={`${sizeClasses[size]} ${className} object-contain`}
     />
   );
 };
