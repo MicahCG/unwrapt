@@ -63,7 +63,8 @@ const Landing = () => {
         showNav ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'
       }`}>
         <div className="bg-white/25 backdrop-blur-[16px] border-b border-white/60">
-          <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-end">
+          <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+            <Logo size="md" />
             <GlassButton variant="primary" href="/app">
               Get Started
             </GlassButton>
