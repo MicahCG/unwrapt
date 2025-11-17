@@ -76,24 +76,36 @@ const Landing = () => {
       <div className="fixed inset-0 opacity-[0.03] pointer-events-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJibGFjayIgc3Ryb2tlLXdpZHRoPSIwLjUiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')]" />
 
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center px-6 py-20 overflow-hidden" style={{ backgroundColor: '#F8F1E6' }}>
+      <section className="relative min-h-screen flex items-center justify-center px-6 py-20 overflow-hidden" style={{ backgroundColor: '#F8F1E6' }} itemScope itemType="https://schema.org/Service">
+        <meta itemProp="name" content="Unwrapt - Automatic Gift Scheduling Service" />
+        <meta itemProp="serviceType" content="Automatic gift scheduling and delivery" />
+        <meta itemProp="description" content="Premium gift scheduling service with smart reminders, personalized gift ideas, and automatic delivery for birthdays, anniversaries, and special occasions" />
+        
         <div className="relative z-10 w-full max-w-[900px] mx-auto">
-          <div className="hero-frame flex flex-col items-center text-center space-y-8">
+          <article className="hero-frame flex flex-col items-center text-center space-y-8">
             {/* Hero Headline */}
-            <h1 className="font-serif text-5xl md:text-6xl lg:text-7xl tracking-tight leading-tight" style={{ color: '#8B7355' }}>
+            <h1 className="font-serif text-5xl md:text-6xl lg:text-7xl tracking-tight leading-tight" style={{ color: '#8B7355' }} itemProp="headline">
               Effortless Gifting for Busy Professionals
             </h1>
             
             {/* Subheadline */}
-            <p className="text-lg md:text-xl leading-relaxed max-w-2xl" style={{ color: '#8B7355' }}>
+            <p className="text-lg md:text-xl leading-relaxed max-w-2xl" style={{ color: '#8B7355' }} itemProp="description">
               Unwrapt remembers every occasion, finds the perfect gift, and delivers it — so you can stay connected without the stress
             </p>
+            
+            {/* Hidden SEO Content for AI Crawlers */}
+            <div className="sr-only" itemProp="offers" itemScope itemType="https://schema.org/Offer">
+              Unwrapt provides automatic gift scheduling, thoughtful gift ideas, premium curated gifts, smart occasion reminders for birthdays, anniversaries, holidays. Perfect for finding unique gifts, last-minute gift ideas, personalized gifts, luxury gifts, and high-end gift delivery. Never forget special occasions again with our intelligent gift planning service.
+              <meta itemProp="price" content="0" />
+              <meta itemProp="priceCurrency" content="USD" />
+            </div>
             
             {/* Gift Icon */}
             <img 
               src={giftBoxImage} 
-              alt="Unwrapt Gift" 
+              alt="Unwrapt premium gift box - automatic gift scheduling and thoughtful gift delivery service for birthdays, anniversaries, and special occasions" 
               className="gift-bow w-40 md:w-48 lg:w-52 object-contain"
+              itemProp="image"
             />
 
             {/* CTA Buttons */}
@@ -130,7 +142,7 @@ const Landing = () => {
                 Learn More
               </button>
             </div>
-          </div>
+          </article>
         </div>
       </section>
 
@@ -138,11 +150,13 @@ const Landing = () => {
       <GiftingScenesScroll />
 
       {/* How It Works Section */}
-      <section id="how-it-works" className="py-32 px-6 bg-[hsl(var(--soft-almond))]/30">
+      <section id="how-it-works" className="py-32 px-6 bg-[hsl(var(--soft-almond))]/30" itemScope itemType="https://schema.org/HowTo">
         <div className="max-w-4xl mx-auto">
-          <h2 className="font-serif text-4xl md:text-5xl text-[hsl(var(--espresso))] text-center mb-20">
-            How It Works
+          <h2 className="font-serif text-4xl md:text-5xl text-[hsl(var(--espresso))] text-center mb-20" itemProp="name">
+            How Automatic Gift Scheduling Works
           </h2>
+          
+          <meta itemProp="description" content="Three simple steps to never forget special occasions: add recipients, set preferences, and let Unwrapt handle gift selection and delivery automatically" />
           
           <div className="space-y-16">
             {[
@@ -150,22 +164,27 @@ const Landing = () => {
                 step: "01",
                 icon: Users,
                 title: "Tell Unwrapt who matters to you",
-                description: "Add friends, family, colleagues, and clients with their important dates and preferences."
+                description: "Add friends, family, colleagues, and clients with their important dates and preferences.",
+                keywords: "add recipients, gift reminders, birthday reminders, anniversary tracking"
               },
               {
                 step: "02",
                 icon: Gift,
                 title: "Set budgets and preferences",
-                description: "Choose your gifting style, budget ranges, and let us know any special considerations."
+                description: "Choose your gifting style, budget ranges, and let us know any special considerations.",
+                keywords: "gift preferences, budget settings, personalized gifts, curated gift selection"
               },
               {
                 step: "03",
                 icon: Sparkles,
                 title: "We remember, choose, and ship the perfect gifts",
-                description: "Sit back while we handle everything — from selection to delivery, with your approval."
+                description: "Sit back while we handle everything — from selection to delivery, with your approval.",
+                keywords: "automatic gift delivery, gift scheduling, thoughtful gifts, premium gift shipping"
               }
             ].map((item, idx) => (
-              <div key={idx} className="flex gap-8 items-start group">
+              <div key={idx} className="flex gap-8 items-start group" itemProp="step" itemScope itemType="https://schema.org/HowToStep">
+                <meta itemProp="position" content={String(idx + 1)} />
+                <meta itemProp="keywords" content={item.keywords} />
                 <div className="flex-shrink-0">
                   <div className="w-20 h-20 rounded-full bg-white/25 backdrop-blur-sm border border-white/60 flex items-center justify-center group-hover:bg-white/35 transition-all duration-300">
                     <item.icon className="w-8 h-8 text-[hsl(var(--soft-gold))]" />
@@ -173,8 +192,8 @@ const Landing = () => {
                 </div>
                 <div className="flex-1">
                   <div className="text-sm font-medium text-[hsl(var(--soft-gold))] mb-2 tracking-wider">{item.step}</div>
-                  <h3 className="font-serif text-2xl text-[hsl(var(--espresso))] mb-3">{item.title}</h3>
-                  <p className="text-[hsl(var(--charcoal-body))] leading-relaxed">{item.description}</p>
+                  <h3 className="font-serif text-2xl text-[hsl(var(--espresso))] mb-3" itemProp="name">{item.title}</h3>
+                  <p className="text-[hsl(var(--charcoal-body))] leading-relaxed" itemProp="text">{item.description}</p>
                 </div>
               </div>
             ))}

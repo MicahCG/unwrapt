@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  
+  <!-- Landing Page -->
+  <url>
+    <loc>https://unwrapt.io/</loc>
+    <lastmod>2025-11-17</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://unwrapt.io/lovable-uploads/6170f25c-7f24-484e-92c6-9fb845379f79.png</image:loc>
+      <image:title>Unwrapt - Automatic Gift Scheduling</image:title>
+    </image:image>
+  </url>
+
+  <!-- Main Landing -->
+  <url>
+    <loc>https://unwrapt.io/landing</loc>
+    <lastmod>2025-11-17</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+
+  <!-- App -->
+  <url>
+    <loc>https://unwrapt.io/app</loc>
+    <lastmod>2025-11-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Settings -->
+  <url>
+    <loc>https://unwrapt.io/settings</loc>
+    <lastmod>2025-11-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <!-- Analytics -->
+  <url>
+    <loc>https://unwrapt.io/analytics</loc>
+    <lastmod>2025-11-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <!-- Gift History -->
+  <url>
+    <loc>https://unwrapt.io/gift-history</loc>
+    <lastmod>2025-11-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- Wishlist -->
+  <url>
+    <loc>https://unwrapt.io/wishlist</loc>
+    <lastmod>2025-11-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- Notifications -->
+  <url>
+    <loc>https://unwrapt.io/notifications</loc>
+    <lastmod>2025-11-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <!-- Legal Pages -->
+  <url>
+    <loc>https://unwrapt.io/privacy</loc>
+    <lastmod>2025-11-17</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+
+  <url>
+    <loc>https://unwrapt.io/terms</loc>
+    <lastmod>2025-11-17</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+
+</urlset>
