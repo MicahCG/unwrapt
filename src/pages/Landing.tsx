@@ -4,7 +4,6 @@ import { ArrowRight, Check, Calendar, Users, Briefcase, TrendingUp, Gift, Heart,
 import { GlassButton } from '@/components/GlassButton';
 import { Logo } from '@/components/ui/logo';
 import giftBoxImage from '@/assets/unwrapt-gift-box.png';
-import GiftUnwrapIntro from '@/components/GiftUnwrapIntro';
 import GiftBoxOpeningIntro from '@/components/GiftBoxOpeningIntro';
 import GiftingScenesScroll from '@/components/GiftingScenesScroll';
 
@@ -12,7 +11,9 @@ const Landing = () => {
   const [email, setEmail] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showNav, setShowNav] = useState(false);
-  const [showIntro, setShowIntro] = useState(false);
+  const [showIntro, setShowIntro] = useState(() => {
+    return !localStorage.getItem('hasSeenLandingIntro');
+  });
 
   useEffect(() => {
     const handleScroll = () => {
@@ -28,9 +29,6 @@ const Landing = () => {
       try {
         sessionStorage.setItem('userEmail', email);
         
-        // Show the intro animation first
-        setShowIntro(true);
-        
         const webhookUrl = 'https://hook.us2.make.com/cjsyb77bay61w4lrcauvbno5dmvdo7ca';
         await fetch(webhookUrl, {
           method: 'POST',
@@ -39,25 +37,25 @@ const Landing = () => {
           body: JSON.stringify({ email }),
         });
         
-        // Wait for intro to complete, then redirect
-        setTimeout(() => {
-          window.location.href = 'https://app.unwrapt.io';
-        }, 4000); // Intro takes ~2.5s + buffer
+        // Redirect immediately to app
+        window.location.href = 'https://app.unwrapt.io';
       } catch (error) {
         console.error('Error:', error);
-        // Still show intro even on error
-        setShowIntro(true);
-        setTimeout(() => {
-          window.location.href = 'https://app.unwrapt.io';
-        }, 4000);
+        // Still redirect even on error
+        window.location.href = 'https://app.unwrapt.io';
       }
     }
   };
 
+  useEffect(() => {
+    if (showIntro) {
+      localStorage.setItem('hasSeenLandingIntro', 'true');
+    }
+  }, [showIntro]);
+
   return (
     <div className="min-h-screen bg-[hsl(var(--champagne))] text-[hsl(var(--espresso))]">
-      <GiftBoxOpeningIntro />
-      {showIntro && <GiftUnwrapIntro />}
+      {showIntro && <GiftBoxOpeningIntro />}
       {/* Sticky Navigation */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         showNav ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'
