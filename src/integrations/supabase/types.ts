@@ -47,6 +47,48 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_queue: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          id: string
+          notification_type: string
+          occasion_date: string | null
+          occasion_type: string | null
+          processed_at: string | null
+          recipient_name: string
+          status: string | null
+          user_email: string
+          user_name: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          notification_type: string
+          occasion_date?: string | null
+          occasion_type?: string | null
+          processed_at?: string | null
+          recipient_name: string
+          status?: string | null
+          user_email: string
+          user_name?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          notification_type?: string
+          occasion_date?: string | null
+          occasion_type?: string | null
+          processed_at?: string | null
+          recipient_name?: string
+          status?: string | null
+          user_email?: string
+          user_name?: string | null
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
