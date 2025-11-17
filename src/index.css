@@ -12,6 +12,21 @@
     --champagne-gold: 43 33% 68%; /* #D2B887 */
     --charcoal-text: 0 0% 10%;   /* #1A1A1A */
     
+    /* Onboarding brand colors */
+    --unwrapt-bg-1: #f8f1e9;
+    --unwrapt-bg-2: #f3dfcf;
+    --unwrapt-bg-3: #f5eadd;
+    --unwrapt-card-bg: #ffffff;
+    --unwrapt-text-main: #2f2b28;
+    --unwrapt-text-subtle: #6c645d;
+    --unwrapt-accent: #e6b77a;
+    --unwrapt-button: #2f2b28;
+    --unwrapt-button-text: #ffffff;
+    --unwrapt-radius-card: 28px;
+    --unwrapt-shadow-card: 0 24px 60px rgba(15, 7, 0, 0.18);
+    --unwrapt-font-heading: "Cormorant Garamond", "Playfair Display", serif;
+    --unwrapt-font-body: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif;
+    
     --background: var(--ivory);
     --foreground: var(--charcoal-text);
 
@@ -353,4 +368,145 @@
 .animate-slideInRight {
   animation: slideInRight 0.5s ease-out;
 }
+
+/* Onboarding Intro Styles */
+.onb-root {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 800ms ease-in-out;
+}
+
+.onb-bg-1 {
+  background: radial-gradient(circle at top left, #fff5ea 0%, var(--unwrapt-bg-1) 40%, #f3e3d4 100%);
+}
+
+.onb-bg-2 {
+  background: radial-gradient(circle at top left, #ffece0 0%, var(--unwrapt-bg-2) 40%, #f0d0b8 100%);
+}
+
+.onb-bg-3 {
+  background: radial-gradient(circle at top left, #fff8ef 0%, var(--unwrapt-bg-3) 40%, #f3e6d7 100%);
+}
+
+.onb-card {
+  position: relative;
+  width: min(480px, 90vw);
+  padding: 40px 48px 44px;
+  border-radius: var(--unwrapt-radius-card);
+  background: var(--unwrapt-card-bg);
+  box-shadow: var(--unwrapt-shadow-card);
+  text-align: center;
+}
+
+.onb-skip {
+  position: absolute;
+  top: 18px;
+  right: 24px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--unwrapt-text-subtle);
+  cursor: pointer;
+  transition: color 200ms ease;
+}
+
+.onb-skip:hover {
+  color: var(--unwrapt-text-main);
+}
+
+.onb-icon-circle {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 24px;
+  border-radius: 999px;
+  background: #f3f1ee;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.onb-icon {
+  font-size: 28px;
+  color: var(--unwrapt-text-subtle);
+}
+
+.onb-headline {
+  margin: 0 0 16px;
+  font-family: var(--unwrapt-font-heading);
+  font-weight: 600;
+  font-size: 28px;
+  line-height: 1.2;
+  color: var(--unwrapt-text-main);
+  min-height: 68px;
+}
+
+.onb-cursor {
+  display: inline-block;
+  width: 10px;
+  color: var(--unwrapt-text-main);
+  animation: onb-blink 900ms steps(1) infinite;
+}
+
+@keyframes onb-blink {
+  0%, 50% { opacity: 1; }
+  50.1%, 100% { opacity: 0; }
+}
+
+.onb-body {
+  margin: 0 auto 24px;
+  max-width: 360px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--unwrapt-text-subtle);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 300ms ease-out 150ms, transform 300ms ease-out 150ms;
+  min-height: 80px;
+}
+
+.onb-body-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.onb-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.onb-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #e0d7cd;
+  transition: background 200ms ease, transform 200ms ease, width 200ms ease;
+}
+
+.onb-dot-active {
+  background: var(--unwrapt-accent);
+  transform: translateY(-1px);
+  width: 16px;
+}
+
+.onb-primary {
+  border: none;
+  border-radius: 999px;
+  padding: 10px 26px;
+  font-size: 14px;
+  font-weight: 500;
+  background: var(--unwrapt-button);
+  color: var(--unwrapt-button-text);
+  cursor: pointer;
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.onb-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(47, 43, 40, 0.2);
+}
+
 

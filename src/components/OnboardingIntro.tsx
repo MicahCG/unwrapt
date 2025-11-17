@@ -1,76 +1,128 @@
 import React, { useState, useEffect } from 'react';
+import { Clock, Heart, Gift } from 'lucide-react';
 
 interface OnboardingIntroProps {
   onComplete: () => void;
 }
 
+const ONBOARDING_SLIDES = [
+  {
+    id: 1,
+    icon: 'clock',
+    headline: 'Life moves fast.',
+    body: "Between work, family, and everything in between, it's easy to lose track of the moments that matter most."
+  },
+  {
+    id: 2,
+    icon: 'heart',
+    headline: "But the people you love shouldn't fade into the background.",
+    body: "Birthdays, anniversaries, and quiet milestones deserve to be remembered, celebrated, and felt — not rushed or forgotten."
+  },
+  {
+    id: 3,
+    icon: 'gift',
+    headline: 'Unwrapt remembers, so they always feel cherished.',
+    body: "We quietly track the important dates, curate beautiful gifts, and schedule everything for you — so showing up thoughtfully feels effortless."
+  }
+];
+
 const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
-  const [currentScreen, setCurrentScreen] = useState(0);
-  const [displayedText, setDisplayedText] = useState('');
-  
-  const [isVisible, setIsVisible] = useState(true);
-  const [isCompleting, setIsCompleting] = useState(false);
+  const [index, setIndex] = useState(0);
+  const [typedText, setTypedText] = useState('');
+  const [isTypingDone, setIsTypingDone] = useState(false);
 
-  const screens = [
-    "Life is busy.",
-    "Special moments get missed.",
-    "We make gifting easy for you."
-  ];
+  const slide = ONBOARDING_SLIDES[index];
 
+  // Typewriter effect
   useEffect(() => {
-    if (isCompleting || currentScreen >= screens.length) {
-      return;
-    }
+    setTypedText('');
+    setIsTypingDone(false);
+    const full = slide.headline;
+    let current = 0;
 
-    const currentText = screens[currentScreen];
-    let currentIndex = 0;
-    setDisplayedText('');
-
-    const typewriterInterval = setInterval(() => {
-      if (currentIndex < currentText.length) {
-        setDisplayedText(currentText.substring(0, currentIndex + 1));
-        currentIndex++;
-      } else {
-        clearInterval(typewriterInterval);
-        
-        // If this is the last screen, complete after a brief pause
-        if (currentScreen === screens.length - 1) {
-          setTimeout(() => {
-            setIsCompleting(true);
-            setIsVisible(false);
-            setTimeout(onComplete, 500);
-          }, 1200);
-        } else {
-          // Move to next screen after text completion + pause
-          const pauseTime = currentScreen === 0 ? 1000 : 2000;
-          setTimeout(() => {
-            setCurrentScreen(prev => prev + 1);
-          }, pauseTime);
-        }
+    const interval = setInterval(() => {
+      current += 1;
+      setTypedText(full.slice(0, current));
+      if (current === full.length) {
+        clearInterval(interval);
+        setIsTypingDone(true);
       }
-    }, 60);
+    }, 40);
 
-    return () => clearInterval(typewriterInterval);
-  }, [currentScreen, onComplete, isCompleting]);
+    return () => clearInterval(interval);
+  }, [index, slide.headline]);
 
-  if (!isVisible) return null;
+  // Auto-advance after typing is done
+  useEffect(() => {
+    if (!isTypingDone) return;
+    
+    const timeout = setTimeout(() => {
+      if (index < ONBOARDING_SLIDES.length - 1) {
+        setIndex(index + 1);
+      }
+    }, 2500);
+    
+    return () => clearTimeout(timeout);
+  }, [isTypingDone, index]);
+
+  const handleSkip = () => {
+    onComplete();
+  };
+
+  const handleGetStarted = () => {
+    onComplete();
+  };
+
+  const renderIcon = () => {
+    const iconProps = { size: 28, strokeWidth: 1.5 };
+    switch (slide.icon) {
+      case 'clock':
+        return <Clock {...iconProps} />;
+      case 'heart':
+        return <Heart {...iconProps} />;
+      case 'gift':
+        return <Gift {...iconProps} />;
+      default:
+        return null;
+    }
+  };
 
   return (
-    <div 
-      className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-500 ${
-        isVisible ? 'opacity-100' : 'opacity-0'
-      }`}
-      style={{
-        background: 'rgba(255, 255, 255, 0.85)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-      }}
-    >
-      <div className="text-center max-w-2xl px-8">
-        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-light text-brand-charcoal tracking-tight leading-tight whitespace-pre-line">
-          {displayedText}
-          <span className="animate-pulse">|</span>
+    <div className={`onb-root onb-bg-${index + 1}`}>
+      <div className="onb-card">
+        <button className="onb-skip" onClick={handleSkip}>
+          Skip intro
+        </button>
+
+        <div className="onb-icon-circle">
+          <span className="onb-icon">
+            {renderIcon()}
+          </span>
+        </div>
+
+        <h1 className="onb-headline">
+          <span>{typedText}</span>
+          <span className="onb-cursor">{isTypingDone ? ' ' : '|'}</span>
         </h1>
+
+        <p className={`onb-body ${isTypingDone ? 'onb-body-visible' : ''}`}>
+          {slide.body}
+        </p>
+
+        <div className="onb-dots">
+          {ONBOARDING_SLIDES.map((s, i) => (
+            <span
+              key={s.id}
+              className={`onb-dot ${i === index ? 'onb-dot-active' : ''}`}
+            />
+          ))}
+        </div>
+
+        {index === ONBOARDING_SLIDES.length - 1 && isTypingDone && (
+          <button className="onb-primary" onClick={handleGetStarted}>
+            Set up my first recipient
+          </button>
+        )}
       </div>
     </div>
   );
