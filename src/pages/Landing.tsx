@@ -11,9 +11,7 @@ const Landing = () => {
   const [email, setEmail] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showNav, setShowNav] = useState(false);
-  const [showIntro, setShowIntro] = useState(() => {
-    return !localStorage.getItem('hasSeenLandingIntro');
-  });
+  const [showIntro, setShowIntro] = useState(true); // Always show intro on marketing site
 
   useEffect(() => {
     const handleScroll = () => {
@@ -47,11 +45,6 @@ const Landing = () => {
     }
   };
 
-  useEffect(() => {
-    if (showIntro) {
-      localStorage.setItem('hasSeenLandingIntro', 'true');
-    }
-  }, [showIntro]);
 
   return (
     <div className="min-h-screen bg-[hsl(var(--champagne))] text-[hsl(var(--espresso))]">
