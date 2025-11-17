@@ -5,42 +5,40 @@
 
 @layer base {
   :root {
-    /* Luxury Neutral Palette */
-    --champagne: 36 35% 94%;
-    --soft-almond: 32 30% 91%;
-    --soft-gold: 40 42% 60%;
-    --warm-bronze: 35 35% 48%;
-    --shadow-charcoal: 20 6% 23%;
-    --espresso: 25 28% 19%;
-    --charcoal-body: 40 2% 29%;
+    /* New Luxury Color Palette */
+    --ivory: 40 43% 97%;        /* #FAF8F3 */
+    --sand: 33 33% 90%;          /* #EFE7DD */
+    --cream-border: 30 24% 87%;  /* #E4DCD2 */
+    --champagne-gold: 43 33% 68%; /* #D2B887 */
+    --charcoal-text: 0 0% 10%;   /* #1A1A1A */
     
-    --background: var(--champagne);
-    --foreground: var(--espresso);
+    --background: var(--ivory);
+    --foreground: var(--charcoal-text);
 
-    --card: var(--soft-almond);
-    --card-foreground: var(--espresso);
+    --card: var(--sand);
+    --card-foreground: var(--charcoal-text);
 
-    --popover: var(--soft-almond);
-    --popover-foreground: var(--espresso);
+    --popover: var(--sand);
+    --popover-foreground: var(--charcoal-text);
 
-    --primary: var(--soft-gold);
-    --primary-foreground: var(--espresso);
+    --primary: var(--champagne-gold);
+    --primary-foreground: var(--charcoal-text);
 
-    --secondary: var(--warm-bronze);
-    --secondary-foreground: 60 9.1% 97.8%;
+    --secondary: var(--sand);
+    --secondary-foreground: var(--charcoal-text);
 
-    --muted: var(--soft-almond);
-    --muted-foreground: var(--charcoal-body);
+    --muted: var(--sand);
+    --muted-foreground: var(--charcoal-text);
 
-    --accent: var(--soft-gold);
-    --accent-foreground: var(--espresso);
+    --accent: var(--champagne-gold);
+    --accent-foreground: var(--charcoal-text);
 
     --destructive: 0 84 60;
     --destructive-foreground: 60 9.1% 97.8%;
 
-    --border: 32 20% 88%;
-    --input: 32 20% 88%;
-    --ring: var(--soft-gold);
+    --border: var(--cream-border);
+    --input: var(--cream-border);
+    --ring: var(--champagne-gold);
 
     --radius: 1.5rem;
 
@@ -92,19 +90,24 @@
 
   html {
     min-height: 100%;
-    background: hsl(var(--champagne));
+    background: hsl(var(--ivory));
   }
 
   body {
     @apply text-foreground;
+    font-family: 'Inter', sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
     min-height: 100%;
-    background: hsl(var(--champagne));
+    background: hsl(var(--ivory));
   }
 
   /* Ensure viewport always shows luxury colors */
   html, body, #root {
-    background: hsl(var(--champagne)) !important;
+    background: hsl(var(--ivory)) !important;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Playfair Display', serif;
   }
 }
 
