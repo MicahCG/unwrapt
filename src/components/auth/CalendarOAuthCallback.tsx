@@ -50,15 +50,15 @@ const CalendarOAuthCallback: React.FC = () => {
           description: error,
           variant: "destructive"
         });
-        // Redirect back to onboarding with error
-        navigate('/', { replace: true });
+        // Redirect back to app
+        window.location.href = 'https://app.unwrapt.io';
         return;
       }
 
       if (!code) {
         console.log('📅 CalendarOAuthCallback: No code received, redirecting...');
         setHasProcessed(true);
-        navigate('/', { replace: true });
+        window.location.href = 'https://app.unwrapt.io';
         return;
       }
 
@@ -105,7 +105,7 @@ const CalendarOAuthCallback: React.FC = () => {
             description: "Please log in again to connect your calendar.",
             variant: "destructive"
           });
-          navigate('/', { replace: true });
+          window.location.href = 'https://app.unwrapt.io';
           return;
         }
       }
@@ -153,8 +153,8 @@ const CalendarOAuthCallback: React.FC = () => {
           description: "Your Google Calendar has been connected. Returning to setup...",
         });
 
-        // Redirect back to onboarding - it will detect the connection and show events
-        navigate('/', { replace: true });
+        // Redirect back to app onboarding - it will detect the connection and show events
+        window.location.href = 'https://app.unwrapt.io/onboarding';
 
       } catch (error) {
         console.error('📅 CalendarOAuthCallback: Error processing OAuth callback:', error);
@@ -164,7 +164,7 @@ const CalendarOAuthCallback: React.FC = () => {
           description: errorMessage,
           variant: "destructive"
         });
-        navigate('/', { replace: true });
+        window.location.href = 'https://app.unwrapt.io';
       } finally {
         setIsProcessing(false);
       }
