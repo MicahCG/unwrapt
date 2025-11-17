@@ -44,7 +44,7 @@ function App() {
               <Route path="/" element={window.location.hostname === 'unwrapt.io' ? <Landing /> : <Index />} />
               
               {/* App flow routes - primarily on app subdomain */}
-              <Route path="/app" element={<AppStart />} />
+              <Route path="/app" element={<Index />} />
               
               {/* Main app routes */}
               

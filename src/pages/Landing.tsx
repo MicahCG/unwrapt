@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Check, Calendar, Users, Briefcase, TrendingUp, Gift, Heart, Clock, Sparkles } from 'lucide-react';
 import { GlassButton } from '@/components/GlassButton';
 import { Logo } from '@/components/ui/logo';
@@ -13,6 +13,7 @@ const Landing = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showNav, setShowNav] = useState(false);
   const [showIntro, setShowIntro] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -39,16 +40,16 @@ const Landing = () => {
           body: JSON.stringify({ email }),
         });
         
-        // Wait for intro to complete, then redirect
+        // Wait for intro to complete, then navigate
         setTimeout(() => {
-          window.location.href = 'https://app.unwrapt.io';
+          navigate('/app');
         }, 4000); // Intro takes ~2.5s + buffer
       } catch (error) {
         console.error('Error:', error);
         // Still show intro even on error
         setShowIntro(true);
         setTimeout(() => {
-          window.location.href = 'https://app.unwrapt.io';
+          navigate('/app');
         }, 4000);
       }
     }
@@ -56,7 +57,6 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen bg-[hsl(var(--champagne))] text-[hsl(var(--espresso))]">
-      <GiftBoxOpeningIntro />
       {showIntro && <GiftUnwrapIntro />}
       {/* Sticky Navigation */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
@@ -111,7 +111,7 @@ const Landing = () => {
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 items-center justify-center pt-4">
               <button
-                onClick={() => window.location.href = '/app'}
+                onClick={() => navigate('/app')}
                 className="px-10 py-4 rounded-full font-medium text-lg text-white transition-all duration-300
                           hover:scale-[1.02]"
                 style={{ 
