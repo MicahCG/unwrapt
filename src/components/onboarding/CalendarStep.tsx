@@ -45,6 +45,14 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
     if (!user) return;
 
     try {
+      // Refresh session to ensure it's valid
+      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
+      
+      if (sessionError || !session) {
+        console.error('Error refreshing session:', sessionError);
+        return;
+      }
+
       const { data: integration } = await supabase
         .from('calendar_integrations')
         .select('*')
@@ -66,11 +74,11 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
 
     setIsConnecting(true);
     try {
-      // Get current session for auth headers
-      const { data: { session } } = await supabase.auth.getSession();
+      // Refresh session to ensure it's valid
+      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
       
-      if (!session) {
-        throw new Error('No active session found');
+      if (sessionError || !session) {
+        throw new Error('No active session found. Please log in again.');
       }
 
       console.log('🔗 Getting Google Calendar auth URL...');
@@ -106,11 +114,13 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
   const fetchCalendarEvents = async (accessToken: string) => {
     setIsFetchingEvents(true);
     try {
-      // Get current session for auth headers
-      const { data: { session } } = await supabase.auth.getSession();
+      // Refresh session to ensure it's valid
+      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
       
-      if (!session) {
-        throw new Error('No active session found');
+      if (sessionError || !session) {
+        console.error('Error refreshing session:', sessionError);
+        setIsFetchingEvents(false);
+        return;
       }
 
       console.log('📅 Fetching calendar events for onboarding...');
