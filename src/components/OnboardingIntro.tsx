@@ -66,11 +66,15 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
   }, [isTypingDone, index]);
 
   const handleSkip = () => {
-    onComplete();
+    // Mark as seen and redirect to app subdomain
+    localStorage.setItem('hasSeenIntro', 'true');
+    window.location.href = 'https://app.unwrapt.io';
   };
 
   const handleGetStarted = () => {
-    onComplete();
+    // Mark as seen and redirect to app subdomain
+    localStorage.setItem('hasSeenIntro', 'true');
+    window.location.href = 'https://app.unwrapt.io';
   };
 
   const renderIcon = () => {

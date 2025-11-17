@@ -37,10 +37,12 @@ function App() {
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <ScrollToTop />
             <Routes>
-              {/* Landing page route - only on main domain */}
+              {/* Landing page route - marketing site only on unwrapt.io */}
               <Route path="/landing" element={<Landing />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<TermsOfService />} />
+              
+              {/* Root path routing: unwrapt.io = marketing, app.unwrapt.io = app */}
               <Route path="/" element={window.location.hostname === 'unwrapt.io' ? <Landing /> : <Index />} />
               
               {/* App flow routes - primarily on app subdomain */}

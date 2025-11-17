@@ -40,8 +40,9 @@ const AppStart = () => {
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      // Redirect to registration/login
-      window.location.href = '/onboarding';
+      // This page should only be accessible on app subdomain
+      // Redirect to home to trigger auth flow
+      window.location.href = '/';
     }
   };
 

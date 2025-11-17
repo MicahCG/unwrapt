@@ -122,10 +122,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       console.log('🔧 AuthProvider: Starting Google sign in');
+      
+      // Always redirect to app subdomain for authentication
+      const redirectUrl = window.location.hostname === 'unwrapt.io' 
+        ? 'https://app.unwrapt.io/'
+        : `${window.location.origin}/`;
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/`,
+          redirectTo: redirectUrl,
         },
       });
       
