@@ -520,7 +520,9 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
                 </Button>
               )}
               <div className="flex items-center">
-                <Logo size="md" />
+                <a href="https://unwrapt.io" className="hover:opacity-80 transition-opacity">
+                  <Logo size="md" />
+                </a>
               </div>
             </div>
             
