@@ -334,14 +334,9 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   };
 
   const handleSkip = () => {
-    console.log('🔧 OnboardingFlow: Skipping step:', currentStep);
-    // Skip to next step or complete onboarding
-    const totalSteps = getTotalSteps();
-    if (currentStep === totalSteps) {
-      handleStepComplete({});
-    } else {
-      setCurrentStep(currentStep + 1);
-    }
+    console.log('🔧 OnboardingFlow: User chose to skip onboarding and go to dashboard');
+    // When user clicks "I'll schedule recipients later", take them to dashboard
+    onBack();
   };
 
   const handleBack = () => {
