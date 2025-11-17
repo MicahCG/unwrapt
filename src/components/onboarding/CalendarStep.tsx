@@ -217,6 +217,14 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
               </>
             )}
           </Button>
+          
+          <Button 
+            variant="ghost" 
+            onClick={onSkip}
+            className="w-full text-muted-foreground hover:text-brand-charcoal"
+          >
+            I'll schedule recipients later
+          </Button>
         </CardContent>
       </Card>
     );
@@ -287,6 +295,16 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
                 ...and {events.length - 3} more dates in your calendar
               </div>
             )}
+
+            <div className="pt-4 border-t">
+              <Button 
+                variant="ghost" 
+                onClick={onSkip}
+                className="w-full text-muted-foreground hover:text-brand-charcoal"
+              >
+                I'll schedule recipients later
+              </Button>
+            </div>
           </>
         ) : (
           <div className="text-center py-8">
