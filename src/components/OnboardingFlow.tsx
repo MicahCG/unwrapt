@@ -28,21 +28,26 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   const getTotalSteps = () => {
     // For manual recipient entry with data: Calendar -> Gift Schedule (2 steps)
     if (onboardingData.manualRecipientData) {
+      console.log('🔧 OnboardingFlow: Using 2-step flow (manual recipient with data)');
       return 2;
     }
     // For no recipients found: Calendar -> Gift Schedule with manual name entry (2 steps)
     if (onboardingData.noRecipientsFound) {
+      console.log('🔧 OnboardingFlow: Using 2-step flow (no recipients found)');
       return 2;
     }
     // For manual recipient entry without data: Calendar -> Recipient -> Gift Schedule (3 steps)
     if (onboardingData.manualRecipientAdded) {
+      console.log('🔧 OnboardingFlow: Using 3-step flow (manual recipient added)');
       return 3;
     }
     // For calendar-based flow: Calendar -> Interests -> Gift Schedule (3 steps)
+    console.log('🔧 OnboardingFlow: Using 3-step flow (calendar-based)');
     return 3;
   };
 
-  console.log('🔧 OnboardingFlow: Rendering step', currentStep, 'for user:', user?.id);
+  console.log('🔧 OnboardingFlow: Rendering step', currentStep, 'of', getTotalSteps(), 'for user:', user?.id);
+  console.log('🔧 OnboardingFlow: Current onboarding data:', onboardingData);
 
   const createRecipientsFromCalendarData = async (importedDates: any[]) => {
     if (!importedDates || importedDates.length === 0) return [];
@@ -144,12 +149,16 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   };
 
   const handleStepComplete = async (stepData: any) => {
+    console.log('🔧 OnboardingFlow: Step', currentStep, 'completed with data:', stepData);
+
     const updatedData = { ...onboardingData, ...stepData };
     setOnboardingData(updatedData);
+    console.log('🔧 OnboardingFlow: Updated onboarding data:', updatedData);
 
     console.log('🔧 OnboardingFlow: Step completed:', currentStep, 'data:', stepData);
 
     const totalSteps = getTotalSteps();
+    console.log('🔧 OnboardingFlow: Current step:', currentStep, 'Total steps:', totalSteps);
 
     if (currentStep === totalSteps) {
       // Complete onboarding and save data
@@ -329,12 +338,13 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
         setIsCompleting(false);
       }
     } else {
+      console.log('🔧 OnboardingFlow: Not final step, moving from step', currentStep, 'to step', currentStep + 1);
       setCurrentStep(currentStep + 1);
     }
   };
 
   const handleSkip = () => {
-    console.log('🔧 OnboardingFlow: Skipping step:', currentStep);
+    console.log('🔧 OnboardingFlow: Skipping step:', currentStep, '-> moving to next');
     // Skip to next step or complete onboarding
     const totalSteps = getTotalSteps();
     if (currentStep === totalSteps) {
@@ -346,8 +356,10 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
 
   const handleBack = () => {
     if (currentStep > 1) {
+      console.log('🔧 OnboardingFlow: Going back from step', currentStep, 'to step', currentStep - 1);
       setCurrentStep(currentStep - 1);
     } else {
+      console.log('🔧 OnboardingFlow: At first step, calling onBack()');
       onBack();
     }
   };
