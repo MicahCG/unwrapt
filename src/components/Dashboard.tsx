@@ -14,6 +14,7 @@ import AddRecipientModal from '@/components/AddRecipientModal';
 import ScheduleGiftModal from '@/components/ScheduleGiftModal';
 import GiftDetailsModal from '@/components/GiftDetailsModal';
 import { format } from 'date-fns';
+import { cleanName } from '@/lib/utils';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -233,11 +234,11 @@ const Dashboard = () => {
                         <div className="flex items-start gap-4">
                           <div className="w-10 h-10 rounded-full bg-[#D2B887]/20 flex items-center justify-center flex-shrink-0">
                             <span className="text-[#1A1A1A] font-medium">
-                              {recipient.name.charAt(0)}
+                              {cleanName(recipient.name).charAt(0)}
                             </span>
                           </div>
                           <div>
-                            <h3 className="font-medium text-[#1A1A1A]">{recipient.name}</h3>
+                            <h3 className="font-medium text-[#1A1A1A]">{cleanName(recipient.name)}</h3>
                             {nextOccasion && (
                               <p className="text-sm text-[#1A1A1A]/70">
                                 {occasionType} — {format(new Date(nextOccasion), 'MMM d')}
@@ -309,7 +310,7 @@ const Dashboard = () => {
                       <div className="flex justify-between items-start mb-3">
                         <div>
                           <h3 className="font-medium text-[#1A1A1A] mb-1">
-                            {gift.recipients?.name}
+                            {cleanName(gift.recipients?.name)}
                           </h3>
                           <p className="text-sm text-[#1A1A1A]/80">
                             {gift.gift_description || gift.gift_type}
