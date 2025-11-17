@@ -178,7 +178,10 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
   };
 
   const handleEventSelect = (event: CalendarEvent) => {
+    console.log('📅 CalendarStep: Event selected:', event);
+    console.log('📅 CalendarStep: Calling onNext with event data...');
     setSelectedEvent(event);
+    
     // Automatically proceed to next step after selection
     onNext({ 
       selectedPersonForGift: {
@@ -189,6 +192,8 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
       importedDates: events,
       calendarConnected: isConnected
     });
+    
+    console.log('📅 CalendarStep: onNext called successfully');
   };
 
   // If not connected, show connection screen
