@@ -11,7 +11,12 @@ const Landing = () => {
   const [email, setEmail] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showNav, setShowNav] = useState(false);
-  const [showIntro, setShowIntro] = useState(true); // Always show intro on marketing site
+  // Clear any old localStorage and always show intro on unwrapt.io
+  const [showIntro, setShowIntro] = useState(() => {
+    localStorage.removeItem('hasSeenLandingIntro');
+    localStorage.removeItem('hasSeenIntro');
+    return true;
+  });
 
   useEffect(() => {
     const handleScroll = () => {
