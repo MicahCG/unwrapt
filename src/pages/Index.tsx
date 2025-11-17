@@ -86,6 +86,14 @@ const Index = () => {
   }
 
   const handleIntroComplete = () => {
+    // This should only happen on app.unwrapt.io
+    // If somehow triggered on unwrapt.io, redirect to app subdomain
+    if (window.location.hostname === 'unwrapt.io') {
+      localStorage.setItem('hasSeenIntro', 'true');
+      window.location.href = 'https://app.unwrapt.io';
+      return;
+    }
+    
     setShowIntro(false);
     localStorage.setItem('hasSeenIntro', 'true');
     // Add a small delay before showing login page to create smooth transition
