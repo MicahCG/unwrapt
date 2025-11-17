@@ -1,147 +1,130 @@
-import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import React, { useState, useEffect } from 'react';
+import { Clock, Heart, Gift } from 'lucide-react';
 
 interface OnboardingIntroProps {
   onComplete: () => void;
 }
 
-const BG = "#F7F0E6";
-const INNER = "#F1E3D0";
-const GOLD = "#D4AF7A";
-const BROWN = "#5B4633";
+const ONBOARDING_SLIDES = [
+  {
+    id: 1,
+    icon: 'clock',
+    headline: 'Life moves fast.',
+    body: "Between work, family, and everything in between, it's easy to lose track of the moments that matter most."
+  },
+  {
+    id: 2,
+    icon: 'heart',
+    headline: "But the people you love shouldn't fade into the background.",
+    body: "Birthdays, anniversaries, and quiet milestones deserve to be remembered, celebrated, and felt — not rushed or forgotten."
+  },
+  {
+    id: 3,
+    icon: 'gift',
+    headline: 'Unwrapt remembers, so they always feel cherished.',
+    body: "We quietly track the important dates, curate beautiful gifts, and schedule everything for you — so showing up thoughtfully feels effortless."
+  }
+];
 
 const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
-  const [show, setShow] = useState(true);
+  const [index, setIndex] = useState(0);
+  const [typedText, setTypedText] = useState('');
+  const [isTypingDone, setIsTypingDone] = useState(false);
 
+  const slide = ONBOARDING_SLIDES[index];
+
+  // Typewriter effect
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setShow(false);
-      onComplete();
-    }, 2100);
-    return () => clearTimeout(timer);
-  }, [onComplete]);
+    setTypedText('');
+    setIsTypingDone(false);
+    const full = slide.headline;
+    let current = 0;
 
-  // Check for reduced motion preference
-  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const interval = setInterval(() => {
+      current += 1;
+      setTypedText(full.slice(0, current));
+      if (current === full.length) {
+        clearInterval(interval);
+        setIsTypingDone(true);
+      }
+    }, 40);
 
-  if (prefersReducedMotion) {
-    return (
-      <AnimatePresence>
-        {show && (
-          <motion.div
-            className="fixed inset-0 z-[60] flex items-center justify-center"
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
-            style={{ backgroundColor: BG }}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.4 }}
-            >
-              <span
-                className="font-serif tracking-[0.2em] text-sm md:text-base uppercase"
-                style={{ color: BROWN }}
-              >
-                Unwrapt
-              </span>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    );
-  }
+    return () => clearInterval(interval);
+  }, [index, slide.headline]);
+
+  // Auto-advance after typing is done
+  useEffect(() => {
+    if (!isTypingDone) return;
+    
+    const timeout = setTimeout(() => {
+      if (index < ONBOARDING_SLIDES.length - 1) {
+        setIndex(index + 1);
+      }
+    }, 2500);
+    
+    return () => clearTimeout(timeout);
+  }, [isTypingDone, index]);
+
+  const handleSkip = () => {
+    onComplete();
+  };
+
+  const handleGetStarted = () => {
+    onComplete();
+  };
+
+  const renderIcon = () => {
+    const iconProps = { size: 28, strokeWidth: 1.5 };
+    switch (slide.icon) {
+      case 'clock':
+        return <Clock {...iconProps} />;
+      case 'heart':
+        return <Heart {...iconProps} />;
+      case 'gift':
+        return <Gift {...iconProps} />;
+      default:
+        return null;
+    }
+  };
 
   return (
-    <AnimatePresence>
-      {show && (
-        <motion.div
-          className="fixed inset-0 z-[60] flex items-center justify-center"
-          initial={{ opacity: 1 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.45, ease: "easeOut", delay: 1.6 }}
-          style={{ backgroundColor: BG }}
-        >
-          {/* Nested rectangles */}
-          <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
-            {/* Outer frame */}
-            <motion.div
-              className="absolute rounded-[32px]"
-              style={{
-                border: `16px solid ${GOLD}`,
-                backgroundColor: INNER,
-                width: "120vw",
-                height: "120vh",
-              }}
-              initial={{ scale: 1.2, opacity: 1 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-            />
+    <div className={`onb-root onb-bg-${index + 1}`}>
+      <div className="onb-card">
+        <button className="onb-skip" onClick={handleSkip}>
+          Skip intro
+        </button>
 
-            {/* Middle frame */}
-            <motion.div
-              className="absolute rounded-[24px]"
-              style={{
-                border: `12px solid ${GOLD}`,
-                backgroundColor: BG,
-                width: "80vw",
-                height: "70vh",
-              }}
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.5, ease: "easeOut", delay: 0.2 }}
-            />
+        <div className="onb-icon-circle">
+          <span className="onb-icon">
+            {renderIcon()}
+          </span>
+        </div>
 
-            {/* Collapsing box - last "lid" */}
-            <motion.div
-              className="absolute rounded-[18px]"
-              style={{
-                border: `8px solid ${GOLD}`,
-                backgroundColor: INNER,
-                width: "40vw",
-                height: "32vh",
-              }}
-              initial={{ scale: 0.6, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.4, ease: "easeOut", delay: 0.35 }}
-            />
+        <h1 className="onb-headline">
+          <span>{typedText}</span>
+          <span className="onb-cursor">{isTypingDone ? ' ' : '|'}</span>
+        </h1>
 
-            {/* Final collapse to center */}
-            <motion.div
-              className="absolute rounded-[16px]"
-              style={{
-                border: `4px solid ${GOLD}`,
-                backgroundColor: INNER,
-                width: "40vw",
-                height: "32vh",
-              }}
-              initial={{ scale: 1, opacity: 1 }}
-              animate={{ scale: 0.02, opacity: 0 }}
-              transition={{ duration: 0.6, ease: "easeInOut", delay: 0.9 }}
-            />
+        <p className={`onb-body ${isTypingDone ? 'onb-body-visible' : ''}`}>
+          {slide.body}
+        </p>
 
-            {/* Unwrapt wordmark in center */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.4, ease: "easeOut", delay: 0.2 }}
-              className="relative z-10"
-            >
-              <span
-                className="font-serif tracking-[0.2em] text-sm md:text-base uppercase"
-                style={{ color: BROWN }}
-              >
-                Unwrapt
-              </span>
-            </motion.div>
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        <div className="onb-dots">
+          {ONBOARDING_SLIDES.map((s, i) => (
+            <span
+              key={s.id}
+              className={`onb-dot ${i === index ? 'onb-dot-active' : ''}`}
+            />
+          ))}
+        </div>
+
+        {index === ONBOARDING_SLIDES.length - 1 && isTypingDone && (
+          <button className="onb-primary" onClick={handleGetStarted}>
+            Set up my first recipient
+          </button>
+        )}
+      </div>
+    </div>
   );
 };
 
