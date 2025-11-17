@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import LoginPage from '@/components/auth/LoginPage';
 import OnboardingFlow from '@/components/OnboardingFlow';
-import GiftBoxOpeningIntro from '@/components/GiftBoxOpeningIntro';
+import OnboardingIntro from '@/components/OnboardingIntro';
 import Dashboard from '@/components/Dashboard';
 
 const Index = () => {
@@ -123,12 +123,7 @@ const Index = () => {
   
   // Show intro for first-time visitors
   if (showIntro) {
-    return (
-      <>
-        <GiftBoxOpeningIntro />
-        <LoginPage />
-      </>
-    );
+    return <OnboardingIntro onComplete={handleIntroComplete} />;
   }
   
   // Show login page for returning visitors or after intro

@@ -11,7 +11,6 @@ import GiftScheduleStep from '@/components/onboarding/GiftScheduleStep';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
 
 interface OnboardingFlowProps {
   onBack: () => void;
@@ -335,9 +334,14 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   };
 
   const handleSkip = () => {
-    console.log('🔧 OnboardingFlow: User chose to skip onboarding and go to dashboard');
-    // When user clicks "I'll schedule recipients later", take them to dashboard
-    onBack();
+    console.log('🔧 OnboardingFlow: Skipping step:', currentStep);
+    // Skip to next step or complete onboarding
+    const totalSteps = getTotalSteps();
+    if (currentStep === totalSteps) {
+      handleStepComplete({});
+    } else {
+      setCurrentStep(currentStep + 1);
+    }
   };
 
   const handleBack = () => {
@@ -516,9 +520,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
                 </Button>
               )}
               <div className="flex items-center">
-                <Link to="/landing">
-                  <Logo size="md" />
-                </Link>
+                <Logo size="md" />
               </div>
             </div>
             
