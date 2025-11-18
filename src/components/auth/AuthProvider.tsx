@@ -26,6 +26,7 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isRateLimited, setIsRateLimited] = useState(false);
 
   useEffect(() => {
     console.log('🔧 AuthProvider: Setting up auth state management');
@@ -49,7 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('🔧 AuthProvider: Auth state change:', { 
         event, 
         hasSession: !!session, 
@@ -58,8 +59,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentPath: window.location.pathname,
         searchParams: window.location.search 
       });
+      
+      // Handle rate limiting
+      if (event === 'TOKEN_REFRESHED' && !session) {
+        console.warn('🔧 AuthProvider: Token refresh failed, possible rate limit');
+        setIsRateLimited(true);
+        // Reset rate limit flag after 1 minute
+        setTimeout(() => {
+          console.log('🔧 AuthProvider: Rate limit cooldown complete');
+          setIsRateLimited(false);
+        }, 60000);
+        return;
+      }
+      
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      // Clear rate limit flag on successful auth
+      if (session?.user) {
+        setIsRateLimited(false);
+      }
       
       // Clean up URL only after successful authentication and only if safe to do so
       if (event === 'SIGNED_IN' && window.location.hash && window.location.hash.includes('access_token')) {
@@ -113,6 +132,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInWithGoogle = async () => {
     try {
+      // Check if currently rate limited
+      if (isRateLimited) {
+        throw new Error('Please wait a moment before signing in again. Too many authentication attempts.');
+      }
+      
       // Rate limiting check
       const rateLimitKey = `google-signin-${window.location.hostname}`;
       if (!rateLimiter.isAllowed(rateLimitKey, RATE_LIMITS.AUTH_ATTEMPTS)) {
@@ -137,6 +161,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (error) {
         console.error('🔧 AuthProvider: Error signing in with Google:', error);
+        // Check for rate limit error
+        if (error.message?.includes('rate limit') || error.status === 429) {
+          setIsRateLimited(true);
+          setTimeout(() => setIsRateLimited(false), 60000);
+          throw new Error('Too many authentication attempts. Please wait a minute and try again.');
+        }
         throw error;
       }
     } catch (error: any) {
