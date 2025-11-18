@@ -50,7 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('🔧 AuthProvider: Auth state change:', { 
         event, 
         hasSession: !!session, 
@@ -60,7 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         searchParams: window.location.search 
       });
       
-      // Handle rate limiting
+      // Handle rate limiting - synchronous only
       if (event === 'TOKEN_REFRESHED' && !session) {
         console.warn('🔧 AuthProvider: Token refresh failed, possible rate limit');
         setIsRateLimited(true);
