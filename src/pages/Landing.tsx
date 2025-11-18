@@ -6,6 +6,7 @@ import { Logo } from "@/components/ui/logo";
 import giftBoxImage from "@/assets/unwrapt-gift-box.png";
 import GiftBoxOpeningIntro from "@/components/GiftBoxOpeningIntro";
 import GiftingScenesScroll from "@/components/GiftingScenesScroll";
+import AnimatedGiftingJourney from "@/components/AnimatedGiftingJourney";
 
 const Landing = () => {
   const [email, setEmail] = useState("");
@@ -156,77 +157,8 @@ const Landing = () => {
       {/* Gifting Scenes Scroll Section */}
       <GiftingScenesScroll />
 
-      {/* How It Works Section */}
-      <section
-        id="how-it-works"
-        className="py-32 px-6 bg-[hsl(var(--soft-almond))]/30"
-        itemScope
-        itemType="https://schema.org/HowTo"
-      >
-        <div className="max-w-4xl mx-auto">
-          <h2 className="font-serif text-4xl md:text-5xl text-[hsl(var(--espresso))] text-center mb-20" itemProp="name">
-            How Automatic Gift Scheduling Works
-          </h2>
-
-          <meta
-            itemProp="description"
-            content="Three simple steps to never forget special occasions: add recipients, set preferences, and let Unwrapt handle gift selection and delivery automatically"
-          />
-
-          <div className="space-y-16">
-            {[
-              {
-                step: "01",
-                icon: Users,
-                title: "Tell Unwrapt who matters to you",
-                description: "Add friends, family, colleagues, and clients with their important dates and preferences.",
-                keywords: "add recipients, gift reminders, birthday reminders, anniversary tracking",
-              },
-              {
-                step: "02",
-                icon: Gift,
-                title: "Set budgets and preferences",
-                description: "Choose your gifting style, budget ranges, and let us know any special considerations.",
-                keywords: "gift preferences, budget settings, personalized gifts, curated gift selection",
-              },
-              {
-                step: "03",
-                icon: Sparkles,
-                title: "We remember, choose, and ship the perfect gifts",
-                description: "Sit back while we handle everything — from selection to delivery, with your approval.",
-                keywords: "automatic gift delivery, gift scheduling, thoughtful gifts, premium gift shipping",
-              },
-            ].map((item, idx) => (
-              <div
-                key={idx}
-                className="flex gap-8 items-start group"
-                itemProp="step"
-                itemScope
-                itemType="https://schema.org/HowToStep"
-              >
-                <meta itemProp="position" content={String(idx + 1)} />
-                <meta itemProp="keywords" content={item.keywords} />
-                <div className="flex-shrink-0">
-                  <div className="w-20 h-20 rounded-full bg-white/25 backdrop-blur-sm border border-white/60 flex items-center justify-center group-hover:bg-white/35 transition-all duration-300">
-                    <item.icon className="w-8 h-8 text-[hsl(var(--soft-gold))]" />
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-[hsl(var(--soft-gold))] mb-2 tracking-wider">
-                    {item.step}
-                  </div>
-                  <h3 className="font-serif text-2xl text-[hsl(var(--espresso))] mb-3" itemProp="name">
-                    {item.title}
-                  </h3>
-                  <p className="text-[hsl(var(--charcoal-body))] leading-relaxed" itemProp="text">
-                    {item.description}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Animated Gifting Journey Section */}
+      <AnimatedGiftingJourney />
 
       {/* Who It's For Section */}
       <section className="py-32 px-6">
