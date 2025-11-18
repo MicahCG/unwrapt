@@ -106,11 +106,11 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
   const fetchCalendarEvents = async (accessToken: string) => {
     setIsFetchingEvents(true);
     try {
-      // Refresh session to ensure it's valid
-      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
+      // Get current session without forcing a refresh
+      const { data: { session } } = await supabase.auth.getSession();
       
-      if (sessionError || !session) {
-        console.error('Error refreshing session:', sessionError);
+      if (!session) {
+        console.error('No active session found');
         setIsFetchingEvents(false);
         return;
       }
