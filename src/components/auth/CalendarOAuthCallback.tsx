@@ -68,26 +68,8 @@ const CalendarOAuthCallback: React.FC = () => {
         return;
       }
 
-      // Check session directly from Supabase if user isn't available from provider
+      // Wait for user to be available from AuthProvider instead of checking session directly
       let currentUser = user;
-      if (!currentUser) {
-        console.log('📅 CalendarOAuthCallback: User not available from provider, checking session...');
-        try {
-          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-          if (sessionError) {
-            console.error('📅 CalendarOAuthCallback: Error checking session:', sessionError);
-          } else {
-            currentUser = session?.user || null;
-            console.log('📅 CalendarOAuthCallback: Session check result:', { 
-              hasSession: !!session, 
-              hasUser: !!currentUser,
-              userId: currentUser?.id
-            });
-          }
-        } catch (sessionError) {
-          console.error('📅 CalendarOAuthCallback: Error checking session:', sessionError);
-        }
-      }
 
       // Retry logic if user is still not available
       if (!currentUser) {
