@@ -7,6 +7,7 @@ import giftBoxImage from "@/assets/unwrapt-gift-box.png";
 import GiftBoxOpeningIntro from "@/components/GiftBoxOpeningIntro";
 import GiftingScenesScroll from "@/components/GiftingScenesScroll";
 import AnimatedGiftingJourney from "@/components/AnimatedGiftingJourney";
+import LuxuryGiftShowcase from "@/components/LuxuryGiftShowcase";
 
 const Landing = () => {
   const [email, setEmail] = useState("");
@@ -160,35 +161,8 @@ const Landing = () => {
       {/* Animated Gifting Journey Section */}
       <AnimatedGiftingJourney />
 
-      {/* Who It's For Section */}
-      <section className="py-32 px-6">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="font-serif text-4xl md:text-5xl text-[hsl(var(--espresso))] text-center mb-6">
-            Built for Professionals
-          </h2>
-          <p className="text-center text-[hsl(var(--charcoal-body))] text-lg mb-20 max-w-2xl mx-auto">
-            Unwrapt is designed for high-achieving professionals who value relationships but lack the time for
-            traditional gift shopping.
-          </p>
-
-          <div className="grid md:grid-cols-4 gap-8">
-            {[
-              { icon: Briefcase, title: "Executives", description: "Maintain client relationships effortlessly" },
-              { icon: Users, title: "Consultants", description: "Show appreciation to key stakeholders" },
-              { icon: TrendingUp, title: "Founders", description: "Build team culture and client loyalty" },
-              { icon: Heart, title: "Client-Facing Professionals", description: "Never miss an important milestone" },
-            ].map((persona, idx) => (
-              <div key={idx} className="text-center group">
-                <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-white/20 backdrop-blur-sm border border-white/40 flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
-                  <persona.icon className="w-7 h-7 text-[hsl(var(--soft-gold))]" />
-                </div>
-                <h3 className="font-serif text-xl text-[hsl(var(--espresso))] mb-3">{persona.title}</h3>
-                <p className="text-sm text-[hsl(var(--charcoal-body))]">{persona.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Luxury Gift Showcase Section */}
+      <LuxuryGiftShowcase />
 
       {/* Testimonials Section */}
       <section className="py-32 px-6 bg-[hsl(var(--soft-almond))]/30">
