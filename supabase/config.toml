@@ -19,4 +19,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.create-gift-payment]
-verify_jwt = false
+verify_jwt = true
+
+[functions.cleanup-test-data]
+verify_jwt = true
+
+[functions.create-test-data]
+verify_jwt = true
