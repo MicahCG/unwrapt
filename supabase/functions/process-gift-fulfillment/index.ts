@@ -11,6 +11,28 @@ serve(async (req) => {
   try {
     console.log('🎁 Process-gift-fulfillment: Function started');
     
+    // Create Supabase client with auth header
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: req.headers.get('Authorization')! },
+        },
+      }
+    );
+
+    // Verify user is authenticated
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    
+    if (userError || !user) {
+      console.error('Authentication failed:', userError);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized', success: false }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabaseService = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -36,6 +58,21 @@ serve(async (req) => {
     }
 
     console.log(`🎁 Process-gift-fulfillment: Processing gift fulfillment for: ${scheduledGiftId}`);
+
+    // Verify the gift belongs to the authenticated user
+    const { data: giftCheck } = await supabaseClient
+      .from('scheduled_gifts')
+      .select('user_id')
+      .eq('id', scheduledGiftId)
+      .single();
+
+    if (!giftCheck || giftCheck.user_id !== user.id) {
+      console.error('Gift verification failed: gift does not belong to user');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized', success: false }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Sanitize input
     const sanitizedGiftId = scheduledGiftId.replace(/[^a-zA-Z0-9\-_]/g, '');

@@ -9,6 +9,28 @@ serve(async (req) => {
   }
 
   try {
+    // Create Supabase client with auth header
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: req.headers.get('Authorization')! },
+        },
+      }
+    );
+
+    // Verify user is authenticated
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    
+    if (userError || !user) {
+      console.error('Authentication failed:', userError);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized', success: false }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { sessionId } = await req.json();
     
     if (!sessionId) {
@@ -76,6 +98,21 @@ serve(async (req) => {
 
     const session = await sessionResponse.json();
     console.log(`💳 Payment status: ${session.payment_status}, Amount: ${session.amount_total}`);
+    
+    // Verify this session belongs to the authenticated user
+    const { data: payment } = await supabaseClient
+      .from('payments')
+      .select('user_id')
+      .eq('stripe_session_id', sessionId)
+      .single();
+
+    if (!payment || payment.user_id !== user.id) {
+      console.error('Payment verification failed: session does not belong to user');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized', success: false }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     if (session.payment_status === "paid") {
       // Update payment and gift status using service role key
