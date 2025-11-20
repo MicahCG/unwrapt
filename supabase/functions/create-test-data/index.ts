@@ -15,6 +15,28 @@ serve(async (req) => {
   try {
     console.log('🧪 Create-test-data: Function started');
     
+    // Authenticate user
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      {
+        global: {
+          headers: { Authorization: req.headers.get("Authorization")! },
+        },
+      }
+    );
+
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    if (userError || !user) {
+      console.error("❌ Unauthorized access attempt");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized", success: false }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`🧪 Authenticated user: ${user.id}`);
+    
     // Use service role to bypass RLS
     const supabaseService = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
