@@ -43,6 +43,80 @@ function extractPersonFromEvent(eventSummary: string) {
   return personName;
 }
 
+// Encryption helper functions using Web Crypto API
+async function encryptToken(token: string): Promise<string> {
+  const encryptionKey = Deno.env.get('TOKEN_ENCRYPTION_KEY');
+  if (!encryptionKey) {
+    throw new Error('TOKEN_ENCRYPTION_KEY not configured');
+  }
+
+  // Derive a key from the base64 encryption key
+  const keyData = Uint8Array.from(atob(encryptionKey), c => c.charCodeAt(0));
+  const key = await crypto.subtle.importKey(
+    'raw',
+    keyData,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt']
+  );
+
+  // Generate a random IV
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  
+  // Encrypt the token
+  const encodedToken = new TextEncoder().encode(token);
+  const encryptedData = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    encodedToken
+  );
+
+  // Combine IV and encrypted data, then base64 encode
+  const combined = new Uint8Array(iv.length + encryptedData.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(encryptedData), iv.length);
+  
+  return btoa(String.fromCharCode(...combined));
+}
+
+async function decryptToken(encryptedToken: string): Promise<string> {
+  const encryptionKey = Deno.env.get('TOKEN_ENCRYPTION_KEY');
+  if (!encryptionKey) {
+    throw new Error('TOKEN_ENCRYPTION_KEY not configured');
+  }
+
+  try {
+    // Derive a key from the base64 encryption key
+    const keyData = Uint8Array.from(atob(encryptionKey), c => c.charCodeAt(0));
+    const key = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt']
+    );
+
+    // Decode the base64 encrypted data
+    const combined = Uint8Array.from(atob(encryptedToken), c => c.charCodeAt(0));
+    
+    // Extract IV and encrypted data
+    const iv = combined.slice(0, 12);
+    const encryptedData = combined.slice(12);
+
+    // Decrypt
+    const decryptedData = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      encryptedData
+    );
+
+    return new TextDecoder().decode(decryptedData);
+  } catch (error) {
+    console.error('Decryption error:', error);
+    throw new Error('Failed to decrypt token');
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -146,15 +220,20 @@ Deno.serve(async (req) => {
         })
       }
 
-      // Store the integration using the user-authenticated supabase client (respects RLS)
-      console.log('💾 Storing calendar integration for user:', user.id)
+      // Encrypt tokens before storing
+      console.log('🔒 Encrypting tokens...')
+      const encryptedAccessToken = await encryptToken(tokenData.access_token);
+      const encryptedRefreshToken = tokenData.refresh_token ? await encryptToken(tokenData.refresh_token) : null;
+
+      // Store the encrypted integration using the user-authenticated supabase client (respects RLS)
+      console.log('💾 Storing encrypted calendar integration for user:', user.id)
       const { error: insertError } = await supabase
         .from('calendar_integrations')
         .upsert({
           user_id: user.id,
           provider: 'google',
-          access_token: tokenData.access_token,
-          refresh_token: tokenData.refresh_token,
+          access_token: encryptedAccessToken,
+          refresh_token: encryptedRefreshToken,
           expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
         }, {
           onConflict: 'user_id,provider'
@@ -162,14 +241,14 @@ Deno.serve(async (req) => {
 
       if (insertError) {
         console.error('❌ Error storing integration:', insertError)
-        return new Response(JSON.stringify({ error: 'Failed to store integration', details: insertError.message }), {
+        return new Response(JSON.stringify({ error: 'Failed to store integration' }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
       }
 
-      console.log('✅ Calendar integration stored successfully')
-      return new Response(JSON.stringify({ success: true, access_token: tokenData.access_token }), {
+      console.log('✅ Calendar integration stored successfully (encrypted)')
+      return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
@@ -194,6 +273,9 @@ Deno.serve(async (req) => {
         if (expiresAt <= fiveMinutesFromNow && currentIntegration.refresh_token) {
           console.log('🔄 Token expired (onboarding), refreshing...');
           
+          // Decrypt the refresh token first
+          const decryptedRefreshToken = await decryptToken(currentIntegration.refresh_token);
+
           // Refresh the token
           const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
             method: 'POST',
@@ -201,7 +283,7 @@ Deno.serve(async (req) => {
             body: new URLSearchParams({
               client_id: Deno.env.get('GOOGLE_CLIENT_ID') ?? '',
               client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') ?? '',
-              refresh_token: currentIntegration.refresh_token,
+              refresh_token: decryptedRefreshToken,
               grant_type: 'refresh_token'
             })
           });
@@ -218,12 +300,13 @@ Deno.serve(async (req) => {
             });
           }
 
-          // Update the stored tokens
+          // Encrypt and update the stored tokens
+          const encryptedNewAccessToken = await encryptToken(refreshData.access_token);
           const newExpiresAt = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
           await supabase
             .from('calendar_integrations')
             .update({
-              access_token: refreshData.access_token,
+              access_token: encryptedNewAccessToken,
               expires_at: newExpiresAt,
               updated_at: new Date().toISOString()
             })
@@ -231,6 +314,9 @@ Deno.serve(async (req) => {
 
           validAccessToken = refreshData.access_token;
           console.log('✅ Token refreshed successfully (onboarding)');
+        } else if (currentIntegration.access_token) {
+          // Decrypt the existing token
+          validAccessToken = await decryptToken(currentIntegration.access_token);
         }
       }
 
@@ -301,6 +387,9 @@ Deno.serve(async (req) => {
         if (expiresAt <= fiveMinutesFromNow && currentIntegration.refresh_token) {
           console.log('🔄 Token expired, refreshing...');
           
+          // Decrypt the refresh token first
+          const decryptedRefreshToken = await decryptToken(currentIntegration.refresh_token);
+
           // Refresh the token
           const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
             method: 'POST',
@@ -308,7 +397,7 @@ Deno.serve(async (req) => {
             body: new URLSearchParams({
               client_id: Deno.env.get('GOOGLE_CLIENT_ID') ?? '',
               client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') ?? '',
-              refresh_token: currentIntegration.refresh_token,
+              refresh_token: decryptedRefreshToken,
               grant_type: 'refresh_token'
             })
           });
@@ -325,12 +414,13 @@ Deno.serve(async (req) => {
             });
           }
 
-          // Update the stored tokens
+          // Encrypt and update the stored tokens
+          const encryptedNewAccessToken = await encryptToken(refreshData.access_token);
           const newExpiresAt = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
           await supabase
             .from('calendar_integrations')
             .update({
-              access_token: refreshData.access_token,
+              access_token: encryptedNewAccessToken,
               expires_at: newExpiresAt,
               updated_at: new Date().toISOString()
             })
@@ -338,6 +428,9 @@ Deno.serve(async (req) => {
 
           validAccessToken = refreshData.access_token;
           console.log('✅ Token refreshed successfully');
+        } else if (currentIntegration.access_token) {
+          // Decrypt the existing token
+          validAccessToken = await decryptToken(currentIntegration.access_token);
         }
       }
 

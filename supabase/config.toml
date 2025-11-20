@@ -1,10 +1,10 @@
 project_id = "zxsswxzpzjimrrpcrrto"
 
 [functions.verify-payment]
-verify_jwt = false
+verify_jwt = true
 
 [functions.process-gift-fulfillment] 
-verify_jwt = false
+verify_jwt = true
 
 [functions.shopify-order]
 verify_jwt = false
