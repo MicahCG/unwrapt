@@ -6,6 +6,12 @@ verify_jwt = true
 [functions.process-gift-fulfillment] 
 verify_jwt = true
 
+[functions.process-automation-lifecycle]
+verify_jwt = false
+
+[functions.trigger-auto-reload]
+verify_jwt = false
+
 [functions.shopify-order]
 verify_jwt = false
 
