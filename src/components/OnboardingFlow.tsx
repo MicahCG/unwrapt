@@ -5,6 +5,7 @@ import { Logo } from '@/components/ui/logo';
 import { useAuth } from '@/components/auth/AuthProvider';
 import UserMenu from '@/components/auth/UserMenu';
 import CalendarStep from '@/components/onboarding/CalendarStep';
+import GiftShowcaseStep from '@/components/onboarding/GiftShowcaseStep';
 import RecipientStep from '@/components/onboarding/RecipientStep';
 import InterestsStep from '@/components/onboarding/InterestsStep';
 import GiftScheduleStep from '@/components/onboarding/GiftScheduleStep';
@@ -148,6 +149,56 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
     return recipients;
   };
 
+  const completeOnboarding = async () => {
+    setIsCompleting(true);
+    try {
+      console.log('Completing onboarding with data:', onboardingData);
+
+      // Create recipients from ALL calendar data
+      let allRecipients = [];
+      if (onboardingData.importedDates && onboardingData.importedDates.length > 0) {
+        allRecipients = await createRecipientsFromCalendarData(onboardingData.importedDates);
+      }
+
+      // Calculate and save initial metrics
+      if (user?.id) {
+        console.log('Calculating user metrics...');
+        await supabase.rpc('calculate_user_metrics', { user_uuid: user.id });
+      }
+
+      // Invalidate queries to refresh dashboard
+      await queryClient.invalidateQueries({ queryKey: ['onboarding-status', user?.id] });
+      await queryClient.invalidateQueries({ queryKey: ['recipients', user?.id] });
+      await queryClient.invalidateQueries({ queryKey: ['user-metrics', user?.id] });
+
+      const recipientCount = allRecipients.length;
+
+      toast({
+        title: "Welcome to Unwrapt!",
+        description: recipientCount > 0 
+          ? `${recipientCount} recipients added to your dashboard!`
+          : "Your onboarding is complete. Let's start making gift-giving effortless!",
+      });
+
+      console.log('Onboarding completed successfully');
+
+      // Small delay to ensure toast is visible, then navigate to dashboard
+      setTimeout(() => {
+        setIsCompleting(false);
+        onBack(); // This will trigger parent to show dashboard
+      }, 1000);
+
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+      toast({
+        title: "Error",
+        description: "There was a problem completing your setup. Please try again.",
+        variant: "destructive"
+      });
+      setIsCompleting(false);
+    }
+  };
+
   const handleStepComplete = async (stepData: any) => {
     console.log('🔧 OnboardingFlow: Step', currentStep, 'completed with data:', stepData);
 
@@ -160,20 +211,21 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
     const totalSteps = getTotalSteps();
     console.log('🔧 OnboardingFlow: Current step:', currentStep, 'Total steps:', totalSteps);
 
+    // If step 1 (calendar) is complete and we have dates, move to gift showcase (step 2)
+    if (currentStep === 1 && updatedData.importedDates && updatedData.importedDates.length > 0) {
+      console.log('🔧 OnboardingFlow: Calendar complete with dates, moving to gift showcase');
+      setCurrentStep(2);
+      return;
+    }
+
     if (currentStep === totalSteps) {
-      // Complete onboarding and save data
+      // Handle old flows that don't use gift showcase
       setIsCompleting(true);
       try {
-        console.log('Completing onboarding with data:', updatedData);
-
-        // Create recipients from ALL calendar data (not just selected one)
-        let allRecipients = [];
-        if (updatedData.importedDates && updatedData.importedDates.length > 0) {
-          allRecipients = await createRecipientsFromCalendarData(updatedData.importedDates);
-        }
-
-        // Create recipient from manual entry or selection
+        // Create recipients from manual entry or selection
+        let allRecipients: any[] = [];
         let selectedRecipient = null;
+        
         if (updatedData.manualRecipientName) {
           // Manual recipient name from no recipients flow
           const { data: newRecipient, error: recipientError } = await supabase
@@ -338,8 +390,14 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
         setIsCompleting(false);
       }
     } else {
-      console.log('🔧 OnboardingFlow: Not final step, moving from step', currentStep, 'to step', currentStep + 1);
-      setCurrentStep(currentStep + 1);
+      // After gift showcase (step 2), complete the onboarding
+      if (currentStep === 2) {
+        console.log('🔧 OnboardingFlow: Gift showcase complete, completing onboarding');
+        await completeOnboarding();
+      } else {
+        console.log('🔧 OnboardingFlow: Not final step, moving from step', currentStep, 'to step', currentStep + 1);
+        setCurrentStep(currentStep + 1);
+      }
     }
   };
 
@@ -379,6 +437,16 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   const renderStep = () => {
     console.log('🔧 OnboardingFlow: Rendering step component for step:', currentStep);
     
+    // Step 1: Calendar
+    if (currentStep === 1) {
+      return <CalendarStep onNext={handleStepComplete} onSkip={handleSkip} />;
+    }
+
+    // Step 2: Gift Showcase (if we have imported dates)
+    if (currentStep === 2 && onboardingData.importedDates && onboardingData.importedDates.length > 0) {
+      return <GiftShowcaseStep onComplete={() => handleStepComplete({})} />;
+    }
+
     // Check if we have manual recipient data (skip recipient entry)
     const hasManualRecipientData = onboardingData.manualRecipientData;
     
