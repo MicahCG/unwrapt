@@ -38,3 +38,9 @@ verify_jwt = true
 
 [functions.assign-admin-role]
 verify_jwt = false
+
+[functions.create-subscription-checkout]
+verify_jwt = true
+
+[functions.stripe-webhook]
+verify_jwt = false
