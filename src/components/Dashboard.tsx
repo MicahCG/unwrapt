@@ -14,6 +14,8 @@ import AddRecipientModal from '@/components/AddRecipientModal';
 import ScheduleGiftModal from '@/components/ScheduleGiftModal';
 import GiftDetailsModal from '@/components/GiftDetailsModal';
 import SubscriptionBadge from '@/components/subscription/SubscriptionBadge';
+import { WalletBalance } from '@/components/wallet/WalletBalance';
+import { AddFundsModal } from '@/components/wallet/AddFundsModal';
 import { format } from 'date-fns';
 import { cleanName } from '@/lib/utils';
 
@@ -27,16 +29,17 @@ const Dashboard = () => {
   const [selectedRecipient, setSelectedRecipient] = useState(null);
   const [showGiftDetails, setShowGiftDetails] = useState(false);
   const [selectedGift, setSelectedGift] = useState(null);
+  const [showAddFunds, setShowAddFunds] = useState(false);
 
-  // Fetch user profile with subscription info
-  const { data: userProfile } = useQuery({
+  // Fetch user profile with subscription info and wallet balance
+  const { data: userProfile, refetch: refetchProfile } = useQuery({
     queryKey: ['user-profile', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
       
       const { data, error } = await supabase
         .from('profiles')
-        .select('subscription_tier, trial_ends_at')
+        .select('subscription_tier, trial_ends_at, gift_wallet_balance')
         .eq('id', user.id)
         .single();
       
@@ -45,6 +48,31 @@ const Dashboard = () => {
     },
     enabled: !!user?.id
   });
+
+  // Subscribe to real-time wallet balance updates
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('wallet-balance-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`,
+        },
+        () => {
+          refetchProfile();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, refetchProfile]);
 
   // Fetch recipients with their upcoming occasions
   const { data: recipients = [] } = useQuery({
@@ -226,6 +254,17 @@ const Dashboard = () => {
           </div>
         )}
 
+        {/* Wallet Balance for VIP users */}
+        {userProfile && (
+          <div className="px-12 pt-8">
+            <WalletBalance
+              balance={userProfile.gift_wallet_balance || 0}
+              onAddFunds={() => setShowAddFunds(true)}
+              tier={userProfile.subscription_tier as 'free' | 'vip'}
+            />
+          </div>
+        )}
+
         {/* Main Content - Two Column Layout */}
         <div className="px-12 py-12 grid grid-cols-1 xl:grid-cols-[620px_1fr] gap-8">
           {/* LEFT COLUMN - Recipients & Important Dates */}
@@ -394,6 +433,14 @@ const Dashboard = () => {
             setShowGiftDetails(false);
             setSelectedGift(null);
           }}
+        />
+      )}
+
+      {showAddFunds && userProfile && (
+        <AddFundsModal
+          isOpen={showAddFunds}
+          onClose={() => setShowAddFunds(false)}
+          currentBalance={userProfile.gift_wallet_balance || 0}
         />
       )}
     </>
