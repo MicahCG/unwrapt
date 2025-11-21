@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar as CalendarIcon, Loader2, AlertCircle } from "lucide-react";
+import { Calendar as CalendarIcon, Loader2, AlertCircle, Sparkles } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { motion } from 'framer-motion';
 
 interface CalendarStepProps {
   onNext: (data: any) => void;
@@ -32,6 +33,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isFetchingEvents, setIsFetchingEvents] = useState(false);
+  const [showAnimation, setShowAnimation] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -135,11 +137,24 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
       console.log('🎉 Found important dates:', importantDates.length);
       
       setEvents(importantDates);
-
-      toast({
-        title: "Calendar Connected!",
-        description: `Found ${importantDates.length} important dates in your calendar.`,
-      });
+      
+      // Show animation if we found events
+      if (importantDates.length > 0) {
+        setShowAnimation(true);
+        // Auto-proceed after animation
+        setTimeout(() => {
+          onNext({
+            importedDates: importantDates,
+            calendarConnected: true
+          });
+        }, 4000); // 4 seconds for animation
+      } else {
+        // No events found, skip animation
+        toast({
+          title: "No Events Found",
+          description: "We couldn't find any important dates in your calendar.",
+        });
+      }
 
     } catch (error) {
       console.error('💥 Events fetch error:', error);
@@ -229,45 +244,50 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
     );
   }
 
-  // If connected but still fetching events
-  if (isFetchingEvents) {
+  // If connected but still fetching events OR showing animation
+  if (isFetchingEvents || showAnimation) {
+    const soonestEvents = getSoonestEvents().slice(0, 5); // Show up to 5 dates
+    
     return (
       <Card className="animate-fadeInUp">
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-brand-charcoal mb-4" />
-          <p className="text-brand-charcoal">Fetching your calendar events...</p>
-        </CardContent>
-      </Card>
-    );
-  }
+        {isFetchingEvents ? (
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-brand-charcoal mb-4" />
+            <p className="text-brand-charcoal">Fetching your calendar events...</p>
+          </CardContent>
+        ) : (
+          <CardContent className="flex flex-col items-center justify-center py-12 space-y-8">
+            <motion.div
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.5 }}
+              className="bg-brand-charcoal/10 p-6 rounded-full"
+            >
+              <Sparkles className="h-16 w-16 text-brand-charcoal" />
+            </motion.div>
+            
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 0.5 }}
+              className="text-center"
+            >
+              <h2 className="text-3xl font-bold text-brand-charcoal mb-2">
+                Amazing! We found {events.length} important dates
+              </h2>
+              <p className="text-muted-foreground">
+                We'll help you never miss a special occasion
+              </p>
+            </motion.div>
 
-  const soonestEvents = getSoonestEvents();
-
-  // Connected and events loaded - show event selection
-  return (
-    <Card className="animate-fadeInUp">
-      <CardHeader className="text-center">
-        <div className="flex justify-center mb-4">
-          <div className="bg-brand-charcoal/10 p-4 rounded-full">
-            <CalendarIcon className="h-12 w-12 text-brand-charcoal" />
-          </div>
-        </div>
-        <CardTitle className="text-3xl mb-2">
-          We Found {events.length} Important Dates!
-        </CardTitle>
-        <p className="text-muted-foreground">
-          Who should we start with?
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {soonestEvents.length > 0 ? (
-          <>
-            <div className="space-y-3">
+            <div className="w-full max-w-md space-y-3">
               {soonestEvents.map((event, index) => (
-                <div
+                <motion.div
                   key={index}
-                  className="border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md hover:border-brand-charcoal/50"
-                  onClick={() => handleEventSelect(event)}
+                  initial={{ x: -100, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ delay: 0.6 + (index * 0.15), duration: 0.4 }}
+                  className="border rounded-lg p-4 bg-white shadow-sm"
                 >
                   <div className="flex justify-between items-center">
                     <div>
@@ -285,32 +305,51 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
                       </p>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               ))}
+              
+              {events.length > 5 && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 1.5, duration: 0.5 }}
+                  className="text-center text-sm text-muted-foreground pt-2"
+                >
+                  ...and {events.length - 5} more dates
+                </motion.div>
+              )}
             </div>
 
-            {events.length > 3 && (
-              <div className="text-center text-sm text-muted-foreground">
-                ...and {events.length - 3} more dates in your calendar
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="text-center py-8">
-            <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Upcoming Events Found</h3>
-            <p className="text-muted-foreground mb-4">
-              We couldn't find any upcoming birthdays or anniversaries in your calendar. You can still continue to set up your first gift.
-            </p>
-            <Button onClick={() => onNext({
-              importedDates: [],
-              calendarConnected: isConnected,
-              noRecipientsFound: true
-            })}>
-              Continue Anyway
-            </Button>
-          </div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 2.5, duration: 0.5 }}
+              className="text-center text-sm text-muted-foreground"
+            >
+              Setting things up for you...
+            </motion.div>
+          </CardContent>
         )}
+      </Card>
+    );
+  }
+
+  // No events found - show error state
+  return (
+    <Card className="animate-fadeInUp">
+      <CardContent className="text-center py-8">
+        <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+        <h3 className="text-lg font-semibold mb-2">No Upcoming Events Found</h3>
+        <p className="text-muted-foreground mb-4">
+          We couldn't find any upcoming birthdays or anniversaries in your calendar.
+        </p>
+        <Button onClick={() => onNext({
+          importedDates: [],
+          calendarConnected: isConnected,
+          noRecipientsFound: true
+        })}>
+          Continue Anyway
+        </Button>
       </CardContent>
     </Card>
   );
