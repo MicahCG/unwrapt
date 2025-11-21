@@ -35,3 +35,6 @@ verify_jwt = true
 
 [functions.wallet-charge-reserved]
 verify_jwt = true
+
+[functions.assign-admin-role]
+verify_jwt = false

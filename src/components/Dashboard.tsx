@@ -16,6 +16,7 @@ import GiftDetailsModal from '@/components/GiftDetailsModal';
 import SubscriptionBadge from '@/components/subscription/SubscriptionBadge';
 import { WalletBalance } from '@/components/wallet/WalletBalance';
 import { AddFundsModal } from '@/components/wallet/AddFundsModal';
+import { TestTierToggle } from '@/components/dev/TestTierToggle';
 import { format } from 'date-fns';
 import { cleanName } from '@/lib/utils';
 
@@ -253,6 +254,11 @@ const Dashboard = () => {
             <TestDataManager />
           </div>
         )}
+
+        {/* Admin Testing Controls */}
+        <div className="px-12 pt-8">
+          <TestTierToggle />
+        </div>
 
         {/* Wallet Balance for VIP users */}
         {userProfile && (
