@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import AddRecipientModal from '@/components/AddRecipientModal';
 import ScheduleGiftModal from '@/components/ScheduleGiftModal';
 import GiftDetailsModal from '@/components/GiftDetailsModal';
+import SubscriptionBadge from '@/components/subscription/SubscriptionBadge';
 import { format } from 'date-fns';
 import { cleanName } from '@/lib/utils';
 
@@ -26,6 +27,24 @@ const Dashboard = () => {
   const [selectedRecipient, setSelectedRecipient] = useState(null);
   const [showGiftDetails, setShowGiftDetails] = useState(false);
   const [selectedGift, setSelectedGift] = useState(null);
+
+  // Fetch user profile with subscription info
+  const { data: userProfile } = useQuery({
+    queryKey: ['user-profile', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('subscription_tier, trial_ends_at')
+        .eq('id', user.id)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id
+  });
 
   // Fetch recipients with their upcoming occasions
   const { data: recipients = [] } = useQuery({
@@ -183,9 +202,17 @@ const Dashboard = () => {
             <UserMenu />
           </div>
           <div className="px-12 pb-8 text-center">
-            <h1 className="font-display text-2xl text-[#1A1A1A] mb-2">
-              Your Unwrapt Concierge
-            </h1>
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <h1 className="font-display text-2xl text-[#1A1A1A]">
+                Your Unwrapt Concierge
+              </h1>
+              {userProfile && (
+                <SubscriptionBadge 
+                  tier={userProfile.subscription_tier as 'free' | 'vip'}
+                  trialEndsAt={userProfile.trial_ends_at}
+                />
+              )}
+            </div>
             <p className="text-[#1A1A1A]/70 text-sm">
               Here to help you prepare every upcoming gift with ease.
             </p>
