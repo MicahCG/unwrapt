@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      automation_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          recipient_id: string | null
+          scheduled_gift_id: string | null
+          stage: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          recipient_id?: string | null
+          scheduled_gift_id?: string | null
+          stage: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          recipient_id?: string | null
+          scheduled_gift_id?: string | null
+          stage?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_logs_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "recipients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_logs_scheduled_gift_id_fkey"
+            columns: ["scheduled_gift_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_gifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_integrations: {
         Row: {
           access_token: string
@@ -138,12 +186,16 @@ export type Database = {
       }
       profiles: {
         Row: {
+          auto_reload_amount: number | null
+          auto_reload_enabled: boolean | null
+          auto_reload_threshold: number | null
           avatar_url: string | null
           created_at: string
           email: string | null
           full_name: string | null
           gift_wallet_balance: number | null
           id: string
+          stripe_payment_method_id: string | null
           subscription_status: string | null
           subscription_tier: string | null
           trial_ends_at: string | null
@@ -153,12 +205,16 @@ export type Database = {
           wallet_reload_threshold: number | null
         }
         Insert: {
+          auto_reload_amount?: number | null
+          auto_reload_enabled?: boolean | null
+          auto_reload_threshold?: number | null
           avatar_url?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
           gift_wallet_balance?: number | null
           id: string
+          stripe_payment_method_id?: string | null
           subscription_status?: string | null
           subscription_tier?: string | null
           trial_ends_at?: string | null
@@ -168,12 +224,16 @@ export type Database = {
           wallet_reload_threshold?: number | null
         }
         Update: {
+          auto_reload_amount?: number | null
+          auto_reload_enabled?: boolean | null
+          auto_reload_threshold?: number | null
           avatar_url?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
           gift_wallet_balance?: number | null
           id?: string
+          stripe_payment_method_id?: string | null
           subscription_status?: string | null
           subscription_tier?: string | null
           trial_ends_at?: string | null
@@ -188,10 +248,12 @@ export type Database = {
         Row: {
           address: Json | null
           anniversary: string | null
+          automation_enabled: boolean | null
           birthday: string | null
           city: string | null
           country: string | null
           created_at: string
+          default_gift_variant_id: string | null
           email: string | null
           id: string
           interests: string[] | null
@@ -208,10 +270,12 @@ export type Database = {
         Insert: {
           address?: Json | null
           anniversary?: string | null
+          automation_enabled?: boolean | null
           birthday?: string | null
           city?: string | null
           country?: string | null
           created_at?: string
+          default_gift_variant_id?: string | null
           email?: string | null
           id?: string
           interests?: string[] | null
@@ -228,10 +292,12 @@ export type Database = {
         Update: {
           address?: Json | null
           anniversary?: string | null
+          automation_enabled?: boolean | null
           birthday?: string | null
           city?: string | null
           country?: string | null
           created_at?: string
+          default_gift_variant_id?: string | null
           email?: string | null
           id?: string
           interests?: string[] | null
@@ -254,6 +320,7 @@ export type Database = {
           auto_schedule: boolean | null
           automation_enabled: boolean | null
           created_at: string
+          default_gift_variant_id: string | null
           delivery_date: string | null
           gift_description: string | null
           gift_image_url: string | null
@@ -277,6 +344,7 @@ export type Database = {
           auto_schedule?: boolean | null
           automation_enabled?: boolean | null
           created_at?: string
+          default_gift_variant_id?: string | null
           delivery_date?: string | null
           gift_description?: string | null
           gift_image_url?: string | null
@@ -300,6 +368,7 @@ export type Database = {
           auto_schedule?: boolean | null
           automation_enabled?: boolean | null
           created_at?: string
+          default_gift_variant_id?: string | null
           delivery_date?: string | null
           gift_description?: string | null
           gift_image_url?: string | null
@@ -447,7 +516,9 @@ export type Database = {
         Args: { user_uuid: string }
         Returns: undefined
       }
+      check_auto_reload: { Args: { p_user_id: string }; Returns: Json }
       check_upcoming_gift_events: { Args: never; Returns: undefined }
+      get_available_balance: { Args: { p_user_id: string }; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
