@@ -142,24 +142,45 @@ export type Database = {
           created_at: string
           email: string | null
           full_name: string | null
+          gift_wallet_balance: number | null
           id: string
+          subscription_status: string | null
+          subscription_tier: string | null
+          trial_ends_at: string | null
           updated_at: string
+          wallet_auto_reload: boolean | null
+          wallet_reload_amount: number | null
+          wallet_reload_threshold: number | null
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
+          gift_wallet_balance?: number | null
           id: string
+          subscription_status?: string | null
+          subscription_tier?: string | null
+          trial_ends_at?: string | null
           updated_at?: string
+          wallet_auto_reload?: boolean | null
+          wallet_reload_amount?: number | null
+          wallet_reload_threshold?: number | null
         }
         Update: {
           avatar_url?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
+          gift_wallet_balance?: number | null
           id?: string
+          subscription_status?: string | null
+          subscription_tier?: string | null
+          trial_ends_at?: string | null
           updated_at?: string
+          wallet_auto_reload?: boolean | null
+          wallet_reload_amount?: number | null
+          wallet_reload_threshold?: number | null
         }
         Relationships: []
       }
@@ -228,7 +249,10 @@ export type Database = {
       }
       scheduled_gifts: {
         Row: {
+          address_reminder_sent: number | null
+          address_requested_at: string | null
           auto_schedule: boolean | null
+          automation_enabled: boolean | null
           created_at: string
           delivery_date: string | null
           gift_description: string | null
@@ -244,9 +268,14 @@ export type Database = {
           status: string | null
           updated_at: string
           user_id: string
+          wallet_reservation_amount: number | null
+          wallet_reserved: boolean | null
         }
         Insert: {
+          address_reminder_sent?: number | null
+          address_requested_at?: string | null
           auto_schedule?: boolean | null
+          automation_enabled?: boolean | null
           created_at?: string
           delivery_date?: string | null
           gift_description?: string | null
@@ -262,9 +291,14 @@ export type Database = {
           status?: string | null
           updated_at?: string
           user_id: string
+          wallet_reservation_amount?: number | null
+          wallet_reserved?: boolean | null
         }
         Update: {
+          address_reminder_sent?: number | null
+          address_requested_at?: string | null
           auto_schedule?: boolean | null
+          automation_enabled?: boolean | null
           created_at?: string
           delivery_date?: string | null
           gift_description?: string | null
@@ -280,6 +314,8 @@ export type Database = {
           status?: string | null
           updated_at?: string
           user_id?: string
+          wallet_reservation_amount?: number | null
+          wallet_reserved?: boolean | null
         }
         Relationships: [
           {
@@ -326,6 +362,60 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      wallet_transactions: {
+        Row: {
+          amount: number
+          balance_after: number
+          created_at: string
+          id: string
+          scheduled_gift_id: string | null
+          status: string | null
+          stripe_payment_intent_id: string | null
+          transaction_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          created_at?: string
+          id?: string
+          scheduled_gift_id?: string | null
+          status?: string | null
+          stripe_payment_intent_id?: string | null
+          transaction_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          created_at?: string
+          id?: string
+          scheduled_gift_id?: string | null
+          status?: string | null
+          stripe_payment_intent_id?: string | null
+          transaction_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wallet_transactions_scheduled_gift_id_fkey"
+            columns: ["scheduled_gift_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_gifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wallet_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
