@@ -17,6 +17,7 @@ import SubscriptionBadge from '@/components/subscription/SubscriptionBadge';
 import { WalletBalance } from '@/components/wallet/WalletBalance';
 import { AddFundsModal } from '@/components/wallet/AddFundsModal';
 import { TestTierToggle } from '@/components/dev/TestTierToggle';
+import { VIPUpgradeModal } from '@/components/subscription/VIPUpgradeModal';
 import { format } from 'date-fns';
 import { cleanName } from '@/lib/utils';
 
@@ -31,6 +32,7 @@ const Dashboard = () => {
   const [showGiftDetails, setShowGiftDetails] = useState(false);
   const [selectedGift, setSelectedGift] = useState(null);
   const [showAddFunds, setShowAddFunds] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   // Fetch user profile with subscription info and wallet balance
   const { data: userProfile, refetch: refetchProfile } = useQuery({
@@ -348,9 +350,7 @@ const Dashboard = () => {
                             </p>
                             <Button
                               className="bg-[#D2B887] hover:bg-[#D2B887]/90 text-[#1A1A1A]"
-                              onClick={() => {
-                                // Trigger upgrade modal
-                              }}
+                              onClick={() => setShowUpgradeModal(true)}
                             >
                               <Crown className="w-4 h-4 mr-2" />
                               Upgrade Now
@@ -487,6 +487,11 @@ const Dashboard = () => {
           currentBalance={userProfile.gift_wallet_balance || 0}
         />
       )}
+
+      <VIPUpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+      />
     </>
   );
 };
