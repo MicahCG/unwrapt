@@ -8,7 +8,7 @@ import TestDataManager from '@/components/TestDataManager';
 import MonthlyOpportunitiesOverlay from '@/components/MonthlyOpportunitiesOverlay';
 import GiftScheduledSuccess from '@/components/GiftScheduledSuccess';
 import { Logo } from '@/components/ui/logo';
-import { Bell, Star, Heart, Plus, Calendar, Lock } from 'lucide-react';
+import { Bell, Star, Heart, Plus, Calendar, Lock, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import AddRecipientModal from '@/components/AddRecipientModal';
 import ScheduleGiftModal from '@/components/ScheduleGiftModal';
@@ -280,7 +280,7 @@ const Dashboard = () => {
                 Recipients & Important Dates
               </h2>
               
-              <div className="space-y-4">
+              <div className="relative space-y-4">
                 {recipients.length === 0 ? (
                   <div className="text-center py-8 text-[#1A1A1A]/60">
                     <p className="mb-4">No recipients yet</p>
@@ -293,61 +293,73 @@ const Dashboard = () => {
                     </Button>
                   </div>
                 ) : (
-                  recipients.map((recipient, index) => {
-                    const nextOccasion = recipient.birthday || recipient.anniversary;
-                    const occasionType = recipient.birthday ? 'Birthday' : 'Anniversary';
-                    const isFreeUser = userProfile?.subscription_tier === 'free';
-                    const isLocked = isFreeUser && index >= 3;
-                    
-                    return (
-                      <div
-                        key={recipient.id}
-                        className={`relative flex items-start justify-between p-4 bg-[#FAF8F3]/50 rounded-xl border border-[#E4DCD2] ${
-                          isLocked ? 'blur-sm pointer-events-none' : 'hover:bg-[#FAF8F3] cursor-pointer'
-                        } transition-colors`}
-                        onClick={() => !isLocked && handleScheduleGift(recipient)}
-                      >
-                        <div className="flex items-start gap-4">
-                          <div className="w-10 h-10 rounded-full bg-[#D2B887]/20 flex items-center justify-center flex-shrink-0">
-                            <span className="text-[#1A1A1A] font-medium">
-                              {cleanName(recipient.name).charAt(0)}
-                            </span>
-                          </div>
-                          <div>
-                            <h3 className="font-medium text-[#1A1A1A]">{cleanName(recipient.name)}</h3>
-                            {nextOccasion && (
-                              <p className="text-sm text-[#1A1A1A]/70">
-                                {occasionType} — {format(new Date(nextOccasion), 'MMM d')}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        {nextOccasion && getOccasionIcon(occasionType)}
-                        
-                        {/* Lock overlay for free users */}
-                        {isLocked && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-[#FAF8F3]/80 backdrop-blur-sm rounded-xl z-10">
-                            <div className="text-center px-4">
-                              <Lock className="w-6 h-6 mx-auto mb-2 text-[#1A1A1A]/50" />
-                              <p className="text-sm font-medium text-[#1A1A1A]/70 mb-2">
-                                Upgrade to VIP
-                              </p>
-                              <Button
-                                size="sm"
-                                className="bg-[#D2B887] hover:bg-[#D2B887]/90 text-[#1A1A1A] pointer-events-auto"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  // Trigger upgrade modal
-                                }}
-                              >
-                                Unlock
-                              </Button>
+                  <>
+                    {recipients.map((recipient, index) => {
+                      const nextOccasion = recipient.birthday || recipient.anniversary;
+                      const occasionType = recipient.birthday ? 'Birthday' : 'Anniversary';
+                      const isFreeUser = userProfile?.subscription_tier === 'free';
+                      const isLocked = isFreeUser && index >= 3;
+                      
+                      return (
+                        <div
+                          key={recipient.id}
+                          className={`flex items-start justify-between p-4 bg-[#FAF8F3]/50 rounded-xl border border-[#E4DCD2] ${
+                            isLocked ? 'blur-sm pointer-events-none' : 'hover:bg-[#FAF8F3] cursor-pointer'
+                          } transition-colors`}
+                          onClick={() => !isLocked && handleScheduleGift(recipient)}
+                        >
+                          <div className="flex items-start gap-4">
+                            <div className="w-10 h-10 rounded-full bg-[#D2B887]/20 flex items-center justify-center flex-shrink-0">
+                              <span className="text-[#1A1A1A] font-medium">
+                                {cleanName(recipient.name).charAt(0)}
+                              </span>
+                            </div>
+                            <div>
+                              <h3 className="font-medium text-[#1A1A1A]">{cleanName(recipient.name)}</h3>
+                              {nextOccasion && (
+                                <p className="text-sm text-[#1A1A1A]/70">
+                                  {occasionType} — {format(new Date(nextOccasion), 'MMM d')}
+                                </p>
+                              )}
                             </div>
                           </div>
-                        )}
+                          {nextOccasion && getOccasionIcon(occasionType)}
+                        </div>
+                      );
+                    })}
+                    
+                    {/* Centered CTA overlay for blurred recipients (Free users only) */}
+                    {userProfile?.subscription_tier === 'free' && recipients.length > 3 && (
+                      <div 
+                        className="absolute left-0 right-0 flex items-center justify-center pointer-events-none z-20"
+                        style={{
+                          top: `calc(${3 * 76}px + ${3 * 16}px)`, // 76px per card + 16px gap
+                          height: `calc(${(recipients.length - 3) * 76}px + ${(recipients.length - 4) * 16}px)` // Height of blurred section
+                        }}
+                      >
+                        <div className="bg-[#FAF8F3]/95 backdrop-blur-sm rounded-2xl p-6 shadow-lg border-2 border-[#D2B887] pointer-events-auto">
+                          <div className="text-center">
+                            <Lock className="w-8 h-8 mx-auto mb-3 text-[#D2B887]" />
+                            <h3 className="font-display text-xl text-[#1A1A1A] mb-2">
+                              Upgrade to VIP
+                            </h3>
+                            <p className="text-sm text-[#1A1A1A]/70 mb-4 max-w-xs">
+                              Unlock unlimited recipients and automation features
+                            </p>
+                            <Button
+                              className="bg-[#D2B887] hover:bg-[#D2B887]/90 text-[#1A1A1A]"
+                              onClick={() => {
+                                // Trigger upgrade modal
+                              }}
+                            >
+                              <Crown className="w-4 h-4 mr-2" />
+                              Upgrade Now
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                    );
-                  })
+                    )}
+                  </>
                 )}
               </div>
             </Card>
