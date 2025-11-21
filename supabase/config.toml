@@ -29,3 +29,9 @@ verify_jwt = true
 
 [functions.wallet-add-funds]
 verify_jwt = true
+
+[functions.wallet-reserve-funds]
+verify_jwt = true
+
+[functions.wallet-charge-reserved]
+verify_jwt = true
