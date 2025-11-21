@@ -397,21 +397,11 @@ export default {
 					to: {
 						height: '0'
 					}
-				},
-				'slide-up': {
-					'0%': { transform: 'translateY(0)' },
-					'100%': { transform: 'translateY(-50%)' }
-				},
-				'slide-down': {
-					'0%': { transform: 'translateY(-50%)' },
-					'100%': { transform: 'translateY(0)' }
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out',
-				'slide-up': 'slide-up 20s linear infinite',
-				'slide-down': 'slide-down 20s linear infinite'
+				'accordion-up': 'accordion-up 0.2s ease-out'
 			}
 		}
 	},
