@@ -83,6 +83,8 @@ const Dashboard = () => {
     queryFn: async () => {
       if (!user?.id) return [];
       
+      console.log('📊 Dashboard: Fetching recipients for user:', user.id);
+      
       const { data, error } = await supabase
         .from('recipients')
         .select(`
@@ -92,10 +94,17 @@ const Dashboard = () => {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Dashboard: Error fetching recipients:', error);
+        throw error;
+      }
+      
+      console.log(`✅ Dashboard: Fetched ${data?.length || 0} recipients`);
       return data || [];
     },
-    enabled: !!user?.id
+    enabled: !!user?.id,
+    staleTime: 0, // Always refetch to ensure fresh data
+    refetchOnWindowFocus: true
   });
 
   // Fetch pending gifts (unpaid)
@@ -210,6 +219,9 @@ const Dashboard = () => {
     setSelectedGift(gift);
     setShowGiftDetails(true);
   };
+
+  // Log rendering info
+  console.log('📊 Dashboard: Rendering with', recipients.length, 'recipients. Free user:', userProfile?.subscription_tier === 'free');
 
   return (
     <>
