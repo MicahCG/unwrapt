@@ -12,7 +12,10 @@ export const TestTierToggle = () => {
   const queryClient = useQueryClient();
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Check if user is admin
+  // Allow dev override for specific test account so we always see the toggle
+  const isDevOverride = import.meta.env.DEV && user?.email === 'giraudelc@gmail.com';
+
+  // Check if user is admin (or dev override)
   const { data: isAdmin } = useQuery({
     queryKey: ['user-admin-status', user?.id],
     queryFn: async () => {
@@ -45,7 +48,7 @@ export const TestTierToggle = () => {
       if (error) throw error;
       return data;
     },
-    enabled: !!user?.id && isAdmin,
+    enabled: !!user?.id && (isAdmin || isDevOverride),
   });
 
   const handleToggleTier = async () => {
@@ -83,8 +86,8 @@ export const TestTierToggle = () => {
     }
   };
 
-  // Only render for admin users
-  if (!isAdmin || !profile) return null;
+  // Only render for admin users (or dev override)
+  if (!(isAdmin || isDevOverride) || !profile) return null;
 
   return (
     <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
