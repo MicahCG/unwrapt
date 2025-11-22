@@ -320,10 +320,13 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Original onboarding flow - fetch limited events for single person selection
+      // Onboarding flow - fetch events for the next 12 months so we don't miss recurring dates
       const calendarResponse = await fetch(
         'https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=' + 
-        new Date().toISOString() + '&maxResults=100&singleEvents=true&orderBy=startTime',
+        new Date().toISOString() +
+        '&timeMax=' +
+        new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString() + // Next 12 months
+        '&maxResults=250&singleEvents=true&orderBy=startTime',
         {
           headers: { 'Authorization': `Bearer ${validAccessToken}` }
         }
@@ -350,15 +353,24 @@ Deno.serve(async (req) => {
         })
       }
 
-      // Filter for birthdays and anniversaries only (onboarding focus)
+      // Filter for birthdays and anniversaries only (onboarding focus),
+      // but look in both summary and description and support more variations
       const importantDates = calendarData.items?.filter((event: any) => {
         const summary = event.summary?.toLowerCase() || ''
-        return summary.includes('birthday') || summary.includes('bday') || summary.includes('anniversary') || 
-               summary.includes('born') || summary.includes('wedding')
+        const description = event.description?.toLowerCase() || ''
+        const text = summary + ' ' + description
+
+        return text.includes('birthday') ||
+               text.includes('bday') ||
+               text.includes('anniversary') ||
+               text.includes('born') ||
+               text.includes('wedding')
       }).map((event: any) => ({
         summary: event.summary,
         date: event.start?.date || event.start?.dateTime,
-        type: event.summary?.toLowerCase().includes('anniversary') ? 'anniversary' : 'birthday',
+        type: (event.summary?.toLowerCase().includes('anniversary') || event.summary?.toLowerCase().includes('wedding'))
+          ? 'anniversary'
+          : 'birthday',
         personName: extractPersonFromEvent(event.summary)
       })) || []
 
