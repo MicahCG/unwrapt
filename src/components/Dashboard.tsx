@@ -79,7 +79,7 @@ const Dashboard = () => {
 
   // Fetch recipients with their upcoming occasions
   const { data: recipients = [] } = useQuery({
-    queryKey: ['dashboard-recipients', user?.id],
+    queryKey: ['recipients', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
       
