@@ -14,6 +14,12 @@ const CalendarSyncButton = () => {
   const [syncing, setSyncing] = useState(false);
   const [justSynced, setJustSynced] = useState(false);
 
+  const normalizeDate = (date: string | null) => {
+    if (!date) return null;
+    // Ensure we only store the YYYY-MM-DD part for Supabase date columns
+    return date.split('T')[0];
+  };
+
   const extractPersonFromEvent = (eventSummary: string) => {
     const summary = eventSummary.toLowerCase();
     let personName = '';
@@ -181,8 +187,8 @@ const CalendarSyncButton = () => {
       const newRecipients = newPeople.map(person => ({
         user_id: user.id,
         name: person.name,
-        birthday: person.birthday,
-        anniversary: person.anniversary,
+        birthday: normalizeDate(person.birthday),
+        anniversary: normalizeDate(person.anniversary),
         interests: [],
         notes: 'Auto-imported from Google Calendar'
       }));
