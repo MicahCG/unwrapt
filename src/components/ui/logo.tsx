@@ -20,9 +20,9 @@ export const Logo: React.FC<LogoProps> = ({
 
   // Use the new gift box icon logo
   return (
-    <img 
-      src="/lovable-uploads/unwrapt-logo-icon.png" 
-      alt="Unwrapt" 
+    <img
+      src="/lovable-uploads/unwrapt-lux.png"
+      alt="Unwrapt"
       className={`${sizeClasses[size]} ${className} object-contain`}
     />
   );

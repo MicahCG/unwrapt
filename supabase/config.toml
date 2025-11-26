@@ -50,3 +50,6 @@ verify_jwt = true
 
 [functions.stripe-webhook]
 verify_jwt = false
+
+[functions.add-test-wallet-balance]
+verify_jwt = true

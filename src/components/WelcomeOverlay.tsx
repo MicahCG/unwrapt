@@ -14,8 +14,30 @@ const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({ onComplete }) => {
   const [displayedText, setDisplayedText] = useState('');
   const [isVisible, setIsVisible] = useState(true);
   const [showProgress, setShowProgress] = useState(false);
-  
-  const firstName = profile?.full_name?.split(' ')[0] || 'there';
+
+  // Extract first name from profile, Google user metadata, or email
+  const getFirstName = () => {
+    // Try profile full_name first
+    if (profile?.full_name) {
+      return profile.full_name.split(' ')[0];
+    }
+
+    // Try Google user metadata
+    if (user?.user_metadata?.full_name) {
+      return user.user_metadata.full_name.split(' ')[0];
+    }
+
+    // Try email username as fallback
+    if (user?.email) {
+      const emailUsername = user.email.split('@')[0];
+      // Capitalize first letter and remove numbers/special chars
+      return emailUsername.charAt(0).toUpperCase() + emailUsername.slice(1).replace(/[0-9._-]/g, '');
+    }
+
+    return 'there';
+  };
+
+  const firstName = getFirstName();
   const fullText = `Welcome back, ${firstName}`;
 
   // Fetch user metrics and recipient data

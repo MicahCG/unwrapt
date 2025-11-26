@@ -130,7 +130,7 @@ export const TestTierToggle = () => {
           </Button>
           
           <p className="text-xs text-purple-700">
-            Toggle between tiers to test free vs VIP features
+            💡 Switch to VIP to see the onboarding modal!
           </p>
         </div>
       </CardContent>

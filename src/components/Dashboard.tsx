@@ -17,9 +17,15 @@ import SubscriptionBadge from '@/components/subscription/SubscriptionBadge';
 import { WalletBalance } from '@/components/wallet/WalletBalance';
 import { AddFundsModal } from '@/components/wallet/AddFundsModal';
 import { TestTierToggle } from '@/components/dev/TestTierToggle';
+import { TestWalletControls } from '@/components/dev/TestWalletControls';
+import { AddTestRecipient } from '@/components/dev/AddTestRecipient';
 import { VIPUpgradeModal } from '@/components/subscription/VIPUpgradeModal';
+import { VIPWelcomeModal } from '@/components/onboarding/VIPWelcomeModal';
+import { AutomationToggle, EnableAutomationModal } from '@/components/automation';
+import { GiftsAwaitingConfirmation } from '@/components/GiftsAwaitingConfirmation';
 import { format } from 'date-fns';
 import { cleanName } from '@/lib/utils';
+import { getNextOccurrence, formatOccasionDate, getDaysUntil } from '@/lib/dateUtils';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -33,6 +39,10 @@ const Dashboard = () => {
   const [selectedGift, setSelectedGift] = useState(null);
   const [showAddFunds, setShowAddFunds] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showEnableAutomation, setShowEnableAutomation] = useState(false);
+  const [automationRecipient, setAutomationRecipient] = useState<any>(null);
+  const [showVIPOnboarding, setShowVIPOnboarding] = useState(false);
+  const [previousTier, setPreviousTier] = useState<string | null>(null);
 
   // Fetch user profile with subscription info and wallet balance
   const { data: userProfile, refetch: refetchProfile } = useQuery({
@@ -76,6 +86,22 @@ const Dashboard = () => {
       supabase.removeChannel(channel);
     };
   }, [user?.id, refetchProfile]);
+
+  // Trigger VIP onboarding when tier changes to VIP
+  useEffect(() => {
+    if (!userProfile?.subscription_tier) return;
+
+    const currentTier = userProfile.subscription_tier;
+
+    // Check if we just switched TO VIP tier (from free or first load)
+    if (currentTier === 'vip' && previousTier !== 'vip') {
+      // For testing: Show every time we switch to VIP
+      // For production: Add && !userProfile.vip_onboarding_completed
+      setShowVIPOnboarding(true);
+    }
+
+    setPreviousTier(currentTier);
+  }, [userProfile?.subscription_tier, previousTier]);
 
   // Fetch recipients with their upcoming occasions
   const { data: recipients = [] } = useQuery({
@@ -220,8 +246,67 @@ const Dashboard = () => {
     setShowGiftDetails(true);
   };
 
-  // Log rendering info
-  console.log('📊 Dashboard: Rendering with', recipients.length, 'recipients. Free user:', userProfile?.subscription_tier === 'free');
+  const handleEnableAutomation = (recipient: any) => {
+    setAutomationRecipient(recipient);
+    setShowEnableAutomation(true);
+  };
+
+  const handleDisableAutomation = async (recipientId: string) => {
+    if (!user) return;
+
+    try {
+      await supabase
+        .from('scheduled_gifts')
+        .update({ automation_enabled: false })
+        .eq('recipient_id', recipientId)
+        .eq('user_id', user.id);
+
+      // Refetch recipients to update UI
+      window.location.reload(); // Simple refresh for now
+    } catch (error) {
+      console.error('Error disabling automation:', error);
+    }
+  };
+
+  // Sort recipients by next upcoming birthday/anniversary
+  const sortedRecipients = [...recipients].sort((a, b) => {
+    const aDateString = a.birthday || a.anniversary;
+    const bDateString = b.birthday || b.anniversary;
+
+    // Handle cases where one or both don't have dates
+    if (!aDateString && !bDateString) return 0;
+    if (!aDateString) return 1;
+    if (!bDateString) return -1;
+
+    // Get next occurrences using timezone-safe utility
+    const aDate = getNextOccurrence(aDateString);
+    const bDate = getNextOccurrence(bDateString);
+
+    // Sort by earliest upcoming date
+    const diff = aDate.getTime() - bDate.getTime();
+
+    // Debug log for testing
+    if (import.meta.env.DEV) {
+      console.log('📅 Sorting:', {
+        a: { name: a.name, date: aDateString, next: aDate.toLocaleDateString(), days: getDaysUntil(aDateString) },
+        b: { name: b.name, date: bDateString, next: bDate.toLocaleDateString(), days: getDaysUntil(bDateString) },
+        diff
+      });
+    }
+
+    return diff;
+  });
+
+  // Log rendering info with current date context
+  const today = new Date();
+  console.log('📊 Dashboard: Rendering with', recipients.length, 'recipients.');
+  console.log('📅 Current Date:', today.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  }));
+  console.log('👤 Tier:', userProfile?.subscription_tier || 'loading...');
 
   return (
     <>
@@ -270,18 +355,30 @@ const Dashboard = () => {
         )}
 
         {/* Admin Testing Controls */}
-        <div className="px-12 pt-8">
+        <div className="px-12 pt-8 space-y-4">
           <TestTierToggle />
+          <AddTestRecipient />
         </div>
 
         {/* Wallet Balance for VIP users */}
         {userProfile && (
-          <div className="px-12 pt-8">
+          <div className="px-12 pt-8 space-y-6">
             <WalletBalance
               balance={userProfile.gift_wallet_balance || 0}
               onAddFunds={() => setShowAddFunds(true)}
               tier={userProfile.subscription_tier as 'free' | 'vip'}
             />
+            <TestWalletControls
+              currentBalance={userProfile.gift_wallet_balance || 0}
+              onBalanceUpdated={() => refetchProfile()}
+            />
+          </div>
+        )}
+
+        {/* Gifts Awaiting Confirmation for VIP users */}
+        {userProfile?.subscription_tier === 'vip' && (
+          <div className="px-12 pt-6">
+            <GiftsAwaitingConfirmation />
           </div>
         )}
 
@@ -295,7 +392,7 @@ const Dashboard = () => {
               </h2>
               
               <div className="relative space-y-4">
-                {recipients.length === 0 ? (
+                {sortedRecipients.length === 0 ? (
                   <div className="text-center py-8 text-[#1A1A1A]/60">
                     <p className="mb-4">No recipients yet</p>
                     <Button
@@ -308,50 +405,76 @@ const Dashboard = () => {
                   </div>
                 ) : (
                   <>
-                    {recipients.map((recipient, index) => {
-                      const nextOccasion = recipient.birthday || recipient.anniversary;
+                    {sortedRecipients.map((recipient, index) => {
+                      const nextOccasionDate = recipient.birthday || recipient.anniversary;
                       const occasionType = recipient.birthday ? 'Birthday' : 'Anniversary';
                       const isFreeUser = userProfile?.subscription_tier === 'free';
                       const isLocked = isFreeUser && index >= 3;
+                      const daysUntil = nextOccasionDate ? getDaysUntil(nextOccasionDate) : null;
                       
                       return (
                         <div
                           key={recipient.id}
-                          className={`flex items-start justify-between p-4 bg-[#FAF8F3]/50 rounded-xl border border-[#E4DCD2] ${
-                            isLocked ? 'blur-sm pointer-events-none' : 'hover:bg-[#FAF8F3] cursor-pointer'
+                          className={`p-4 bg-[#FAF8F3]/50 rounded-xl border border-[#E4DCD2] ${
+                            isLocked ? 'blur-sm pointer-events-none' : 'hover:bg-[#FAF8F3]'
                           } transition-colors`}
-                          onClick={() => !isLocked && handleScheduleGift(recipient)}
                         >
-                          <div className="flex items-start gap-4">
-                            <div className="w-10 h-10 rounded-full bg-[#D2B887]/20 flex items-center justify-center flex-shrink-0">
-                              <span className="text-[#1A1A1A] font-medium">
-                                {cleanName(recipient.name).charAt(0)}
-                              </span>
+                          <div
+                            className="flex items-start justify-between cursor-pointer"
+                            onClick={() => !isLocked && handleScheduleGift(recipient)}
+                          >
+                            <div className="flex items-start gap-4">
+                              <div className="w-10 h-10 rounded-full bg-[#D2B887]/20 flex items-center justify-center flex-shrink-0">
+                                <span className="text-[#1A1A1A] font-medium">
+                                  {cleanName(recipient.name).charAt(0)}
+                                </span>
+                              </div>
+                              <div>
+                                <h3 className="font-medium text-[#1A1A1A]">{cleanName(recipient.name)}</h3>
+                                {nextOccasionDate ? (
+                                  <p className="text-sm text-[#1A1A1A]/70">
+                                    {occasionType} — {formatOccasionDate(nextOccasionDate)}
+                                    {daysUntil !== null && (
+                                      <span className="text-xs text-[#1A1A1A]/50 ml-2">
+                                        ({daysUntil === 0 ? 'Today!' : daysUntil === 1 ? 'Tomorrow' : `${daysUntil} days`})
+                                      </span>
+                                    )}
+                                  </p>
+                                ) : (
+                                  <p className="text-sm text-[#1A1A1A]/50">No date set</p>
+                                )}
+                              </div>
                             </div>
-                            <div>
-                              <h3 className="font-medium text-[#1A1A1A]">{cleanName(recipient.name)}</h3>
-                              {nextOccasion && (
-                                <p className="text-sm text-[#1A1A1A]/70">
-                                  {occasionType} — {format(new Date(nextOccasion), 'MMM d')}
-                                </p>
-                              )}
-                            </div>
+                            {nextOccasionDate && getOccasionIcon(occasionType)}
                           </div>
-                          {nextOccasion && getOccasionIcon(occasionType)}
+
+                          {/* Automation Toggle for VIP users */}
+                          {!isLocked && nextOccasionDate && userProfile?.subscription_tier === 'vip' && (
+                            <div className="mt-3 pt-3 border-t border-[#E4DCD2]" onClick={(e) => e.stopPropagation()}>
+                              <AutomationToggle
+                                recipientId={recipient.id}
+                                recipientName={cleanName(recipient.name)}
+                                estimatedCost={42.00}
+                                onEnableAutomation={() => handleEnableAutomation(recipient)}
+                                onDisableAutomation={() => handleDisableAutomation(recipient.id)}
+                                tier={userProfile.subscription_tier as 'free' | 'vip'}
+                              />
+                            </div>
+                          )}
                         </div>
                       );
                     })}
                     
                     {/* Centered CTA overlay for blurred recipients (Free users only) */}
-                    {userProfile?.subscription_tier === 'free' && recipients.length > 3 && (
-                      <div 
-                        className="absolute left-0 right-0 flex items-center justify-center pointer-events-none z-20"
+                    {userProfile?.subscription_tier === 'free' && sortedRecipients.length > 3 && (
+                      <div
+                        className="absolute left-0 right-0 flex items-start justify-center pointer-events-none z-20 pt-6"
                         style={{
-                          top: `calc(${3 * 76}px + ${3 * 16}px)`, // 76px per card + 16px gap
-                          height: `calc(${(recipients.length - 3) * 76}px + ${(recipients.length - 4) * 16}px)` // Height of blurred section
+                          top: `calc(${3 * 76}px + ${3 * 16}px)`, // Position at start of 4th recipient (after 3 visible ones)
+                          height: `calc(${(sortedRecipients.length - 3) * 76}px + ${(sortedRecipients.length - 4) * 16}px)` // Height covering all blurred recipients
                         }}
                       >
-                        <div className="bg-[#FAF8F3]/95 backdrop-blur-sm rounded-2xl p-6 shadow-lg border-2 border-[#D2B887] pointer-events-auto">
+                        <div className="bg-[#FAF8F3]/95 backdrop-blur-sm rounded-2xl p-6 shadow-lg border-2 border-[#D2B887] pointer-events-auto max-w-sm">
                           <div className="text-center">
                             <Lock className="w-8 h-8 mx-auto mb-3 text-[#D2B887]" />
                             <h3 className="font-display text-xl text-[#1A1A1A] mb-2">
@@ -377,7 +500,7 @@ const Dashboard = () => {
             </Card>
 
             {/* Add New Recipient Button */}
-            {recipients.length > 0 && (
+            {sortedRecipients.length > 0 && (
               <Button
                 onClick={() => setShowAddRecipient(true)}
                 variant="outline"
@@ -504,6 +627,31 @@ const Dashboard = () => {
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
       />
+
+      <VIPWelcomeModal
+        open={showVIPOnboarding}
+        onComplete={() => {
+          setShowVIPOnboarding(false);
+          refetchProfile();
+        }}
+      />
+
+      {showEnableAutomation && automationRecipient && (
+        <EnableAutomationModal
+          open={showEnableAutomation}
+          onOpenChange={setShowEnableAutomation}
+          recipientId={automationRecipient.id}
+          recipientName={cleanName(automationRecipient.name)}
+          occasionType={automationRecipient.birthday ? 'birthday' : 'anniversary'}
+          occasionDate={automationRecipient.birthday || automationRecipient.anniversary}
+          currentInterests={automationRecipient.interests}
+          onSuccess={() => {
+            setShowEnableAutomation(false);
+            setAutomationRecipient(null);
+            window.location.reload();
+          }}
+        />
+      )}
     </>
   );
 };

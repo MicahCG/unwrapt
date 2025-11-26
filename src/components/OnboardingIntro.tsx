@@ -33,6 +33,13 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
 
   const slide = ONBOARDING_SLIDES[index];
 
+  // Use localhost when in development, production URL otherwise
+  const getAppUrl = () => {
+    return window.location.hostname === 'localhost'
+      ? 'http://localhost:8080'
+      : 'https://app.unwrapt.io';
+  };
+
   // Typewriter effect
   useEffect(() => {
     setTypedText('');
@@ -68,13 +75,13 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
   const handleSkip = () => {
     // Mark as seen and redirect to app subdomain
     localStorage.setItem('hasSeenIntro', 'true');
-    window.location.href = 'https://app.unwrapt.io';
+    window.location.href = getAppUrl();
   };
 
   const handleGetStarted = () => {
     // Mark as seen and redirect to app subdomain
     localStorage.setItem('hasSeenIntro', 'true');
-    window.location.href = 'https://app.unwrapt.io';
+    window.location.href = getAppUrl();
   };
 
   const renderIcon = () => {

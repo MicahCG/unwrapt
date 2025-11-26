@@ -20,6 +20,13 @@ const Landing = () => {
     return true;
   });
 
+  // Use localhost when in development, production URL otherwise
+  const getAppUrl = () => {
+    return window.location.hostname === 'localhost'
+      ? 'http://localhost:8080'
+      : 'https://app.unwrapt.io';
+  };
+
   useEffect(() => {
     const handleScroll = () => {
       setShowNav(window.scrollY > 100);
@@ -43,11 +50,11 @@ const Landing = () => {
         });
 
         // Redirect immediately to app
-        window.location.href = "https://app.unwrapt.io";
+        window.location.href = getAppUrl();
       } catch (error) {
         console.error("Error:", error);
         // Still redirect even on error
-        window.location.href = "https://app.unwrapt.io";
+        window.location.href = getAppUrl();
       }
     }
   };
@@ -64,7 +71,7 @@ const Landing = () => {
         <div className="bg-white/25 backdrop-blur-[16px] border-b border-white/60">
           <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
             <Logo size="md" />
-            <GlassButton variant="primary" href="https://app.unwrapt.io">
+            <GlassButton variant="primary" href={getAppUrl()}>
               Get Started
             </GlassButton>
           </div>
@@ -120,7 +127,7 @@ const Landing = () => {
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 items-center justify-center pt-4">
               <button
-                onClick={() => (window.location.href = "https://app.unwrapt.io")}
+                onClick={() => (window.location.href = getAppUrl())}
                 className="px-10 py-4 rounded-full font-medium text-lg text-white transition-all duration-300
                           hover:scale-[1.02]"
                 style={{
@@ -215,7 +222,7 @@ const Landing = () => {
           <p className="text-lg text-[hsl(var(--charcoal-body))] mb-10">
             Join professionals who never miss an important moment
           </p>
-          <GlassButton variant="primary" href="https://app.unwrapt.io">
+          <GlassButton variant="primary" href={getAppUrl()}>
             Get Started Free <ArrowRight className="w-5 h-5 ml-2 inline" />
           </GlassButton>
         </div>

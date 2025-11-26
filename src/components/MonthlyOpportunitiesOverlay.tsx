@@ -255,7 +255,24 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
   const noCoverage = data.noCoverage;
   
   const getWelcomeText = () => {
-    const firstName = profile?.full_name?.split(' ')[0] || 'there';
+    // Extract first name from profile, Google user metadata, or email
+    let firstName = 'there';
+
+    // Try profile full_name first
+    if (profile?.full_name) {
+      firstName = profile.full_name.split(' ')[0];
+    }
+    // Try Google user metadata
+    else if (user?.user_metadata?.full_name) {
+      firstName = user.user_metadata.full_name.split(' ')[0];
+    }
+    // Try email username as fallback
+    else if (user?.email) {
+      const emailUsername = user.email.split('@')[0];
+      // Capitalize first letter and remove numbers/special chars
+      firstName = emailUsername.charAt(0).toUpperCase() + emailUsername.slice(1).replace(/[0-9._-]/g, '');
+    }
+
     return `Welcome back, ${firstName}`;
   };
 

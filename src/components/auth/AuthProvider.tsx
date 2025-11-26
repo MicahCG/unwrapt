@@ -146,12 +146,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       console.log('🔧 AuthProvider: Starting Google sign in');
-      
-      // Always redirect to app subdomain for authentication
-      const redirectUrl = window.location.hostname === 'unwrapt.io' 
-        ? 'https://app.unwrapt.io/'
-        : `${window.location.origin}/`;
-      
+
+      // Determine redirect URL based on environment
+      let redirectUrl: string;
+      if (window.location.hostname === 'localhost') {
+        // Development: redirect to localhost
+        redirectUrl = `http://localhost:${window.location.port || '8080'}/`;
+      } else if (window.location.hostname === 'unwrapt.io') {
+        // Marketing site: redirect to app subdomain
+        redirectUrl = 'https://app.unwrapt.io/';
+      } else {
+        // App subdomain or other: redirect to same origin
+        redirectUrl = `${window.location.origin}/`;
+      }
+
+      console.log('🔧 AuthProvider: OAuth redirect URL:', redirectUrl);
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
