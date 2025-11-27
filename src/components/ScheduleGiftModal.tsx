@@ -1,19 +1,19 @@
-import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import React, { useState, useEffect } from 'react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { CreditCard, Package, Heart, MapPin, ChevronLeft } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { useProductsForInterests } from '@/hooks/useShopifyCollection';
-import InterestBasedProductSelector from './InterestBasedProductSelector';
+import { Heart, MapPin, Sparkles, Wallet as WalletIcon } from 'lucide-react';
+import { useShopifyCollection } from '@/hooks/useShopifyCollection';
 import { cleanName } from '@/lib/utils';
+import { GIFT_VIBE_OPTIONS, type GiftVibe } from '@/lib/giftVibes';
 
 interface ScheduleGiftModalProps {
   recipient: any;
@@ -26,12 +26,11 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
-  const [currentStep, setCurrentStep] = useState(1);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  
+
+  const [selectedVibe, setSelectedVibe] = useState<GiftVibe | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+
   const [formData, setFormData] = useState({
-    occasion: '',
     occasion_date: '',
     street: '',
     city: '',
@@ -39,11 +38,38 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     zip_code: '',
     country: 'United States'
   });
-  
+
   const [isLoading, setIsLoading] = useState(false);
 
+  // Fetch user wallet balance
+  const { data: userProfile } = useQuery({
+    queryKey: ['user-profile'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('gift_wallet_balance, subscription_tier')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: isOpen,
+  });
+
+  // Fetch all products with limit of 50
+  const { data: allProducts = [], isLoading: productsLoading } = useShopifyCollection('', 50);
+
+  // Filter products by selected vibe
+  const filteredProducts = selectedVibe
+    ? allProducts.filter(p => p.metafields?.gift_vibe === selectedVibe)
+    : allProducts;
+
   // Debug logging for recipient prop
-  React.useEffect(() => {
+  useEffect(() => {
     console.log('🔍 ScheduleGiftModal recipient prop changed:', {
       recipient,
       isOpen,
@@ -56,9 +82,8 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   // Early return if recipient is invalid
   if (isOpen && (!recipient || !recipient.id)) {
     console.error('❌ ScheduleGiftModal: Invalid recipient data', { recipient, isOpen });
-    
-    // Show error and close modal
-    React.useEffect(() => {
+
+    useEffect(() => {
       if (isOpen && (!recipient || !recipient.id)) {
         toast({
           title: "Error",
@@ -68,16 +93,15 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         onClose();
       }
     }, [isOpen, recipient, onClose, toast]);
-    
+
     return null;
   }
 
   const getDefaultOccasionDate = () => {
     const today = new Date();
     const currentYear = today.getFullYear();
-    
+
     if (recipient.birthday) {
-      // Parse date as local date to avoid timezone issues
       const birthdayParts = recipient.birthday.split('-');
       const birthday = new Date(parseInt(birthdayParts[0]), parseInt(birthdayParts[1]) - 1, parseInt(birthdayParts[2]));
       const thisYearBirthday = new Date(currentYear, birthday.getMonth(), birthday.getDate());
@@ -89,19 +113,19 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         date: thisYearBirthday.toISOString().split('T')[0]
       };
     }
-    
+
     return { occasion: '', date: '' };
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (isOpen) {
-      // If we're collecting address for payment, skip to step 2
-      if (payingForGiftId) {
-        setCurrentStep(2);
+      // Initialize with recipient's preferred vibe if available
+      if (recipient.preferred_gift_vibe) {
+        setSelectedVibe(recipient.preferred_gift_vibe);
       } else {
-        setCurrentStep(1);
+        setSelectedVibe(null);
       }
-      
+
       // Check if this is a holiday preset
       if (recipient._holidayPreset) {
         setFormData(prev => ({
@@ -112,7 +136,6 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         const defaultOccasion = getDefaultOccasionDate();
         setFormData(prev => ({
           ...prev,
-          occasion: defaultOccasion.occasion,
           occasion_date: defaultOccasion.date
         }));
       }
@@ -131,21 +154,6 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     }
   }, [isOpen, recipient]);
 
-  const getGiftImage = (giftType: string) => {
-    const imageMap = {
-      'wine': 'https://images.unsplash.com/photo-1482938289607-e9573fc25ebb?w=400&h=300&fit=crop',
-      'tea': 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=400&h=300&fit=crop',
-      'coffee': 'https://images.unsplash.com/photo-1581090464777-f3220bbe1b8b?w=400&h=300&fit=crop',
-      'sweet treats': 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=400&h=300&fit=crop',
-      'self care': 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?w=400&h=300&fit=crop'
-    };
-    return imageMap[giftType.toLowerCase()] || 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop';
-  };
-
-  const getGiftDescription = (giftType: string, recipientName: string) => {
-    return `We'll curate premium ${giftType.toLowerCase()} perfect for ${recipientName}'s interests`;
-  };
-
   const getSenderName = () => {
     return user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Someone special';
   };
@@ -159,7 +167,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           userName: user?.user_metadata?.full_name || user?.email?.split('@')[0],
           recipientName: cleanName(recipient.name),
           giftDetails: {
-            occasion: giftDetails.occasion,
+            occasion: 'Birthday',
             occasionDate: giftDetails.occasion_date,
             giftType: giftDetails.gift_type,
             price: giftDetails.price
@@ -169,52 +177,28 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
       console.log('Gift notification email sent');
     } catch (error) {
       console.error('Failed to send gift notification email:', error);
-      // Don't throw error - email failure shouldn't block gift scheduling
     }
   };
 
-  const isStep1Valid = () => {
-    return formData.occasion && 
-           formData.occasion_date && 
-           selectedProduct; // Ensure we have selected product
-  };
-
-  const isStep2Valid = () => {
-    return formData.street &&
+  const isFormValid = () => {
+    return formData.occasion_date &&
+           selectedProduct &&
+           formData.street &&
            formData.city &&
            formData.state &&
            formData.zip_code;
   };
 
-  const handleNextStep = () => {
-    if (currentStep === 1 && isStep1Valid()) {
-      setCurrentStep(2);
-    }
-  };
-
-  const handlePrevStep = () => {
-    if (currentStep === 2) {
-      setCurrentStep(1);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // For address collection mode, only validate address
-    if (payingForGiftId) {
-      if (!isStep2Valid()) return;
-    } else {
-      // For normal gift creation, validate both steps
-      if (!isStep1Valid() || !isStep2Valid() || !selectedProduct) return;
-    }
-    
+
+    if (!isFormValid() || !selectedProduct) return;
+
     setIsLoading(true);
 
     try {
-      // Get current user with fresh session data
       const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
-      
+
       if (authError || !currentUser?.id) {
         console.error('Authentication error:', authError);
         toast({
@@ -235,7 +219,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         return;
       }
 
-      // Always update the recipient with the complete address information
+      // Update recipient with address
       const { error: recipientUpdateError } = await supabase
         .from('recipients')
         .update({
@@ -255,41 +239,36 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
       }
 
       if (payingForGiftId) {
-        // Address collection for payment mode - trigger payment flow
-        console.log('Address updated for payment, triggering payment flow...');
-        
         toast({
           title: "Address Updated",
           description: "Now proceeding to payment...",
         });
-        
-        // Close modal and let parent component handle payment
+
         onClose();
-        
-        // Trigger payment flow by dispatching a custom event
-        window.dispatchEvent(new CustomEvent('proceedWithPayment', { 
-          detail: { giftId: payingForGiftId, recipientId: recipient.id } 
+
+        window.dispatchEvent(new CustomEvent('proceedWithPayment', {
+          detail: { giftId: payingForGiftId, recipientId: recipient.id }
         }));
-        
+
         return;
       }
 
-      // Continue with normal gift creation flow
+      // Create scheduled gift
       const deliveryDate = new Date(new Date(formData.occasion_date).getTime() - 4 * 24 * 60 * 60 * 1000)
         .toISOString().split('T')[0];
 
       console.log('Creating scheduled gift with recipient_id:', recipient.id);
-      
-      // Then create the scheduled gift with Shopify price using current user ID
+
       const { data: giftData, error: giftError } = await supabase
         .from('scheduled_gifts')
         .insert({
-          user_id: currentUser.id, // Use freshly fetched user ID
+          user_id: currentUser.id,
           recipient_id: recipient.id,
-          occasion: formData.occasion,
+          occasion: 'Birthday',
           occasion_date: formData.occasion_date,
+          occasion_type: 'birthday',
           gift_type: selectedProduct.title,
-          price_range: `$${selectedProduct.price.toFixed(2)}`, // Store actual price
+          price_range: `$${selectedProduct.price.toFixed(2)}`,
           delivery_date: deliveryDate,
           status: 'scheduled',
           payment_status: 'unpaid'
@@ -299,7 +278,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
       if (giftError) throw giftError;
 
-      // Now process payment with Shopify product data
+      // Process payment
       const { data: paymentData, error: paymentError } = await supabase.functions.invoke('create-gift-payment', {
         body: {
           scheduledGiftId: giftData.id,
@@ -307,7 +286,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           productImage: selectedProduct.featuredImage,
           giftDetails: {
             recipientName: cleanName(recipient.name),
-            occasion: formData.occasion,
+            occasion: 'Birthday',
             giftType: selectedProduct.title
           },
           shippingAddress: {
@@ -326,30 +305,25 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
       if (paymentError) throw paymentError;
 
       if (paymentData?.url) {
-        // Send notification email
         await sendGiftNotificationEmail({
           ...formData,
           gift_type: selectedProduct.title,
           price: selectedProduct.price
         });
 
-        // Set success flag for animation when user returns
         sessionStorage.setItem('giftScheduledSuccess', JSON.stringify({
           recipientId: recipient.id,
           timestamp: Date.now()
         }));
 
-        // Redirect in the same tab instead of opening new tab
         window.location.href = paymentData.url;
-        
-        // Refresh queries to update the UI
+
         queryClient.invalidateQueries({ queryKey: ['upcoming-gifts'] });
         queryClient.invalidateQueries({ queryKey: ['user-metrics'] });
         queryClient.invalidateQueries({ queryKey: ['recipients'] });
-        
+
         onClose();
         setFormData({
-          occasion: '',
           occasion_date: '',
           street: '',
           city: '',
@@ -359,14 +333,8 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         });
         setSelectedProduct(null);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error scheduling gift:', error);
-      console.error('❌ Error details:', {
-        message: error?.message,
-        name: error?.name,
-        stack: error?.stack,
-        fullError: JSON.stringify(error, null, 2)
-      });
       toast({
         title: "Error",
         description: error?.message || "There was a problem scheduling your gift. Please try again.",
@@ -378,241 +346,289 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   };
 
   const handleClose = () => {
-    setCurrentStep(1);
     onClose();
   };
 
-  const renderStep1 = () => (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="occasion" className="text-brand-charcoal">Occasion *</Label>
-        <Select 
-          value={formData.occasion} 
-          onValueChange={(value) => setFormData(prev => ({ ...prev, occasion: value }))}
-        >
-          <SelectTrigger className="text-brand-charcoal border-brand-cream">
-            <SelectValue placeholder="Select occasion" />
-          </SelectTrigger>
-          <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
-            <SelectItem value="Birthday">Birthday</SelectItem>
-            <SelectItem value="Anniversary">Anniversary</SelectItem>
-            <SelectItem value="Christmas">Christmas</SelectItem>
-            <SelectItem value="Valentine's Day">Valentine's Day</SelectItem>
-            <SelectItem value="Mother's Day">Mother's Day</SelectItem>
-            <SelectItem value="Father's Day">Father's Day</SelectItem>
-            <SelectItem value="Graduation">Graduation</SelectItem>
-            <SelectItem value="Other">Other</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+  const walletBalance = userProfile?.gift_wallet_balance || 0;
 
-      <div className="space-y-2">
-        <Label htmlFor="occasion_date" className="text-brand-charcoal">Occasion Date *</Label>
-        <Input
-          id="occasion_date"
-          type="date"
-          value={formData.occasion_date}
-          onChange={(e) => setFormData(prev => ({ ...prev, occasion_date: e.target.value }))}
-          required
-          className="text-brand-charcoal border-brand-cream"
-        />
-      </div>
-
-      <div className="space-y-6">
-        <Label className="text-lg font-semibold text-brand-charcoal">Choose Gift *</Label>
-        <InterestBasedProductSelector
-          recipientInterests={recipient?.interests || []}
-          onProductSelect={setSelectedProduct}
-          selectedProduct={selectedProduct}
-          className="min-h-[400px]"
-        />
-      </div>
-
-      {selectedProduct && (
-        <Card className="bg-gradient-to-br from-brand-cream/20 to-brand-cream/40 border-brand-cream">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2 mb-3">
-              <Heart className="h-4 w-4 text-brand-charcoal" />
-              <span className="font-medium text-sm text-brand-charcoal">Note Preview</span>
-            </div>
-            <div className="bg-white p-3 rounded border border-brand-cream/50 shadow-sm">
-              <p className="text-sm text-brand-charcoal mb-3 leading-relaxed">
-                {getSenderName()} was thinking about you on your special day and decided to send you some {selectedProduct.title.toLowerCase()}. We hope you enjoy!
-              </p>
-              <div className="border-t pt-2 mt-2">
-                <p className="text-xs text-brand-charcoal/60 italic">
-                  This gift was curated and sent through Unwrapt - Making thoughtfulness effortless ✨ unwrapt.io
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="flex justify-end space-x-2 pt-4">
-        <Button 
-          type="button" 
-          variant="outline" 
-          onClick={handleClose} 
-          className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream"
-        >
-          Cancel
-        </Button>
-        <Button 
-          type="button" 
-          onClick={handleNextStep}
-          disabled={!isStep1Valid()} 
-          className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
-        >
-          Continue
-        </Button>
-      </div>
-    </div>
-  );
-
-  const renderStep2 = () => (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="flex items-center space-x-2 mb-4">
-        <MapPin className="h-4 w-4 text-brand-charcoal" />
-        <span className="font-medium text-sm text-brand-charcoal">Shipping Address *</span>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="street" className="text-brand-charcoal">Street Address *</Label>
-        <Input
-          id="street"
-          placeholder="123 Main Street"
-          value={formData.street}
-          onChange={(e) => setFormData(prev => ({ ...prev, street: e.target.value }))}
-          required
-          className="text-brand-charcoal border-brand-cream"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="city" className="text-brand-charcoal">City *</Label>
-          <Input
-            id="city"
-            placeholder="City"
-            value={formData.city}
-            onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
-            required
-            className="text-brand-charcoal border-brand-cream"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="state" className="text-brand-charcoal">State *</Label>
-          <Input
-            id="state"
-            placeholder="State"
-            value={formData.state}
-            onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
-            required
-            className="text-brand-charcoal border-brand-cream"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="zip_code" className="text-brand-charcoal">ZIP Code *</Label>
-          <Input
-            id="zip_code"
-            placeholder="12345"
-            value={formData.zip_code}
-            onChange={(e) => setFormData(prev => ({ ...prev, zip_code: e.target.value }))}
-            required
-            className="text-brand-charcoal border-brand-cream"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="country" className="text-brand-charcoal">Country *</Label>
-          <Select 
-            value={formData.country} 
-            onValueChange={(value) => setFormData(prev => ({ ...prev, country: value }))}
-          >
-            <SelectTrigger className="text-brand-charcoal border-brand-cream">
-              <SelectValue placeholder="Select country" />
-            </SelectTrigger>
-            <SelectContent className="bg-white text-brand-charcoal border-brand-cream">
-              <SelectItem value="United States">United States</SelectItem>
-              <SelectItem value="Canada">Canada</SelectItem>
-              <SelectItem value="United Kingdom">United Kingdom</SelectItem>
-              <SelectItem value="Australia">Australia</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="bg-brand-cream/50 p-3 rounded-lg border border-brand-cream">
-        <p className="text-sm text-brand-charcoal/80">
-          📦 Deliveries are sent 3-5 days before occasion
-        </p>
-      </div>
-
-      {selectedProduct && (
-        <div className="bg-brand-cream p-3 rounded-lg border border-brand-cream">
-          <div className="flex items-center space-x-2 mb-1">
-            <CreditCard className="h-4 w-4 text-brand-charcoal" />
-            <span className="font-medium text-sm text-brand-charcoal">Payment Required</span>
-          </div>
-          <p className="text-xs text-brand-charcoal/70">
-            You'll pay ${selectedProduct.price.toFixed(2)} to schedule this gift
-          </p>
-        </div>
-      )}
-
-      <div className="flex justify-between space-x-2 pt-4">
-        <Button 
-          type="button" 
-          variant="outline" 
-          onClick={handlePrevStep}
-          className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream"
-        >
-          <ChevronLeft className="w-4 h-4 mr-1" />
-          Back
-        </Button>
-        <div className="flex space-x-2">
-          <Button 
-            type="button" 
-            variant="outline" 
-            onClick={handleClose} 
-            disabled={isLoading}
-            className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream"
-          >
-            Cancel
-          </Button>
-          <Button 
-            type="submit" 
-            disabled={isLoading || !isStep2Valid()} 
-            className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
-          >
-            {isLoading ? 'Processing...' : 
-             selectedProduct ? `Schedule & Pay $${selectedProduct.price.toFixed(2)}` : 
-             'Schedule & Pay for Gift'}
-          </Button>
-        </div>
-      </div>
-    </form>
-  );
+  // Vibe button mappings (user-friendly labels → enum values)
+  const vibeButtons = [
+    {
+      label: 'Home & Atmosphere',
+      vibe: 'CALM_COMFORT' as GiftVibe,
+      description: 'Soft lighting, soothing scents, cozy rituals',
+      icon: '🕯️'
+    },
+    {
+      label: 'Personal & Mindful',
+      vibe: 'ARTFUL_UNIQUE' as GiftVibe,
+      description: 'Handmade pieces, objects with a story',
+      icon: '🎨'
+    },
+    {
+      label: 'Luxe & Elegant',
+      vibe: 'REFINED_STYLISH' as GiftVibe,
+      description: 'Elegant glassware, statement pieces',
+      icon: '✨'
+    }
+  ];
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px] bg-white border-brand-cream text-brand-charcoal max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-brand-charcoal">
-            {currentStep === 1 ? `Schedule Gift for ${cleanName(recipient.name)}` : 'Shipping Address'}
-          </DialogTitle>
-          <div className="flex space-x-2 mt-2">
-            <div className={`h-2 rounded-full flex-1 ${currentStep >= 1 ? 'bg-brand-charcoal' : 'bg-brand-cream'}`} />
-            <div className={`h-2 rounded-full flex-1 ${currentStep >= 2 ? 'bg-brand-charcoal' : 'bg-brand-cream'}`} />
+    <Sheet open={isOpen} onOpenChange={handleClose}>
+      <SheetContent
+        side="right"
+        className="w-full sm:w-[840px] sm:max-w-[90vw] p-0 bg-[#FAF8F3] border-l-2 border-[#E4DCD2] overflow-hidden flex flex-col"
+      >
+        {/* Header */}
+        <SheetHeader className="px-8 pt-8 pb-6 border-b border-[#E4DCD2] bg-white/50 backdrop-blur-sm">
+          <SheetTitle className="font-display text-2xl text-[#1A1A1A]">
+            Schedule Gift for {cleanName(recipient.name)}
+          </SheetTitle>
+          <p className="text-sm text-[#1A1A1A]/60 mt-1">
+            Choose a gift vibe and perfect item for their birthday
+          </p>
+        </SheetHeader>
+
+        {/* Two-Column Layout */}
+        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+          {/* Left Column: Form Fields */}
+          <div className="lg:w-[280px] flex-shrink-0 px-8 py-6 space-y-6 overflow-y-auto bg-white/30">
+            {/* Birthday Date */}
+            <div className="space-y-2">
+              <Label htmlFor="occasion_date" className="text-sm font-medium text-[#1A1A1A]">
+                Birthday Date *
+              </Label>
+              <Input
+                id="occasion_date"
+                type="date"
+                value={formData.occasion_date}
+                onChange={(e) => setFormData(prev => ({ ...prev, occasion_date: e.target.value }))}
+                required
+                className="bg-white border-[#E4DCD2] text-[#1A1A1A]"
+              />
+            </div>
+
+            {/* Gift Vibe Selection */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium text-[#1A1A1A]">
+                Gift Vibe *
+              </Label>
+              <div className="space-y-2">
+                {vibeButtons.map((vibe) => (
+                  <button
+                    key={vibe.vibe}
+                    type="button"
+                    onClick={() => setSelectedVibe(vibe.vibe)}
+                    className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
+                      selectedVibe === vibe.vibe
+                        ? 'border-[#D2B887] bg-[#D2B887]/10'
+                        : 'border-[#E4DCD2] bg-white hover:border-[#D2B887]/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg">{vibe.icon}</span>
+                      <span className="font-medium text-sm text-[#1A1A1A]">{vibe.label}</span>
+                    </div>
+                    <p className="text-xs text-[#1A1A1A]/60 ml-7">{vibe.description}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Shipping Address */}
+            <div className="space-y-4 pt-4 border-t border-[#E4DCD2]">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-[#1A1A1A]/60" />
+                <Label className="text-sm font-medium text-[#1A1A1A]">Shipping Address</Label>
+              </div>
+
+              <div className="space-y-3">
+                <Input
+                  placeholder="Street Address *"
+                  value={formData.street}
+                  onChange={(e) => setFormData(prev => ({ ...prev, street: e.target.value }))}
+                  className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm"
+                />
+
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    placeholder="City *"
+                    value={formData.city}
+                    onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                    className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm"
+                  />
+                  <Input
+                    placeholder="State *"
+                    value={formData.state}
+                    onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
+                    className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    placeholder="ZIP Code *"
+                    value={formData.zip_code}
+                    onChange={(e) => setFormData(prev => ({ ...prev, zip_code: e.target.value }))}
+                    className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm"
+                  />
+                  <Select
+                    value={formData.country}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, country: value }))}
+                  >
+                    <SelectTrigger className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm">
+                      <SelectValue placeholder="Country" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border-[#E4DCD2]">
+                      <SelectItem value="United States">USA</SelectItem>
+                      <SelectItem value="Canada">Canada</SelectItem>
+                      <SelectItem value="United Kingdom">UK</SelectItem>
+                      <SelectItem value="Australia">Australia</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
           </div>
-        </DialogHeader>
-        
-        {currentStep === 1 ? renderStep1() : renderStep2()}
-      </DialogContent>
-    </Dialog>
+
+          {/* Right Column: Gift Gallery */}
+          <div className="flex-1 px-8 py-6 overflow-y-auto bg-gradient-to-br from-[#FAF8F3] to-[#EFE7DD]/30">
+            <div className="mb-4">
+              <h3 className="font-semibold text-[#1A1A1A] flex items-center gap-2">
+                <Heart className="w-4 h-4 text-[#D2B887]" />
+                Choose the Perfect Gift
+              </h3>
+              <p className="text-xs text-[#1A1A1A]/60 mt-1">
+                {selectedVibe ? `Showing ${vibeButtons.find(v => v.vibe === selectedVibe)?.label} gifts` : 'Select a gift vibe to browse'}
+              </p>
+            </div>
+
+            {productsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#D2B887]"></div>
+              </div>
+            ) : !selectedVibe ? (
+              <div className="flex items-center justify-center py-12">
+                <p className="text-sm text-[#1A1A1A]/50">Select a gift vibe to browse products</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {filteredProducts.map((product) => (
+                  <button
+                    key={product.variantId}
+                    type="button"
+                    onClick={() => setSelectedProduct(product)}
+                    className={`group relative bg-white rounded-xl overflow-hidden border-2 transition-all shadow-sm hover:shadow-md ${
+                      selectedProduct?.variantId === product.variantId
+                        ? 'border-[#D2B887] ring-2 ring-[#D2B887]/20'
+                        : 'border-[#E4DCD2] hover:border-[#D2B887]/50'
+                    }`}
+                  >
+                    {/* Product Image */}
+                    <div className="aspect-square overflow-hidden bg-[#FAF8F3]">
+                      <img
+                        src={product.featuredImage || ''}
+                        alt={product.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
+
+                    {/* Product Info */}
+                    <div className="p-4 text-left">
+                      <h4 className="font-medium text-sm text-[#1A1A1A] line-clamp-2 mb-2">
+                        {product.title}
+                      </h4>
+                      <div className="flex items-center justify-between">
+                        <p className="text-lg font-bold text-[#1A1A1A]">
+                          ${product.price.toFixed(2)}
+                        </p>
+                        {product.metafields?.badge && (
+                          <Badge variant="secondary" className="text-xs bg-[#D2B887]/10 text-[#D2B887] border-[#D2B887]/20">
+                            {product.metafields.badge}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Selected Indicator */}
+                    {selectedProduct?.variantId === product.variantId && (
+                      <div className="absolute top-3 right-3 bg-[#D2B887] text-white rounded-full p-1.5">
+                        <Heart className="w-3 h-3 fill-current" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Sticky Bottom Summary Bar */}
+        <div className="border-t-2 border-[#E4DCD2] bg-white px-8 py-4 shadow-lg">
+          <div className="flex items-center justify-between gap-4">
+            {/* Left: Selected Gift Summary */}
+            <div className="flex items-center gap-4 flex-1">
+              {selectedProduct ? (
+                <>
+                  <img
+                    src={selectedProduct.featuredImage || ''}
+                    alt={selectedProduct.title}
+                    className="w-12 h-12 rounded-lg object-cover border border-[#E4DCD2]"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-[#1A1A1A] truncate">
+                      {selectedProduct.title}
+                    </p>
+                    <p className="text-xs text-[#1A1A1A]/60">
+                      ${selectedProduct.price.toFixed(2)} + $7 service fee
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-2 text-[#1A1A1A]/50">
+                  <Heart className="w-5 h-5" />
+                  <span className="text-sm">No gift selected</span>
+                </div>
+              )}
+            </div>
+
+            {/* Middle: Wallet Balance */}
+            <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-[#EFE7DD] rounded-lg">
+              <WalletIcon className="w-4 h-4 text-[#1A1A1A]/60" />
+              <span className="text-sm font-medium text-[#1A1A1A]">
+                ${walletBalance.toFixed(2)}
+              </span>
+            </div>
+
+            {/* Right: Action Buttons */}
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClose}
+                disabled={isLoading}
+                className="border-[#E4DCD2] text-[#1A1A1A] hover:bg-[#EFE7DD]"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={isLoading || !isFormValid()}
+                className="bg-[#D2B887] hover:bg-[#D2B887]/90 text-[#1A1A1A] font-medium"
+              >
+                {isLoading ? (
+                  'Processing...'
+                ) : selectedProduct ? (
+                  `Schedule & Pay $${selectedProduct.price.toFixed(2)}`
+                ) : (
+                  'Schedule Gift'
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 };
 

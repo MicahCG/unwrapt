@@ -24,7 +24,7 @@ export const AutomationSetupModal = ({ isOpen, onClose, recipient, onSuccess }: 
   const queryClient = useQueryClient();
 
   // Fetch all products
-  const { data: products = [], isLoading: productsLoading } = useShopifyCollection("", 12);
+  const { data: products = [], isLoading: productsLoading } = useShopifyCollection("", 50);
 
   // Fetch user profile (wallet balance and tier)
   const { data: userProfile } = useQuery({

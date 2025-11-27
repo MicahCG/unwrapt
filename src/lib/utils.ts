@@ -7,9 +7,33 @@ export function cn(...inputs: ClassValue[]) {
 
 export function cleanName(name: string | null | undefined): string {
   if (!name) return '';
-  console.log('cleanName called with:', name);
-  // Remove "'s" suffix from names (e.g., "Frankie's" becomes "Frankie")
-  const cleaned = name.endsWith("'s") ? name.slice(0, -2) : name;
-  console.log('cleanName result:', cleaned);
-  return cleaned;
+
+  let cleaned = name;
+
+  // Remove "'s" possessive suffix (e.g., "Andrea's" → "Andrea")
+  if (cleaned.endsWith("'s")) {
+    cleaned = cleaned.slice(0, -2);
+  }
+
+  // Remove common birthday-related suffixes (case insensitive)
+  const birthdaySuffixes = [
+    ' Bday',
+    ' Birthday',
+    ' bday',
+    ' birthday',
+    "'s Bday",
+    "'s Birthday",
+    "'s bday",
+    "'s birthday",
+    ' B-day',
+    ' b-day'
+  ];
+
+  for (const suffix of birthdaySuffixes) {
+    if (cleaned.endsWith(suffix)) {
+      cleaned = cleaned.slice(0, -suffix.length);
+    }
+  }
+
+  return cleaned.trim();
 }

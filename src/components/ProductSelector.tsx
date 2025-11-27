@@ -26,13 +26,13 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
 
   // Use different hooks based on whether we have a specific interest or multiple interests
   const collectionQuery = useShopifyCollection(
-    selectedInterest || null, 
-    12
+    selectedInterest || null,
+    50
   );
-  
+
   const interestsQuery = useProductsForInterests(
     !selectedInterest ? interests : [],
-    12
+    50
   );
 
   // Use the appropriate query based on what's available

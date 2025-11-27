@@ -10,6 +10,8 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { formatOccasionDate } from '@/lib/dateUtils';
+import { GIFT_VIBE_OPTIONS, type GiftVibe } from '@/lib/giftVibes';
+import { cn } from '@/lib/utils';
 
 interface VIPWelcomeModalProps {
   open: boolean;
@@ -17,10 +19,6 @@ interface VIPWelcomeModalProps {
 }
 
 const PRESET_AMOUNTS = [100, 200, 300];
-const INTEREST_OPTIONS = [
-  'wellness', 'cooking', 'reading', 'coffee_tea',
-  'outdoors', 'art_decor', 'tech', 'fashion'
-];
 
 export const VIPWelcomeModal = ({ open, onComplete }: VIPWelcomeModalProps) => {
   const { user } = useAuth();
@@ -63,7 +61,7 @@ export const VIPWelcomeModal = ({ open, onComplete }: VIPWelcomeModalProps) => {
     const setup: Record<string, any> = {};
     data?.forEach(r => {
       setup[r.id] = {
-        interests: r.interests || [],
+        giftVibe: r.preferred_gift_vibe || null,
         enableAutomation: true
       };
     });
@@ -121,13 +119,8 @@ export const VIPWelcomeModal = ({ open, onComplete }: VIPWelcomeModalProps) => {
     }));
   };
 
-  const toggleInterest = (recipientId: string, interest: string) => {
-    const current = recipientSetup[recipientId]?.interests || [];
-    const updated = current.includes(interest)
-      ? current.filter((i: string) => i !== interest)
-      : [...current, interest];
-
-    updateRecipientSetup(recipientId, 'interests', updated);
+  const setGiftVibe = (recipientId: string, vibe: GiftVibe) => {
+    updateRecipientSetup(recipientId, 'giftVibe', vibe);
   };
 
   const handleEnableAutomation = async () => {
@@ -135,34 +128,42 @@ export const VIPWelcomeModal = ({ open, onComplete }: VIPWelcomeModalProps) => {
 
     setLoading(true);
     try {
-      // Update recipients with interests
+      // Update recipients with gift vibe preference
       for (const recipient of upcomingRecipients) {
         const setup = recipientSetup[recipient.id];
         if (!setup.enableAutomation) continue;
 
-        // Update recipient with interests only
-        if (setup.interests?.length > 0) {
+        // Update recipient with gift vibe preference
+        if (setup.giftVibe) {
           await supabase
             .from('recipients')
             .update({
-              interests: setup.interests
+              preferred_gift_vibe: setup.giftVibe
             })
             .eq('id', recipient.id);
         }
 
         // Create scheduled gift with automation
-        await supabase
+        const { error: giftError } = await supabase
           .from('scheduled_gifts')
           .upsert({
             recipient_id: recipient.id,
             user_id: user.id,
+            occasion: 'Birthday',
             occasion_date: recipient.birthday,
             occasion_type: 'birthday',
             automation_enabled: true,
-            status: 'pending'
+            gift_vibe: setup.giftVibe || 'CALM_COMFORT',
+            status: 'pending',
+            delivery_date: new Date(new Date(recipient.birthday).getTime() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
           }, {
             onConflict: 'recipient_id,occasion_date'
           });
+
+        if (giftError) {
+          console.error('Error creating scheduled gift:', giftError);
+          throw giftError;
+        }
       }
 
       // Mark onboarding complete
@@ -356,11 +357,11 @@ export const VIPWelcomeModal = ({ open, onComplete }: VIPWelcomeModalProps) => {
         </div>
 
         <h2 className="font-display text-2xl text-[#1A1A1A] mb-2">
-          Personalize Your First Gifts
+          Set Gift Preferences
         </h2>
 
         <p className="text-sm text-[#1A1A1A]/70">
-          Tell us a bit about these people so we can pick the perfect gifts
+          Choose the vibe for each person's gifts. We'll quietly handle the rest.
         </p>
       </div>
 
@@ -408,25 +409,44 @@ export const VIPWelcomeModal = ({ open, onComplete }: VIPWelcomeModalProps) => {
               {recipientSetup[recipient.id]?.enableAutomation && (
                 <div className="space-y-3">
                   <div>
-                    <Label className="text-xs text-[#1A1A1A]/60 mb-2 block">
-                      Interests (Optional - helps us pick better gifts)
+                    <Label className="text-xs text-[#1A1A1A]/60 mb-3 block">
+                      What kind of gifts do they usually love?
                     </Label>
-                    <div className="flex flex-wrap gap-2">
-                      {INTEREST_OPTIONS.map((interest) => (
-                        <Badge
-                          key={interest}
-                          variant={
-                            recipientSetup[recipient.id]?.interests?.includes(interest)
-                              ? 'default'
-                              : 'outline'
-                          }
-                          className="cursor-pointer text-xs"
-                          onClick={() => toggleInterest(recipient.id, interest)}
+                    <div className="space-y-2">
+                      {GIFT_VIBE_OPTIONS.map((option) => (
+                        <div
+                          key={option.vibe}
+                          onClick={() => setGiftVibe(recipient.id, option.vibe)}
+                          className={cn(
+                            "p-4 rounded-lg border-2 cursor-pointer transition-all",
+                            recipientSetup[recipient.id]?.giftVibe === option.vibe
+                              ? "border-[#D2B887] bg-[#D2B887]/10"
+                              : "border-[#E4DCD2] hover:border-[#D2B887]/50 bg-white"
+                          )}
                         >
-                          {interest.replace('_', ' ')}
-                        </Badge>
+                          <div className="flex items-start gap-3">
+                            <div className={cn(
+                              "w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 flex-shrink-0",
+                              recipientSetup[recipient.id]?.giftVibe === option.vibe
+                                ? "border-[#D2B887] bg-[#D2B887]"
+                                : "border-[#E4DCD2]"
+                            )}>
+                              {recipientSetup[recipient.id]?.giftVibe === option.vibe && (
+                                <CheckCircle className="w-3 h-3 text-white" />
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-medium text-[#1A1A1A] mb-1">{option.label}</p>
+                              <p className="text-xs text-[#1A1A1A]/60">{option.description}</p>
+                              <p className="text-xs text-[#1A1A1A]/40 mt-1">{option.examples}</p>
+                            </div>
+                          </div>
+                        </div>
                       ))}
                     </div>
+                    <p className="text-xs text-[#1A1A1A]/50 mt-2">
+                      You can skip this for now. We'll choose a cozy, universally loved gift by default.
+                    </p>
                   </div>
                 </div>
               )}
@@ -519,7 +539,7 @@ export const VIPWelcomeModal = ({ open, onComplete }: VIPWelcomeModalProps) => {
   );
 
   return (
-    <Dialog open={open} onOpenChange={() => {}}>
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onComplete()}>
       <DialogContent className="max-w-2xl bg-[#FAF8F3] border-[#E4DCD2]">
         <div className="relative">
           {/* Progress indicator */}

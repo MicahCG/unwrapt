@@ -18,7 +18,6 @@ import { WalletBalance } from '@/components/wallet/WalletBalance';
 import { AddFundsModal } from '@/components/wallet/AddFundsModal';
 import { TestTierToggle } from '@/components/dev/TestTierToggle';
 import { TestWalletControls } from '@/components/dev/TestWalletControls';
-import { AddTestRecipient } from '@/components/dev/AddTestRecipient';
 import { VIPUpgradeModal } from '@/components/subscription/VIPUpgradeModal';
 import { VIPWelcomeModal } from '@/components/onboarding/VIPWelcomeModal';
 import { AutomationToggle, EnableAutomationModal } from '@/components/automation';
@@ -87,16 +86,19 @@ const Dashboard = () => {
     };
   }, [user?.id, refetchProfile]);
 
-  // Trigger VIP onboarding when tier changes to VIP
+  // Trigger VIP onboarding when user upgrades from free to VIP
   useEffect(() => {
     if (!userProfile?.subscription_tier) return;
 
     const currentTier = userProfile.subscription_tier;
 
-    // Check if we just switched TO VIP tier (from free or first load)
-    if (currentTier === 'vip' && previousTier !== 'vip') {
-      // For testing: Show every time we switch to VIP
-      // For production: Add && !userProfile.vip_onboarding_completed
+    // Only show onboarding if:
+    // 1. User just switched TO VIP (previousTier exists and was not VIP)
+    // 2. They haven't completed onboarding yet
+    if (currentTier === 'vip' &&
+        previousTier !== null &&
+        previousTier !== 'vip' &&
+        !userProfile.vip_onboarding_completed) {
       setShowVIPOnboarding(true);
     }
 
@@ -357,7 +359,6 @@ const Dashboard = () => {
         {/* Admin Testing Controls */}
         <div className="px-12 pt-8 space-y-4">
           <TestTierToggle />
-          <AddTestRecipient />
         </div>
 
         {/* Wallet Balance for VIP users */}
@@ -384,12 +385,24 @@ const Dashboard = () => {
 
         {/* Main Content - Two Column Layout */}
         <div className="px-12 py-12 grid grid-cols-1 xl:grid-cols-[620px_1fr] gap-8">
-          {/* LEFT COLUMN - Recipients & Important Dates */}
+          {/* LEFT COLUMN - Upcoming Birthdays */}
           <div className="space-y-6">
             <Card className="bg-[#EFE7DD] border-[#E4DCD2] rounded-2xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.07)]">
-              <h2 className="font-display text-xl text-[#1A1A1A] mb-6">
-                Recipients & Important Dates
-              </h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="font-display text-xl text-[#1A1A1A]">
+                  Upcoming Birthdays
+                </h2>
+                {sortedRecipients.length > 0 && (
+                  <Button
+                    onClick={() => setShowAddRecipient(true)}
+                    size="sm"
+                    className="bg-[#D2B887] hover:bg-[#D2B887]/90 text-[#1A1A1A] h-8 w-8 p-0 rounded-full"
+                    title="Add New Recipient"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
               
               <div className="relative space-y-4">
                 {sortedRecipients.length === 0 ? (
@@ -432,14 +445,16 @@ const Dashboard = () => {
                               <div>
                                 <h3 className="font-medium text-[#1A1A1A]">{cleanName(recipient.name)}</h3>
                                 {nextOccasionDate ? (
-                                  <p className="text-sm text-[#1A1A1A]/70">
-                                    {occasionType} — {formatOccasionDate(nextOccasionDate)}
+                                  <div className="flex items-baseline gap-2 mt-0.5">
+                                    <p className="text-base font-medium text-[#D2B887]">
+                                      {formatOccasionDate(nextOccasionDate)}
+                                    </p>
                                     {daysUntil !== null && (
-                                      <span className="text-xs text-[#1A1A1A]/50 ml-2">
-                                        ({daysUntil === 0 ? 'Today!' : daysUntil === 1 ? 'Tomorrow' : `${daysUntil} days`})
+                                      <span className="text-xs text-[#1A1A1A]/50">
+                                        {daysUntil === 0 ? '• Today!' : daysUntil === 1 ? '• Tomorrow' : `• in ${daysUntil} days`}
                                       </span>
                                     )}
-                                  </p>
+                                  </div>
                                 ) : (
                                   <p className="text-sm text-[#1A1A1A]/50">No date set</p>
                                 )}
@@ -644,7 +659,7 @@ const Dashboard = () => {
           recipientName={cleanName(automationRecipient.name)}
           occasionType={automationRecipient.birthday ? 'birthday' : 'anniversary'}
           occasionDate={automationRecipient.birthday || automationRecipient.anniversary}
-          currentInterests={automationRecipient.interests}
+          currentGiftVibe={automationRecipient.preferred_gift_vibe}
           onSuccess={() => {
             setShowEnableAutomation(false);
             setAutomationRecipient(null);

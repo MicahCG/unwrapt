@@ -26,6 +26,7 @@ import {
   type AutomationEligibility,
   type WalletCoverage
 } from '@/lib/automation';
+import { GIFT_VIBE_OPTIONS, type GiftVibe } from '@/lib/giftVibes';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
@@ -36,22 +37,9 @@ interface EnableAutomationModalProps {
   recipientName: string;
   occasionType: 'birthday' | 'anniversary' | 'custom';
   occasionDate: string;
-  currentInterests?: string[];
+  currentGiftVibe?: GiftVibe | null;
   onSuccess: () => void;
 }
-
-const INTEREST_OPTIONS = [
-  'cooking',
-  'wellness',
-  'technology',
-  'reading',
-  'sports',
-  'art',
-  'music',
-  'travel',
-  'gardening',
-  'fashion'
-];
 
 export const EnableAutomationModal = ({
   open,
@@ -60,11 +48,11 @@ export const EnableAutomationModal = ({
   recipientName,
   occasionType,
   occasionDate,
-  currentInterests,
+  currentGiftVibe,
   onSuccess
 }: EnableAutomationModalProps) => {
   const { user } = useAuth();
-  const [interests, setInterests] = useState<string[]>(currentInterests || []);
+  const [giftVibe, setGiftVibe] = useState<GiftVibe | null>(currentGiftVibe || null);
   const [eligibility, setEligibility] = useState<AutomationEligibility | null>(null);
   const [coverage, setCoverage] = useState<WalletCoverage | null>(null);
   const [defaultGift, setDefaultGift] = useState<{
@@ -86,10 +74,10 @@ export const EnableAutomationModal = ({
 
     setLoading(true);
     try {
-      // Get default gift recommendation
+      // Get default gift recommendation based on vibe
       const gift = await getDefaultGiftVariant({
         occasionType,
-        interests
+        giftVibe: giftVibe
       });
 
       setDefaultGift(gift);
@@ -115,27 +103,33 @@ export const EnableAutomationModal = ({
 
     setEnabling(true);
     try {
-      // Update recipient with interests if provided
-      if (interests.length > 0) {
+      // Update recipient with gift vibe preference if provided
+      if (giftVibe) {
         await supabase
           .from('recipients')
           .update({
-            interests: interests,
+            preferred_gift_vibe: giftVibe,
             default_gift_variant_id: defaultGift.variantId
           })
           .eq('id', recipientId);
       }
 
       // Create or update scheduled gift with automation enabled
+      const occasionLabel = occasionType === 'birthday' ? 'Birthday' :
+                           occasionType === 'anniversary' ? 'Anniversary' :
+                           'Special Occasion';
+
       const { error: giftError } = await supabase
         .from('scheduled_gifts')
         .upsert({
           recipient_id: recipientId,
           user_id: user.id,
+          occasion: occasionLabel,
           occasion_date: occasionDate,
           occasion_type: occasionType,
           automation_enabled: true,
           gift_variant_id: defaultGift.variantId,
+          gift_vibe: giftVibe || 'CALM_COMFORT',
           estimated_cost: defaultGift.price,
           gift_description: defaultGift.description,
           status: 'pending',
@@ -144,7 +138,10 @@ export const EnableAutomationModal = ({
           onConflict: 'recipient_id,occasion_date'
         });
 
-      if (giftError) throw giftError;
+      if (giftError) {
+        console.error('Error creating scheduled gift:', giftError);
+        throw giftError;
+      }
 
       // Log automation enable event
       await supabase
@@ -172,13 +169,12 @@ export const EnableAutomationModal = ({
     }
   };
 
-  const toggleInterest = (interest: string) => {
-    setInterests(prev =>
-      prev.includes(interest)
-        ? prev.filter(i => i !== interest)
-        : [...prev, interest]
-    );
-  };
+  // Reload data when gift vibe changes
+  useEffect(() => {
+    if (open && user) {
+      loadData();
+    }
+  }, [giftVibe]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -265,29 +261,47 @@ export const EnableAutomationModal = ({
               </div>
             )}
 
-            {/* Interest Selection */}
-            {(!currentInterests || currentInterests.length === 0) && (
-              <div className="space-y-2">
-                <Label>Interests (Optional - Select up to 3)</Label>
-                <div className="flex flex-wrap gap-2">
-                  {INTEREST_OPTIONS.map(interest => (
-                    <Badge
-                      key={interest}
-                      variant={interests.includes(interest) ? 'default' : 'outline'}
+            {/* Gift Vibe Selection */}
+            {!currentGiftVibe && (
+              <div className="space-y-3">
+                <Label>What kind of gifts do they usually love?</Label>
+                <p className="text-xs text-[#1A1A1A]/60 mb-3">
+                  This helps Unwrapt choose the right kind of present automatically.
+                </p>
+                <div className="space-y-2">
+                  {GIFT_VIBE_OPTIONS.map((option) => (
+                    <div
+                      key={option.vibe}
+                      onClick={() => setGiftVibe(option.vibe)}
                       className={cn(
-                        'cursor-pointer',
-                        interests.includes(interest)
-                          ? 'bg-[#D2B887] hover:bg-[#D2B887]/90 text-white'
-                          : 'hover:bg-[#D2B887]/10'
+                        "p-4 rounded-lg border-2 cursor-pointer transition-all",
+                        giftVibe === option.vibe
+                          ? "border-[#D2B887] bg-[#D2B887]/10"
+                          : "border-[#E4DCD2] hover:border-[#D2B887]/50 bg-white"
                       )}
-                      onClick={() => interests.length < 3 || interests.includes(interest) ? toggleInterest(interest) : null}
                     >
-                      {interest.charAt(0).toUpperCase() + interest.slice(1)}
-                    </Badge>
+                      <div className="flex items-start gap-3">
+                        <div className={cn(
+                          "w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 flex-shrink-0",
+                          giftVibe === option.vibe
+                            ? "border-[#D2B887] bg-[#D2B887]"
+                            : "border-[#E4DCD2]"
+                        )}>
+                          {giftVibe === option.vibe && (
+                            <CheckCircle className="w-3 h-3 text-white" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium text-[#1A1A1A] mb-1">{option.label}</p>
+                          <p className="text-xs text-[#1A1A1A]/60">{option.description}</p>
+                          <p className="text-xs text-[#1A1A1A]/40 mt-1">{option.examples}</p>
+                        </div>
+                      </div>
+                    </div>
                   ))}
                 </div>
-                <p className="text-xs text-[#1A1A1A]/60">
-                  Helps personalize gift selection
+                <p className="text-xs text-[#1A1A1A]/50">
+                  You can skip this for now. We'll choose a cozy, universally loved gift by default.
                 </p>
               </div>
             )}

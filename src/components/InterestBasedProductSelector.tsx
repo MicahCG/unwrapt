@@ -3,25 +3,30 @@ import { Badge } from '@/components/ui/badge';
 import { Heart } from 'lucide-react';
 import ProductSelector from './ProductSelector';
 import { ShopifyProduct } from '@/hooks/useShopifyCollection';
+import { GIFT_VIBE_OPTIONS, type GiftVibe } from '@/lib/giftVibes';
 
 interface InterestBasedProductSelectorProps {
-  recipientInterests?: string[];
+  recipientGiftVibe?: GiftVibe | null;
   onProductSelect: (product: ShopifyProduct) => void;
   selectedProduct?: ShopifyProduct | null;
   className?: string;
 }
 
 const InterestBasedProductSelector: React.FC<InterestBasedProductSelectorProps> = ({
-  recipientInterests = [],
+  recipientGiftVibe = null,
   onProductSelect,
   selectedProduct,
   className = ""
 }) => {
+  const vibeOption = recipientGiftVibe
+    ? GIFT_VIBE_OPTIONS.find(v => v.vibe === recipientGiftVibe)
+    : null;
+
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Background gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-gray-50/30 via-transparent to-blue-50/20 pointer-events-none" />
-      
+
       <div className="relative space-y-4">
         <div className="flex items-center gap-3">
           <div className="p-3 rounded-xl bg-white/90 backdrop-blur-sm border border-gray-200 shadow-md">
@@ -29,14 +34,12 @@ const InterestBasedProductSelector: React.FC<InterestBasedProductSelectorProps> 
           </div>
           <div>
             <h3 className="text-lg font-semibold text-gray-900">Choose the Perfect Gift</h3>
-            {recipientInterests.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                <span className="text-sm text-gray-600">Based on interests:</span>
-                {recipientInterests.map((interest, index) => (
-                  <Badge key={index} variant="secondary" className="text-xs bg-blue-50 text-blue-700 border border-blue-200">
-                    {interest}
-                  </Badge>
-                ))}
+            {vibeOption && (
+              <div className="flex items-center gap-2 mt-2">
+                <Badge variant="secondary" className="text-xs bg-[#D2B887]/10 text-[#D2B887] border border-[#D2B887]/20">
+                  {vibeOption.label}
+                </Badge>
+                <span className="text-sm text-gray-600">{vibeOption.description}</span>
               </div>
             )}
           </div>
@@ -45,7 +48,7 @@ const InterestBasedProductSelector: React.FC<InterestBasedProductSelectorProps> 
       
       <div className="mt-8 space-y-6">
         <ProductSelector
-          interests={recipientInterests}
+          interests={[]}
           onProductSelect={onProductSelect}
           selectedProduct={selectedProduct}
           className="border-none shadow-none"

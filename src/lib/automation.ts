@@ -105,41 +105,44 @@ export async function calculateWalletCoverage(userId: string): Promise<WalletCov
 }
 
 /**
- * Get default gift variant for a recipient based on occasion and interests
+ * Get default gift variant for a recipient based on their gift vibe preference
  */
 export async function getDefaultGiftVariant(params: {
   occasionType: 'birthday' | 'anniversary' | 'custom';
-  interests?: string[];
+  giftVibe?: 'CALM_COMFORT' | 'ARTFUL_UNIQUE' | 'REFINED_STYLISH' | null;
   availableBalance?: number;
 }): Promise<{
   variantId: string;
+  productId: string;
   description: string;
   price: number;
 } | null> {
-  const { selectGiftForRecipient, estimateGiftCost } = await import('@/lib/giftDefaults');
+  const { selectGiftForRecipient, estimateGiftCost } = await import('@/lib/giftVibes');
 
-  const { interests, occasionType, availableBalance = 1000 } = params;
+  const { giftVibe, occasionType, availableBalance = 1000 } = params;
 
-  // Use smart gift selection
-  const selectedGift = selectGiftForRecipient({
-    interests,
+  // Use vibe-based gift selection
+  const selectedGift = await selectGiftForRecipient({
+    recipientVibe: giftVibe,
     availableBalance,
     occasionType
   });
 
   if (!selectedGift) {
     // Return estimated cost for budget planning
-    const estimatedCost = estimateGiftCost({ interests, occasionType });
+    const estimatedCost = await estimateGiftCost({ recipientVibe: giftVibe, occasionType });
     return {
       variantId: 'insufficient-funds',
+      productId: 'insufficient-funds',
       description: 'Insufficient wallet balance',
       price: estimatedCost
     };
   }
 
   return {
-    variantId: selectedGift.variantId,
-    description: selectedGift.description,
+    variantId: selectedGift.shopify_variant_id,
+    productId: selectedGift.id,
+    description: selectedGift.title,
     price: selectedGift.price
   };
 }
