@@ -11,9 +11,8 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { Heart, MapPin, Sparkles, Wallet as WalletIcon } from 'lucide-react';
-import { useShopifyCollection } from '@/hooks/useShopifyCollection';
 import { cleanName } from '@/lib/utils';
-import { GIFT_VIBE_OPTIONS, type GiftVibe } from '@/lib/giftVibes';
+import { GIFT_VIBE_OPTIONS, type GiftVibe, type Product, getAllProducts } from '@/lib/giftVibes';
 
 interface ScheduleGiftModalProps {
   recipient: any;
@@ -28,7 +27,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   const { toast } = useToast();
 
   const [selectedVibe, setSelectedVibe] = useState<GiftVibe | null>(null);
-  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   const [formData, setFormData] = useState({
     occasion_date: '',
@@ -60,13 +59,30 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     enabled: isOpen,
   });
 
-  // Fetch all products with limit of 50
-  const { data: allProducts = [], isLoading: productsLoading } = useShopifyCollection('', 50);
+  // Fetch all products from Supabase products table
+  const { data: allProducts = [], isLoading: productsLoading } = useQuery({
+    queryKey: ['products', 'all'],
+    queryFn: () => getAllProducts(),
+    enabled: isOpen,
+    staleTime: 5 * 60 * 1000,
+  });
 
   // Filter products by selected vibe
   const filteredProducts = selectedVibe
-    ? allProducts.filter(p => p.metafields?.gift_vibe === selectedVibe)
+    ? allProducts.filter(p => p.gift_vibe === selectedVibe)
     : allProducts;
+
+  // Debug logging for products
+  useEffect(() => {
+    if (isOpen) {
+      console.log('🎁 Products loaded:', {
+        totalProducts: allProducts.length,
+        selectedVibe,
+        filteredCount: filteredProducts.length,
+        productsLoading
+      });
+    }
+  }, [allProducts, selectedVibe, filteredProducts, isOpen, productsLoading]);
 
   // Debug logging for recipient prop
   useEffect(() => {
@@ -283,7 +299,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         body: {
           scheduledGiftId: giftData.id,
           productPrice: selectedProduct.price,
-          productImage: selectedProduct.featuredImage,
+          productImage: selectedProduct.featured_image_url,
           giftDetails: {
             recipientName: cleanName(recipient.name),
             occasion: 'Birthday',
@@ -298,7 +314,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             country: formData.country,
             zip: formData.zip_code
           },
-          variantId: selectedProduct.variantId
+          variantId: selectedProduct.shopify_variant_id
         }
       });
 
@@ -511,15 +527,20 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
               <div className="flex items-center justify-center py-12">
                 <p className="text-sm text-[#1A1A1A]/50">Select a gift vibe to browse products</p>
               </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-4">
+                <p className="text-sm text-[#1A1A1A]/50">No products found for this vibe</p>
+                <p className="text-xs text-[#1A1A1A]/40">Total products available: {allProducts.length}</p>
+              </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {filteredProducts.map((product) => (
                   <button
-                    key={product.variantId}
+                    key={product.id}
                     type="button"
                     onClick={() => setSelectedProduct(product)}
                     className={`group relative bg-white rounded-xl overflow-hidden border-2 transition-all shadow-sm hover:shadow-md ${
-                      selectedProduct?.variantId === product.variantId
+                      selectedProduct?.id === product.id
                         ? 'border-[#D2B887] ring-2 ring-[#D2B887]/20'
                         : 'border-[#E4DCD2] hover:border-[#D2B887]/50'
                     }`}
@@ -527,7 +548,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
                     {/* Product Image */}
                     <div className="aspect-square overflow-hidden bg-[#FAF8F3]">
                       <img
-                        src={product.featuredImage || ''}
+                        src={product.featured_image_url || ''}
                         alt={product.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
@@ -542,16 +563,14 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
                         <p className="text-lg font-bold text-[#1A1A1A]">
                           ${product.price.toFixed(2)}
                         </p>
-                        {product.metafields?.badge && (
-                          <Badge variant="secondary" className="text-xs bg-[#D2B887]/10 text-[#D2B887] border-[#D2B887]/20">
-                            {product.metafields.badge}
-                          </Badge>
-                        )}
+                        <Badge variant="secondary" className="text-xs bg-[#D2B887]/10 text-[#D2B887] border-[#D2B887]/20">
+                          {GIFT_VIBE_OPTIONS.find(v => v.vibe === product.gift_vibe)?.label}
+                        </Badge>
                       </div>
                     </div>
 
                     {/* Selected Indicator */}
-                    {selectedProduct?.variantId === product.variantId && (
+                    {selectedProduct?.id === product.id && (
                       <div className="absolute top-3 right-3 bg-[#D2B887] text-white rounded-full p-1.5">
                         <Heart className="w-3 h-3 fill-current" />
                       </div>
@@ -571,7 +590,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
               {selectedProduct ? (
                 <>
                   <img
-                    src={selectedProduct.featuredImage || ''}
+                    src={selectedProduct.featured_image_url || ''}
                     alt={selectedProduct.title}
                     className="w-12 h-12 rounded-lg object-cover border border-[#E4DCD2]"
                   />

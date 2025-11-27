@@ -29,6 +29,7 @@ import {
 import { GIFT_VIBE_OPTIONS, type GiftVibe } from '@/lib/giftVibes';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface EnableAutomationModalProps {
   open: boolean;
@@ -52,6 +53,7 @@ export const EnableAutomationModal = ({
   onSuccess
 }: EnableAutomationModalProps) => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [giftVibe, setGiftVibe] = useState<GiftVibe | null>(currentGiftVibe || null);
   const [eligibility, setEligibility] = useState<AutomationEligibility | null>(null);
   const [coverage, setCoverage] = useState<WalletCoverage | null>(null);
@@ -119,24 +121,44 @@ export const EnableAutomationModal = ({
                            occasionType === 'anniversary' ? 'Anniversary' :
                            'Special Occasion';
 
-      const { error: giftError } = await supabase
+      // Check if scheduled gift already exists for this recipient and occasion
+      const { data: existingGift } = await supabase
         .from('scheduled_gifts')
-        .upsert({
-          recipient_id: recipientId,
-          user_id: user.id,
-          occasion: occasionLabel,
-          occasion_date: occasionDate,
-          occasion_type: occasionType,
-          automation_enabled: true,
-          gift_variant_id: defaultGift.variantId,
-          gift_vibe: giftVibe || 'CALM_COMFORT',
-          estimated_cost: defaultGift.price,
-          gift_description: defaultGift.description,
-          status: 'pending',
-          delivery_date: new Date(new Date(occasionDate).getTime() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-        }, {
-          onConflict: 'recipient_id,occasion_date'
-        });
+        .select('id')
+        .eq('recipient_id', recipientId)
+        .eq('occasion_date', occasionDate)
+        .maybeSingle();
+
+      const giftData = {
+        recipient_id: recipientId,
+        user_id: user.id,
+        occasion: occasionLabel,
+        occasion_date: occasionDate,
+        occasion_type: occasionType,
+        automation_enabled: true,
+        gift_variant_id: defaultGift.variantId,
+        gift_vibe: giftVibe || 'CALM_COMFORT',
+        estimated_cost: defaultGift.price,
+        gift_description: defaultGift.description,
+        status: 'pending',
+        delivery_date: new Date(new Date(occasionDate).getTime() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      };
+
+      let giftError;
+      if (existingGift) {
+        // Update existing gift
+        const { error } = await supabase
+          .from('scheduled_gifts')
+          .update(giftData)
+          .eq('id', existingGift.id);
+        giftError = error;
+      } else {
+        // Insert new gift
+        const { error } = await supabase
+          .from('scheduled_gifts')
+          .insert(giftData);
+        giftError = error;
+      }
 
       if (giftError) {
         console.error('Error creating scheduled gift:', giftError);
@@ -156,6 +178,11 @@ export const EnableAutomationModal = ({
             occasion_type: occasionType
           }
         });
+
+      // Invalidate queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: ['recipients', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['upcoming-gifts'] });
+      queryClient.invalidateQueries({ queryKey: ['user-profile'] });
 
       onSuccess();
       onOpenChange(false);

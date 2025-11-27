@@ -91,14 +91,70 @@ async function processGiftStage(supabaseClient: any, gift: any, recipient: any, 
     return;
   }
 
-  // STAGE 2: Address request (10 days before)
-  if (daysUntilDelivery === 10 && gift.wallet_reserved && !gift.address_requested_at) {
+  // STAGE 2: Auto-confirm gift (3 days after reservation if address exists)
+  if (gift.wallet_reserved && !gift.gift_confirmed_at && isAddressComplete(recipient)) {
+    const reservationDate = new Date(gift.wallet_reservation_date || gift.updated_at);
+    const daysSinceReservation = Math.ceil((today.getTime() - reservationDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysSinceReservation >= 3) {
+      await handleGiftAutoConfirmation(supabaseClient, gift, recipient);
+      return;
+    }
+  }
+
+  // STAGE 3: Address request (10 days before, if gift not confirmed yet)
+  if (daysUntilDelivery === 10 && gift.wallet_reserved && !gift.gift_confirmed_at && !gift.address_requested_at) {
     await handleAddressRequest(supabaseClient, gift, recipient);
     return;
   }
 
-  // STAGE 3: Address reminder (3 days after request)
-  if (gift.address_requested_at && !isAddressComplete(recipient)) {
+  // STAGE 3: Auto-confirm if address became complete after initial request
+  if (gift.address_requested_at && !gift.address_confirmed_at && isAddressComplete(recipient)) {
+    const daysSinceRequest = Math.ceil((today.getTime() - new Date(gift.address_requested_at).getTime()) / (1000 * 60 * 60 * 24));
+
+    // Auto-confirm after 1 day if address is complete
+    if (daysSinceRequest >= 1) {
+      console.log("    ✅ Auto-confirming address (address became complete)");
+
+      const { error: updateError } = await supabaseClient
+        .from("scheduled_gifts")
+        .update({ address_confirmed_at: new Date().toISOString() })
+        .eq("id", gift.id);
+
+      if (!updateError) {
+        await logAutomation(supabaseClient, gift.user_id, recipient.id, gift.id, "address_auto_confirm", "success", {
+          days_since_request: daysSinceRequest
+        });
+
+        // Get product details for email
+        const productImage = await getProductImage(supabaseClient, gift.gift_variant_id);
+
+        // Send gift confirmed email
+        await supabaseClient.functions.invoke("send-notification-email", {
+          body: {
+            type: "gift_confirmed_with_address",
+            recipientEmail: recipient.profiles.email,
+            userName: recipient.profiles.full_name,
+            data: {
+              recipientName: recipient.name,
+              occasion: gift.occasion,
+              giftDescription: gift.gift_description || "Curated selection",
+              giftImage: productImage,
+              deliveryDate: gift.delivery_date,
+              modifyLink: `${Deno.env.get("SUPABASE_URL")}/dashboard`
+            }
+          }
+        });
+
+        // Proceed to fulfillment immediately
+        await handleOrderFulfillment(supabaseClient, gift, recipient);
+        return;
+      }
+    }
+  }
+
+  // STAGE 3b: Address reminder (3 days after request, if still incomplete)
+  if (gift.address_requested_at && !gift.address_confirmed_at && !isAddressComplete(recipient)) {
     const daysSinceRequest = Math.ceil((today.getTime() - new Date(gift.address_requested_at).getTime()) / (1000 * 60 * 60 * 24));
     if (daysSinceRequest === 3 && daysUntilDelivery > 2 && (gift.address_reminder_sent || 0) === 0) {
       await handleAddressReminder(supabaseClient, gift, recipient);
@@ -106,8 +162,8 @@ async function processGiftStage(supabaseClient: any, gift: any, recipient: any, 
     }
   }
 
-  // STAGE 4: Order fulfillment (when address is complete)
-  if (gift.wallet_reserved && isAddressComplete(recipient) && gift.payment_status === "unpaid" && daysUntilDelivery > 0) {
+  // STAGE 4: Order fulfillment (when gift is confirmed and address is confirmed)
+  if (gift.wallet_reserved && gift.gift_confirmed_at && gift.address_confirmed_at && gift.payment_status === "unpaid" && daysUntilDelivery > 0) {
     await handleOrderFulfillment(supabaseClient, gift, recipient);
     return;
   }
@@ -234,6 +290,7 @@ async function handleFundReservation(supabaseClient: any, gift: any, recipient: 
       .update({
         wallet_reserved: true,
         wallet_reservation_amount: totalCost,
+        wallet_reservation_date: new Date().toISOString(),
         default_gift_variant_id: variantId
       })
       .eq("id", gift.id);
@@ -271,7 +328,47 @@ async function handleAddressRequest(supabaseClient: any, gift: any, recipient: a
   console.log("    📍 STAGE 2: Address Request");
 
   if (isAddressComplete(recipient)) {
-    console.log("    ✅ Address already complete, skipping to fulfillment");
+    console.log("    ✅ Address already complete, auto-confirming");
+
+    // Auto-confirm the address since it's already complete
+    const { error: updateError } = await supabaseClient
+      .from("scheduled_gifts")
+      .update({
+        address_requested_at: new Date().toISOString(),
+        address_confirmed_at: new Date().toISOString()
+      })
+      .eq("id", gift.id);
+
+    if (updateError) {
+      console.error("    ❌ Auto-confirm error:", updateError);
+      return;
+    }
+
+    await logAutomation(supabaseClient, gift.user_id, recipient.id, gift.id, "address_request", "auto_confirmed", {
+      reason: "address_already_complete"
+    });
+
+    // Get product details for email
+    const productImage = await getProductImage(supabaseClient, gift.gift_variant_id);
+
+    // Send gift confirmed email (address already exists)
+    await supabaseClient.functions.invoke("send-notification-email", {
+      body: {
+        type: "gift_confirmed_with_address",
+        recipientEmail: recipient.profiles.email,
+        userName: recipient.profiles.full_name,
+        data: {
+          recipientName: recipient.name,
+          occasion: gift.occasion,
+          giftDescription: gift.gift_description || "Curated selection",
+          giftImage: productImage,
+          deliveryDate: gift.delivery_date,
+          modifyLink: `${Deno.env.get("SUPABASE_URL")}/dashboard`
+        }
+      }
+    });
+
+    // Proceed directly to fulfillment
     await handleOrderFulfillment(supabaseClient, gift, recipient);
     return;
   }
@@ -285,16 +382,23 @@ async function handleAddressRequest(supabaseClient: any, gift: any, recipient: a
 
     if (updateError) throw updateError;
 
-    // Send address confirmation request email
+    // Get product details for email
+    const productImage = await getProductImage(supabaseClient, gift.gift_variant_id);
+
+    // Send gift confirmed but needs address email
     await supabaseClient.functions.invoke("send-notification-email", {
       body: {
-        type: "address_confirmation_request",
+        type: "gift_confirmed_need_address",
         recipientEmail: recipient.profiles.email,
+        userName: recipient.profiles.full_name,
         data: {
           recipientName: recipient.name,
           occasion: gift.occasion,
+          giftDescription: gift.gift_description || "Curated selection",
+          giftImage: productImage,
           deliveryDate: gift.delivery_date,
-          confirmationLink: `${Deno.env.get("SUPABASE_URL")}/confirm-address/${gift.id}`
+          confirmationLink: `${Deno.env.get("SUPABASE_URL")}/confirm-address/${gift.id}`,
+          modifyLink: `${Deno.env.get("SUPABASE_URL")}/dashboard`
         }
       }
     });
@@ -458,6 +562,61 @@ async function handleEscalation(supabaseClient: any, gift: any, recipient: any) 
   }
 }
 
+async function handleGiftAutoConfirmation(supabaseClient: any, gift: any, recipient: any) {
+  console.log("    ✅ STAGE 2: Auto-Confirm Gift");
+
+  try {
+    // Get product details for email
+    const productImage = await getProductImage(supabaseClient, gift.gift_variant_id);
+
+    // Mark gift as confirmed
+    const { error: updateError } = await supabaseClient
+      .from("scheduled_gifts")
+      .update({
+        gift_confirmed_at: new Date().toISOString()
+      })
+      .eq("id", gift.id);
+
+    if (updateError) throw updateError;
+
+    // Send gift confirmed email
+    await supabaseClient.functions.invoke("send-notification-email", {
+      body: {
+        type: "gift_confirmed_with_address",
+        recipientEmail: recipient.profiles.email,
+        userName: recipient.profiles.full_name,
+        data: {
+          recipientName: recipient.name,
+          occasion: gift.occasion,
+          giftDescription: gift.gift_description || "Curated selection",
+          giftImage: productImage,
+          deliveryDate: gift.delivery_date,
+          modifyLink: `${Deno.env.get("SUPABASE_URL")}/dashboard`
+        }
+      }
+    });
+
+    await logAutomation(supabaseClient, gift.user_id, recipient.id, gift.id, "gift_confirmation", "auto_confirmed", {
+      reason: "address_exists_3_days_after_reservation"
+    });
+
+    // Set address as confirmed if it exists
+    if (!gift.address_confirmed_at) {
+      await supabaseClient
+        .from("scheduled_gifts")
+        .update({ address_confirmed_at: new Date().toISOString() })
+        .eq("id", gift.id);
+    }
+
+    console.log("    ✅ Gift auto-confirmed successfully");
+  } catch (error) {
+    console.error("    ❌ Auto-confirmation error:", error);
+    await logAutomation(supabaseClient, gift.user_id, recipient.id, gift.id, "gift_confirmation", "error", {
+      error: error.message
+    });
+  }
+}
+
 async function handleExpiredGift(supabaseClient: any, gift: any, recipient: any) {
   console.log("    🗑️ STAGE 6: Cleanup Expired Gift");
 
@@ -583,4 +742,21 @@ async function logAutomation(
       action,
       details
     });
+}
+
+async function getProductImage(supabaseClient: any, variantId: string | null): Promise<string | undefined> {
+  if (!variantId) return undefined;
+
+  try {
+    const { data: product } = await supabaseClient
+      .from("products")
+      .select("featured_image_url")
+      .eq("shopify_variant_id", variantId)
+      .single();
+
+    return product?.featured_image_url;
+  } catch (error) {
+    console.error("Error fetching product image:", error);
+    return undefined;
+  }
 }

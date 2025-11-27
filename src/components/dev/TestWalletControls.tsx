@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Beaker, Plus, Database } from 'lucide-react';
+import { Beaker, Plus, Database, Zap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -86,6 +86,43 @@ export const TestWalletControls = ({ onBalanceUpdated, currentBalance = 0 }: Tes
     }
   };
 
+  const triggerAutomationLifecycle = async () => {
+    if (!user?.id) {
+      toast({
+        title: 'Error',
+        description: 'User not authenticated',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('process-automation-lifecycle');
+
+      if (error) throw error;
+
+      toast({
+        title: '✅ Automation Lifecycle Triggered',
+        description: `Processed ${data?.processed || 0} recipients with automation`,
+      });
+
+      // Trigger a refresh
+      if (onBalanceUpdated) {
+        setTimeout(() => onBalanceUpdated(), 500);
+      }
+    } catch (error: any) {
+      console.error('Error triggering automation lifecycle:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to trigger automation',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <Card className="bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200 rounded-2xl p-4 shadow-sm">
       <div className="flex items-center gap-2 mb-3">
@@ -136,6 +173,22 @@ export const TestWalletControls = ({ onBalanceUpdated, currentBalance = 0 }: Tes
       <div className="mt-3 p-3 bg-purple-100/50 rounded-lg">
         <p className="text-xs text-purple-600">
           💡 <strong>Tip:</strong> Use these test funds to enable automation on your recipients and see the full automation lifecycle without real payments.
+        </p>
+      </div>
+
+      <div className="mt-4 pt-4 border-t border-purple-200">
+        <Button
+          onClick={triggerAutomationLifecycle}
+          disabled={isLoading}
+          size="sm"
+          variant="outline"
+          className="w-full border-purple-300 text-purple-700 hover:bg-purple-100"
+        >
+          <Zap className="w-4 h-4 mr-2" />
+          {isLoading ? 'Processing...' : 'Run Automation Lifecycle Now'}
+        </Button>
+        <p className="text-xs text-purple-600 mt-2">
+          Manually trigger automation processing (auto-confirms addresses, processes gifts, etc.)
         </p>
       </div>
     </Card>

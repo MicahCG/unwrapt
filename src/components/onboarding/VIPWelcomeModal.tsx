@@ -12,6 +12,8 @@ import { toast } from '@/hooks/use-toast';
 import { formatOccasionDate } from '@/lib/dateUtils';
 import { GIFT_VIBE_OPTIONS, type GiftVibe } from '@/lib/giftVibes';
 import { cn } from '@/lib/utils';
+import { getDefaultGiftVariant } from '@/lib/automation';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface VIPWelcomeModalProps {
   open: boolean;
@@ -22,6 +24,7 @@ const PRESET_AMOUNTS = [100, 200, 300];
 
 export const VIPWelcomeModal = ({ open, onComplete }: VIPWelcomeModalProps) => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
@@ -128,41 +131,99 @@ export const VIPWelcomeModal = ({ open, onComplete }: VIPWelcomeModalProps) => {
 
     setLoading(true);
     try {
-      // Update recipients with gift vibe preference
+      // Update recipients with gift vibe preference and create scheduled gifts
       for (const recipient of upcomingRecipients) {
         const setup = recipientSetup[recipient.id];
         if (!setup.enableAutomation) continue;
 
-        // Update recipient with gift vibe preference
-        if (setup.giftVibe) {
-          await supabase
-            .from('recipients')
-            .update({
-              preferred_gift_vibe: setup.giftVibe
-            })
-            .eq('id', recipient.id);
+        // Get default gift for this recipient's vibe
+        const defaultGift = await getDefaultGiftVariant({
+          occasionType: 'birthday',
+          giftVibe: setup.giftVibe || 'CALM_COMFORT'
+        });
+
+        if (!defaultGift) {
+          console.error('Failed to get default gift for recipient:', recipient.id);
+          continue;
         }
 
-        // Create scheduled gift with automation
-        const { error: giftError } = await supabase
+        // Update recipient with gift vibe preference
+        await supabase
+          .from('recipients')
+          .update({
+            preferred_gift_vibe: setup.giftVibe || 'CALM_COMFORT'
+          })
+          .eq('id', recipient.id);
+
+        // Check if scheduled gift already exists for this recipient and occasion
+        const { data: existingGift } = await supabase
           .from('scheduled_gifts')
-          .upsert({
-            recipient_id: recipient.id,
-            user_id: user.id,
-            occasion: 'Birthday',
-            occasion_date: recipient.birthday,
-            occasion_type: 'birthday',
-            automation_enabled: true,
-            gift_vibe: setup.giftVibe || 'CALM_COMFORT',
-            status: 'pending',
-            delivery_date: new Date(new Date(recipient.birthday).getTime() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-          }, {
-            onConflict: 'recipient_id,occasion_date'
-          });
+          .select('id')
+          .eq('recipient_id', recipient.id)
+          .eq('occasion_date', recipient.birthday)
+          .maybeSingle();
+
+        const giftData = {
+          recipient_id: recipient.id,
+          user_id: user.id,
+          occasion: 'Birthday',
+          occasion_date: recipient.birthday,
+          occasion_type: 'birthday' as const,
+          automation_enabled: true,
+          gift_vibe: setup.giftVibe || 'CALM_COMFORT',
+          gift_variant_id: defaultGift.variantId,
+          gift_description: defaultGift.description,
+          estimated_cost: defaultGift.price,
+          status: 'pending',
+          delivery_date: new Date(new Date(recipient.birthday).getTime() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+        };
+
+        let giftError;
+        if (existingGift) {
+          // Update existing gift
+          const { error } = await supabase
+            .from('scheduled_gifts')
+            .update(giftData)
+            .eq('id', existingGift.id);
+          giftError = error;
+        } else {
+          // Insert new gift
+          const { error } = await supabase
+            .from('scheduled_gifts')
+            .insert(giftData);
+          giftError = error;
+        }
 
         if (giftError) {
           console.error('Error creating scheduled gift:', giftError);
           throw giftError;
+        }
+
+        // Send automation enabled email
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('email, full_name')
+            .eq('id', user.id)
+            .single();
+
+          if (profile?.email) {
+            await supabase.functions.invoke('send-notification-email', {
+              body: {
+                type: 'automation_enabled',
+                recipientEmail: profile.email,
+                userName: profile.full_name,
+                data: {
+                  recipientName: recipient.name,
+                  occasion: 'Birthday',
+                  amount: defaultGift?.price || 0
+                }
+              }
+            });
+          }
+        } catch (emailError) {
+          console.error('Error sending automation email:', emailError);
+          // Don't fail the whole process if email fails
         }
       }
 
@@ -171,6 +232,11 @@ export const VIPWelcomeModal = ({ open, onComplete }: VIPWelcomeModalProps) => {
         .from('profiles')
         .update({ vip_onboarding_completed: true })
         .eq('id', user.id);
+
+      // Invalidate queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: ['recipients', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['upcoming-gifts'] });
+      queryClient.invalidateQueries({ queryKey: ['user-profile'] });
 
       setStep(4);
     } catch (error: any) {
@@ -498,11 +564,11 @@ export const VIPWelcomeModal = ({ open, onComplete }: VIPWelcomeModalProps) => {
         We'll handle everything for your upcoming occasions
       </p>
 
-      <div className="space-y-3 mb-8 text-left max-w-md mx-auto">
+      <div className="space-y-3 mb-6 text-left max-w-md mx-auto">
         <div className="flex gap-3">
           <div className="text-2xl">📅</div>
           <div>
-            <p className="font-medium text-[#1A1A1A]">14 days before</p>
+            <p className="font-medium text-[#1A1A1A]">14 days before each occasion</p>
             <p className="text-sm text-[#1A1A1A]/60">We reserve funds from your wallet</p>
           </div>
         </div>
@@ -522,6 +588,12 @@ export const VIPWelcomeModal = ({ open, onComplete }: VIPWelcomeModalProps) => {
             <p className="text-sm text-[#1A1A1A]/60">Gift ships and arrives on time</p>
           </div>
         </div>
+      </div>
+
+      <div className="p-3 mb-6 bg-blue-50 rounded-lg max-w-md mx-auto">
+        <p className="text-xs text-blue-800">
+          💡 Your wallet balance won't be touched until 14 days before each occasion. You can add more funds anytime.
+        </p>
       </div>
 
       <p className="text-sm text-[#1A1A1A]/60 mb-6">

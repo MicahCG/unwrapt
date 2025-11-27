@@ -2,22 +2,25 @@ import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Clock, AlertCircle, ExternalLink } from 'lucide-react';
+import { MapPin, Clock, AlertCircle, ExternalLink, CheckCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { cleanName } from '@/lib/utils';
 import { format, differenceInDays } from 'date-fns';
+import { toast } from '@/hooks/use-toast';
 
 interface GiftAwaitingConfirmation {
   id: string;
   recipient_id: string;
   recipient_name: string;
+  occasion: string;
   occasion_date: string;
   occasion_type: string;
   estimated_cost: number;
-  address_requested_at: string;
-  confirmation_token: string;
-  confirmation_expires_at: string;
+  gift_description: string | null;
+  gift_variant_id: string | null;
+  wallet_reserved: boolean;
+  gift_confirmed_at: string | null;
   delivery_date: string;
 }
 
@@ -25,6 +28,7 @@ export const GiftsAwaitingConfirmation = () => {
   const { user } = useAuth();
   const [gifts, setGifts] = useState<GiftAwaitingConfirmation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirming, setConfirming] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -62,19 +66,21 @@ export const GiftsAwaitingConfirmation = () => {
         .select(`
           id,
           recipient_id,
+          occasion,
           occasion_date,
           occasion_type,
           estimated_cost,
-          address_requested_at,
-          confirmation_token,
-          confirmation_expires_at,
+          gift_description,
+          gift_variant_id,
+          wallet_reserved,
+          gift_confirmed_at,
           delivery_date,
           recipients!inner(name)
         `)
         .eq('user_id', user.id)
         .eq('automation_enabled', true)
-        .not('address_requested_at', 'is', null)
-        .is('address_confirmed_at', null)
+        .eq('wallet_reserved', true)
+        .is('gift_confirmed_at', null)
         .order('occasion_date', { ascending: true });
 
       if (error) throw error;
@@ -92,19 +98,31 @@ export const GiftsAwaitingConfirmation = () => {
     }
   };
 
-  const getConfirmationUrl = (token: string) => {
-    const baseUrl = window.location.hostname === 'localhost'
-      ? `http://localhost:${window.location.port || '8080'}`
-      : 'https://app.unwrapt.io';
-    return `${baseUrl}/gifts/confirm-address/${token}`;
-  };
-
-  const copyToClipboard = async (url: string) => {
+  const confirmGift = async (giftId: string) => {
+    setConfirming(giftId);
     try {
-      await navigator.clipboard.writeText(url);
-      // TODO: Show success toast
-    } catch (error) {
-      console.error('Error copying to clipboard:', error);
+      const { error } = await supabase.functions.invoke('confirm-gift', {
+        body: { giftId }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Gift Confirmed!',
+        description: 'Your gift will be processed and shipped soon.',
+      });
+
+      // Reload gifts
+      await loadAwaitingGifts();
+    } catch (error: any) {
+      console.error('Error confirming gift:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to confirm gift. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setConfirming(null);
     }
   };
 
@@ -112,12 +130,6 @@ export const GiftsAwaitingConfirmation = () => {
     const today = new Date();
     const occasion = new Date(occasionDate);
     return differenceInDays(occasion, today);
-  };
-
-  const getUrgencyColor = (daysRemaining: number) => {
-    if (daysRemaining <= 3) return 'text-red-600 bg-red-50';
-    if (daysRemaining <= 7) return 'text-yellow-600 bg-yellow-50';
-    return 'text-blue-600 bg-blue-50';
   };
 
   if (loading) {
@@ -131,9 +143,9 @@ export const GiftsAwaitingConfirmation = () => {
   return (
     <Card className="bg-gradient-to-br from-[#EFE7DD] to-[#E4DCD2] border-[#D2B887]/30 rounded-2xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.07)] backdrop-blur-sm">
       <div className="flex items-center gap-2 mb-4">
-        <MapPin className="w-5 h-5 text-[#D2B887]" />
+        <CheckCircle className="w-5 h-5 text-[#D2B887]" />
         <h2 className="font-display text-xl text-[#1A1A1A]">
-          Gifts Awaiting Address Confirmation
+          Gifts Pending Your Confirmation
         </h2>
         <Badge variant="secondary" className="bg-[#D2B887]/10 text-[#D2B887] border-[#D2B887]/20">
           {gifts.length}
@@ -141,14 +153,13 @@ export const GiftsAwaitingConfirmation = () => {
       </div>
 
       <p className="text-sm text-[#1A1A1A]/70 mb-4">
-        These gifts need shipping addresses confirmed before they can be sent.
+        Funds are reserved. Review and confirm these gifts to proceed with purchase.
       </p>
 
       <div className="space-y-3">
         {gifts.map((gift) => {
           const daysRemaining = getDaysRemaining(gift.occasion_date);
-          const confirmationUrl = getConfirmationUrl(gift.confirmation_token);
-          const urgencyColor = getUrgencyColor(daysRemaining);
+          const isConfirming = confirming === gift.id;
 
           return (
             <div
@@ -168,44 +179,53 @@ export const GiftsAwaitingConfirmation = () => {
                   <p className="text-sm text-[#1A1A1A]/70">
                     {format(new Date(gift.occasion_date), 'MMM d, yyyy')}
                   </p>
+                  {gift.gift_description && (
+                    <p className="text-sm text-[#1A1A1A]/60 mt-1">
+                      {gift.gift_description}
+                    </p>
+                  )}
                 </div>
 
-                <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium ${urgencyColor}`}>
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-600">
                   <Clock className="w-3.5 h-3.5" />
-                  <span>{daysRemaining} day{daysRemaining === 1 ? '' : 's'} left</span>
+                  <span>{daysRemaining} days</span>
                 </div>
               </div>
 
-              {daysRemaining <= 3 && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-red-50 rounded-lg mb-3">
-                  <AlertCircle className="w-4 h-4 text-red-600" />
-                  <p className="text-xs text-red-700">
-                    Urgent: Address needed soon to ensure on-time delivery
+              <div className="flex items-center justify-between p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-3">
+                <div>
+                  <p className="text-sm font-medium text-yellow-900">
+                    Reserved: ${gift.estimated_cost?.toFixed(2)}
+                  </p>
+                  <p className="text-xs text-yellow-700 mt-0.5">
+                    Funds will be charged when you confirm
                   </p>
                 </div>
-              )}
+              </div>
 
               <div className="flex items-center gap-2">
                 <Button
-                  onClick={() => window.open(confirmationUrl, '_blank')}
+                  onClick={() => confirmGift(gift.id)}
+                  disabled={isConfirming}
                   className="flex-1 bg-[#D2B887] hover:bg-[#D2B887]/90 text-[#1A1A1A]"
                   size="sm"
                 >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Confirm Address
-                </Button>
-                <Button
-                  onClick={() => copyToClipboard(confirmationUrl)}
-                  variant="outline"
-                  size="sm"
-                  className="border-[#D2B887] text-[#D2B887] hover:bg-[#D2B887]/10"
-                >
-                  Copy Link
+                  {isConfirming ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Confirming...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Confirm Gift
+                    </>
+                  )}
                 </Button>
               </div>
 
               <p className="text-xs text-[#1A1A1A]/50 mt-2">
-                Delivery scheduled for {format(new Date(gift.delivery_date), 'MMM d')}
+                Auto-confirms in 3 days • Delivery: {format(new Date(gift.delivery_date), 'MMM d')}
               </p>
             </div>
           );
