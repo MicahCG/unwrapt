@@ -98,6 +98,50 @@ serve(async (req) => {
       throw updateError;
     }
 
+    // If both gift and address are confirmed, trigger fulfillment immediately
+    const shouldFulfillNow = isAddressComplete && gift.wallet_reserved && gift.payment_status === 'unpaid';
+    
+    if (shouldFulfillNow) {
+      console.log('🚀 Triggering immediate fulfillment after manual confirmation');
+      
+      try {
+        // Step 1: Charge wallet (convert reservation to charge)
+        const chargeResponse = await supabaseClient.functions.invoke("wallet-charge-reserved", {
+          body: { scheduledGiftId: giftId },
+          headers: {
+            Authorization: req.headers.get("Authorization")!
+          }
+        });
+
+        if (chargeResponse.error) {
+          console.error('❌ Wallet charge failed:', chargeResponse.error);
+          throw new Error(`Wallet charge failed: ${chargeResponse.error.message}`);
+        }
+
+        console.log('💳 Wallet charged successfully');
+
+        // Step 2: Process gift fulfillment (create Shopify order)
+        const fulfillmentResponse = await supabaseClient.functions.invoke("process-gift-fulfillment", {
+          body: { scheduledGiftId: giftId },
+          headers: {
+            Authorization: req.headers.get("Authorization")!
+          }
+        });
+
+        if (fulfillmentResponse.error) {
+          console.error('❌ Fulfillment failed:', fulfillmentResponse.error);
+          // Note: wallet charge reversal would need to be handled here
+          throw new Error(`Fulfillment failed: ${fulfillmentResponse.error.message}`);
+        }
+
+        console.log('✅ Gift fulfilled successfully');
+      } catch (fulfillmentError) {
+        console.error('❌ Error during fulfillment:', fulfillmentError);
+        // Don't fail the confirmation, but log the error
+        // The automation lifecycle will retry fulfillment
+      }
+    }
+
     // Log the confirmation
     await supabaseClient
       .from("automation_logs")
