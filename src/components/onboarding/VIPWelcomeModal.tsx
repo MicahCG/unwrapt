@@ -227,11 +227,7 @@ export const VIPWelcomeModal = ({ open, onComplete }: VIPWelcomeModalProps) => {
         }
       }
 
-      // Mark onboarding complete
-      await supabase
-        .from('profiles')
-        .update({ vip_onboarding_completed: true })
-        .eq('id', user.id);
+      // VIP onboarding complete - tracking removed from database
 
       // Invalidate queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: ['recipients', user.id] });

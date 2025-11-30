@@ -30,7 +30,7 @@ export async function checkAutomationEligibility(
     });
 
     if (error) throw error;
-    return data as AutomationEligibility;
+    return data as unknown as AutomationEligibility;
   } catch (error) {
     console.error('Error checking automation eligibility:', error);
     throw error;

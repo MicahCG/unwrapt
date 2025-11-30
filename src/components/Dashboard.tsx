@@ -94,11 +94,9 @@ const Dashboard = () => {
 
     // Only show onboarding if:
     // 1. User just switched TO VIP (previousTier exists and was not VIP)
-    // 2. They haven't completed onboarding yet
     if (currentTier === 'vip' &&
         previousTier !== null &&
-        previousTier !== 'vip' &&
-        !userProfile.vip_onboarding_completed) {
+        previousTier !== 'vip') {
       setShowVIPOnboarding(true);
     }
 
