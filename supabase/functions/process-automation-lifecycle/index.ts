@@ -92,7 +92,7 @@ async function processGiftStage(supabaseClient: any, gift: any, recipient: any, 
   }
 
   // STAGE 2: Auto-confirm gift (3 days after reservation if address exists)
-  if (gift.wallet_reserved && !gift.gift_confirmed_at && isAddressComplete(recipient)) {
+  if (gift.wallet_reserved && gift.status !== 'confirmed' && isAddressComplete(recipient)) {
     const reservationDate = new Date(gift.wallet_reservation_date || gift.updated_at);
     const daysSinceReservation = Math.ceil((today.getTime() - reservationDate.getTime()) / (1000 * 60 * 60 * 24));
 
@@ -103,7 +103,7 @@ async function processGiftStage(supabaseClient: any, gift: any, recipient: any, 
   }
 
   // STAGE 3: Address request (10 days before, if gift not confirmed yet)
-  if (daysUntilDelivery === 10 && gift.wallet_reserved && !gift.gift_confirmed_at && !gift.address_requested_at) {
+  if (daysUntilDelivery === 10 && gift.wallet_reserved && gift.status !== 'confirmed' && !gift.address_requested_at) {
     await handleAddressRequest(supabaseClient, gift, recipient);
     return;
   }
@@ -163,7 +163,7 @@ async function processGiftStage(supabaseClient: any, gift: any, recipient: any, 
   }
 
   // STAGE 4: Order fulfillment (when gift is confirmed and address is confirmed)
-  if (gift.wallet_reserved && gift.gift_confirmed_at && gift.address_confirmed_at && gift.payment_status === "unpaid" && daysUntilDelivery > 0) {
+  if (gift.wallet_reserved && gift.status === 'confirmed' && gift.address_confirmed_at && gift.payment_status === "unpaid" && daysUntilDelivery > 0) {
     await handleOrderFulfillment(supabaseClient, gift, recipient);
     return;
   }
@@ -573,7 +573,7 @@ async function handleGiftAutoConfirmation(supabaseClient: any, gift: any, recipi
     const { error: updateError } = await supabaseClient
       .from("scheduled_gifts")
       .update({
-        gift_confirmed_at: new Date().toISOString()
+        status: 'confirmed'
       })
       .eq("id", gift.id);
 
