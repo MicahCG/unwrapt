@@ -61,7 +61,7 @@ serve(async (req) => {
       throw new Error("Gift not found or access denied");
     }
 
-    if (gift.gift_confirmed_at) {
+    if (gift.fulfilled_at) {
       throw new Error("Gift already confirmed");
     }
 
@@ -81,7 +81,7 @@ serve(async (req) => {
 
     // Update gift as confirmed
     const updateData: any = {
-      gift_confirmed_at: new Date().toISOString(),
+      status: 'confirmed',
     };
 
     // If address is complete, mark it as confirmed too
