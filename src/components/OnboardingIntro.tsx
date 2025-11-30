@@ -79,9 +79,9 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
   };
 
   const handleGetStarted = () => {
-    // Mark as seen and redirect to app subdomain
+    // Mark as seen and proceed to onboarding
     localStorage.setItem('hasSeenIntro', 'true');
-    window.location.href = getAppUrl();
+    onComplete();
   };
 
   const renderIcon = () => {
