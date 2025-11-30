@@ -20,7 +20,7 @@ interface GiftAwaitingConfirmation {
   gift_description: string | null;
   gift_variant_id: string | null;
   wallet_reserved: boolean;
-  gift_confirmed_at: string | null;
+  fulfilled_at: string | null;
   delivery_date: string;
 }
 
@@ -73,14 +73,14 @@ export const GiftsAwaitingConfirmation = () => {
           gift_description,
           gift_variant_id,
           wallet_reserved,
-          gift_confirmed_at,
+          fulfilled_at,
           delivery_date,
           recipients!inner(name)
         `)
         .eq('user_id', user.id)
         .eq('automation_enabled', true)
         .eq('wallet_reserved', true)
-        .is('gift_confirmed_at', null)
+        .is('fulfilled_at', null)
         .order('occasion_date', { ascending: true });
 
       if (error) throw error;

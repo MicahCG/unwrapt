@@ -171,6 +171,7 @@ export const EnableAutomationModal = ({
         .insert({
           user_id: user.id,
           recipient_id: recipientId,
+          stage: 'setup',
           action: 'automation_enabled',
           details: {
             gift_variant_id: defaultGift.variantId,
