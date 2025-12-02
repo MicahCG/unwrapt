@@ -49,12 +49,24 @@ serve(async (req) => {
 
         console.log(`✅ Checkout completed for user: ${userId}, plan: ${planType}`);
 
+        // Check if this is a trial subscription
+        const subscriptionId = session.subscription as string;
+        let trialEndsAt: string | null = null;
+
+        if (subscriptionId) {
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          if (subscription.trial_end) {
+            trialEndsAt = new Date(subscription.trial_end * 1000).toISOString();
+          }
+        }
+
         // Update user to VIP tier
         const { error: updateError } = await supabaseClient
           .from("profiles")
           .update({
             subscription_tier: "vip",
-            subscription_status: "active",
+            subscription_status: trialEndsAt ? "trialing" : "active",
+            trial_ends_at: trialEndsAt,
           })
           .eq("id", userId);
 
@@ -63,7 +75,46 @@ serve(async (req) => {
           throw updateError;
         }
 
-        console.log(`✅ User ${userId} upgraded to VIP`);
+        console.log(`✅ User ${userId} upgraded to VIP${trialEndsAt ? ' (trial)' : ''}`);
+        break;
+      }
+
+      case "customer.subscription.trial_will_end": {
+        const subscription = event.data.object as Stripe.Subscription;
+        const customerId = subscription.customer as string;
+
+        const customer = await stripe.customers.retrieve(customerId);
+        if (!customer || customer.deleted) break;
+
+        const userId = customer.metadata?.supabase_user_id;
+        if (!userId) break;
+
+        // Get user profile for email
+        const { data: profile } = await supabaseClient
+          .from("profiles")
+          .select("email, full_name")
+          .eq("id", userId)
+          .single();
+
+        if (profile?.email) {
+          // Calculate days remaining
+          const trialEnd = subscription.trial_end ? new Date(subscription.trial_end * 1000) : new Date();
+          const now = new Date();
+          const daysRemaining = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+          console.log(`⏳ Trial ending in ${daysRemaining} days for user: ${userId}`);
+
+          await supabaseClient.functions.invoke("send-notification-email", {
+            body: {
+              type: "trial_ending",
+              recipientEmail: profile.email,
+              userName: profile.full_name,
+              data: {
+                daysRemaining: daysRemaining,
+              },
+            },
+          });
+        }
         break;
       }
 
@@ -78,12 +129,21 @@ serve(async (req) => {
         const userId = customer.metadata?.supabase_user_id;
         if (!userId) break;
 
-        console.log(`📝 Subscription updated for user: ${userId}`);
+        console.log(`📝 Subscription updated for user: ${userId}, status: ${subscription.status}`);
 
-        // Update subscription status based on Stripe status
+        // Determine tier and status
+        let tier = "vip";
         let status = "active";
-        if (subscription.status === "canceled" || subscription.status === "unpaid") {
+        let trialEndsAt: string | null = null;
+
+        if (subscription.status === "trialing") {
+          status = "trialing";
+          if (subscription.trial_end) {
+            trialEndsAt = new Date(subscription.trial_end * 1000).toISOString();
+          }
+        } else if (subscription.status === "canceled" || subscription.status === "unpaid") {
           status = "cancelled";
+          tier = "free";
         } else if (subscription.status === "past_due") {
           status = "expired";
         }
@@ -92,12 +152,34 @@ serve(async (req) => {
           .from("profiles")
           .update({
             subscription_status: status,
-            subscription_tier: subscription.status === "active" ? "vip" : "free",
+            subscription_tier: tier,
+            trial_ends_at: trialEndsAt,
           })
           .eq("id", userId);
 
         if (updateError) {
           console.error("❌ Error updating subscription:", updateError);
+        }
+
+        // If trial ended and no active subscription, send trial ended email
+        if (subscription.status === "canceled" && subscription.canceled_at) {
+          const { data: profile } = await supabaseClient
+            .from("profiles")
+            .select("email, full_name")
+            .eq("id", userId)
+            .single();
+
+          if (profile?.email && subscription.trial_end && subscription.trial_end * 1000 > Date.now() - 86400000) {
+            // Trial ended recently (within 24 hours)
+            await supabaseClient.functions.invoke("send-notification-email", {
+              body: {
+                type: "trial_ended",
+                recipientEmail: profile.email,
+                userName: profile.full_name,
+                data: {},
+              },
+            });
+          }
         }
         break;
       }
@@ -114,17 +196,81 @@ serve(async (req) => {
 
         console.log(`🚫 Subscription cancelled for user: ${userId}`);
 
+        // Get user profile for email
+        const { data: profile } = await supabaseClient
+          .from("profiles")
+          .select("email, full_name")
+          .eq("id", userId)
+          .single();
+
         // Downgrade to free tier
         const { error: updateError } = await supabaseClient
           .from("profiles")
           .update({
             subscription_tier: "free",
             subscription_status: "cancelled",
+            trial_ends_at: null,
           })
           .eq("id", userId);
 
         if (updateError) {
           console.error("❌ Error downgrading user:", updateError);
+        }
+
+        // Pause all automations for this user
+        const { error: automationError } = await supabaseClient
+          .from("recipients")
+          .update({ automation_enabled: false })
+          .eq("user_id", userId);
+
+        if (automationError) {
+          console.error("❌ Error pausing automations:", automationError);
+        }
+
+        // Send cancellation email
+        if (profile?.email) {
+          await supabaseClient.functions.invoke("send-notification-email", {
+            body: {
+              type: "subscription_cancelled",
+              recipientEmail: profile.email,
+              userName: profile.full_name,
+              data: {},
+            },
+          });
+        }
+        break;
+      }
+
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const customerId = invoice.customer as string;
+
+        const customer = await stripe.customers.retrieve(customerId);
+        if (!customer || customer.deleted) break;
+
+        const userId = customer.metadata?.supabase_user_id;
+        if (!userId) break;
+
+        console.log(`❌ Payment failed for user: ${userId}`);
+
+        // Get user profile for email
+        const { data: profile } = await supabaseClient
+          .from("profiles")
+          .select("email, full_name")
+          .eq("id", userId)
+          .single();
+
+        if (profile?.email) {
+          await supabaseClient.functions.invoke("send-notification-email", {
+            body: {
+              type: "auto_reload_failed",
+              recipientEmail: profile.email,
+              userName: profile.full_name,
+              data: {
+                error: "Your subscription payment failed. Please update your payment method.",
+              },
+            },
+          });
         }
         break;
       }
