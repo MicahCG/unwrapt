@@ -89,9 +89,9 @@ serve(async (req) => {
       body: {
         type: "auto_reload_success",
         recipientEmail: profile.email,
+        userName: profile.full_name,
         data: {
-          userName: profile.full_name,
-          amount: amount,
+          reloadAmount: amount,
           newBalance: newBalance,
         },
       },

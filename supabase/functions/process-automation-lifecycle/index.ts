@@ -535,10 +535,13 @@ async function handleEscalation(supabaseClient: any, gift: any, recipient: any) 
       body: {
         type: "address_escalation",
         recipientEmail: recipient.profiles.email,
+        userName: recipient.profiles.full_name,
         data: {
           recipientName: recipient.name,
           occasion: gift.occasion,
-          deliveryDate: gift.delivery_date
+          occasionDate: gift.occasion_date,
+          deliveryDate: gift.delivery_date,
+          confirmationLink: `https://app.unwrapt.io/confirm-address/${gift.id}`
         }
       }
     });
@@ -639,9 +642,11 @@ async function handleExpiredGift(supabaseClient: any, gift: any, recipient: any)
       body: {
         type: "gift_expired",
         recipientEmail: recipient.profiles.email,
+        userName: recipient.profiles.full_name,
         data: {
           recipientName: recipient.name,
-          occasion: gift.occasion
+          occasion: gift.occasion,
+          amount: gift.wallet_reservation_amount || 0
         }
       }
     });
