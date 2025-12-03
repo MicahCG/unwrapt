@@ -217,31 +217,32 @@ const MonthlyOpportunitiesOverlay: React.FC<MonthlyOpportunitiesOverlayProps> = 
         };
       }
 
-      // No opportunities in either timeframe, but check if there are any scheduled gifts this month
-      console.log('No opportunities found in month or next 2 weeks, checking for existing scheduled gifts');
-      
-      // Check if there are any scheduled gifts for this month
+      // No opportunities in either timeframe, but check if there are any confirmed/fulfilled gifts this month
+      console.log('No opportunities found in month or next 2 weeks, checking for confirmed scheduled gifts');
+
+      // Check if there are any confirmed or fulfilled gifts for this month (not just pending)
       const { data: existingGifts, error: existingGiftsError } = await supabase
         .from('scheduled_gifts')
-        .select('id')
+        .select('id, status')
         .eq('user_id', user.id)
         .gte('occasion_date', monthStart.toISOString().split('T')[0])
-        .lte('occasion_date', monthEnd.toISOString().split('T')[0]);
-      
+        .lte('occasion_date', monthEnd.toISOString().split('T')[0])
+        .in('status', ['confirmed', 'fulfilled']);
+
       if (existingGiftsError) {
         console.error('Error checking existing gifts:', existingGiftsError);
         return { count: 0, opportunities: [], allScheduled: false, timeframe: 'month', noCoverage: false };
       }
-      
-      const hasScheduledGifts = existingGifts && existingGifts.length > 0;
-      console.log('Has scheduled gifts this month:', hasScheduledGifts);
-      
-      return { 
-        count: 0, 
-        opportunities: [], 
-        allScheduled: false, 
-        timeframe: 'month', 
-        noCoverage: hasScheduledGifts // Only covered if there are actually scheduled gifts
+
+      const hasConfirmedGifts = existingGifts && existingGifts.length > 0;
+      console.log('Has confirmed/fulfilled gifts this month:', hasConfirmedGifts);
+
+      return {
+        count: 0,
+        opportunities: [],
+        allScheduled: false,
+        timeframe: 'month',
+        noCoverage: hasConfirmedGifts // Only covered if there are actually confirmed/fulfilled gifts
       };
     },
     enabled: !!user?.id

@@ -8,11 +8,10 @@ import TestDataManager from '@/components/TestDataManager';
 import MonthlyOpportunitiesOverlay from '@/components/MonthlyOpportunitiesOverlay';
 import GiftScheduledSuccess from '@/components/GiftScheduledSuccess';
 import { Logo } from '@/components/ui/logo';
-import { Bell, Star, Heart, Plus, Calendar, Lock, Crown } from 'lucide-react';
+import { Bell, Star, Heart, Plus, Lock, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import AddRecipientModal from '@/components/AddRecipientModal';
 import ScheduleGiftModal from '@/components/ScheduleGiftModal';
-import GiftDetailsModal from '@/components/GiftDetailsModal';
 import SubscriptionBadge from '@/components/subscription/SubscriptionBadge';
 import { WalletBalance } from '@/components/wallet/WalletBalance';
 import { AddFundsModal } from '@/components/wallet/AddFundsModal';
@@ -34,8 +33,6 @@ const Dashboard = () => {
   const [showAddRecipient, setShowAddRecipient] = useState(false);
   const [showScheduleGift, setShowScheduleGift] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState(null);
-  const [showGiftDetails, setShowGiftDetails] = useState(false);
-  const [selectedGift, setSelectedGift] = useState(null);
   const [showAddFunds, setShowAddFunds] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showEnableAutomation, setShowEnableAutomation] = useState(false);
@@ -133,27 +130,6 @@ const Dashboard = () => {
     refetchOnWindowFocus: true
   });
 
-  // Fetch pending gifts (unpaid)
-  const { data: pendingGifts = [] } = useQuery({
-    queryKey: ['pending-gifts', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      
-      const { data, error } = await supabase
-        .from('scheduled_gifts')
-        .select(`
-          *,
-          recipients(name, email)
-        `)
-        .eq('user_id', user.id)
-        .eq('payment_status', 'unpaid')
-        .order('occasion_date', { ascending: true });
-      
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!user?.id
-  });
 
   // Check for recently scheduled gift to show success animation
   const { data: recentGift } = useQuery({
@@ -239,11 +215,6 @@ const Dashboard = () => {
   const handleScheduleGift = (recipient: any) => {
     setSelectedRecipient(recipient);
     setShowScheduleGift(true);
-  };
-
-  const handleViewGift = (gift: any) => {
-    setSelectedGift(gift);
-    setShowGiftDetails(true);
   };
 
   const handleEnableAutomation = (recipient: any) => {
@@ -545,54 +516,9 @@ const Dashboard = () => {
             </Card>
           </div>
 
-          {/* RIGHT COLUMN - Pending Gifts */}
+          {/* RIGHT COLUMN - Reserved for future features */}
           <div className="space-y-6">
-            <Card className="bg-[#EFE7DD] border-[#E4DCD2] rounded-2xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.07)]">
-              <h2 className="font-display text-xl text-[#1A1A1A] mb-6">
-                Gifts Awaiting Confirmation
-              </h2>
-              
-              <div className="space-y-4">
-                {pendingGifts.length === 0 ? (
-                  <div className="text-center py-12 text-[#1A1A1A]/60">
-                    <Calendar className="w-12 h-12 mx-auto mb-4 opacity-40" />
-                    <p>No pending gifts at the moment</p>
-                    <p className="text-sm mt-2">Schedule a gift to get started</p>
-                  </div>
-                ) : (
-                  pendingGifts.map((gift) => (
-                    <div
-                      key={gift.id}
-                      className="p-5 bg-[#FAF8F3] rounded-xl border border-[#E4DCD2] hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <h3 className="font-medium text-[#1A1A1A] mb-1">
-                            {cleanName(gift.recipients?.name)}
-                          </h3>
-                          <p className="text-sm text-[#1A1A1A]/80">
-                            {gift.gift_description || gift.gift_type}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      {gift.payment_amount && (
-                        <p className="text-sm text-[#1A1A1A]/70 mb-4">
-                          Price: ${gift.payment_amount.toFixed(2)}
-                        </p>
-                      )}
-                      
-                      <Button
-                        onClick={() => handleViewGift(gift)}
-                        className="w-full bg-[#D2B887] hover:bg-[#D2B887]/90 text-[#1A1A1A]"
-                      >
-                        Confirm Gift
-                      </Button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </Card>
+            {/* Future features will go here */}
           </div>
         </div>
       </div>
@@ -613,18 +539,6 @@ const Dashboard = () => {
           isOpen={showScheduleGift}
           onClose={() => setShowScheduleGift(false)}
           recipient={selectedRecipient}
-        />
-      )}
-
-      {showGiftDetails && selectedGift && (
-        <GiftDetailsModal
-          isOpen={showGiftDetails}
-          onClose={() => setShowGiftDetails(false)}
-          gift={selectedGift}
-          onDelete={(giftId) => {
-            setShowGiftDetails(false);
-            setSelectedGift(null);
-          }}
         />
       )}
 

@@ -26,7 +26,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const [selectedVibe, setSelectedVibe] = useState<GiftVibe | null>(null);
+  const [selectedVibe, setSelectedVibe] = useState<GiftVibe | null>('CALM_COMFORT');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   const [formData, setFormData] = useState({
@@ -135,11 +135,11 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
   useEffect(() => {
     if (isOpen) {
-      // Initialize with recipient's preferred vibe if available
+      // Initialize with recipient's preferred vibe if available, otherwise default to CALM_COMFORT
       if (recipient.preferred_gift_vibe) {
         setSelectedVibe(recipient.preferred_gift_vibe);
       } else {
-        setSelectedVibe(null);
+        setSelectedVibe('CALM_COMFORT');
       }
 
       // Check if this is a holiday preset
