@@ -170,7 +170,7 @@ export const AutomationToggle = ({
   const maxStages = 6;
 
   return (
-    <div className={cn('flex items-center gap-3', className)}>
+    <div className={cn('flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3', className)}>
       {/* Toggle Switch */}
       <div className="flex items-center gap-2">
         <Switch
@@ -179,7 +179,7 @@ export const AutomationToggle = ({
           disabled={!isEligible || status?.fulfilled}
           className="data-[state=checked]:bg-[#D2B887]"
         />
-        <Badge variant="secondary" className="bg-[#D2B887]/10 text-[#D2B887] border-[#D2B887]/20">
+        <Badge variant="secondary" className="bg-[#D2B887]/10 text-[#D2B887] border-[#D2B887]/20 text-xs">
           <Zap className="w-3 h-3 mr-1" />
           VIP
         </Badge>
@@ -187,14 +187,14 @@ export const AutomationToggle = ({
 
       {/* Status Display */}
       {status?.enabled && (
-        <div className="flex items-center gap-2">
-          <div className={cn('flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium', state.bgColor, state.color)}>
-            {StateIcon && <StateIcon className="w-3.5 h-3.5" />}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className={cn('flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap', state.bgColor, state.color)}>
+            {StateIcon && <StateIcon className="w-3.5 h-3.5 flex-shrink-0" />}
             <span>{state.label}</span>
           </div>
 
           {/* Stage Progress */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 whitespace-nowrap">
             <span className="text-xs text-gray-500">Stage</span>
             <div className="flex gap-0.5">
               {Array.from({ length: maxStages }).map((_, idx) => (

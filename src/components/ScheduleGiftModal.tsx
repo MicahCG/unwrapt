@@ -79,8 +79,18 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         totalProducts: allProducts.length,
         selectedVibe,
         filteredCount: filteredProducts.length,
-        productsLoading
+        productsLoading,
+        allProductsPreview: allProducts.slice(0, 3).map(p => ({
+          title: p.title,
+          vibe: p.gift_vibe,
+          active: p.active,
+          available: p.available_for_sale
+        }))
       });
+
+      if (allProducts.length === 0 && !productsLoading) {
+        console.error('⚠️ NO PRODUCTS FOUND - Check production database!');
+      }
     }
   }, [allProducts, selectedVibe, filteredProducts, isOpen, productsLoading]);
 
@@ -406,9 +416,9 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         </SheetHeader>
 
         {/* Two-Column Layout */}
-        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
           {/* Left Column: Form Fields */}
-          <div className="lg:w-[280px] flex-shrink-0 px-8 py-6 space-y-6 overflow-y-auto bg-white/30">
+          <div className="lg:w-[280px] flex-shrink-0 px-8 py-6 space-y-6 lg:overflow-y-auto bg-white/30">
             {/* Birthday Date */}
             <div className="space-y-2">
               <Label htmlFor="occasion_date" className="text-sm font-medium text-[#1A1A1A]">
@@ -508,7 +518,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           </div>
 
           {/* Right Column: Gift Gallery */}
-          <div className="flex-1 px-8 py-6 overflow-y-auto bg-gradient-to-br from-[#FAF8F3] to-[#EFE7DD]/30">
+          <div className="flex-1 px-8 py-6 lg:overflow-y-auto bg-gradient-to-br from-[#FAF8F3] to-[#EFE7DD]/30">
             <div className="mb-4">
               <h3 className="font-semibold text-[#1A1A1A] flex items-center gap-2">
                 <Heart className="w-4 h-4 text-[#D2B887]" />

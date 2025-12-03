@@ -351,9 +351,14 @@ export async function getAllProducts(params?: {
     const { data, error } = await query;
 
     if (error) {
-      console.error('Error fetching all products:', error);
+      console.error('❌ Error fetching all products:', error);
       return [];
     }
+
+    console.log(`✅ getAllProducts: Fetched ${data?.length || 0} products`, {
+      filters: params,
+      sampleProducts: data?.slice(0, 2).map(p => ({ title: p.title, vibe: p.gift_vibe }))
+    });
 
     return (data || []) as Product[];
   } catch (error) {
