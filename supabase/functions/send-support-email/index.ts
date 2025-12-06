@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { Resend } from "npm:resend@2.0.0";
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,32 +33,41 @@ const handler = async (req: Request): Promise<Response> => {
       userName 
     }: SupportEmailRequest = await req.json();
 
-    const emailResponse = await resend.emails.send({
-      from: "Unwrapt Support <support@unwrapt.com>",
-      to: ["team@unwrapt.io"],
-      subject: `Support Request - Gift Order ${giftId}`,
-      html: `
-        <h2>Support Request from ${userName}</h2>
-        <p><strong>User Email:</strong> ${userEmail}</p>
-        
-        <h3>Gift Details</h3>
-        <ul>
-          <li><strong>Gift ID:</strong> ${giftId}</li>
-          <li><strong>Recipient:</strong> ${recipientName}</li>
-          <li><strong>Gift Type:</strong> ${giftType}</li>
-          <li><strong>Occasion Date:</strong> ${occasionDate}</li>
-        </ul>
-        
-        <p>The user has a question or issue regarding this order. Please follow up with them directly.</p>
-        
-        <hr>
-        <p><em>This email was automatically generated from the Unwrapt app.</em></p>
-      `,
+    const emailResponse = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "Unwrapt Support <support@unwrapt.com>",
+        to: ["team@unwrapt.io"],
+        subject: `Support Request - Gift Order ${giftId}`,
+        html: `
+          <h2>Support Request from ${userName}</h2>
+          <p><strong>User Email:</strong> ${userEmail}</p>
+          
+          <h3>Gift Details</h3>
+          <ul>
+            <li><strong>Gift ID:</strong> ${giftId}</li>
+            <li><strong>Recipient:</strong> ${recipientName}</li>
+            <li><strong>Gift Type:</strong> ${giftType}</li>
+            <li><strong>Occasion Date:</strong> ${occasionDate}</li>
+          </ul>
+          
+          <p>The user has a question or issue regarding this order. Please follow up with them directly.</p>
+          
+          <hr>
+          <p><em>This email was automatically generated from the Unwrapt app.</em></p>
+        `,
+      }),
     });
+
+    const emailData = await emailResponse.json();
 
     console.log("Support email sent successfully:", emailResponse);
 
-    return new Response(JSON.stringify({ success: true, emailId: emailResponse.data?.id }), {
+    return new Response(JSON.stringify({ success: true, emailId: emailData?.id }), {
       status: 200,
       headers: {
         "Content-Type": "application/json",
