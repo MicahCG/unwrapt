@@ -11,33 +11,45 @@ serve(async (req) => {
   try {
     console.log('🎁 Process-gift-fulfillment: Function started');
     
-    // Create Supabase client with auth header
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
-    );
-
-    // Verify user is authenticated
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    const authHeader = req.headers.get('Authorization');
+    const isServiceRoleCall = authHeader?.includes(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || 'INVALID');
     
-    if (userError || !user) {
-      console.error('Authentication failed:', userError);
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized', success: false }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     const supabaseService = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       { auth: { persistSession: false } }
     );
+
+    let userId: string | null = null;
+
+    // Check if this is an internal service call (from verify-payment or automation)
+    if (isServiceRoleCall) {
+      console.log('🎁 Process-gift-fulfillment: Service role call detected - internal request');
+      // For service role calls, we trust the caller and skip user auth
+      // The scheduledGiftId will be validated against the database
+    } else {
+      // For client calls, verify user authentication
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        {
+          global: {
+            headers: { Authorization: authHeader! },
+          },
+        }
+      );
+
+      const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+      
+      if (userError || !user) {
+        console.error('Authentication failed:', userError);
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized', success: false }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      userId = user.id;
+    }
 
     console.log('🎁 Process-gift-fulfillment: Supabase client created');
 
@@ -59,14 +71,23 @@ serve(async (req) => {
 
     console.log(`🎁 Process-gift-fulfillment: Processing gift fulfillment for: ${scheduledGiftId}`);
 
-    // Verify the gift belongs to the authenticated user
-    const { data: giftCheck } = await supabaseClient
+    // Verify the gift exists and get user_id
+    const { data: giftCheck, error: giftCheckError } = await supabaseService
       .from('scheduled_gifts')
       .select('user_id')
       .eq('id', scheduledGiftId)
       .single();
 
-    if (!giftCheck || giftCheck.user_id !== user.id) {
+    if (giftCheckError || !giftCheck) {
+      console.error('Gift not found:', giftCheckError);
+      return new Response(
+        JSON.stringify({ error: 'Gift not found', success: false }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // For client calls, verify ownership
+    if (userId && giftCheck.user_id !== userId) {
       console.error('Gift verification failed: gift does not belong to user');
       return new Response(
         JSON.stringify({ error: 'Unauthorized', success: false }),
