@@ -92,7 +92,7 @@ export const VIPUpgradeModal = ({ isOpen, onClose }: VIPUpgradeModalProps) => {
             <div className="text-center">
               <div className="text-sm text-[#1A1A1A]/70 mb-2">VIP Monthly</div>
               <div className="flex items-baseline justify-center gap-1 mb-4">
-                <span className="text-4xl font-display text-[#1A1A1A]">$29</span>
+                <span className="text-4xl font-display text-[#1A1A1A]">$4.99</span>
                 <span className="text-[#1A1A1A]/70">/month</span>
               </div>
               <div className="text-xs text-[#1A1A1A]/60">
