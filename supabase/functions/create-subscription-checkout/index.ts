@@ -77,6 +77,10 @@ serve(async (req) => {
       console.log(`✅ Created new Stripe customer: ${customerId}`);
     }
 
+    // Get origin, fallback to app domain
+    const origin = req.headers.get("origin") || "https://app.unwrapt.io";
+    console.log(`💳 Using origin for redirect: ${origin}`);
+
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -87,8 +91,8 @@ serve(async (req) => {
         },
       ],
       mode: "subscription",
-      success_url: `${req.headers.get("origin")}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.get("origin")}/`,
+      success_url: `${origin}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/`,
       metadata: {
         supabase_user_id: user.id,
         plan_type: planType,
