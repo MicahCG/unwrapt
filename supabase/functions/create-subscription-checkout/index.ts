@@ -57,6 +57,14 @@ serve(async (req) => {
     if (customers.data.length > 0) {
       customerId = customers.data[0].id;
       console.log(`✅ Found existing Stripe customer: ${customerId}`);
+      
+      // Ensure supabase_user_id is in metadata for existing customers
+      if (!customers.data[0].metadata?.supabase_user_id) {
+        await stripe.customers.update(customerId, {
+          metadata: { supabase_user_id: user.id }
+        });
+        console.log(`✅ Updated existing customer metadata with supabase_user_id`);
+      }
     } else {
       // Create new customer
       const customer = await stripe.customers.create({

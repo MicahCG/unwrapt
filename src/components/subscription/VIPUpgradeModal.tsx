@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Check, Crown, Loader2, Zap, Users, Calendar } from 'lucide-react';
+import { Crown, Loader2, Zap, Users, Calendar, Wallet } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -11,24 +11,16 @@ interface VIPUpgradeModalProps {
   onClose: () => void;
 }
 
-// Stripe Price IDs - You'll need to create these in your Stripe Dashboard
-const STRIPE_PRICES = {
-  vip_monthly: 'price_YOUR_MONTHLY_PRICE_ID', // Replace with actual price ID
-  vip_annual: 'price_YOUR_ANNUAL_PRICE_ID', // Replace with actual price ID
-};
+// Stripe Price ID for VIP Monthly subscription
+const VIP_MONTHLY_PRICE_ID = 'price_1SbpNlRvvOzjYUzy9iakOpwv';
 
 export const VIPUpgradeModal = ({ isOpen, onClose }: VIPUpgradeModalProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'annual'>('monthly');
 
   const handleUpgrade = async () => {
     setIsProcessing(true);
 
     try {
-      const priceId = selectedPlan === 'monthly' 
-        ? STRIPE_PRICES.vip_monthly 
-        : STRIPE_PRICES.vip_annual;
-
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error('Not authenticated');
@@ -36,8 +28,8 @@ export const VIPUpgradeModal = ({ isOpen, onClose }: VIPUpgradeModalProps) => {
 
       const response = await supabase.functions.invoke('create-subscription-checkout', {
         body: {
-          priceId,
-          planType: `vip_${selectedPlan}`,
+          priceId: VIP_MONTHLY_PRICE_ID,
+          planType: 'vip_monthly',
         },
       });
 
@@ -64,12 +56,12 @@ export const VIPUpgradeModal = ({ isOpen, onClose }: VIPUpgradeModalProps) => {
     { icon: Users, text: 'Unlimited recipients' },
     { icon: Zap, text: 'Full gift automation' },
     { icon: Calendar, text: 'Advanced scheduling' },
-    { icon: Crown, text: 'Priority support' },
+    { icon: Wallet, text: 'Gift wallet & auto-reload' },
   ];
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl bg-[#FAF8F3] border-[#E4DCD2]">
+      <DialogContent className="sm:max-w-md bg-[#FAF8F3] border-[#E4DCD2]">
         <DialogHeader>
           <div className="flex items-center gap-3 mb-2">
             <Crown className="w-8 h-8 text-[#D2B887]" />
@@ -95,53 +87,19 @@ export const VIPUpgradeModal = ({ isOpen, onClose }: VIPUpgradeModalProps) => {
             ))}
           </div>
 
-          {/* Pricing Plans */}
-          <div className="grid grid-cols-2 gap-4">
-            {/* Monthly Plan */}
-            <Card
-              className={`p-6 cursor-pointer transition-all ${
-                selectedPlan === 'monthly'
-                  ? 'border-2 border-[#D2B887] bg-[#D2B887]/10'
-                  : 'border border-[#E4DCD2] hover:border-[#D2B887]/50'
-              }`}
-              onClick={() => setSelectedPlan('monthly')}
-            >
-              <div className="text-center">
-                <div className="text-sm text-[#1A1A1A]/70 mb-2">Monthly</div>
-                <div className="flex items-baseline justify-center gap-1 mb-4">
-                  <span className="text-4xl font-display text-[#1A1A1A]">$29</span>
-                  <span className="text-[#1A1A1A]/70">/mo</span>
-                </div>
-                <div className="text-xs text-[#1A1A1A]/60">
-                  Billed monthly
-                </div>
+          {/* Pricing Card */}
+          <Card className="p-6 border-2 border-[#D2B887] bg-[#D2B887]/10">
+            <div className="text-center">
+              <div className="text-sm text-[#1A1A1A]/70 mb-2">VIP Monthly</div>
+              <div className="flex items-baseline justify-center gap-1 mb-4">
+                <span className="text-4xl font-display text-[#1A1A1A]">$29</span>
+                <span className="text-[#1A1A1A]/70">/month</span>
               </div>
-            </Card>
-
-            {/* Annual Plan */}
-            <Card
-              className={`p-6 cursor-pointer transition-all relative ${
-                selectedPlan === 'annual'
-                  ? 'border-2 border-[#D2B887] bg-[#D2B887]/10'
-                  : 'border border-[#E4DCD2] hover:border-[#D2B887]/50'
-              }`}
-              onClick={() => setSelectedPlan('annual')}
-            >
-              <div className="absolute -top-3 right-4 bg-[#D2B887] text-white text-xs px-2 py-1 rounded-full">
-                Save 20%
+              <div className="text-xs text-[#1A1A1A]/60">
+                Cancel anytime • No commitment
               </div>
-              <div className="text-center">
-                <div className="text-sm text-[#1A1A1A]/70 mb-2">Annual</div>
-                <div className="flex items-baseline justify-center gap-1 mb-4">
-                  <span className="text-4xl font-display text-[#1A1A1A]">$279</span>
-                  <span className="text-[#1A1A1A]/70">/yr</span>
-                </div>
-                <div className="text-xs text-[#1A1A1A]/60">
-                  $23.25/mo • Billed annually
-                </div>
-              </div>
-            </Card>
-          </div>
+            </div>
+          </Card>
 
           {/* CTA Button */}
           <Button
@@ -163,7 +121,7 @@ export const VIPUpgradeModal = ({ isOpen, onClose }: VIPUpgradeModalProps) => {
           </Button>
 
           <p className="text-xs text-center text-[#1A1A1A]/60">
-            Secure payment processing by Stripe • Cancel anytime
+            Secure payment processing by Stripe
           </p>
         </div>
       </DialogContent>
