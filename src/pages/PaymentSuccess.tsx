@@ -1,9 +1,8 @@
-// Enhanced PaymentSuccess component with better debugging
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Gift, TestTube } from 'lucide-react';
+import { CheckCircle, Gift, AlertCircle, ArrowRight, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -18,163 +17,88 @@ const PaymentSuccess = () => {
   const { user } = useAuth();
   const [isVerifying, setIsVerifying] = useState(true);
   const [verificationComplete, setVerificationComplete] = useState(false);
-  const [showConfetti, setShowConfetti] = useState(true);
-  const [showVerificationConfetti, setShowVerificationConfetti] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
   const [isFromOnboarding, setIsFromOnboarding] = useState(false);
-  const [testMode, setTestMode] = useState(false);
 
   useEffect(() => {
-    // Get all possible session ID parameters from Stripe
     const sessionId = 
-    searchParams.get('session_id') || 
-    searchParams.get('checkout_session_id') ||
-    searchParams.get('sessionId') ||  // Additional fallback
-    searchParams.get('checkoutSessionId'); // Additional fallback
+      searchParams.get('session_id') || 
+      searchParams.get('checkout_session_id') ||
+      searchParams.get('sessionId') ||
+      searchParams.get('checkoutSessionId');
   
-    const testParam = searchParams.get('test');
-    
-    console.log('🔧 PaymentSuccess: URL params:', { 
+    console.log('PaymentSuccess: URL params:', { 
       sessionId, 
-      testParam,
       allParams: Object.fromEntries(searchParams.entries()),
-      currentURL: window.location.href,
-      pathname: window.location.pathname,
-      search: window.location.search
+      currentURL: window.location.href
     });
-    
-    if (testParam === 'true') {
-      console.log('🔧 PaymentSuccess: Test mode activated');
-      setTestMode(true);
-      const testSessionId = 'cs_test_' + Date.now();
-      console.log('🔧 PaymentSuccess: Using test session ID:', testSessionId);
-      testVerifyPayment(testSessionId);
-      return;
-    }
     
     // Check if this payment came from onboarding flow
     const onboardingFlag = localStorage.getItem('onboardingPaymentFlow');
     if (onboardingFlag === 'true') {
       setIsFromOnboarding(true);
       localStorage.removeItem('onboardingPaymentFlow');
-      console.log('🔧 PaymentSuccess: Detected onboarding payment flow');
     }
     
     if (sessionId) {
-      console.log('🔧 PaymentSuccess: Starting payment verification for session:', sessionId);
       verifyPayment(sessionId);
     } else {
-      console.error('🔧 PaymentSuccess: No session_id found in URL parameters');
-      console.error('🔧 PaymentSuccess: Available URL parameters:', Object.fromEntries(searchParams.entries()));
-      console.error('🔧 PaymentSuccess: Full URL:', window.location.href);
+      console.error('PaymentSuccess: No session_id found in URL');
       setIsVerifying(false);
-      
-      // Show more detailed error information
       toast({
-        title: "Payment Verification Issue",
-        description: `Unable to find payment session. URL: ${window.location.href}. Available params: ${Object.keys(Object.fromEntries(searchParams.entries())).join(', ') || 'none'}`,
+        title: "Session Not Found",
+        description: "Unable to find payment session. Please try again or contact support.",
         variant: "destructive"
       });
     }
   }, [searchParams]);
 
-  const testVerifyPayment = async (testSessionId) => {
-    console.log('🧪 PaymentSuccess: Testing verification flow with session:', testSessionId);
-    
+  const verifyPayment = async (sessionId: string) => {
     try {
-      console.log('🧪 PaymentSuccess: Calling verify-payment function...');
-      
-      const { data, error } = await supabase.functions.invoke('verify-payment', {
-        body: { sessionId: testSessionId }
-      });
-
-      console.log('🧪 PaymentSuccess: verify-payment response:', { data, error });
-
-      if (error) {
-        console.error('🧪 PaymentSuccess: verify-payment function error:', error);
-        toast({
-          title: "Test Failed",
-          description: `verify-payment function error: ${error.message}`,
-          variant: "destructive"
-        });
-        
-        setVerificationComplete(false);
-      } else {
-        console.log('🧪 PaymentSuccess: verify-payment succeeded');
-        setVerificationComplete(true);
-        setShowVerificationConfetti(true);
-        
-        toast({
-          title: "Test Status",
-          description: `Test session processed. Response received from verify-payment function.`,
-        });
-      }
-      
-    } catch (error) {
-      console.error('🧪 PaymentSuccess: Test error:', error);
-      toast({
-        title: "Test Error",
-        description: `Test failed: ${error.message}`,
-        variant: "destructive"
-      });
-      setVerificationComplete(false);
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  const verifyPayment = async (sessionId) => {
-    try {
-      console.log('🔧 PaymentSuccess: Calling verify-payment function with session:', sessionId);
-      console.log('🔧 PaymentSuccess: Supabase client configured, user authenticated:', !!user);
+      console.log('PaymentSuccess: Verifying session:', sessionId);
       
       const { data, error } = await supabase.functions.invoke('verify-payment', {
         body: { sessionId }
       });
 
-      console.log('🔧 PaymentSuccess: Verify payment response:', { data, error });
+      console.log('PaymentSuccess: Response:', { data, error });
 
       if (error) {
-        console.error('🔧 PaymentSuccess: Error from verify-payment function:', error);
+        console.error('PaymentSuccess: Error:', error);
         throw error;
       }
 
       if (data?.paymentStatus === 'paid') {
-        console.log('🔧 PaymentSuccess: Payment verified successfully');
         setVerificationComplete(true);
-        setShowVerificationConfetti(true);
+        setShowConfetti(true);
         
-        // Invalidate gift-related queries to update the UI
         if (user?.id) {
-          console.log('🔧 PaymentSuccess: Invalidating gift queries to update UI');
           await queryClient.invalidateQueries({ queryKey: ['upcoming-gifts', user.id] });
           await queryClient.invalidateQueries({ queryKey: ['unpaid-gifts', user.id] });
+          await queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
           
-          // If this was from onboarding, also invalidate onboarding status
           if (isFromOnboarding) {
-            console.log('🔧 PaymentSuccess: Invalidating onboarding queries');
             await queryClient.invalidateQueries({ queryKey: ['onboarding-status', user.id] });
             await queryClient.invalidateQueries({ queryKey: ['recipients', user.id] });
-            await queryClient.invalidateQueries({ queryKey: ['user-metrics', user.id] });
           }
         }
         
         toast({
           title: "Payment Successful!",
-          description: "Your gift has been scheduled and payment confirmed.",
+          description: "Your subscription is now active.",
         });
       } else {
-        console.log('🔧 PaymentSuccess: Payment not completed, status:', data?.paymentStatus);
         toast({
           title: "Payment Status",
-          description: `Payment status: ${data?.paymentStatus || 'unknown'}`,
+          description: `Status: ${data?.paymentStatus || 'unknown'}`,
           variant: "destructive"
         });
       }
     } catch (error) {
-      console.error('🔧 PaymentSuccess: Error verifying payment:', error);
+      console.error('PaymentSuccess: Verification error:', error);
       toast({
         title: "Verification Error",
-        description: "There was an issue verifying your payment. Please contact support if needed.",
+        description: "There was an issue verifying your payment.",
         variant: "destructive"
       });
     } finally {
@@ -182,200 +106,122 @@ const PaymentSuccess = () => {
     }
   };
 
-  const handleGoToDashboard = async () => {
-    console.log('🔧 PaymentSuccess: Navigating to dashboard');
-    
-    // If from onboarding, force refresh the onboarding status before navigating
-    if (isFromOnboarding && user?.id) {
-      try {
-        // Invalidate all relevant queries to force refresh
-        await queryClient.invalidateQueries({ queryKey: ['onboarding-status', user.id] });
-        await queryClient.invalidateQueries({ queryKey: ['recipients', user.id] });
-        
-        // Small delay to allow queries to invalidate
-        setTimeout(() => {
-          navigate('/', { replace: true });
-        }, 100);
-      } catch (error) {
-        console.error('Error invalidating queries:', error);
-        navigate('/', { replace: true });
-      }
-    } else {
-      navigate('/', { replace: true });
-    }
+  const handleGoToDashboard = () => {
+    navigate('/', { replace: true });
   };
 
   const handleRetryVerification = () => {
-    console.log('🔧 PaymentSuccess: Manually retrying verification');
     const sessionId = searchParams.get('session_id') || searchParams.get('checkout_session_id');
-    
     if (sessionId) {
       setIsVerifying(true);
       setVerificationComplete(false);
       verifyPayment(sessionId);
-    } else {
-      toast({
-        title: "No Session ID",
-        description: "Cannot retry verification without a valid session ID in the URL.",
-        variant: "destructive"
-      });
     }
   };
 
-  const runManualTest = () => {
-    console.log('🧪 PaymentSuccess: Running manual test');
-    setIsVerifying(true);
-    setVerificationComplete(false);
-    testVerifyPayment('cs_test_manual_' + Date.now());
-  };
-
-  if (isVerifying) {
-    return (
-      <>
-        <ConfettiAnimation isActive={showConfetti} duration={5000} startDelay={0} />
-        <div className="min-h-screen bg-brand-cream flex items-center justify-center">
-          <Card className="w-full max-w-md">
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal mx-auto mb-4"></div>
-                <p className="text-brand-charcoal">
-                  {testMode ? 'Testing payment verification...' : 'Verifying your payment and creating your order...'}
-                </p>
-                <p className="text-sm text-brand-charcoal/60 mt-2">This may take a few moments</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </>
-    );
-  }
-
-  // If no session ID and not in test mode, show error state with retry options
   const sessionId = searchParams.get('session_id') || searchParams.get('checkout_session_id');
   const hasSessionId = !!sessionId;
 
   return (
     <>
-      <ConfettiAnimation isActive={showConfetti} duration={8000} startDelay={0} />
-      <ConfettiAnimation isActive={showVerificationConfetti} duration={8000} startDelay={500} />
+      <ConfettiAnimation isActive={showConfetti} duration={6000} startDelay={0} />
       
-      {/* Animated glassmorphism background */}
-      <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
-        {/* Animated gradient background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-400/20 via-pink-400/20 to-blue-400/20 animate-pulse" />
-        <div className="absolute inset-0 bg-gradient-to-tr from-cyan-400/10 via-emerald-400/10 to-yellow-400/10" 
-             style={{
-               animation: 'gradientShift 8s ease-in-out infinite',
-             }} />
-        
-        {/* Floating orbs */}
-        <div className="absolute top-20 left-20 w-32 h-32 bg-purple-400/30 rounded-full blur-xl animate-bounce" 
-             style={{ animationDelay: '0s', animationDuration: '4s' }} />
-        <div className="absolute top-40 right-32 w-24 h-24 bg-pink-400/30 rounded-full blur-xl animate-bounce" 
-             style={{ animationDelay: '1s', animationDuration: '5s' }} />
-        <div className="absolute bottom-32 left-32 w-20 h-20 bg-cyan-400/30 rounded-full blur-xl animate-bounce" 
-             style={{ animationDelay: '2s', animationDuration: '6s' }} />
-        <div className="absolute bottom-20 right-20 w-28 h-28 bg-emerald-400/30 rounded-full blur-xl animate-bounce" 
-             style={{ animationDelay: '3s', animationDuration: '7s' }} />
-
-        {/* Main card with glassmorphism */}
-        <Card className="w-full max-w-md relative backdrop-blur-xl bg-white/10 border-white/20 shadow-2xl">
-          <style>{`
-            @keyframes gradientShift {
-              0%, 100% { transform: rotate(0deg) scale(1); }
-              33% { transform: rotate(120deg) scale(1.1); }
-              66% { transform: rotate(240deg) scale(0.9); }
-            }
-          `}</style>
-          
-          <CardHeader className="text-center pb-4">
+      <div className="min-h-screen bg-[#FAF9F7] flex items-center justify-center p-4">
+        <Card className="w-full max-w-md bg-white border border-[#E8E4DE] shadow-lg">
+          <CardHeader className="text-center pb-2 pt-8">
+            {/* Status Icon */}
             <div className="flex justify-center mb-6">
-              <div className={`p-6 rounded-full backdrop-blur-md border-2 transition-all duration-500 ${
-                verificationComplete 
-                  ? 'bg-emerald-500/20 border-emerald-400/40 animate-pulse' 
-                  : hasSessionId 
-                    ? 'bg-amber-500/20 border-amber-400/40' 
-                    : 'bg-red-500/20 border-red-400/40'
-              }`}>
-                {verificationComplete ? (
-                  <CheckCircle className="h-16 w-16 text-emerald-400 drop-shadow-lg" />
-                ) : hasSessionId ? (
-                  <Gift className="h-16 w-16 text-amber-400 drop-shadow-lg" />
-                ) : (
-                  <Gift className="h-16 w-16 text-red-400 drop-shadow-lg" />
-                )}
-              </div>
+              {isVerifying ? (
+                <div className="w-20 h-20 rounded-full bg-[#F5F3F0] flex items-center justify-center">
+                  <RefreshCw className="h-10 w-10 text-[#8B7355] animate-spin" />
+                </div>
+              ) : verificationComplete ? (
+                <div className="w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center">
+                  <CheckCircle className="h-10 w-10 text-emerald-600" />
+                </div>
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-amber-50 flex items-center justify-center">
+                  <AlertCircle className="h-10 w-10 text-amber-600" />
+                </div>
+              )}
             </div>
-            <CardTitle className="text-3xl font-bold text-white drop-shadow-lg">
-              {testMode 
-                ? 'Test Complete!' 
+            
+            {/* Title */}
+            <CardTitle className="text-2xl font-display text-[#1A1A1A]">
+              {isVerifying 
+                ? 'Verifying Payment...' 
                 : verificationComplete 
-                  ? 'Payment Successful!' 
-                  : hasSessionId 
-                    ? 'Thank You!' 
-                    : 'Payment Issue'
+                  ? 'Welcome to VIP!' 
+                  : 'Payment Issue'
               }
             </CardTitle>
           </CardHeader>
           
-          <CardContent className="space-y-6 text-center">
-            <p className="text-white/80 text-lg leading-relaxed drop-shadow-md">
-              {testMode 
-                ? 'Payment verification test completed. Check console logs and Supabase function logs for details.'
+          <CardContent className="space-y-6 text-center px-6 pb-8">
+            {/* Description */}
+            <p className="text-[#1A1A1A]/70 leading-relaxed">
+              {isVerifying 
+                ? 'Please wait while we confirm your subscription...'
                 : verificationComplete 
-                  ? 'Your gift has been scheduled and your payment has been confirmed. We\'ll take care of everything from here!'
+                  ? 'Your VIP subscription is now active. Enjoy unlimited recipients, gift automation, and more!'
                   : hasSessionId
-                    ? 'We\'re processing your order now.'
-                    : 'There was an issue finding your payment session. This might be due to a URL problem or payment cancellation.'
+                    ? 'We encountered an issue processing your payment. Please try again.'
+                    : 'We couldn\'t find your payment session. This may happen if the checkout was cancelled.'
               }
             </p>
             
-            {/* Debug info section - only show if no session ID */}
-            {!hasSessionId && !testMode && (
-              <div className="bg-black/20 backdrop-blur-sm p-4 rounded-lg border border-white/10">
-                <p className="text-white/60 text-xs"><strong>Debug Info:</strong></p>
-                <p className="text-white/60 text-xs break-all">URL: {window.location.href}</p>
-                <p className="text-white/60 text-xs break-all">Params: {JSON.stringify(Object.fromEntries(searchParams.entries()))}</p>
+            {/* VIP Features - only show on success */}
+            {verificationComplete && (
+              <div className="bg-[#F5F3F0] rounded-lg p-4 space-y-2 text-left">
+                <p className="text-sm font-medium text-[#1A1A1A] mb-3">Your VIP benefits:</p>
+                <div className="flex items-center gap-2 text-sm text-[#1A1A1A]/80">
+                  <CheckCircle className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                  <span>Unlimited recipients</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-[#1A1A1A]/80">
+                  <CheckCircle className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                  <span>Gift automation & scheduling</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-[#1A1A1A]/80">
+                  <CheckCircle className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                  <span>Gift wallet with auto-reload</span>
+                </div>
               </div>
             )}
-            
-            {(verificationComplete || hasSessionId) && (
-              <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 backdrop-blur-sm p-6 rounded-xl border border-amber-400/30">
-                <p className="text-white drop-shadow-md flex items-center justify-center gap-2">
-                  🎁 We'll curate the perfect gift and handle delivery at just the right time
+
+            {/* Error details - only show when no session */}
+            {!isVerifying && !hasSessionId && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-left">
+                <p className="text-xs text-amber-800">
+                  <strong>Need help?</strong> Contact support with your payment confirmation email.
                 </p>
               </div>
             )}
 
-            {testMode && (
-              <Button 
-                onClick={runManualTest}
-                variant="outline"
-                className="w-full mb-4 bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm"
-              >
-                <TestTube className="w-4 h-4 mr-2" />
-                Run Another Test
-              </Button>
-            )}
+            {/* Action Buttons */}
+            <div className="space-y-3 pt-2">
+              {!isVerifying && !verificationComplete && hasSessionId && (
+                <Button 
+                  onClick={handleRetryVerification}
+                  variant="outline"
+                  className="w-full h-12 border-[#8B7355]/30 text-[#8B7355] hover:bg-[#8B7355]/5"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Retry Verification
+                </Button>
+              )}
 
-            {!hasSessionId && !testMode && (
               <Button 
-                onClick={handleRetryVerification}
-                variant="outline"
-                className="w-full mb-4 bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm"
+                size="lg" 
+                className="w-full h-12 bg-[#1A1A1A] hover:bg-[#2A2A2A] text-white"
+                onClick={handleGoToDashboard}
+                disabled={isVerifying}
               >
-                Retry Verification
+                <Gift className="w-4 h-4 mr-2" />
+                {verificationComplete ? 'Go to Dashboard' : 'Back to Home'}
+                <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
-            )}
-
-            <Button 
-              size="lg" 
-              className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0 shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
-              onClick={handleGoToDashboard}
-            >
-              <Gift className="w-5 h-5 mr-3" />
-              Schedule Next Gift
-            </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
