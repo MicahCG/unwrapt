@@ -22,12 +22,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { 
-  Settings as SettingsIcon, 
-  ArrowLeft, 
-  User, 
-  Bell, 
-  Zap, 
+import {
+  Settings as SettingsIcon,
+  ArrowLeft,
+  User,
+  Bell,
+  Zap,
   Shield,
   Clock,          // Added Clock import
   Download,
@@ -39,6 +39,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
+import { SubscriptionManagement } from '@/components/subscription/SubscriptionManagement';
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -114,6 +115,9 @@ const Settings = () => {
             <p className="text-brand-charcoal/60">Manage your account and preferences</p>
           </div>
         </div>
+
+        {/* Subscription Section */}
+        <SubscriptionManagement />
 
         {/* Account Section */}
         <Card className="border-brand-charcoal/10">

@@ -142,48 +142,33 @@ const PaymentSuccess = () => {
   const verifyPayment = async (sessionId: string) => {
     try {
       console.log('PaymentSuccess: Verifying session:', sessionId);
-      
-      const { data, error } = await supabase.functions.invoke('verify-payment', {
-        body: { sessionId }
-      });
 
-      console.log('PaymentSuccess: Response:', { data, error });
+      // For subscription payments, we don't use verify-payment edge function
+      // Instead, we rely on the webhook to upgrade the user and poll the database
+      // The verify-payment function is designed for gift payments, not subscriptions
 
-      if (error) {
-        console.error('PaymentSuccess: Error:', error);
-        // Fallback: check subscription status directly
-        const isVip = await checkSubscriptionStatus();
-        if (!isVip) throw error;
-        return;
-      }
+      console.log('PaymentSuccess: Polling subscription status after checkout...');
+      const isVip = await pollSubscriptionStatus();
 
-      if (data?.paymentStatus === 'paid') {
-        setVerificationComplete(true);
-        setShowConfetti(true);
-        await invalidateQueries();
-        
+      if (!isVip) {
+        console.log('PaymentSuccess: Not yet VIP after polling, showing pending message');
         toast({
-          title: "Payment Successful!",
-          description: "Your subscription is now active.",
+          title: "Payment Processing",
+          description: "Your subscription payment is being processed. Please check your dashboard in a moment.",
+          variant: "default"
         });
-      } else {
-        // Fallback: check subscription status directly
-        const isVip = await checkSubscriptionStatus();
-        if (!isVip) {
-          toast({
-            title: "Payment Status",
-            description: `Status: ${data?.paymentStatus || 'unknown'}`,
-            variant: "destructive"
-          });
-        }
       }
     } catch (error) {
       console.error('PaymentSuccess: Verification error:', error);
-      toast({
-        title: "Verification Error",
-        description: "There was an issue verifying your payment.",
-        variant: "destructive"
-      });
+      // Even on error, try to check subscription status
+      const isVip = await checkSubscriptionStatus();
+      if (!isVip) {
+        toast({
+          title: "Verification Error",
+          description: "There was an issue verifying your payment. Please check your dashboard or contact support.",
+          variant: "destructive"
+        });
+      }
     } finally {
       setIsVerifying(false);
     }
