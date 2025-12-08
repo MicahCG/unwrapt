@@ -55,6 +55,30 @@ const PaymentSuccess = () => {
     }
   };
 
+  // Poll subscription status multiple times with exponential backoff
+  const pollSubscriptionStatus = async (maxAttempts = 5) => {
+    console.log('PaymentSuccess: Starting subscription status polling...');
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      console.log(`PaymentSuccess: Poll attempt ${attempt}/${maxAttempts}`);
+
+      const isVip = await checkSubscriptionStatus();
+      if (isVip) {
+        return true;
+      }
+
+      // Don't wait after the last attempt
+      if (attempt < maxAttempts) {
+        // Exponential backoff: 1s, 2s, 3s, 4s
+        const delayMs = attempt * 1000;
+        console.log(`PaymentSuccess: Not VIP yet, waiting ${delayMs}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+
+    return false;
+  };
+
   const invalidateQueries = async () => {
     if (user?.id) {
       await queryClient.invalidateQueries({ queryKey: ['upcoming-gifts', user.id] });
@@ -69,38 +93,42 @@ const PaymentSuccess = () => {
   };
 
   useEffect(() => {
-    const sessionId = 
-      searchParams.get('session_id') || 
+    const sessionId =
+      searchParams.get('session_id') ||
       searchParams.get('checkout_session_id') ||
       searchParams.get('sessionId') ||
       searchParams.get('checkoutSessionId');
-  
-    console.log('PaymentSuccess: URL params:', { 
-      sessionId, 
+
+    console.log('PaymentSuccess: URL params:', {
+      sessionId,
       allParams: Object.fromEntries(searchParams.entries()),
       currentURL: window.location.href
     });
-    
+
     // Check if this payment came from onboarding flow
     const onboardingFlag = localStorage.getItem('onboardingPaymentFlow');
     if (onboardingFlag === 'true') {
       setIsFromOnboarding(true);
       localStorage.removeItem('onboardingPaymentFlow');
     }
-    
+
     const processVerification = async () => {
       if (sessionId) {
+        // Try to verify with session_id first
         await verifyPayment(sessionId);
       } else {
-        // No session_id - check if user is already VIP (webhook may have processed)
-        console.log('PaymentSuccess: No session_id, checking subscription status...');
-        const isVip = await checkSubscriptionStatus();
+        // No session_id - this is common with Stripe billing portal or direct checkout links
+        // The webhook likely already processed the subscription
+        console.log('PaymentSuccess: No session_id, polling subscription status via webhook processing...');
+
+        const isVip = await pollSubscriptionStatus();
+
         if (!isVip) {
           setIsVerifying(false);
           toast({
-            title: "Session Not Found",
-            description: "Unable to find payment session. Please try again or contact support.",
-            variant: "destructive"
+            title: "Verifying Payment",
+            description: "Your payment is being processed. Your subscription will be active shortly. Please check your dashboard in a moment.",
+            variant: "default"
           });
         } else {
           setIsVerifying(false);
@@ -215,13 +243,15 @@ const PaymentSuccess = () => {
           <CardContent className="space-y-6 text-center px-6 pb-8">
             {/* Description */}
             <p className="text-[#1A1A1A]/70 leading-relaxed">
-              {isVerifying 
-                ? 'Please wait while we confirm your subscription...'
-                : verificationComplete 
+              {isVerifying
+                ? hasSessionId
+                  ? 'Please wait while we confirm your subscription...'
+                  : 'Confirming your subscription with Stripe...'
+                : verificationComplete
                   ? 'Your VIP subscription is now active. Enjoy unlimited recipients, gift automation, and more!'
                   : hasSessionId
                     ? 'We encountered an issue processing your payment. Please try again.'
-                    : 'We couldn\'t find your payment session. This may happen if the checkout was cancelled.'
+                    : 'Your payment is being processed. Please refresh this page in a moment or check your dashboard.'
               }
             </p>
             
@@ -245,10 +275,11 @@ const PaymentSuccess = () => {
             )}
 
             {/* Error details - only show when no session */}
-            {!isVerifying && !hasSessionId && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-left">
-                <p className="text-xs text-amber-800">
-                  <strong>Need help?</strong> Contact support with your payment confirmation email.
+            {!isVerifying && !verificationComplete && !hasSessionId && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left">
+                <p className="text-xs text-blue-800">
+                  <strong>Note:</strong> Your payment was successful in Stripe and is being processed.
+                  If you don't see VIP status after refreshing, please contact support with your payment confirmation email.
                 </p>
               </div>
             )}
