@@ -20,6 +20,54 @@ const PaymentSuccess = () => {
   const [showConfetti, setShowConfetti] = useState(false);
   const [isFromOnboarding, setIsFromOnboarding] = useState(false);
 
+  // Check user's subscription status directly as fallback
+  const checkSubscriptionStatus = async () => {
+    if (!user?.id) {
+      setIsVerifying(false);
+      return false;
+    }
+
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('subscription_tier, subscription_status')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+
+      // If user is VIP, they successfully subscribed (webhook already processed)
+      if (profile?.subscription_tier === 'vip') {
+        console.log('PaymentSuccess: User is VIP, subscription confirmed via profile check');
+        setVerificationComplete(true);
+        setShowConfetti(true);
+        await invalidateQueries();
+        toast({
+          title: "Payment Successful!",
+          description: "Your VIP subscription is now active.",
+        });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('PaymentSuccess: Error checking subscription:', error);
+      return false;
+    }
+  };
+
+  const invalidateQueries = async () => {
+    if (user?.id) {
+      await queryClient.invalidateQueries({ queryKey: ['upcoming-gifts', user.id] });
+      await queryClient.invalidateQueries({ queryKey: ['unpaid-gifts', user.id] });
+      await queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
+      
+      if (isFromOnboarding) {
+        await queryClient.invalidateQueries({ queryKey: ['onboarding-status', user.id] });
+        await queryClient.invalidateQueries({ queryKey: ['recipients', user.id] });
+      }
+    }
+  };
+
   useEffect(() => {
     const sessionId = 
       searchParams.get('session_id') || 
@@ -40,18 +88,28 @@ const PaymentSuccess = () => {
       localStorage.removeItem('onboardingPaymentFlow');
     }
     
-    if (sessionId) {
-      verifyPayment(sessionId);
-    } else {
-      console.error('PaymentSuccess: No session_id found in URL');
-      setIsVerifying(false);
-      toast({
-        title: "Session Not Found",
-        description: "Unable to find payment session. Please try again or contact support.",
-        variant: "destructive"
-      });
-    }
-  }, [searchParams]);
+    const processVerification = async () => {
+      if (sessionId) {
+        await verifyPayment(sessionId);
+      } else {
+        // No session_id - check if user is already VIP (webhook may have processed)
+        console.log('PaymentSuccess: No session_id, checking subscription status...');
+        const isVip = await checkSubscriptionStatus();
+        if (!isVip) {
+          setIsVerifying(false);
+          toast({
+            title: "Session Not Found",
+            description: "Unable to find payment session. Please try again or contact support.",
+            variant: "destructive"
+          });
+        } else {
+          setIsVerifying(false);
+        }
+      }
+    };
+
+    processVerification();
+  }, [searchParams, user?.id]);
 
   const verifyPayment = async (sessionId: string) => {
     try {
@@ -65,34 +123,31 @@ const PaymentSuccess = () => {
 
       if (error) {
         console.error('PaymentSuccess: Error:', error);
-        throw error;
+        // Fallback: check subscription status directly
+        const isVip = await checkSubscriptionStatus();
+        if (!isVip) throw error;
+        return;
       }
 
       if (data?.paymentStatus === 'paid') {
         setVerificationComplete(true);
         setShowConfetti(true);
-        
-        if (user?.id) {
-          await queryClient.invalidateQueries({ queryKey: ['upcoming-gifts', user.id] });
-          await queryClient.invalidateQueries({ queryKey: ['unpaid-gifts', user.id] });
-          await queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
-          
-          if (isFromOnboarding) {
-            await queryClient.invalidateQueries({ queryKey: ['onboarding-status', user.id] });
-            await queryClient.invalidateQueries({ queryKey: ['recipients', user.id] });
-          }
-        }
+        await invalidateQueries();
         
         toast({
           title: "Payment Successful!",
           description: "Your subscription is now active.",
         });
       } else {
-        toast({
-          title: "Payment Status",
-          description: `Status: ${data?.paymentStatus || 'unknown'}`,
-          variant: "destructive"
-        });
+        // Fallback: check subscription status directly
+        const isVip = await checkSubscriptionStatus();
+        if (!isVip) {
+          toast({
+            title: "Payment Status",
+            description: `Status: ${data?.paymentStatus || 'unknown'}`,
+            variant: "destructive"
+          });
+        }
       }
     } catch (error) {
       console.error('PaymentSuccess: Verification error:', error);
