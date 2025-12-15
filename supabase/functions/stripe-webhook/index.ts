@@ -39,6 +39,65 @@ serve(async (req) => {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
+        const transactionType = session.metadata?.transaction_type;
+        
+        // Handle wallet deposit
+        if (transactionType === "wallet_deposit") {
+          const userId = session.metadata?.user_id;
+          const amount = parseFloat(session.metadata?.amount || "0");
+          
+          if (!userId || !amount) {
+            console.error("❌ Missing user_id or amount in wallet deposit metadata");
+            break;
+          }
+          
+          console.log(`💰 Wallet deposit completed for user: ${userId}, amount: $${amount}`);
+          
+          // Get current balance
+          const { data: profile, error: profileError } = await supabaseClient
+            .from("profiles")
+            .select("gift_wallet_balance")
+            .eq("id", userId)
+            .single();
+          
+          if (profileError) {
+            console.error("❌ Error fetching profile:", profileError);
+            break;
+          }
+          
+          const currentBalance = profile?.gift_wallet_balance || 0;
+          const newBalance = currentBalance + amount;
+          
+          // Update wallet balance
+          const { error: updateError } = await supabaseClient
+            .from("profiles")
+            .update({ gift_wallet_balance: newBalance })
+            .eq("id", userId);
+          
+          if (updateError) {
+            console.error("❌ Error updating wallet balance:", updateError);
+            break;
+          }
+          
+          // Update pending transaction to completed
+          const { error: txError } = await supabaseClient
+            .from("wallet_transactions")
+            .update({ 
+              status: "completed",
+              balance_after: newBalance
+            })
+            .eq("stripe_payment_intent_id", session.id)
+            .eq("user_id", userId);
+          
+          if (txError) {
+            console.error("❌ Error updating transaction:", txError);
+          }
+          
+          console.log(`✅ Wallet updated: $${currentBalance} → $${newBalance}`);
+          break;
+        }
+        
+        // Handle subscription checkout
         const userId = session.metadata?.supabase_user_id;
         const planType = session.metadata?.plan_type;
 
