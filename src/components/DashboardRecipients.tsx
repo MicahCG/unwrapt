@@ -91,6 +91,7 @@ const DashboardRecipients = () => {
             occasion_date,
             gift_type,
             gift_description,
+            gift_image_url,
             price_range,
             status,
             payment_status,
@@ -469,6 +470,17 @@ const DashboardRecipients = () => {
                           )}
                         </div>
                       </div>
+
+                      {/* Gift Image Thumbnail - only show for recipients with scheduled gifts */}
+                      {!item.isHoliday && item.hasScheduledGifts && item.nextScheduledGift?.gift_image_url && (
+                        <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 border border-brand-cream/50 shadow-sm">
+                          <img 
+                            src={item.nextScheduledGift.gift_image_url} 
+                            alt={item.nextScheduledGift.gift_type || 'Scheduled gift'}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
                     </div>
                     
                     {/* Status Badge (if has scheduled gifts) */}
