@@ -245,6 +245,10 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         return;
       }
 
+      const totalCost = selectedProduct.price + 7; // Price + service fee
+      const isVIP = userProfile?.subscription_tier === 'vip';
+      const hasEnoughBalance = walletBalance >= totalCost;
+
       // Update recipient with address
       const { error: recipientUpdateError } = await supabase
         .from('recipients')
@@ -294,43 +298,50 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           occasion_date: formData.occasion_date,
           occasion_type: 'birthday',
           gift_type: selectedProduct.title,
+          gift_variant_id: selectedProduct.shopify_variant_id,
+          estimated_cost: totalCost,
           price_range: `$${selectedProduct.price.toFixed(2)}`,
           delivery_date: deliveryDate,
           status: 'scheduled',
-          payment_status: 'unpaid'
+          payment_status: isVIP && hasEnoughBalance ? 'pending' : 'unpaid'
         })
         .select()
         .single();
 
       if (giftError) throw giftError;
 
-      // Process payment
-      const { data: paymentData, error: paymentError } = await supabase.functions.invoke('create-gift-payment', {
-        body: {
-          scheduledGiftId: giftData.id,
-          productPrice: selectedProduct.price,
-          productImage: selectedProduct.featured_image_url,
-          giftDetails: {
-            recipientName: cleanName(recipient.name),
-            occasion: 'Birthday',
-            giftType: selectedProduct.title
-          },
-          shippingAddress: {
-            first_name: cleanName(recipient.name).split(' ')[0] || cleanName(recipient.name),
-            last_name: cleanName(recipient.name).split(' ').slice(1).join(' ') || '',
-            address1: formData.street,
-            city: formData.city,
-            province: formData.state,
-            country: formData.country,
-            zip: formData.zip_code
-          },
-          variantId: selectedProduct.shopify_variant_id
-        }
-      });
+      // VIP users with sufficient balance: deduct from wallet
+      if (isVIP && hasEnoughBalance) {
+        // Create wallet transaction
+        const { error: transactionError } = await supabase
+          .from('wallet_transactions')
+          .insert({
+            user_id: currentUser.id,
+            amount: -totalCost,
+            balance_after: walletBalance - totalCost,
+            transaction_type: 'charge',
+            scheduled_gift_id: giftData.id,
+            status: 'completed'
+          });
 
-      if (paymentError) throw paymentError;
+        if (transactionError) throw transactionError;
 
-      if (paymentData?.url) {
+        // Update wallet balance
+        const { error: balanceError } = await supabase
+          .from('profiles')
+          .update({
+            gift_wallet_balance: walletBalance - totalCost
+          })
+          .eq('id', currentUser.id);
+
+        if (balanceError) throw balanceError;
+
+        // Update gift payment status
+        await supabase
+          .from('scheduled_gifts')
+          .update({ payment_status: 'paid', payment_amount: totalCost })
+          .eq('id', giftData.id);
+
         await sendGiftNotificationEmail({
           ...formData,
           gift_type: selectedProduct.title,
@@ -342,11 +353,15 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           timestamp: Date.now()
         }));
 
-        window.location.href = paymentData.url;
+        toast({
+          title: "Gift Scheduled!",
+          description: `$${totalCost.toFixed(2)} deducted from your wallet.`,
+        });
 
         queryClient.invalidateQueries({ queryKey: ['upcoming-gifts'] });
         queryClient.invalidateQueries({ queryKey: ['user-metrics'] });
         queryClient.invalidateQueries({ queryKey: ['recipients'] });
+        queryClient.invalidateQueries({ queryKey: ['user-profile'] });
 
         onClose();
         setFormData({
@@ -358,6 +373,63 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           country: 'United States'
         });
         setSelectedProduct(null);
+        window.location.reload();
+      } else {
+        // Non-VIP or insufficient balance: redirect to Stripe
+        const { data: paymentData, error: paymentError } = await supabase.functions.invoke('create-gift-payment', {
+          body: {
+            scheduledGiftId: giftData.id,
+            productPrice: selectedProduct.price,
+            productImage: selectedProduct.featured_image_url,
+            giftDetails: {
+              recipientName: cleanName(recipient.name),
+              occasion: 'Birthday',
+              giftType: selectedProduct.title
+            },
+            shippingAddress: {
+              first_name: cleanName(recipient.name).split(' ')[0] || cleanName(recipient.name),
+              last_name: cleanName(recipient.name).split(' ').slice(1).join(' ') || '',
+              address1: formData.street,
+              city: formData.city,
+              province: formData.state,
+              country: formData.country,
+              zip: formData.zip_code
+            },
+            variantId: selectedProduct.shopify_variant_id
+          }
+        });
+
+        if (paymentError) throw paymentError;
+
+        if (paymentData?.url) {
+          await sendGiftNotificationEmail({
+            ...formData,
+            gift_type: selectedProduct.title,
+            price: selectedProduct.price
+          });
+
+          sessionStorage.setItem('giftScheduledSuccess', JSON.stringify({
+            recipientId: recipient.id,
+            timestamp: Date.now()
+          }));
+
+          window.location.href = paymentData.url;
+
+          queryClient.invalidateQueries({ queryKey: ['upcoming-gifts'] });
+          queryClient.invalidateQueries({ queryKey: ['user-metrics'] });
+          queryClient.invalidateQueries({ queryKey: ['recipients'] });
+
+          onClose();
+          setFormData({
+            occasion_date: '',
+            street: '',
+            city: '',
+            state: '',
+            zip_code: '',
+            country: 'United States'
+          });
+          setSelectedProduct(null);
+        }
       }
     } catch (error: any) {
       console.error('❌ Error scheduling gift:', error);
@@ -648,7 +720,11 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
                 {isLoading ? (
                   'Processing...'
                 ) : selectedProduct ? (
-                  `Schedule & Pay $${selectedProduct.price.toFixed(2)}`
+                  userProfile?.subscription_tier === 'vip' && walletBalance >= (selectedProduct.price + 7) ? (
+                    `Schedule Gift • $${(selectedProduct.price + 7).toFixed(2)}`
+                  ) : (
+                    `Schedule & Pay $${(selectedProduct.price + 7).toFixed(2)}`
+                  )
                 ) : (
                   'Schedule Gift'
                 )}
