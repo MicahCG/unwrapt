@@ -441,6 +441,7 @@ const Dashboard = () => {
                                 estimatedCost={42.00}
                                 onEnableAutomation={() => handleEnableAutomation(recipient)}
                                 onDisableAutomation={() => handleDisableAutomation(recipient.id)}
+                                onEditAutomation={() => handleEnableAutomation(recipient)}
                                 tier={userProfile.subscription_tier as 'free' | 'vip'}
                               />
                             </div>
