@@ -130,25 +130,27 @@ serve(async (req) => {
 
       console.log('🎁 Process-gift-fulfillment: Shopify order test result:', orderResult);
 
-      if (orderResult.error) {
-        console.error('🎁 Process-gift-fulfillment: Shopify order test failed:', orderResult.error);
-        return new Response(JSON.stringify({
-          success: false,
-          error: `Test order creation failed: ${orderResult.error}`,
-          testMode: true
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 500,
-        });
-      }
+    const typedTestOrderResult = orderResult as { error?: { message?: string }; data?: { success?: boolean; error?: string } };
 
-      if (!orderResult.data || !orderResult.data.success) {
-        console.error('🎁 Process-gift-fulfillment: Shopify order test not successful:', orderResult.data?.error);
-        return new Response(JSON.stringify({
-          success: false,
-          error: `Test order creation failed: ${orderResult.data?.error || 'Unknown error'}`,
-          testMode: true
-        }), {
+    if (typedTestOrderResult.error) {
+      console.error('🎁 Process-gift-fulfillment: Shopify order test failed:', typedTestOrderResult.error);
+      return new Response(JSON.stringify({
+        success: false,
+        error: `Test order creation failed: ${typedTestOrderResult.error}`,
+        testMode: true
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      });
+    }
+
+    if (!typedTestOrderResult.data || !typedTestOrderResult.data.success) {
+      console.error('🎁 Process-gift-fulfillment: Shopify order test not successful:', typedTestOrderResult.data?.error);
+      return new Response(JSON.stringify({
+        success: false,
+        error: `Test order creation failed: ${typedTestOrderResult.data?.error || 'Unknown error'}`,
+        testMode: true
+      }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 500,
         });
@@ -160,7 +162,7 @@ serve(async (req) => {
         success: true,
         message: "Test gift fulfillment processed successfully",
         testMode: true,
-        orderDetails: orderResult.data
+        orderDetails: typedTestOrderResult.data
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
@@ -294,10 +296,12 @@ serve(async (req) => {
 
     console.log(`🎁 Process-gift-fulfillment: Shopify order result:`, orderResult);
 
-    if (orderResult.error) {
-      console.error('🎁 Process-gift-fulfillment: Shopify order function error:', orderResult.error);
+    const typedOrderResult = orderResult as { error?: { message?: string }; data?: { success?: boolean; error?: string } };
+
+    if (typedOrderResult.error) {
+      console.error('🎁 Process-gift-fulfillment: Shopify order function error:', typedOrderResult.error);
       return new Response(JSON.stringify({ 
-        error: `Order creation failed: ${orderResult.error}`,
+        error: `Order creation failed: ${typedOrderResult.error}`,
         success: false
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -305,10 +309,10 @@ serve(async (req) => {
       });
     }
 
-    if (!orderResult.data || !orderResult.data.success) {
-      console.error('🎁 Process-gift-fulfillment: Shopify order creation failed:', orderResult.data?.error);
+    if (!typedOrderResult.data || !typedOrderResult.data.success) {
+      console.error('🎁 Process-gift-fulfillment: Shopify order creation failed:', typedOrderResult.data?.error);
       return new Response(JSON.stringify({ 
-        error: `Order creation failed: ${orderResult.data?.error || 'Unknown error'}`,
+        error: `Order creation failed: ${typedOrderResult.data?.error || 'Unknown error'}`,
         success: false
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -339,7 +343,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       message: "Gift fulfillment processed successfully",
-      orderDetails: orderResult.data
+      orderDetails: typedOrderResult.data
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
@@ -347,8 +351,10 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('🎁 Process-gift-fulfillment: Error processing gift fulfillment:', error);
-    console.error('🎁 Process-gift-fulfillment: Error message:', error.message);
-    console.error('🎁 Process-gift-fulfillment: Error stack:', error.stack);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error('🎁 Process-gift-fulfillment: Error message:', errorMessage);
+    console.error('🎁 Process-gift-fulfillment: Error stack:', errorStack);
     
     // Return generic error message (detailed errors are in server logs)
     return new Response(JSON.stringify({ 

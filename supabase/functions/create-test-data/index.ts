@@ -179,10 +179,12 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('❌ Error creating test data:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const errorStack = error instanceof Error ? error.stack : undefined;
     return new Response(JSON.stringify({ 
-      error: error.message || 'Unknown error occurred',
+      error: errorMessage,
       success: false,
-      details: error.stack
+      details: errorStack
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,

@@ -71,10 +71,11 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("🔐 Error in assign-admin-role:", error);
+    const errorMessage = error instanceof Error ? error.message : "Failed to assign admin role";
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || "Failed to assign admin role",
+        error: errorMessage,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -165,9 +165,10 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("💰 Error in wallet-add-funds:", error);
+    const errorMessage = error instanceof Error ? error.message : "Failed to process wallet deposit";
     return new Response(
       JSON.stringify({ 
-        error: error.message || "Failed to process wallet deposit",
+        error: errorMessage,
         success: false 
       }),
       {

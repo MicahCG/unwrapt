@@ -270,7 +270,7 @@ serve(async (req) => {
       products: fallbackProducts,
       total: fallbackProducts.length,
       note: 'Using fallback products due to API error',
-      error: error.message
+      error: error instanceof Error ? error.message : 'Unknown error'
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,

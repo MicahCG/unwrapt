@@ -58,8 +58,9 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error fetching Shopify product types:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(JSON.stringify({ 
-      error: error.message,
+      error: errorMessage,
       success: false 
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
