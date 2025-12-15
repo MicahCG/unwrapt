@@ -159,7 +159,7 @@ serve(async (req) => {
           }
         }
       } catch (error) {
-        console.log('⚠️ Could not retrieve payment variant info:', error.message);
+        console.log('⚠️ Could not retrieve payment variant info:', error instanceof Error ? error.message : 'Unknown error');
       }
     }
 
@@ -188,7 +188,7 @@ serve(async (req) => {
           console.log(`🎯 Selected dynamic product: ${productName} (${matchReason})`);
         }
       } catch (error) {
-        console.error('⚠️ Dynamic selection failed:', error.message);
+        console.error('⚠️ Dynamic selection failed:', error instanceof Error ? error.message : 'Unknown error');
         // Continue to fallback
       }
     }
@@ -260,7 +260,7 @@ serve(async (req) => {
           console.log(`⚠️ Could not validate variant ${numericVariantId}, proceeding anyway`);
         }
       } catch (e) {
-        console.log(`⚠️ Variant validation skipped: ${e.message}`);
+        console.log(`⚠️ Variant validation skipped: ${e instanceof Error ? e.message : 'Unknown error'}`);
       }
 
       // Create the order
@@ -370,8 +370,10 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('❌ Error in Shopify order processing:', error);
-    console.error('❌ Error message:', error.message);
-    console.error('❌ Error stack:', error.stack);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error('❌ Error message:', errorMessage);
+    console.error('❌ Error stack:', errorStack);
     
     // Return generic error message (detailed errors are in server logs)
     return new Response(JSON.stringify({ 

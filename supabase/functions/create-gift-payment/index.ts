@@ -149,7 +149,7 @@ serve(async (req) => {
     if (!stripeSecretKey || stripeSecretKey.trim() === '') {
       console.log("🔄 First attempt failed, trying alternative environment access...");
       const envObject = Deno.env.toObject();
-      stripeSecretKey = envObject["STRIPE_SECRET_KEY"] || envObject["STRIPE_SECRET_KEY "] || null;
+      stripeSecretKey = envObject["STRIPE_SECRET_KEY"] || envObject["STRIPE_SECRET_KEY "] || undefined;
       console.log("🔍 Second attempt - Alternative access:", stripeSecretKey ? `${stripeSecretKey.substring(0, 7)}...` : 'null/undefined');
     }
     
@@ -330,8 +330,10 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("💳 Error creating payment:", error);
-    console.error("💳 Error message:", error.message);
-    console.error("💳 Error stack:", error.stack);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error("💳 Error message:", errorMessage);
+    console.error("💳 Error stack:", errorStack);
     
     // Return generic error message (detailed errors are in server logs)
     return new Response(JSON.stringify({ 

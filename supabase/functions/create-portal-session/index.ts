@@ -75,9 +75,10 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("🔑 Error in create-portal-session:", error);
+    const errorMessage = error instanceof Error ? error.message : "Failed to create portal session";
     return new Response(
       JSON.stringify({
-        error: error.message || "Failed to create portal session",
+        error: errorMessage,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

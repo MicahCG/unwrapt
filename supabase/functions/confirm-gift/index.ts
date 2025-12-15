@@ -204,9 +204,10 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Error confirming gift:", error);
+    const errorMessage = error instanceof Error ? error.message : "Failed to confirm gift";
     return new Response(
       JSON.stringify({
-        error: error.message || "Failed to confirm gift",
+        error: errorMessage,
         success: false,
       }),
       {

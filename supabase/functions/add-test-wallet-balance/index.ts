@@ -116,8 +116,9 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('❌ Error adding test wallet balance:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(JSON.stringify({
-      error: error.message || 'Unknown error occurred',
+      error: errorMessage,
       success: false
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

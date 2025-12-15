@@ -135,23 +135,25 @@ serve(async (req) => {
         .single();
 
       if (profile) {
+        const autoReloadErrorMessage = error instanceof Error ? error.message : 'Unknown error';
         await supabaseClient.functions.invoke("send-notification-email", {
           body: {
             type: "auto_reload_failed",
             recipientEmail: profile.email,
             data: {
               userName: profile.full_name,
-              error: error.message,
+              error: autoReloadErrorMessage,
             },
           },
         });
       }
     }
 
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
+        error: errorMessage,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

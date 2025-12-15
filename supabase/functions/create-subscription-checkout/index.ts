@@ -113,9 +113,10 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("💳 Error in create-subscription-checkout:", error);
+    const errorMessage = error instanceof Error ? error.message : "Failed to create checkout session";
     return new Response(
       JSON.stringify({
-        error: error.message || "Failed to create checkout session",
+        error: errorMessage,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -252,7 +252,7 @@ serve(async (req) => {
             new Promise((_, reject) => 
               setTimeout(() => reject(new Error('Fulfillment timeout after 30 seconds')), 30000)
             )
-          ]);
+          ]) as { error?: { message?: string }; data?: { success?: boolean; error?: string } };
 
           if (fulfillmentResult.error) {
             console.error('❌ Fulfillment function error:', fulfillmentResult.error);
@@ -288,8 +288,10 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("❌ Error verifying payment:", error);
-    console.error("❌ Error details:", error.message);
-    console.error("❌ Error stack:", error.stack);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error("❌ Error details:", errorMessage);
+    console.error("❌ Error stack:", errorStack);
     
     // Return generic error message (detailed errors are in server logs)
     return new Response(JSON.stringify({ 

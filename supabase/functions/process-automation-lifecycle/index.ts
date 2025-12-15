@@ -41,8 +41,9 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("❌ Error in process-automation-lifecycle:", error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { headers: { "Content-Type": "application/json" }, status: 500 }
     );
   }
@@ -318,8 +319,9 @@ async function handleFundReservation(supabaseClient: any, gift: any, recipient: 
     console.log(`    ✅ Funds reserved: $${totalCost}`);
   } catch (error) {
     console.error("    ❌ Fund reservation error:", error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     await logAutomation(supabaseClient, gift.user_id, recipient.id, gift.id, "fund_reservation", "error", {
-      error: error.message
+      error: errorMessage
     });
   }
 }
@@ -408,8 +410,9 @@ async function handleAddressRequest(supabaseClient: any, gift: any, recipient: a
     console.log("    ✅ Address confirmation requested");
   } catch (error) {
     console.error("    ❌ Address request error:", error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     await logAutomation(supabaseClient, gift.user_id, recipient.id, gift.id, "address_request", "error", {
-      error: error.message
+      error: errorMessage
     });
   }
 }
@@ -520,8 +523,9 @@ async function handleOrderFulfillment(supabaseClient: any, gift: any, recipient:
     console.log("    ✅ Gift fulfilled successfully");
   } catch (error) {
     console.error("    ❌ Fulfillment error:", error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     await logAutomation(supabaseClient, gift.user_id, recipient.id, gift.id, "fulfillment", "error", {
-      error: error.message
+      error: errorMessage
     });
   }
 }
@@ -614,8 +618,9 @@ async function handleGiftAutoConfirmation(supabaseClient: any, gift: any, recipi
     console.log("    ✅ Gift auto-confirmed successfully");
   } catch (error) {
     console.error("    ❌ Auto-confirmation error:", error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     await logAutomation(supabaseClient, gift.user_id, recipient.id, gift.id, "gift_confirmation", "error", {
-      error: error.message
+      error: errorMessage
     });
   }
 }
