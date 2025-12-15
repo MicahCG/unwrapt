@@ -20,9 +20,8 @@ import { TestTierToggle } from '@/components/dev/TestTierToggle';
 import { TestWalletControls } from '@/components/dev/TestWalletControls';
 import { VIPUpgradeModal } from '@/components/subscription/VIPUpgradeModal';
 import { VIPWelcomeModal } from '@/components/onboarding/VIPWelcomeModal';
-import { AutomationToggle, EnableAutomationModal } from '@/components/automation';
+import { AutomationToggle, EnableAutomationModal, AutomationDetailModal } from '@/components/automation';
 import { GiftsAwaitingConfirmation } from '@/components/GiftsAwaitingConfirmation';
-import { QueuedGiftsSection } from '@/components/QueuedGiftsSection';
 import { format } from 'date-fns';
 import { cleanName } from '@/lib/utils';
 import { getNextOccurrence, formatOccasionDate, getDaysUntil } from '@/lib/dateUtils';
@@ -43,6 +42,8 @@ const Dashboard = () => {
   const [previousTier, setPreviousTier] = useState<string | null>(null);
   const [showEditRecipient, setShowEditRecipient] = useState(false);
   const [editingRecipient, setEditingRecipient] = useState<any>(null);
+  const [showAutomationDetail, setShowAutomationDetail] = useState(false);
+  const [detailRecipient, setDetailRecipient] = useState<any>(null);
 
   // Fetch user profile with subscription info and wallet balance
   const { data: userProfile, refetch: refetchProfile } = useQuery({
@@ -445,8 +446,14 @@ const Dashboard = () => {
                                 estimatedCost={42.00}
                                 onEnableAutomation={() => handleEnableAutomation(recipient)}
                                 onDisableAutomation={() => handleDisableAutomation(recipient.id)}
-                                onEditAutomation={() => handleEnableAutomation(recipient)}
+                                onViewDetails={() => {
+                                  setDetailRecipient(recipient);
+                                  setShowAutomationDetail(true);
+                                }}
                                 tier={userProfile.subscription_tier as 'free' | 'vip'}
+                                isEnabled={recipient.automation_enabled || recipient.scheduled_gifts?.some((g: any) => g.automation_enabled)}
+                                hasCompleteAddress={!!(recipient.street && recipient.city && recipient.state && recipient.zip_code)}
+                                hasGiftSelected={!!(recipient.default_gift_variant_id || recipient.preferred_gift_vibe)}
                               />
                             </div>
                           )}
@@ -521,18 +528,9 @@ const Dashboard = () => {
             </Card>
           </div>
 
-          {/* RIGHT COLUMN - Queued Gifts for VIP users */}
+          {/* RIGHT COLUMN - Reserved for future features */}
           <div className="space-y-6">
-            {userProfile?.subscription_tier === 'vip' && (
-              <QueuedGiftsSection
-                recipients={sortedRecipients}
-                walletBalance={userProfile.gift_wallet_balance || 0}
-                onRequestAddress={(recipient) => {
-                  setEditingRecipient(recipient);
-                  setShowEditRecipient(true);
-                }}
-              />
-            )}
+            {/* Future features will go here */}
           </div>
         </div>
       </div>
@@ -601,6 +599,23 @@ const Dashboard = () => {
             setShowEnableAutomation(false);
             setAutomationRecipient(null);
             window.location.reload();
+          }}
+        />
+      )}
+
+      {showAutomationDetail && detailRecipient && userProfile && (
+        <AutomationDetailModal
+          open={showAutomationDetail}
+          onOpenChange={setShowAutomationDetail}
+          recipient={detailRecipient}
+          walletBalance={userProfile.gift_wallet_balance || 0}
+          onEditAddress={() => {
+            setEditingRecipient(detailRecipient);
+            setShowEditRecipient(true);
+          }}
+          onEditGift={() => {
+            setAutomationRecipient(detailRecipient);
+            setShowEnableAutomation(true);
           }}
         />
       )}
