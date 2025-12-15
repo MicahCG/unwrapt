@@ -10,7 +10,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { Heart, MapPin, Sparkles, Wallet as WalletIcon } from 'lucide-react';
+import { Heart, MapPin, Sparkles, Wallet as WalletIcon, Calendar, CreditCard, Package, Truck } from 'lucide-react';
+import { format, subDays, parseISO } from 'date-fns';
 import { cleanName } from '@/lib/utils';
 import { GIFT_VIBE_OPTIONS, type GiftVibe, type Product, getAllProducts } from '@/lib/giftVibes';
 
@@ -486,6 +487,54 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             Choose a gift vibe and perfect item for their birthday
           </p>
         </SheetHeader>
+
+        {/* Automation Timeline - Only show when occasion date is set */}
+        {formData.occasion_date && (
+          <div className="px-8 py-4 border-b border-[#E4DCD2] bg-white/40">
+            <div className="flex items-center gap-2 mb-3">
+              <Calendar className="w-4 h-4 text-[#C4A36F]" />
+              <span className="text-sm font-medium text-[#1A1A1A]">Gift Delivery Timeline</span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              {/* Funds Reserved */}
+              <div className="flex-1 text-center">
+                <div className="w-8 h-8 mx-auto rounded-full bg-[#C4A36F]/10 flex items-center justify-center mb-1">
+                  <CreditCard className="w-4 h-4 text-[#C4A36F]" />
+                </div>
+                <p className="text-xs font-medium text-[#1A1A1A]">Funds Reserved</p>
+                <p className="text-xs text-[#1A1A1A]/60">
+                  {format(subDays(parseISO(formData.occasion_date), 14), 'MMM d')}
+                </p>
+              </div>
+              
+              <div className="w-8 h-px bg-[#C4A36F]/30" />
+              
+              {/* Order Placed */}
+              <div className="flex-1 text-center">
+                <div className="w-8 h-8 mx-auto rounded-full bg-[#C4A36F]/10 flex items-center justify-center mb-1">
+                  <Package className="w-4 h-4 text-[#C4A36F]" />
+                </div>
+                <p className="text-xs font-medium text-[#1A1A1A]">Order Placed</p>
+                <p className="text-xs text-[#1A1A1A]/60">
+                  {format(subDays(parseISO(formData.occasion_date), 10), 'MMM d')}
+                </p>
+              </div>
+              
+              <div className="w-8 h-px bg-[#C4A36F]/30" />
+              
+              {/* Arrives By */}
+              <div className="flex-1 text-center">
+                <div className="w-8 h-8 mx-auto rounded-full bg-[#C4A36F]/10 flex items-center justify-center mb-1">
+                  <Truck className="w-4 h-4 text-[#C4A36F]" />
+                </div>
+                <p className="text-xs font-medium text-[#1A1A1A]">Arrives By</p>
+                <p className="text-xs text-[#1A1A1A]/60">
+                  {format(subDays(parseISO(formData.occasion_date), 3), 'MMM d')}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Two-Column Layout */}
         <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
