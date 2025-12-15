@@ -12,6 +12,7 @@ import { Bell, Star, Heart, Plus, Lock, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import AddRecipientModal from '@/components/AddRecipientModal';
 import ScheduleGiftModal from '@/components/ScheduleGiftModal';
+import EditRecipientModal from '@/components/EditRecipientModal';
 import SubscriptionBadge from '@/components/subscription/SubscriptionBadge';
 import { WalletBalance } from '@/components/wallet/WalletBalance';
 import { AddFundsModal } from '@/components/wallet/AddFundsModal';
@@ -21,6 +22,7 @@ import { VIPUpgradeModal } from '@/components/subscription/VIPUpgradeModal';
 import { VIPWelcomeModal } from '@/components/onboarding/VIPWelcomeModal';
 import { AutomationToggle, EnableAutomationModal } from '@/components/automation';
 import { GiftsAwaitingConfirmation } from '@/components/GiftsAwaitingConfirmation';
+import { QueuedGiftsSection } from '@/components/QueuedGiftsSection';
 import { format } from 'date-fns';
 import { cleanName } from '@/lib/utils';
 import { getNextOccurrence, formatOccasionDate, getDaysUntil } from '@/lib/dateUtils';
@@ -39,6 +41,8 @@ const Dashboard = () => {
   const [automationRecipient, setAutomationRecipient] = useState<any>(null);
   const [showVIPOnboarding, setShowVIPOnboarding] = useState(false);
   const [previousTier, setPreviousTier] = useState<string | null>(null);
+  const [showEditRecipient, setShowEditRecipient] = useState(false);
+  const [editingRecipient, setEditingRecipient] = useState<any>(null);
 
   // Fetch user profile with subscription info and wallet balance
   const { data: userProfile, refetch: refetchProfile } = useQuery({
@@ -517,9 +521,18 @@ const Dashboard = () => {
             </Card>
           </div>
 
-          {/* RIGHT COLUMN - Reserved for future features */}
+          {/* RIGHT COLUMN - Queued Gifts for VIP users */}
           <div className="space-y-6">
-            {/* Future features will go here */}
+            {userProfile?.subscription_tier === 'vip' && (
+              <QueuedGiftsSection
+                recipients={sortedRecipients}
+                walletBalance={userProfile.gift_wallet_balance || 0}
+                onRequestAddress={(recipient) => {
+                  setEditingRecipient(recipient);
+                  setShowEditRecipient(true);
+                }}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -548,6 +561,17 @@ const Dashboard = () => {
           isOpen={showAddFunds}
           onClose={() => setShowAddFunds(false)}
           currentBalance={userProfile.gift_wallet_balance || 0}
+        />
+      )}
+
+      {showEditRecipient && editingRecipient && (
+        <EditRecipientModal
+          isOpen={showEditRecipient}
+          onClose={() => {
+            setShowEditRecipient(false);
+            setEditingRecipient(null);
+          }}
+          recipient={editingRecipient}
         />
       )}
 
