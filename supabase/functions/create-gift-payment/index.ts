@@ -232,7 +232,7 @@ serve(async (req) => {
     console.log(`💳 Creating session with price: $${productPrice} (${Math.round(productPrice * 100)} cents)`);
     const sessionData = new URLSearchParams({
       'mode': 'payment',
-      'success_url': `${cleanOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      'success_url': `${cleanOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}&type=gift`,
       'cancel_url': `${cleanOrigin}/`,
       'line_items[0][price_data][currency]': 'usd',
       'line_items[0][price_data][product_data][name]': `Gift: ${sanitizedGiftType} for ${sanitizedRecipientName}`,
