@@ -242,40 +242,6 @@ export const EnableAutomationModal = ({
               </div>
             )}
 
-            {/* Eligibility Status */}
-            {eligibility && (
-              <div className={cn(
-                'flex items-center gap-3 p-4 rounded-lg',
-                eligibility.eligible
-                  ? 'bg-green-50 text-green-700'
-                  : 'bg-red-50 text-red-700'
-              )}>
-                {eligibility.eligible ? (
-                  <>
-                    <CheckCircle className="w-5 h-5" />
-                    <div>
-                      <p className="font-medium">Ready to automate</p>
-                      <p className="text-sm opacity-80">
-                        Available balance: ${eligibility.available_balance?.toFixed(2)}
-                      </p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="w-5 h-5" />
-                    <div>
-                      <p className="font-medium">{eligibility.message}</p>
-                      {eligibility.shortfall && (
-                        <p className="text-sm opacity-80">
-                          Add ${eligibility.shortfall.toFixed(2)} to enable automation
-                        </p>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
             {/* Wallet Coverage */}
             {coverage && coverage.availableBalance >= (defaultGift?.price || 0) && (
               <div className="flex items-center justify-between p-3 bg-[#1A1A1A]/5 rounded-lg">
