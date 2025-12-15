@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Zap, Clock, MapPin, CheckCircle, AlertCircle, XCircle, Edit2, Gift, Package } from 'lucide-react';
+import { Zap, Clock, MapPin, CheckCircle, AlertCircle, XCircle, Edit2, Gift, Package, Calendar, DollarSign, Truck } from 'lucide-react';
 import { getAutomationStatus, checkAutomationEligibility } from '@/lib/automation';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
+import { format, differenceInDays, subDays } from 'date-fns';
 
 interface AutomationToggleProps {
   recipientId: string;
@@ -250,6 +251,42 @@ export const AutomationToggle = ({
 
   const orderStatus = getOrderStatus();
 
+  // Calculate automation timeline dates
+  const getTimelineInfo = () => {
+    if (!nextScheduledGift?.occasion_date) return null;
+
+    const occasionDate = new Date(nextScheduledGift.occasion_date + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Automation timeline:
+    // - Funds reserved: 14 days before occasion
+    // - Address request: 10 days before occasion  
+    // - Gift ships: 3 days before occasion (once address confirmed)
+    const fundsReserveDate = subDays(occasionDate, 14);
+    const addressRequestDate = subDays(occasionDate, 10);
+    const shipDate = subDays(occasionDate, 3);
+    
+    const daysUntilOccasion = differenceInDays(occasionDate, today);
+    const daysUntilReserve = differenceInDays(fundsReserveDate, today);
+    const daysUntilShip = differenceInDays(shipDate, today);
+
+    return {
+      occasionDate,
+      fundsReserveDate,
+      addressRequestDate,
+      shipDate,
+      daysUntilOccasion,
+      daysUntilReserve,
+      daysUntilShip,
+      fundsAlreadyReserved: nextScheduledGift.wallet_reserved,
+      alreadyShipped: !!nextScheduledGift.shopify_order_id
+    };
+  };
+
+  const timeline = getTimelineInfo();
+  const giftPrice = defaultGift ? Number(defaultGift.price) + 7 : estimatedCost; // Add $7 service fee
+
   return (
     <div className={cn('flex flex-col gap-2', className)}>
       {/* Top Row: Toggle and Status */}
@@ -329,7 +366,7 @@ export const AutomationToggle = ({
             </p>
             <div className="flex items-center gap-2">
               <span className="text-xs text-[#1A1A1A]/60">
-                ${Number(defaultGift.price).toFixed(2)}
+                ${giftPrice.toFixed(2)}
               </span>
               {orderStatus && (
                 <span className={cn('text-xs font-medium px-1.5 py-0.5 rounded', orderStatus.bgColor, orderStatus.color)}>
@@ -353,6 +390,72 @@ export const AutomationToggle = ({
               <Edit2 className="w-4 h-4" />
             </Button>
           )}
+        </div>
+      )}
+
+      {/* Timeline Info - Show when automation is enabled and we have a scheduled gift */}
+      {status?.enabled && timeline && !timeline.alreadyShipped && (
+        <div className="p-2 bg-gradient-to-r from-[#D2B887]/5 to-[#D2B887]/10 rounded-lg border border-[#D2B887]/20">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Calendar className="w-3.5 h-3.5 text-[#D2B887]" />
+            <span className="text-xs font-medium text-[#1A1A1A]">Automation Timeline</span>
+          </div>
+          
+          <div className="space-y-1.5">
+            {/* Funds Reserve Date */}
+            {!timeline.fundsAlreadyReserved ? (
+              <div className="flex items-center gap-2 text-xs">
+                <DollarSign className="w-3 h-3 text-purple-500" />
+                <span className="text-[#1A1A1A]/70">Funds reserved:</span>
+                <span className="font-medium text-[#1A1A1A]">
+                  {format(timeline.fundsReserveDate, 'MMM d')}
+                  {timeline.daysUntilReserve > 0 && (
+                    <span className="text-[#1A1A1A]/50 ml-1">
+                      ({timeline.daysUntilReserve} days)
+                    </span>
+                  )}
+                  {timeline.daysUntilReserve <= 0 && (
+                    <span className="text-purple-600 ml-1">(soon)</span>
+                  )}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-xs">
+                <CheckCircle className="w-3 h-3 text-green-500" />
+                <span className="text-green-700 font-medium">
+                  ${giftPrice.toFixed(2)} reserved from wallet
+                </span>
+              </div>
+            )}
+
+            {/* Ship Date */}
+            <div className="flex items-center gap-2 text-xs">
+              <Truck className="w-3 h-3 text-blue-500" />
+              <span className="text-[#1A1A1A]/70">Gift ships:</span>
+              <span className="font-medium text-[#1A1A1A]">
+                {format(timeline.shipDate, 'MMM d')}
+                {timeline.daysUntilShip > 0 && (
+                  <span className="text-[#1A1A1A]/50 ml-1">
+                    ({timeline.daysUntilShip} days)
+                  </span>
+                )}
+              </span>
+            </div>
+
+            {/* Occasion Date */}
+            <div className="flex items-center gap-2 text-xs">
+              <Gift className="w-3 h-3 text-[#D2B887]" />
+              <span className="text-[#1A1A1A]/70">Arrives by:</span>
+              <span className="font-medium text-[#D2B887]">
+                {format(timeline.occasionDate, 'MMM d')}
+                {timeline.daysUntilOccasion > 0 && (
+                  <span className="text-[#1A1A1A]/50 ml-1">
+                    ({timeline.daysUntilOccasion} days)
+                  </span>
+                )}
+              </span>
+            </div>
+          </div>
         </div>
       )}
 
