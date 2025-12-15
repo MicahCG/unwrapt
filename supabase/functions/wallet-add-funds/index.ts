@@ -88,7 +88,7 @@ serve(async (req) => {
     // Create checkout session
     const sessionData = new URLSearchParams({
       'mode': 'payment',
-      'success_url': `${cleanOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      'success_url': `${cleanOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}&type=wallet&amount=${amount}`,
       'cancel_url': `${cleanOrigin}/`,
       'line_items[0][price_data][currency]': 'usd',
       'line_items[0][price_data][product_data][name]': 'Gift Wallet Funds',
