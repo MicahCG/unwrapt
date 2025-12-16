@@ -108,9 +108,14 @@ const DashboardRecipients = () => {
       
       if (error) throw error;
 
-      // Get all unique variant IDs from scheduled gifts
+      // Get all unique variant IDs from scheduled gifts AND default gifts
       const variantIds = new Set<string>();
       data?.forEach(recipient => {
+        // Add default gift variant ID
+        if (recipient.default_gift_variant_id) {
+          variantIds.add(recipient.default_gift_variant_id);
+        }
+        // Add scheduled gift variant IDs
         recipient.scheduled_gifts?.forEach((gift: any) => {
           if (gift.gift_variant_id) {
             variantIds.add(gift.gift_variant_id);
@@ -119,17 +124,18 @@ const DashboardRecipients = () => {
       });
 
       // Fetch products for these variant IDs
-      let productMap: Record<string, { title: string; featured_image_url: string }> = {};
+      let productMap: Record<string, { title: string; featured_image_url: string; price: number }> = {};
       if (variantIds.size > 0) {
         const { data: products } = await supabase
           .from('products')
-          .select('shopify_variant_id, title, featured_image_url')
+          .select('shopify_variant_id, title, featured_image_url, price')
           .in('shopify_variant_id', Array.from(variantIds));
         
         products?.forEach(p => {
           productMap[p.shopify_variant_id] = {
             title: p.title,
-            featured_image_url: p.featured_image_url
+            featured_image_url: p.featured_image_url,
+            price: p.price
           };
         });
       }
@@ -185,11 +191,17 @@ const DashboardRecipients = () => {
           };
         }
 
+        // Get the default gift product info for this recipient
+        const defaultGiftProduct = recipient.default_gift_variant_id && productMap[recipient.default_gift_variant_id]
+          ? productMap[recipient.default_gift_variant_id]
+          : null;
+
         return {
           ...recipient,
           nextOccasion,
           hasScheduledGifts,
           nextScheduledGift,
+          defaultGiftProduct,
           daysUntilNext: nextOccasion ? Math.ceil((nextOccasion.date.getTime() - today.getTime()) / (1000 * 3600 * 24)) : null
         };
       });
@@ -537,15 +549,17 @@ const DashboardRecipients = () => {
                         </div>
                       </div>
 
-                      {/* Gift Image Thumbnail - only show for recipients with scheduled gifts */}
-                      {!item.isHoliday && item.hasScheduledGifts && item.nextScheduledGift?.gift_image_url && (
-                        <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 border border-brand-cream/50 shadow-sm">
-                          <img 
-                            src={item.nextScheduledGift.gift_image_url} 
-                            alt={item.nextScheduledGift.gift_type || 'Scheduled gift'}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
+                      {/* Gift Image Thumbnail - show scheduled gift OR default gift */}
+                      {!item.isHoliday && (
+                        (item.nextScheduledGift?.gift_image_url || item.defaultGiftProduct?.featured_image_url) && (
+                          <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 border border-brand-cream/50 shadow-sm">
+                            <img 
+                              src={item.nextScheduledGift?.gift_image_url || item.defaultGiftProduct?.featured_image_url} 
+                              alt={item.nextScheduledGift?.gift_type || item.defaultGiftProduct?.title || 'Gift'}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )
                       )}
                     </div>
                     
