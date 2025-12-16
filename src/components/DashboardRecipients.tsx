@@ -95,6 +95,7 @@ const DashboardRecipients = () => {
             price_range,
             status,
             payment_status,
+            shopify_order_id,
             created_at,
             updated_at
           )
@@ -413,7 +414,20 @@ const DashboardRecipients = () => {
                   } else if (!item.hasScheduledGifts || !item.nextScheduledGift) {
                     setSchedulingGift(item);
                   } else {
-                    setViewingGift(item.nextScheduledGift);
+                    // Include recipient info with the gift
+                    setViewingGift({
+                      ...item.nextScheduledGift,
+                      recipients: {
+                        id: item.id,
+                        name: item.name,
+                        relationship: item.relationship,
+                        interests: item.interests,
+                        street: item.street,
+                        city: item.city,
+                        state: item.state,
+                        zip_code: item.zip_code
+                      }
+                    });
                   }
                 }}
                 onKeyDown={(e) => {
@@ -425,7 +439,20 @@ const DashboardRecipients = () => {
                     } else if (!item.hasScheduledGifts || !item.nextScheduledGift) {
                       setSchedulingGift(item);
                     } else {
-                      setViewingGift(item.nextScheduledGift);
+                      // Include recipient info with the gift
+                      setViewingGift({
+                        ...item.nextScheduledGift,
+                        recipients: {
+                          id: item.id,
+                          name: item.name,
+                          relationship: item.relationship,
+                          interests: item.interests,
+                          street: item.street,
+                          city: item.city,
+                          state: item.state,
+                          zip_code: item.zip_code
+                        }
+                      });
                     }
                   }
                 }}
@@ -484,10 +511,20 @@ const DashboardRecipients = () => {
                     </div>
                     
                     {/* Status Badge (if has scheduled gifts) */}
-                    {!item.isHoliday && item.hasScheduledGifts && (
-                      <Badge className="bg-green-100 text-green-800 border-green-200 text-xs opacity-100 group-hover:opacity-0 transition-opacity duration-300 ml-2 flex-shrink-0">
+                    {!item.isHoliday && item.hasScheduledGifts && item.nextScheduledGift && (
+                      <Badge className={`text-xs opacity-100 group-hover:opacity-0 transition-opacity duration-300 ml-2 flex-shrink-0 ${
+                        item.nextScheduledGift.shopify_order_id || item.nextScheduledGift.status === 'ordered'
+                          ? 'bg-blue-100 text-blue-800 border-blue-200'
+                          : item.nextScheduledGift.payment_status === 'paid'
+                            ? 'bg-amber-100 text-amber-800 border-amber-200'
+                            : 'bg-green-100 text-green-800 border-green-200'
+                      }`}>
                         <Check className="h-3 w-3 mr-1" />
-                        Scheduled
+                        {item.nextScheduledGift.shopify_order_id || item.nextScheduledGift.status === 'ordered'
+                          ? 'Ordered'
+                          : item.nextScheduledGift.payment_status === 'paid'
+                            ? 'Paid'
+                            : 'Scheduled'}
                       </Badge>
                     )}
                   </div>

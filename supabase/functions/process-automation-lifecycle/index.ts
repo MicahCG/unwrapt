@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
 
-const SERVICE_FEE = 7;
+const SERVICE_FEE = 0; // No service fee
 
 serve(async (req) => {
   try {
