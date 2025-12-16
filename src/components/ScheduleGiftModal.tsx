@@ -337,11 +337,42 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
         if (balanceError) throw balanceError;
 
-        // Update gift payment status
+        // Update gift payment status and image
         await supabase
           .from('scheduled_gifts')
-          .update({ payment_status: 'paid', payment_amount: totalCost })
+          .update({ 
+            payment_status: 'paid', 
+            payment_amount: totalCost,
+            gift_image_url: selectedProduct.featured_image_url
+          })
           .eq('id', giftData.id);
+
+        // Call process-gift-fulfillment to place the Shopify order
+        console.log('🎁 Calling process-gift-fulfillment for wallet payment...');
+        const { data: fulfillmentData, error: fulfillmentError } = await supabase.functions.invoke('process-gift-fulfillment', {
+          body: { scheduledGiftId: giftData.id }
+        });
+
+        if (fulfillmentError) {
+          console.error('🎁 Gift fulfillment error:', fulfillmentError);
+          toast({
+            title: "Payment Processed",
+            description: "Gift scheduled but order placement pending. We'll process it shortly.",
+            variant: "default"
+          });
+        } else if (fulfillmentData?.success) {
+          console.log('🎁 Gift fulfillment successful:', fulfillmentData);
+          toast({
+            title: "Gift Ordered!",
+            description: `$${totalCost.toFixed(2)} deducted. Order placed successfully!`,
+          });
+        } else {
+          console.log('🎁 Gift fulfillment response:', fulfillmentData);
+          toast({
+            title: "Gift Scheduled!",
+            description: `$${totalCost.toFixed(2)} deducted from your wallet.`,
+          });
+        }
 
         await sendGiftNotificationEmail({
           ...formData,
@@ -353,11 +384,6 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           recipientId: recipient.id,
           timestamp: Date.now()
         }));
-
-        toast({
-          title: "Gift Scheduled!",
-          description: `$${totalCost.toFixed(2)} deducted from your wallet.`,
-        });
 
         queryClient.invalidateQueries({ queryKey: ['upcoming-gifts'] });
         queryClient.invalidateQueries({ queryKey: ['user-metrics'] });
