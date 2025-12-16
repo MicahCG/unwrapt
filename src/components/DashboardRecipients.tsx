@@ -513,18 +513,22 @@ const DashboardRecipients = () => {
                     {/* Status Badge (if has scheduled gifts) */}
                     {!item.isHoliday && item.hasScheduledGifts && item.nextScheduledGift && (
                       <Badge className={`text-xs opacity-100 group-hover:opacity-0 transition-opacity duration-300 ml-2 flex-shrink-0 ${
-                        item.nextScheduledGift.shopify_order_id || item.nextScheduledGift.status === 'ordered'
-                          ? 'bg-blue-100 text-blue-800 border-blue-200'
-                          : item.nextScheduledGift.payment_status === 'paid'
-                            ? 'bg-amber-100 text-amber-800 border-amber-200'
-                            : 'bg-green-100 text-green-800 border-green-200'
+                        item.nextScheduledGift.status === 'delivered'
+                          ? 'bg-green-100 text-green-800 border-green-200'
+                          : item.nextScheduledGift.shopify_order_id || item.nextScheduledGift.status === 'ordered'
+                            ? 'bg-blue-100 text-blue-800 border-blue-200'
+                            : item.nextScheduledGift.payment_status === 'paid'
+                              ? 'bg-amber-100 text-amber-800 border-amber-200'
+                              : 'bg-slate-100 text-slate-800 border-slate-200'
                       }`}>
                         <Check className="h-3 w-3 mr-1" />
-                        {item.nextScheduledGift.shopify_order_id || item.nextScheduledGift.status === 'ordered'
-                          ? 'Ordered'
-                          : item.nextScheduledGift.payment_status === 'paid'
-                            ? 'Paid'
-                            : 'Scheduled'}
+                        {item.nextScheduledGift.status === 'delivered'
+                          ? 'Delivered'
+                          : item.nextScheduledGift.shopify_order_id || item.nextScheduledGift.status === 'ordered'
+                            ? 'Processing'
+                            : item.nextScheduledGift.payment_status === 'paid'
+                              ? 'Paid'
+                              : 'Scheduled'}
                       </Badge>
                     )}
                   </div>
