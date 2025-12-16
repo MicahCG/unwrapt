@@ -18,8 +18,14 @@ interface GiftDetailsModalProps {
 
 const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClose, onDelete }) => {
   const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
+
+  // Check if gift is paid but not yet ordered
+  const isPaidButNotOrdered = gift?.payment_status === 'paid' && 
+    gift?.status !== 'ordered' && 
+    !gift?.shopify_order_id;
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -30,12 +36,74 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClo
     });
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string, paymentStatus?: string, shopifyOrderId?: string) => {
+    // If order has been placed (shopify_order_id exists or status is ordered)
+    if (shopifyOrderId || status?.toLowerCase() === 'ordered') {
+      return 'bg-blue-100 text-blue-800';
+    }
+    // If paid but not ordered
+    if (paymentStatus === 'paid') {
+      return 'bg-amber-100 text-amber-800';
+    }
     switch (status?.toLowerCase()) {
       case 'scheduled': return 'bg-slate-100 text-slate-800';
-      case 'ordered': return 'status-warning';
       case 'delivered': return 'status-success';
       default: return 'bg-slate-100 text-slate-800';
+    }
+  };
+
+  const getStatusLabel = (status: string, paymentStatus?: string, shopifyOrderId?: string) => {
+    if (shopifyOrderId || status?.toLowerCase() === 'ordered') {
+      return 'Ordered';
+    }
+    if (paymentStatus === 'paid') {
+      return 'Paid - Pending Fulfillment';
+    }
+    return status;
+  };
+
+  const handlePlaceOrderNow = async () => {
+    if (!user || !gift?.id) return;
+
+    setIsPlacingOrder(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('No active session found');
+      }
+
+      console.log('🎁 Manually placing order for gift:', gift.id);
+      
+      const { data, error } = await supabase.functions.invoke('process-gift-fulfillment', {
+        body: { scheduledGiftId: gift.id },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        toast({
+          title: "Order Placed!",
+          description: "Your gift order has been submitted to Shopify.",
+        });
+        onClose();
+        // Trigger refresh
+        window.location.reload();
+      } else {
+        throw new Error(data?.error || 'Failed to place order');
+      }
+    } catch (error) {
+      console.error('Error placing order:', error);
+      toast({
+        title: "Failed to Place Order",
+        description: error instanceof Error ? error.message : "Please try again or contact support.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsPlacingOrder(false);
     }
   };
 
@@ -124,10 +192,29 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClo
               <h3 className="text-xl font-semibold text-brand-charcoal">
                 {gift.occasion} for {cleanName(gift.recipients?.name)}
               </h3>
-              <Badge className={getStatusColor(gift.status)}>
-                {gift.status}
+              <Badge className={getStatusColor(gift.status, gift.payment_status, gift.shopify_order_id)}>
+                {getStatusLabel(gift.status, gift.payment_status, gift.shopify_order_id)}
               </Badge>
             </div>
+
+            {/* Place Order Now - for paid but unordered gifts */}
+            {isPaidButNotOrdered && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-semibold text-amber-800">Ready to Ship</h4>
+                    <p className="text-xs text-amber-700">Payment received. Click to place the order now.</p>
+                  </div>
+                  <Button
+                    onClick={handlePlaceOrderNow}
+                    disabled={isPlacingOrder}
+                    className="bg-amber-600 hover:bg-amber-700 text-white"
+                  >
+                    {isPlacingOrder ? 'Placing Order...' : 'Place Order Now'}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Gift Preview */}
             {gift.gift_type && (
