@@ -246,7 +246,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         return;
       }
 
-      const totalCost = selectedProduct.price + 7; // Price + service fee
+      const totalCost = selectedProduct.price;
       const isVIP = userProfile?.subscription_tier === 'vip';
       const hasEnoughBalance = walletBalance >= totalCost;
 
@@ -730,7 +730,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
                       {selectedProduct.title}
                     </p>
                     <p className="text-xs text-[#1A1A1A]/60">
-                      ${selectedProduct.price.toFixed(2)} + $7 service fee
+                      ${selectedProduct.price.toFixed(2)}
                     </p>
                   </div>
                 </>
@@ -769,10 +769,10 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
                 {isLoading ? (
                   'Processing...'
                 ) : selectedProduct ? (
-                  userProfile?.subscription_tier === 'vip' && walletBalance >= (selectedProduct.price + 7) ? (
-                    `Schedule Gift • $${(selectedProduct.price + 7).toFixed(2)}`
+                  userProfile?.subscription_tier === 'vip' && walletBalance >= selectedProduct.price ? (
+                    `Schedule Gift • $${selectedProduct.price.toFixed(2)}`
                   ) : (
-                    `Schedule & Pay $${(selectedProduct.price + 7).toFixed(2)}`
+                    `Schedule & Pay $${selectedProduct.price.toFixed(2)}`
                   )
                 ) : (
                   'Schedule Gift'
