@@ -92,6 +92,7 @@ const DashboardRecipients = () => {
             gift_type,
             gift_description,
             gift_image_url,
+            gift_variant_id,
             price_range,
             status,
             payment_status,
@@ -106,6 +107,32 @@ const DashboardRecipients = () => {
       console.log('📊 DashboardRecipients: Raw database response:', { data, error, count: data?.length });
       
       if (error) throw error;
+
+      // Get all unique variant IDs from scheduled gifts
+      const variantIds = new Set<string>();
+      data?.forEach(recipient => {
+        recipient.scheduled_gifts?.forEach((gift: any) => {
+          if (gift.gift_variant_id) {
+            variantIds.add(gift.gift_variant_id);
+          }
+        });
+      });
+
+      // Fetch products for these variant IDs
+      let productMap: Record<string, { title: string; featured_image_url: string }> = {};
+      if (variantIds.size > 0) {
+        const { data: products } = await supabase
+          .from('products')
+          .select('shopify_variant_id, title, featured_image_url')
+          .in('shopify_variant_id', Array.from(variantIds));
+        
+        products?.forEach(p => {
+          productMap[p.shopify_variant_id] = {
+            title: p.title,
+            featured_image_url: p.featured_image_url
+          };
+        });
+      }
 
       // Process recipients with their next events and sort
       const today = new Date();
@@ -140,11 +167,23 @@ const DashboardRecipients = () => {
         const nextOccasion = occasions[0];
 
         const hasScheduledGifts = recipient.scheduled_gifts && recipient.scheduled_gifts.length > 0;
-        const nextScheduledGift = hasScheduledGifts ? 
+        
+        // Get the next scheduled gift and enrich with product image
+        let nextScheduledGift = hasScheduledGifts ? 
           recipient.scheduled_gifts
-            .filter(gift => new Date(gift.occasion_date) >= today)
-            .sort((a, b) => new Date(a.occasion_date).getTime() - new Date(b.occasion_date).getTime())[0] 
+            .filter((gift: any) => new Date(gift.occasion_date) >= today)
+            .sort((a: any, b: any) => new Date(a.occasion_date).getTime() - new Date(b.occasion_date).getTime())[0] 
           : null;
+
+        // Enrich gift with product data if we have a variant ID
+        if (nextScheduledGift && nextScheduledGift.gift_variant_id && productMap[nextScheduledGift.gift_variant_id]) {
+          const product = productMap[nextScheduledGift.gift_variant_id];
+          nextScheduledGift = {
+            ...nextScheduledGift,
+            gift_image_url: nextScheduledGift.gift_image_url || product.featured_image_url,
+            gift_type: nextScheduledGift.gift_type || product.title
+          };
+        }
 
         return {
           ...recipient,
