@@ -53,11 +53,14 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClo
   };
 
   const getStatusLabel = (status: string, paymentStatus?: string, shopifyOrderId?: string) => {
+    if (status?.toLowerCase() === 'delivered') {
+      return 'Delivered';
+    }
     if (shopifyOrderId || status?.toLowerCase() === 'ordered') {
-      return 'Ordered';
+      return 'Processing';
     }
     if (paymentStatus === 'paid') {
-      return 'Paid - Pending Fulfillment';
+      return 'Paid - Ready to Order';
     }
     return status;
   };
