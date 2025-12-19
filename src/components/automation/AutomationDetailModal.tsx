@@ -43,6 +43,9 @@ interface AutomationDetailModalProps {
       wallet_reserved: boolean;
       estimated_cost: number | null;
       occasion_date: string;
+      shopify_order_id: string | null;
+      status: string | null;
+      payment_status: string | null;
     }>;
   };
   walletBalance: number;
@@ -72,7 +75,9 @@ export const AutomationDetailModal: React.FC<AutomationDetailModalProps> = ({
   const shipDate = subDays(nextOccurrence, 3);
   
   const automatedGift = recipient.scheduled_gifts?.find(g => g.automation_enabled);
-  const isReserved = automatedGift?.wallet_reserved;
+  const isReserved = automatedGift?.wallet_reserved || automatedGift?.payment_status === 'paid';
+  const isOrdered = !!automatedGift?.shopify_order_id || automatedGift?.status === 'ordered';
+  const isDelivered = automatedGift?.status === 'delivered';
   const estimatedCost = automatedGift?.estimated_cost || 42;
 
   const handleOrderNow = async () => {
@@ -196,32 +201,40 @@ export const AutomationDetailModal: React.FC<AutomationDetailModalProps> = ({
                     <CreditCard className={`w-4 h-4 ${isReserved ? 'text-emerald-600' : 'text-[#D2B887]'}`} />
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-[#1A1A1A]">
-                      {isReserved ? 'Funds reserved' : 'Funds will be reserved'}
+                    <p className={`text-sm font-medium ${isReserved ? 'text-emerald-700' : 'text-[#1A1A1A]'}`}>
+                      {isReserved ? 'Funds reserved ✓' : 'Funds will be reserved'}
                     </p>
                     <p className="text-xs text-[#1A1A1A]/60">
-                      {isReserved ? 'Complete' : format(reserveDate, 'MMM d, yyyy')}
+                      {isReserved ? 'Completed' : format(reserveDate, 'MMM d, yyyy')}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-[#D2B887]/20 flex items-center justify-center">
-                    <Package className="w-4 h-4 text-[#D2B887]" />
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isOrdered ? 'bg-emerald-100' : 'bg-[#D2B887]/20'}`}>
+                    <Package className={`w-4 h-4 ${isOrdered ? 'text-emerald-600' : 'text-[#D2B887]'}`} />
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-[#1A1A1A]">Gift ships</p>
-                    <p className="text-xs text-[#1A1A1A]/60">{format(shipDate, 'MMM d, yyyy')}</p>
+                    <p className={`text-sm font-medium ${isOrdered ? 'text-emerald-700' : 'text-[#1A1A1A]'}`}>
+                      {isOrdered ? 'Order placed ✓' : 'Order will be placed'}
+                    </p>
+                    <p className="text-xs text-[#1A1A1A]/60">
+                      {isOrdered ? 'Completed' : format(shipDate, 'MMM d, yyyy')}
+                    </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-[#D2B887]/20 flex items-center justify-center">
-                    <Gift className="w-4 h-4 text-[#D2B887]" />
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isDelivered ? 'bg-emerald-100' : 'bg-[#D2B887]/20'}`}>
+                    <Gift className={`w-4 h-4 ${isDelivered ? 'text-emerald-600' : 'text-[#D2B887]'}`} />
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-[#1A1A1A]">Arrives by</p>
-                    <p className="text-xs text-[#1A1A1A]/60">{format(nextOccurrence, 'MMM d, yyyy')}</p>
+                    <p className={`text-sm font-medium ${isDelivered ? 'text-emerald-700' : 'text-[#1A1A1A]'}`}>
+                      {isDelivered ? 'Delivered ✓' : 'Arrives by'}
+                    </p>
+                    <p className="text-xs text-[#1A1A1A]/60">
+                      {isDelivered ? 'Completed' : format(nextOccurrence, 'MMM d, yyyy')}
+                    </p>
                   </div>
                 </div>
               </div>
