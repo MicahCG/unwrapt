@@ -457,24 +457,44 @@ const Dashboard = () => {
                                 {/* Order Status - show if an order has been placed */}
                                 {activeOrder && (
                                   <div className="mt-2 pt-2 border-t border-[#E4DCD2]/50">
-                                    <div className="flex items-center gap-2">
-                                      <Truck className="w-3.5 h-3.5 text-emerald-600" />
-                                      <span className="text-sm font-medium text-emerald-700">
-                                        {activeOrder.status === 'delivered' ? 'Delivered' : 'Order Placed'}
-                                      </span>
-                                      {activeOrder.shopify_order_id && (
-                                        <span className="text-xs text-[#1A1A1A]/40">
-                                          #{activeOrder.shopify_order_id.slice(-6)}
-                                        </span>
+                                    <div className="flex items-center gap-3">
+                                      {/* Product Image */}
+                                      {activeOrder.gift_image_url && (
+                                        <div className="w-12 h-12 rounded-lg overflow-hidden bg-[#FAF8F3] border border-[#E4DCD2] flex-shrink-0">
+                                          <img
+                                            src={activeOrder.gift_image_url}
+                                            alt={activeOrder.gift_type || 'Gift'}
+                                            className="w-full h-full object-cover"
+                                          />
+                                        </div>
                                       )}
+
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                          <Truck className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                                          <span className="text-sm font-medium text-emerald-700">
+                                            {activeOrder.status === 'delivered' ? 'Delivered' : 'Order Placed'}
+                                          </span>
+                                          {activeOrder.shopify_order_id && (
+                                            <span className="text-xs text-[#1A1A1A]/40">
+                                              #{activeOrder.shopify_order_id.slice(-6)}
+                                            </span>
+                                          )}
+                                        </div>
+                                        {activeOrder.gift_type && (
+                                          <p className="text-xs text-[#1A1A1A]/70 mt-0.5 truncate">
+                                            {activeOrder.gift_type}
+                                          </p>
+                                        )}
+                                        {activeOrder.delivery_date && deliveryDaysUntil !== null && (
+                                          <p className="text-xs text-[#1A1A1A]/60 mt-0.5">
+                                            Delivers {formatOccasionDate(activeOrder.delivery_date)}
+                                            {deliveryDaysUntil > 0 && ` (in ${deliveryDaysUntil} ${deliveryDaysUntil === 1 ? 'day' : 'days'})`}
+                                            {deliveryDaysUntil === 0 && ' (today)'}
+                                          </p>
+                                        )}
+                                      </div>
                                     </div>
-                                    {activeOrder.delivery_date && deliveryDaysUntil !== null && (
-                                      <p className="text-xs text-[#1A1A1A]/60 mt-0.5 ml-5">
-                                        Delivers {formatOccasionDate(activeOrder.delivery_date)}
-                                        {deliveryDaysUntil > 0 && ` (in ${deliveryDaysUntil} ${deliveryDaysUntil === 1 ? 'day' : 'days'})`}
-                                        {deliveryDaysUntil === 0 && ' (today)'}
-                                      </p>
-                                    )}
                                   </div>
                                 )}
                               </div>

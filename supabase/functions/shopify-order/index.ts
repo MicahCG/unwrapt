@@ -121,15 +121,18 @@ serve(async (req) => {
     let productName = 'Gift Item';
     let variantPrice = "25.00";
 
-    // First, check if we have the user's specific product selection from payment
-    // This should be stored in the payment metadata or gift data
+    // PRIORITY 1: Check if the scheduled_gift already has a variant_id saved (wallet payment or automation)
     console.log('🔍 Checking for user-selected variant ID...');
-    
-    // Try to get the variant ID from the payment record first
-    let userSelectedVariantId = null;
-    let userSelectedPrice = null;
-    
-    if (!testMode) {
+
+    if (giftData.gift_variant_id) {
+      selectedVariantId = giftData.gift_variant_id;
+      productName = giftData.gift_type || 'Selected Gift';
+      variantPrice = giftData.estimated_cost?.toString() || giftData.payment_amount?.toString() || "25.00";
+      matchReason = 'gift-record';
+      console.log(`✅ Using variant from gift record: ${productName} (variant: ${selectedVariantId}, price: $${variantPrice})`);
+    }
+    // PRIORITY 2: Try to get the variant ID from the payment record (Stripe checkout)
+    else if (!testMode) {
       try {
         const { data: paymentData, error: paymentError } = await supabaseService
           .from('payments')
@@ -141,20 +144,22 @@ serve(async (req) => {
 
         if (paymentData && !paymentError) {
           console.log('💳 Found payment record, checking Stripe session metadata...');
-          
+
           // Get the Stripe session to extract variant_id from metadata
           const stripeResponse = await fetch(`https://api.stripe.com/v1/checkout/sessions/${paymentData.stripe_session_id}`, {
             headers: {
               'Authorization': `Bearer ${Deno.env.get("STRIPE_SECRET_KEY")}`,
             },
           });
-          
+
           if (stripeResponse.ok) {
             const stripeSession = await stripeResponse.json();
             if (stripeSession.metadata?.variant_id) {
-              userSelectedVariantId = stripeSession.metadata.variant_id;
-              userSelectedPrice = (paymentData.amount / 100).toString(); // Convert from cents
-              console.log(`🎯 Found user-selected variant: ${userSelectedVariantId} for $${userSelectedPrice}`);
+              selectedVariantId = stripeSession.metadata.variant_id;
+              variantPrice = (paymentData.amount / 100).toString(); // Convert from cents
+              productName = giftData.gift_type || 'Selected Gift';
+              matchReason = 'stripe-payment';
+              console.log(`🎯 Found user-selected variant from Stripe: ${selectedVariantId} for $${variantPrice}`);
             }
           }
         }
@@ -163,13 +168,9 @@ serve(async (req) => {
       }
     }
 
-    // Use the user's exact selection if available
-    if (userSelectedVariantId) {
-      selectedVariantId = userSelectedVariantId;
-      variantPrice = userSelectedPrice || variantPrice;
-      matchReason = 'user-selected-product';
-      productName = giftData.gift_type || 'Selected Gift';
-      console.log(`✅ Using user-selected product: ${productName} (variant: ${selectedVariantId})`);
+    // PRIORITY 3: Only use dynamic/fallback selection if NO variant was found
+    if (selectedVariantId) {
+      console.log(`✅ Using user-selected product: ${productName} (variant: ${selectedVariantId}, source: ${matchReason})`);
     }
     // Only fall back to dynamic selection if we don't have user's specific choice
     else if (shopifyStorefrontToken) {
