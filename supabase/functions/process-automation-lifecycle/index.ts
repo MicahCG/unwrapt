@@ -16,27 +16,78 @@ serve(async (req) => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    // Get all recipients with automation enabled
-    const { data: recipients, error: recipientsError } = await supabaseClient
-      .from("recipients")
-      .select("*, profiles!inner(id, email, full_name, gift_wallet_balance, auto_reload_enabled, auto_reload_threshold, auto_reload_amount, stripe_payment_method_id)")
-      .eq("automation_enabled", true);
+    // Get all scheduled gifts with automation enabled (gift-level automation)
+    const { data: automatedGifts, error: giftsError } = await supabaseClient
+      .from("scheduled_gifts")
+      .select("*, recipients!inner(*)")
+      .eq("automation_enabled", true)
+      .neq("status", "cancelled")
+      .neq("status", "expired")
+      .neq("status", "delivered")
+      .gte("occasion_date", today.toISOString().split("T")[0]);
 
-    if (recipientsError) {
-      console.error("Error fetching recipients:", recipientsError);
-      throw recipientsError;
+    if (giftsError) {
+      console.error("Error fetching automated gifts:", giftsError);
+      throw giftsError;
     }
 
-    console.log(`📋 Processing ${recipients?.length || 0} recipients with automation enabled`);
+    console.log(`📋 Found ${automatedGifts?.length || 0} gifts with automation enabled`);
 
-    for (const recipient of recipients || []) {
-      await processRecipientAutomation(supabaseClient, recipient, today);
+    // Get unique user_ids for profile lookup
+    const userIds = [...new Set(automatedGifts?.map((g: any) => g.user_id) || [])];
+    
+    // Fetch profile data
+    const { data: profiles, error: profilesError } = await supabaseClient
+      .from("profiles")
+      .select("id, email, full_name, gift_wallet_balance, auto_reload_enabled, auto_reload_threshold, auto_reload_amount, stripe_payment_method_id")
+      .in("id", userIds);
+
+    if (profilesError) {
+      console.error("Error fetching profiles:", profilesError);
+      throw profilesError;
+    }
+
+    // Create a map of user_id to profile data
+    const profileMap = new Map();
+    profiles?.forEach((p: any) => profileMap.set(p.id, p));
+
+    // Group gifts by recipient for processing
+    const recipientGiftsMap = new Map();
+    for (const gift of automatedGifts || []) {
+      const recipientId = gift.recipient_id;
+      if (!recipientGiftsMap.has(recipientId)) {
+        recipientGiftsMap.set(recipientId, {
+          recipient: {
+            ...gift.recipients,
+            profiles: profileMap.get(gift.user_id)
+          },
+          gifts: []
+        });
+      }
+      recipientGiftsMap.get(recipientId).gifts.push(gift);
+    }
+
+    console.log(`📋 Processing ${recipientGiftsMap.size} recipients with automated gifts`);
+
+    // Process each recipient's gifts
+    for (const [recipientId, data] of recipientGiftsMap) {
+      const { recipient, gifts } = data;
+      if (!recipient.profiles) {
+        console.log(`  ⚠️ Skipping recipient ${recipient.name}: no profile found`);
+        continue;
+      }
+      
+      console.log(`\n👤 Processing recipient: ${recipient.name} (${gifts.length} gifts)`);
+      
+      for (const gift of gifts) {
+        await processGiftStage(supabaseClient, gift, recipient, today);
+      }
     }
 
     console.log("✅ Automation lifecycle processing complete");
 
     return new Response(
-      JSON.stringify({ success: true, processed: recipients?.length || 0 }),
+      JSON.stringify({ success: true, processed: automatedGifts?.length || 0 }),
       { headers: { "Content-Type": "application/json" }, status: 200 }
     );
   } catch (error) {
@@ -49,30 +100,6 @@ serve(async (req) => {
   }
 });
 
-async function processRecipientAutomation(supabaseClient: any, recipient: any, today: Date) {
-  console.log(`\n👤 Processing recipient: ${recipient.name}`);
-
-  // Get all eligible gifts for this recipient
-  const { data: gifts, error: giftsError } = await supabaseClient
-    .from("scheduled_gifts")
-    .select("*")
-    .eq("recipient_id", recipient.id)
-    .eq("automation_enabled", true)
-    .neq("status", "cancelled")
-    .neq("status", "expired")
-    .gte("occasion_date", today.toISOString().split("T")[0]);
-
-  if (giftsError) {
-    console.error(`Error fetching gifts for ${recipient.name}:`, giftsError);
-    return;
-  }
-
-  console.log(`  📦 Found ${gifts?.length || 0} eligible gifts`);
-
-  for (const gift of gifts || []) {
-    await processGiftStage(supabaseClient, gift, recipient, today);
-  }
-}
 
 async function processGiftStage(supabaseClient: any, gift: any, recipient: any, today: Date) {
   const deliveryDate = new Date(gift.delivery_date);

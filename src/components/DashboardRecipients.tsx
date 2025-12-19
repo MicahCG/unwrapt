@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
-import { Gift, Calendar, Plus, Users, Clock, ChevronDown, ChevronUp, Check } from 'lucide-react';
+import { Gift, Calendar, Plus, Users, Clock, ChevronDown, ChevronUp, Check, AlertCircle, Truck, CreditCard, MapPin } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { cleanName } from '@/lib/utils';
 import ScheduleGiftModal from './ScheduleGiftModal';
@@ -97,6 +97,10 @@ const DashboardRecipients = () => {
             status,
             payment_status,
             shopify_order_id,
+            automation_enabled,
+            wallet_reserved,
+            address_requested_at,
+            address_confirmed_at,
             created_at,
             updated_at
           )
@@ -564,26 +568,71 @@ const DashboardRecipients = () => {
                     </div>
                     
                     {/* Status Badge (if has scheduled gifts) */}
-                    {!item.isHoliday && item.hasScheduledGifts && item.nextScheduledGift && (
-                      <Badge className={`text-xs opacity-100 group-hover:opacity-0 transition-opacity duration-300 ml-2 flex-shrink-0 ${
-                        item.nextScheduledGift.status === 'delivered'
-                          ? 'bg-green-100 text-green-800 border-green-200'
-                          : item.nextScheduledGift.shopify_order_id || item.nextScheduledGift.status === 'ordered'
-                            ? 'bg-blue-100 text-blue-800 border-blue-200'
-                            : item.nextScheduledGift.payment_status === 'paid'
-                              ? 'bg-amber-100 text-amber-800 border-amber-200'
-                              : 'bg-slate-100 text-slate-800 border-slate-200'
-                      }`}>
-                        <Check className="h-3 w-3 mr-1" />
-                        {item.nextScheduledGift.status === 'delivered'
-                          ? 'Delivered'
-                          : item.nextScheduledGift.shopify_order_id || item.nextScheduledGift.status === 'ordered'
-                            ? 'Processing'
-                            : item.nextScheduledGift.payment_status === 'paid'
-                              ? 'Paid'
-                              : 'Scheduled'}
-                      </Badge>
-                    )}
+                    {!item.isHoliday && item.hasScheduledGifts && item.nextScheduledGift && (() => {
+                      const gift = item.nextScheduledGift;
+                      const hasAddress = item.street && item.city && item.state && item.zip_code;
+                      
+                      // Determine status priority
+                      let statusConfig = {
+                        label: 'Scheduled',
+                        bgColor: 'bg-slate-100',
+                        textColor: 'text-slate-700',
+                        icon: Clock
+                      };
+                      
+                      if (gift.status === 'delivered') {
+                        statusConfig = {
+                          label: 'Delivered',
+                          bgColor: 'bg-green-100',
+                          textColor: 'text-green-700',
+                          icon: Check
+                        };
+                      } else if (gift.shopify_order_id || gift.status === 'ordered') {
+                        statusConfig = {
+                          label: 'Ordered',
+                          bgColor: 'bg-blue-100',
+                          textColor: 'text-blue-700',
+                          icon: Truck
+                        };
+                      } else if (gift.payment_status === 'paid' && !hasAddress) {
+                        statusConfig = {
+                          label: 'Needs Address',
+                          bgColor: 'bg-amber-100',
+                          textColor: 'text-amber-700',
+                          icon: MapPin
+                        };
+                      } else if (gift.payment_status === 'paid' && hasAddress) {
+                        statusConfig = {
+                          label: 'Ready',
+                          bgColor: 'bg-emerald-100',
+                          textColor: 'text-emerald-700',
+                          icon: Check
+                        };
+                      } else if (gift.automation_enabled && !gift.wallet_reserved) {
+                        statusConfig = {
+                          label: 'Auto Pending',
+                          bgColor: 'bg-purple-100',
+                          textColor: 'text-purple-700',
+                          icon: Clock
+                        };
+                      } else if (!gift.automation_enabled && gift.payment_status !== 'paid') {
+                        statusConfig = {
+                          label: 'Unpaid',
+                          bgColor: 'bg-red-100',
+                          textColor: 'text-red-700',
+                          icon: CreditCard
+                        };
+                      }
+                      
+                      const IconComponent = statusConfig.icon;
+                      
+                      return (
+                        <Badge className={`text-xs opacity-100 group-hover:opacity-0 transition-opacity duration-300 ml-2 flex-shrink-0 ${statusConfig.bgColor} ${statusConfig.textColor} border-0`}>
+                          <IconComponent className="h-3 w-3 mr-1" />
+                          {statusConfig.label}
+                        </Badge>
+                      );
+                    })()}
                   </div>
                 </div>
 
