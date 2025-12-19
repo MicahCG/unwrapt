@@ -40,14 +40,16 @@ const UserMenu: React.FC<UserMenuProps> = ({ hideSettings = false }) => {
     if (!user) return;
 
     try {
-      const { data: integration } = await supabase
-        .from('calendar_integrations')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('provider', 'google')
-        .maybeSingle();
+      // Use secure function - tokens are never exposed to client
+      const { data: integrations, error } = await supabase
+        .rpc('get_my_calendar_integration');
 
-      setIsCalendarConnected(!!integration);
+      if (!error && integrations && integrations.length > 0) {
+        const integration = integrations[0];
+        setIsCalendarConnected(integration.is_connected && !integration.is_expired);
+      } else {
+        setIsCalendarConnected(false);
+      }
     } catch (error) {
       console.error('Error checking calendar integration:', error);
     }
@@ -108,15 +110,13 @@ const UserMenu: React.FC<UserMenuProps> = ({ hideSettings = false }) => {
         throw new Error('No active session found');
       }
 
-      // Check if user has calendar integration
-      const { data: integration } = await supabase
-        .from('calendar_integrations')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('provider', 'google')
-        .maybeSingle();
+      // Check if user has calendar integration using secure function
+      const { data: integrations, error: integrationError } = await supabase
+        .rpc('get_my_calendar_integration');
 
-      if (!integration) {
+      const integration = integrations?.[0];
+
+      if (integrationError || !integration?.is_connected) {
         toast({
           title: "No Calendar Connected",
           description: "Please connect your Google Calendar first to sync recipients.",
@@ -125,12 +125,11 @@ const UserMenu: React.FC<UserMenuProps> = ({ hideSettings = false }) => {
         return;
       }
 
-      // Fetch calendar events
+      // Fetch calendar events - edge function handles tokens securely server-side
       console.log('🔄 Syncing calendar events...');
       const { data: eventsData, error: eventsError } = await supabase.functions.invoke('google-calendar', {
         body: { 
-          action: 'fetch_dashboard_events',
-          access_token: integration.access_token 
+          action: 'fetch_dashboard_events'
         },
         headers: {
           Authorization: `Bearer ${session.access_token}`,

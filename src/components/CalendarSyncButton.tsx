@@ -64,15 +64,13 @@ const CalendarSyncButton = () => {
         throw new Error('No active session found');
       }
 
-      // Check if user has calendar integration
-      const { data: integration } = await supabase
-        .from('calendar_integrations')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('provider', 'google')
-        .maybeSingle();
+      // Check if user has calendar integration using secure function (tokens are never exposed)
+      const { data: integrations, error: integrationError } = await supabase
+        .rpc('get_my_calendar_integration');
 
-      if (!integration) {
+      const integration = integrations?.[0];
+
+      if (integrationError || !integration?.is_connected) {
         toast({
           title: "No Calendar Connected",
           description: "Please connect your Google Calendar first to sync recipients.",
@@ -81,12 +79,11 @@ const CalendarSyncButton = () => {
         return;
       }
 
-      // Fetch calendar events
+      // Fetch calendar events - edge function handles tokens securely server-side
       console.log('🔄 Syncing calendar events...');
       const { data: eventsData, error: eventsError } = await supabase.functions.invoke('google-calendar', {
         body: { 
-          action: 'fetch_dashboard_events',
-          access_token: integration.access_token 
+          action: 'fetch_dashboard_events'
         },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
