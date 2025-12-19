@@ -130,7 +130,7 @@ serve(async (req) => {
 
       console.log('🎁 Process-gift-fulfillment: Shopify order test result:', orderResult);
 
-    const typedTestOrderResult = orderResult as { error?: { message?: string }; data?: { success?: boolean; error?: string } };
+    const typedTestOrderResult = orderResult as unknown as { error?: { message?: string }; data?: { success?: boolean; error?: string } };
 
     if (typedTestOrderResult.error) {
       console.error('🎁 Process-gift-fulfillment: Shopify order test failed:', typedTestOrderResult.error);
