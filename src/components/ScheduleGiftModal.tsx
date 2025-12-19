@@ -68,6 +68,32 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     staleTime: 5 * 60 * 1000,
   });
 
+  // Fetch existing scheduled gift for this recipient
+  const { data: existingGift } = useQuery({
+    queryKey: ['scheduled-gift', recipient?.id],
+    queryFn: async () => {
+      if (!recipient?.id || !user?.id) return null;
+      
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('scheduled_gifts')
+        .select('*')
+        .eq('recipient_id', recipient.id)
+        .eq('user_id', user.id)
+        .gte('occasion_date', today)
+        .order('occasion_date', { ascending: true })
+        .limit(1)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching existing gift:', error);
+        return null;
+      }
+      return data;
+    },
+    enabled: isOpen && !!recipient?.id && !!user?.id,
+  });
+
   // Filter products by selected vibe
   const filteredProducts = selectedVibe
     ? allProducts.filter(p => p.gift_vibe === selectedVibe)
@@ -515,52 +541,125 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         </SheetHeader>
 
         {/* Automation Timeline - Only show when occasion date is set */}
-        {formData.occasion_date && (
-          <div className="px-8 py-4 border-b border-[#E4DCD2] bg-white/40">
-            <div className="flex items-center gap-2 mb-3">
-              <Calendar className="w-4 h-4 text-[#C4A36F]" />
-              <span className="text-sm font-medium text-[#1A1A1A]">Gift Delivery Timeline</span>
+        {formData.occasion_date && (() => {
+          const occasionDate = parseISO(formData.occasion_date);
+          const today = new Date();
+          
+          // Determine states based on existing gift data
+          const fundsReserved = existingGift?.wallet_reserved || existingGift?.payment_status === 'paid';
+          const orderPlaced = !!existingGift?.shopify_order_id || existingGift?.status === 'ordered';
+          const delivered = existingGift?.status === 'delivered';
+          
+          // Calculate dates
+          const fundsReserveDate = subDays(occasionDate, 14);
+          const orderDate = subDays(occasionDate, 10);
+          const deliveryDate = subDays(occasionDate, 3);
+          
+          // Past dates that haven't happened yet
+          const fundsPastDue = fundsReserveDate < today && !fundsReserved;
+          const orderPastDue = orderDate < today && !orderPlaced;
+          
+          return (
+            <div className="px-8 py-4 border-b border-[#E4DCD2] bg-white/40">
+              <div className="flex items-center gap-2 mb-3">
+                <Calendar className="w-4 h-4 text-[#C4A36F]" />
+                <span className="text-sm font-medium text-[#1A1A1A]">Gift Delivery Timeline</span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                {/* Funds Reserved */}
+                <div className="flex-1 text-center">
+                  <div className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center mb-1 ${
+                    fundsReserved 
+                      ? 'bg-emerald-100' 
+                      : fundsPastDue 
+                        ? 'bg-amber-100' 
+                        : 'bg-[#C4A36F]/10'
+                  }`}>
+                    <CreditCard className={`w-4 h-4 ${
+                      fundsReserved 
+                        ? 'text-emerald-600' 
+                        : fundsPastDue 
+                          ? 'text-amber-600' 
+                          : 'text-[#C4A36F]'
+                    }`} />
+                  </div>
+                  <p className={`text-xs font-medium ${
+                    fundsReserved 
+                      ? 'text-emerald-700' 
+                      : fundsPastDue 
+                        ? 'text-amber-700' 
+                        : 'text-[#1A1A1A]'
+                  }`}>
+                    {fundsReserved ? 'Funds Reserved ✓' : fundsPastDue ? 'Funds Pending' : 'Reserve Funds'}
+                  </p>
+                  <p className="text-xs text-[#1A1A1A]/60">
+                    {fundsReserved ? 'Completed' : format(fundsReserveDate, 'MMM d')}
+                  </p>
+                </div>
+                
+                <div className={`w-8 h-px ${fundsReserved ? 'bg-emerald-300' : 'bg-[#C4A36F]/30'}`} />
+                
+                {/* Order Placed */}
+                <div className="flex-1 text-center">
+                  <div className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center mb-1 ${
+                    orderPlaced 
+                      ? 'bg-emerald-100' 
+                      : orderPastDue 
+                        ? 'bg-amber-100' 
+                        : 'bg-[#C4A36F]/10'
+                  }`}>
+                    <Package className={`w-4 h-4 ${
+                      orderPlaced 
+                        ? 'text-emerald-600' 
+                        : orderPastDue 
+                          ? 'text-amber-600' 
+                          : 'text-[#C4A36F]'
+                    }`} />
+                  </div>
+                  <p className={`text-xs font-medium ${
+                    orderPlaced 
+                      ? 'text-emerald-700' 
+                      : orderPastDue 
+                        ? 'text-amber-700' 
+                        : 'text-[#1A1A1A]'
+                  }`}>
+                    {orderPlaced ? 'Order Placed ✓' : orderPastDue ? 'Order Pending' : 'Place Order'}
+                  </p>
+                  <p className="text-xs text-[#1A1A1A]/60">
+                    {orderPlaced ? 'Completed' : format(orderDate, 'MMM d')}
+                  </p>
+                </div>
+                
+                <div className={`w-8 h-px ${orderPlaced ? 'bg-emerald-300' : 'bg-[#C4A36F]/30'}`} />
+                
+                {/* Arrives By */}
+                <div className="flex-1 text-center">
+                  <div className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center mb-1 ${
+                    delivered 
+                      ? 'bg-emerald-100' 
+                      : 'bg-[#C4A36F]/10'
+                  }`}>
+                    <Truck className={`w-4 h-4 ${
+                      delivered 
+                        ? 'text-emerald-600' 
+                        : 'text-[#C4A36F]'
+                    }`} />
+                  </div>
+                  <p className={`text-xs font-medium ${
+                    delivered 
+                      ? 'text-emerald-700' 
+                      : 'text-[#1A1A1A]'
+                  }`}>
+                    {delivered ? 'Delivered ✓' : 'Arrives By'}
+                  </p>
+                  <p className="text-xs text-[#1A1A1A]/60">
+                    {delivered ? 'Completed' : format(deliveryDate, 'MMM d')}
+                  </p>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center justify-between gap-2">
-              {/* Funds Reserved */}
-              <div className="flex-1 text-center">
-                <div className="w-8 h-8 mx-auto rounded-full bg-[#C4A36F]/10 flex items-center justify-center mb-1">
-                  <CreditCard className="w-4 h-4 text-[#C4A36F]" />
-                </div>
-                <p className="text-xs font-medium text-[#1A1A1A]">Funds Reserved</p>
-                <p className="text-xs text-[#1A1A1A]/60">
-                  {format(subDays(parseISO(formData.occasion_date), 14), 'MMM d')}
-                </p>
-              </div>
-              
-              <div className="w-8 h-px bg-[#C4A36F]/30" />
-              
-              {/* Order Placed */}
-              <div className="flex-1 text-center">
-                <div className="w-8 h-8 mx-auto rounded-full bg-[#C4A36F]/10 flex items-center justify-center mb-1">
-                  <Package className="w-4 h-4 text-[#C4A36F]" />
-                </div>
-                <p className="text-xs font-medium text-[#1A1A1A]">Order Placed</p>
-                <p className="text-xs text-[#1A1A1A]/60">
-                  {format(subDays(parseISO(formData.occasion_date), 10), 'MMM d')}
-                </p>
-              </div>
-              
-              <div className="w-8 h-px bg-[#C4A36F]/30" />
-              
-              {/* Arrives By */}
-              <div className="flex-1 text-center">
-                <div className="w-8 h-8 mx-auto rounded-full bg-[#C4A36F]/10 flex items-center justify-center mb-1">
-                  <Truck className="w-4 h-4 text-[#C4A36F]" />
-                </div>
-                <p className="text-xs font-medium text-[#1A1A1A]">Arrives By</p>
-                <p className="text-xs text-[#1A1A1A]/60">
-                  {format(subDays(parseISO(formData.occasion_date), 3), 'MMM d')}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Two-Column Layout */}
         <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
