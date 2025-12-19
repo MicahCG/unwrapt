@@ -113,8 +113,8 @@ async function processGiftStage(supabaseClient: any, gift: any, recipient: any, 
     return;
   }
 
-  // STAGE 1: Fund reservation (14 days before)
-  if (daysUntilDelivery === 14 && !gift.wallet_reserved) {
+  // STAGE 1: Fund reservation (14 days or less before, if not reserved yet)
+  if (daysUntilDelivery <= 14 && daysUntilDelivery > 0 && !gift.wallet_reserved) {
     await handleFundReservation(supabaseClient, gift, recipient);
     return;
   }
@@ -130,8 +130,8 @@ async function processGiftStage(supabaseClient: any, gift: any, recipient: any, 
     }
   }
 
-  // STAGE 3: Address request (10 days before, if gift not confirmed yet)
-  if (daysUntilDelivery === 10 && gift.wallet_reserved && gift.status !== 'confirmed' && !gift.address_requested_at) {
+  // STAGE 3: Address request (10 days or less, if gift not confirmed yet)
+  if (daysUntilDelivery <= 10 && daysUntilDelivery > 1 && gift.wallet_reserved && gift.status !== 'confirmed' && !gift.address_requested_at) {
     await handleAddressRequest(supabaseClient, gift, recipient);
     return;
   }
@@ -196,8 +196,8 @@ async function processGiftStage(supabaseClient: any, gift: any, recipient: any, 
     return;
   }
 
-  // STAGE 5: Escalation (24 hours before, no address)
-  if (daysUntilDelivery === 1 && gift.address_requested_at && !isAddressComplete(recipient) && gift.wallet_reserved) {
+  // STAGE 5: Escalation (1 day or less, no address)
+  if (daysUntilDelivery <= 1 && gift.address_requested_at && !isAddressComplete(recipient) && gift.wallet_reserved) {
     await handleEscalation(supabaseClient, gift, recipient);
     return;
   }
