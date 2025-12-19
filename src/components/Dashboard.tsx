@@ -8,7 +8,7 @@ import TestDataManager from '@/components/TestDataManager';
 import MonthlyOpportunitiesOverlay from '@/components/MonthlyOpportunitiesOverlay';
 import GiftScheduledSuccess from '@/components/GiftScheduledSuccess';
 import { Logo } from '@/components/ui/logo';
-import { Bell, Star, Heart, Plus, Lock, Crown } from 'lucide-react';
+import { Bell, Star, Heart, Plus, Lock, Crown, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import AddRecipientModal from '@/components/AddRecipientModal';
 import ScheduleGiftModal from '@/components/ScheduleGiftModal';
@@ -398,7 +398,14 @@ const Dashboard = () => {
                       const isFreeUser = userProfile?.subscription_tier === 'free';
                       const isLocked = isFreeUser && index >= 3;
                       const daysUntil = nextOccasionDate ? getDaysUntil(nextOccasionDate) : null;
-                      
+
+                      // Find active order for this recipient
+                      const activeOrder = recipient.scheduled_gifts?.find((gift: any) =>
+                        (gift.status === 'ordered' || gift.status === 'delivered') &&
+                        gift.delivery_date
+                      );
+                      const deliveryDaysUntil = activeOrder?.delivery_date ? getDaysUntil(activeOrder.delivery_date) : null;
+
                       return (
                         <div
                           key={recipient.id}
@@ -432,6 +439,30 @@ const Dashboard = () => {
                                 ) : (
                                   <p className="text-sm text-[#1A1A1A]/50">No date set</p>
                                 )}
+
+                                {/* Order Status - show if an order has been placed */}
+                                {activeOrder && (
+                                  <div className="mt-2 pt-2 border-t border-[#E4DCD2]/50">
+                                    <div className="flex items-center gap-2">
+                                      <Truck className="w-3.5 h-3.5 text-emerald-600" />
+                                      <span className="text-sm font-medium text-emerald-700">
+                                        {activeOrder.status === 'delivered' ? 'Delivered' : 'Order Placed'}
+                                      </span>
+                                      {activeOrder.shopify_order_id && (
+                                        <span className="text-xs text-[#1A1A1A]/40">
+                                          #{activeOrder.shopify_order_id.slice(-6)}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {activeOrder.delivery_date && deliveryDaysUntil !== null && (
+                                      <p className="text-xs text-[#1A1A1A]/60 mt-0.5 ml-5">
+                                        Delivers {formatOccasionDate(activeOrder.delivery_date)}
+                                        {deliveryDaysUntil > 0 && ` (in ${deliveryDaysUntil} ${deliveryDaysUntil === 1 ? 'day' : 'days'})`}
+                                        {deliveryDaysUntil === 0 && ' (today)'}
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
                             {nextOccasionDate && getOccasionIcon(occasionType)}
@@ -454,6 +485,8 @@ const Dashboard = () => {
                                 isEnabled={recipient.automation_enabled || recipient.scheduled_gifts?.some((g: any) => g.automation_enabled)}
                                 hasCompleteAddress={!!(recipient.street && recipient.city && recipient.state && recipient.zip_code)}
                                 hasGiftSelected={!!(recipient.default_gift_variant_id || recipient.preferred_gift_vibe)}
+                                scheduledGift={recipient.scheduled_gifts?.find((g: any) => g.automation_enabled)}
+                                walletBalance={userProfile.gift_wallet_balance || 0}
                               />
                             </div>
                           )}
