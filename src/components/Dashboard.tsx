@@ -406,6 +406,20 @@ const Dashboard = () => {
                       );
                       const deliveryDaysUntil = activeOrder?.delivery_date ? getDaysUntil(activeOrder.delivery_date) : null;
 
+                      // Find the most relevant automated gift for the NEXT upcoming occasion
+                      // Priority: ordered > paid > reserved > pending
+                      const nextOccasionGiftDate = nextOccasionDate ? getNextOccurrence(nextOccasionDate) : null;
+                      const relevantAutomatedGift = recipient.scheduled_gifts
+                        ?.filter((g: any) => g.automation_enabled && g.occasion_date)
+                        ?.sort((a: any, b: any) => {
+                          const aDate = new Date(a.occasion_date);
+                          const bDate = new Date(b.occasion_date);
+                          // Sort by closest to next occurrence
+                          const aDiff = Math.abs(aDate.getTime() - (nextOccasionGiftDate?.getTime() || 0));
+                          const bDiff = Math.abs(bDate.getTime() - (nextOccasionGiftDate?.getTime() || 0));
+                          return aDiff - bDiff;
+                        })[0];
+
                       return (
                         <div
                           key={recipient.id}
@@ -469,27 +483,42 @@ const Dashboard = () => {
                           </div>
 
                           {/* Automation Toggle for VIP users */}
-                          {!isLocked && nextOccasionDate && userProfile?.subscription_tier === 'vip' && (
-                            <div className="mt-3 pt-3 border-t border-[#E4DCD2]" onClick={(e) => e.stopPropagation()}>
-                              <AutomationToggle
-                                recipientId={recipient.id}
-                                recipientName={cleanName(recipient.name)}
-                                estimatedCost={42.00}
-                                onEnableAutomation={() => handleEnableAutomation(recipient)}
-                                onDisableAutomation={() => handleDisableAutomation(recipient.id)}
-                                onViewDetails={() => {
-                                  setDetailRecipient(recipient);
-                                  setShowAutomationDetail(true);
-                                }}
-                                tier={userProfile.subscription_tier as 'free' | 'vip'}
-                                isEnabled={recipient.automation_enabled || recipient.scheduled_gifts?.some((g: any) => g.automation_enabled)}
-                                hasCompleteAddress={!!(recipient.street && recipient.city && recipient.state && recipient.zip_code)}
-                                hasGiftSelected={!!(recipient.default_gift_variant_id || recipient.preferred_gift_vibe)}
-                                scheduledGift={recipient.scheduled_gifts?.find((g: any) => g.automation_enabled)}
-                                walletBalance={userProfile.gift_wallet_balance || 0}
-                              />
-                            </div>
-                          )}
+                          {!isLocked && nextOccasionDate && userProfile?.subscription_tier === 'vip' && (() => {
+                            // If there's an active order and the relevant automated gift is for the SAME occasion, don't show duplicate status
+                            const activeOrderDate = activeOrder?.occasion_date;
+                            const automatedGiftDate = relevantAutomatedGift?.occasion_date;
+                            const isSameOccasion = activeOrderDate && automatedGiftDate &&
+                              new Date(activeOrderDate).getTime() === new Date(automatedGiftDate).getTime();
+
+                            // Only show automation toggle if:
+                            // 1. No active order exists, OR
+                            // 2. The automated gift is for a different (future) occasion
+                            if (activeOrder && isSameOccasion) {
+                              return null;
+                            }
+
+                            return (
+                              <div className="mt-3 pt-3 border-t border-[#E4DCD2]" onClick={(e) => e.stopPropagation()}>
+                                <AutomationToggle
+                                  recipientId={recipient.id}
+                                  recipientName={cleanName(recipient.name)}
+                                  estimatedCost={42.00}
+                                  onEnableAutomation={() => handleEnableAutomation(recipient)}
+                                  onDisableAutomation={() => handleDisableAutomation(recipient.id)}
+                                  onViewDetails={() => {
+                                    setDetailRecipient(recipient);
+                                    setShowAutomationDetail(true);
+                                  }}
+                                  tier={userProfile.subscription_tier as 'free' | 'vip'}
+                                  isEnabled={recipient.automation_enabled || recipient.scheduled_gifts?.some((g: any) => g.automation_enabled)}
+                                  hasCompleteAddress={!!(recipient.street && recipient.city && recipient.state && recipient.zip_code)}
+                                  hasGiftSelected={!!(recipient.default_gift_variant_id || recipient.preferred_gift_vibe)}
+                                  scheduledGift={relevantAutomatedGift}
+                                  walletBalance={userProfile.gift_wallet_balance || 0}
+                                />
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     })}
