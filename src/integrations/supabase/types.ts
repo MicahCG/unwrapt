@@ -672,6 +672,18 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_my_calendar_integration: {
+        Args: never
+        Returns: {
+          created_at: string
+          expires_at: string
+          id: string
+          is_connected: boolean
+          is_expired: boolean
+          provider: string
+          updated_at: string
+        }[]
+      }
       get_products_by_vibe_and_budget: {
         Args: {
           p_max_price: number

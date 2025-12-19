@@ -47,16 +47,17 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
     if (!user) return;
 
     try {
-      const { data: integration } = await supabase
-        .from('calendar_integrations')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('provider', 'google')
-        .maybeSingle();
+      // Use secure function - tokens are never exposed to client
+      const { data: integrations, error } = await supabase
+        .rpc('get_my_calendar_integration');
 
-      if (integration) {
-        setIsConnected(true);
-        await fetchCalendarEvents(integration.access_token);
+      if (!error && integrations && integrations.length > 0) {
+        const integration = integrations[0];
+        if (integration.is_connected && !integration.is_expired) {
+          setIsConnected(true);
+          // Fetch events through edge function (handles tokens server-side)
+          await fetchCalendarEvents();
+        }
       }
     } catch (error) {
       console.error('Error checking calendar integration:', error);
@@ -105,7 +106,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
     }
   };
 
-  const fetchCalendarEvents = async (accessToken: string) => {
+  const fetchCalendarEvents = async () => {
     setIsFetchingEvents(true);
     try {
       // Get current session without forcing a refresh
@@ -117,11 +118,11 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
         return;
       }
 
+      // Edge function handles tokens securely server-side
       console.log('📅 Fetching calendar events for onboarding...');
       const { data: eventsData, error: eventsError } = await supabase.functions.invoke('google-calendar', {
         body: { 
-          action: 'fetch_events',
-          access_token: accessToken 
+          action: 'fetch_events'
         },
         headers: {
           Authorization: `Bearer ${session.access_token}`,

@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Create supabase client with the user's auth token to respect RLS
+    // Create user-authenticated supabase client for RLS-protected operations
     const authHeader = req.headers.get('Authorization')
     console.log('🔐 Auth header present:', !!authHeader)
     
@@ -135,7 +135,8 @@ Deno.serve(async (req) => {
       })
     }
     
-    const supabase = createClient(
+    // User client for auth and RLS-protected tables
+    const supabaseUser = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
@@ -145,7 +146,13 @@ Deno.serve(async (req) => {
       }
     )
     
-    const { data: { user } } = await supabase.auth.getUser()
+    // Service role client for accessing calendar_integrations (tokens are sensitive)
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+    
+    const { data: { user } } = await supabaseUser.auth.getUser()
 
     if (!user) {
       console.error('❌ No user found in auth header')
@@ -157,7 +164,7 @@ Deno.serve(async (req) => {
 
     console.log('✅ User authenticated:', user.id)
 
-    const { action, code, access_token } = await req.json()
+    const { action, code } = await req.json()
     console.log('📝 Action received:', action)
 
     if (action === 'get_auth_url') {
@@ -225,9 +232,9 @@ Deno.serve(async (req) => {
       const encryptedAccessToken = await encryptToken(tokenData.access_token);
       const encryptedRefreshToken = tokenData.refresh_token ? await encryptToken(tokenData.refresh_token) : null;
 
-      // Store the encrypted integration using the user-authenticated supabase client (respects RLS)
+      // Store the encrypted integration using service role (user can't directly read tokens)
       console.log('💾 Storing encrypted calendar integration for user:', user.id)
-      const { error: insertError } = await supabase
+      const { error: insertError } = await supabaseAdmin
         .from('calendar_integrations')
         .upsert({
           user_id: user.id,
@@ -254,15 +261,22 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'fetch_events') {
-      // Check if we need to refresh the token first for onboarding flow too
-      const { data: currentIntegration } = await supabase
+      // Fetch integration using service role (tokens are not exposed to client)
+      const { data: currentIntegration } = await supabaseAdmin
         .from('calendar_integrations')
         .select('*')
         .eq('user_id', user.id)
         .eq('provider', 'google')
         .maybeSingle();
 
-      let validAccessToken = access_token;
+      if (!currentIntegration) {
+        return new Response(JSON.stringify({ error: 'No calendar integration found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      let validAccessToken: string;
 
       // Check if token is expired or will expire in the next 5 minutes
       if (currentIntegration?.expires_at) {
@@ -300,10 +314,10 @@ Deno.serve(async (req) => {
             });
           }
 
-          // Encrypt and update the stored tokens
+          // Encrypt and update the stored tokens using service role
           const encryptedNewAccessToken = await encryptToken(refreshData.access_token);
           const newExpiresAt = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
-          await supabase
+          await supabaseAdmin
             .from('calendar_integrations')
             .update({
               access_token: encryptedNewAccessToken,
@@ -380,15 +394,22 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'fetch_dashboard_events') {
-      // Check if we need to refresh the token first
-      const { data: currentIntegration } = await supabase
+      // Fetch integration using service role (tokens are not exposed to client)
+      const { data: currentIntegration } = await supabaseAdmin
         .from('calendar_integrations')
         .select('*')
         .eq('user_id', user.id)
         .eq('provider', 'google')
         .maybeSingle();
 
-      let validAccessToken = access_token;
+      if (!currentIntegration) {
+        return new Response(JSON.stringify({ error: 'No calendar integration found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      let validAccessToken: string;
 
       // Check if token is expired or will expire in the next 5 minutes
       if (currentIntegration?.expires_at) {
@@ -426,10 +447,10 @@ Deno.serve(async (req) => {
             });
           }
 
-          // Encrypt and update the stored tokens
+          // Encrypt and update the stored tokens using service role
           const encryptedNewAccessToken = await encryptToken(refreshData.access_token);
           const newExpiresAt = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
-          await supabase
+          await supabaseAdmin
             .from('calendar_integrations')
             .update({
               access_token: encryptedNewAccessToken,
