@@ -10,6 +10,7 @@ import GiftScheduledSuccess from '@/components/GiftScheduledSuccess';
 import { Logo } from '@/components/ui/logo';
 import { Bell, Star, Heart, Plus, Lock, Crown, Truck, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { Users, Zap, Calendar, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import AddRecipientModal from '@/components/AddRecipientModal';
 import ScheduleGiftModal from '@/components/ScheduleGiftModal';
@@ -583,17 +584,38 @@ const Dashboard = () => {
                           height: `calc(${(sortedRecipients.length - 3) * 76}px + ${(sortedRecipients.length - 4) * 16}px)` // Height covering all blurred recipients
                         }}
                       >
-                        <div className="bg-[#FAF8F3]/95 backdrop-blur-sm rounded-2xl p-6 shadow-lg border-2 border-[#D2B887] pointer-events-auto max-w-sm">
+                        <div className="bg-[#FAF8F3]/95 backdrop-blur-sm rounded-2xl p-6 shadow-lg border-2 border-[#D2B887] pointer-events-auto max-w-md">
                           <div className="text-center">
                             <Lock className="w-8 h-8 mx-auto mb-3 text-[#D2B887]" />
                             <h3 className="font-display text-xl text-[#1A1A1A] mb-2">
                               Upgrade to VIP
                             </h3>
-                            <p className="text-sm text-[#1A1A1A]/70 mb-4 max-w-xs">
+                            <p className="text-sm text-[#1A1A1A]/70 mb-4">
                               Unlock unlimited recipients and automation features
                             </p>
+                            
+                            {/* Benefits grid */}
+                            <div className="grid grid-cols-2 gap-2 mb-4">
+                              <div className="flex items-center gap-2 bg-white/60 rounded-full px-3 py-2 border border-[#E4DCD2]">
+                                <Users className="w-4 h-4 text-[#D2B887]" />
+                                <span className="text-xs text-[#1A1A1A]">Unlimited recipients</span>
+                              </div>
+                              <div className="flex items-center gap-2 bg-white/60 rounded-full px-3 py-2 border border-[#E4DCD2]">
+                                <Zap className="w-4 h-4 text-[#D2B887]" />
+                                <span className="text-xs text-[#1A1A1A]">Full gift automation</span>
+                              </div>
+                              <div className="flex items-center gap-2 bg-white/60 rounded-full px-3 py-2 border border-[#E4DCD2]">
+                                <Calendar className="w-4 h-4 text-[#D2B887]" />
+                                <span className="text-xs text-[#1A1A1A]">Advanced scheduling</span>
+                              </div>
+                              <div className="flex items-center gap-2 bg-white/60 rounded-full px-3 py-2 border border-[#E4DCD2]">
+                                <Wallet className="w-4 h-4 text-[#D2B887]" />
+                                <span className="text-xs text-[#1A1A1A]">Gift wallet & auto-reload</span>
+                              </div>
+                            </div>
+                            
                             <Button
-                              className="bg-[#D2B887] hover:bg-[#D2B887]/90 text-[#1A1A1A]"
+                              className="bg-[#D2B887] hover:bg-[#D2B887]/90 text-[#1A1A1A] w-full"
                               onClick={handleDirectUpgrade}
                               disabled={isUpgrading}
                             >
