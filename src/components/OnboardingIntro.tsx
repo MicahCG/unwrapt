@@ -66,6 +66,9 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
     const timeout = setTimeout(() => {
       if (index < ONBOARDING_SLIDES.length - 1) {
         setIndex(index + 1);
+      } else {
+        // On last slide, auto-advance to onboarding
+        handleGetStarted();
       }
     }, 2500);
     
@@ -129,11 +132,6 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
           ))}
         </div>
 
-        {index === ONBOARDING_SLIDES.length - 1 && isTypingDone && (
-          <button className="onb-primary" onClick={handleGetStarted}>
-            Set up my first recipient
-          </button>
-        )}
       </div>
     </div>
   );
