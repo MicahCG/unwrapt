@@ -24,7 +24,7 @@ import { AutomationToggle, EnableAutomationModal, AutomationDetailModal } from '
 import { GiftsAwaitingConfirmation } from '@/components/GiftsAwaitingConfirmation';
 import { format } from 'date-fns';
 import { cleanName } from '@/lib/utils';
-import { getNextOccurrence, formatOccasionDate, getDaysUntil } from '@/lib/dateUtils';
+import { getNextOccurrence, formatOccasionDate, getDaysUntil, getDaysUntilExact } from '@/lib/dateUtils';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -404,7 +404,7 @@ const Dashboard = () => {
                         (gift.status === 'ordered' || gift.status === 'delivered') &&
                         gift.delivery_date
                       );
-                      const deliveryDaysUntil = activeOrder?.delivery_date ? getDaysUntil(activeOrder.delivery_date) : null;
+                      const deliveryDaysUntil = activeOrder?.delivery_date ? getDaysUntilExact(activeOrder.delivery_date) : null;
 
                       // Find the most relevant automated gift for the NEXT upcoming occasion
                       // Priority: ordered > paid > reserved > pending
@@ -488,9 +488,12 @@ const Dashboard = () => {
                                         )}
                                         {activeOrder.delivery_date && deliveryDaysUntil !== null && (
                                           <p className="text-xs text-[#1A1A1A]/60 mt-0.5">
-                                            Delivers {formatOccasionDate(activeOrder.delivery_date)}
-                                            {deliveryDaysUntil > 0 && ` (in ${deliveryDaysUntil} ${deliveryDaysUntil === 1 ? 'day' : 'days'})`}
-                                            {deliveryDaysUntil === 0 && ' (today)'}
+                                            {deliveryDaysUntil < 0 
+                                              ? `Delivered ${formatOccasionDate(activeOrder.delivery_date)}`
+                                              : deliveryDaysUntil === 0 
+                                                ? 'Delivers today'
+                                                : `Delivers ${formatOccasionDate(activeOrder.delivery_date)} (in ${deliveryDaysUntil} ${deliveryDaysUntil === 1 ? 'day' : 'days'})`
+                                            }
                                           </p>
                                         )}
                                       </div>
