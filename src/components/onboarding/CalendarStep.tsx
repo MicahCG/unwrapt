@@ -335,7 +335,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
     );
   }
 
-  // No events found - show error state
+// No events found - show error state and go straight to dashboard
   return (
     <Card className="animate-fadeInUp">
       <CardContent className="text-center py-8">
@@ -344,12 +344,8 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
         <p className="text-muted-foreground mb-4">
           We couldn't find any upcoming birthdays or anniversaries in your calendar.
         </p>
-        <Button onClick={() => onNext({
-          importedDates: [],
-          calendarConnected: isConnected,
-          noRecipientsFound: true
-        })}>
-          Continue Anyway
+        <Button onClick={onSkip}>
+          Continue to Dashboard
         </Button>
       </CardContent>
     </Card>
