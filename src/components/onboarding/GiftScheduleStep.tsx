@@ -18,6 +18,7 @@ import { ShopifyProduct } from '@/hooks/useShopifyCollection';
 
 interface GiftScheduleStepProps {
   onNext: (data: any) => void;
+  onSkip?: () => void;
   recipientName?: string;
   interests?: string[];
   selectedPersonForGift?: any;
@@ -28,6 +29,7 @@ interface GiftScheduleStepProps {
 
 const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({ 
   onNext, 
+  onSkip,
   recipientName, 
   interests = [], 
   selectedPersonForGift,
@@ -312,8 +314,12 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
     }
   };
 
-  const handleSkip = () => {
-    onNext({ firstGift: null });
+const handleSkip = () => {
+    if (onSkip) {
+      onSkip();
+    } else {
+      onNext({ firstGift: null });
+    }
   };
 
   const formatDate = (date: Date) => {
