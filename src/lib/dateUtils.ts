@@ -53,7 +53,7 @@ export function getNextOccurrence(dateString: string): Date {
 }
 
 /**
- * Get days until a date
+ * Get days until a date (for recurring occasions like birthdays)
  */
 export function getDaysUntil(dateString: string): number {
   const nextOccurrence = getNextOccurrence(dateString);
@@ -62,6 +62,23 @@ export function getDaysUntil(dateString: string): number {
 
   const diffTime = nextOccurrence.getTime() - now.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  return diffDays;
+}
+
+/**
+ * Get days until a specific date (NOT recurring - for delivery dates, etc.)
+ * Returns negative number if date is in the past
+ */
+export function getDaysUntilExact(dateString: string): number {
+  const targetDate = parseLocalDate(dateString);
+  targetDate.setHours(0, 0, 0, 0);
+  
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  const diffTime = targetDate.getTime() - now.getTime();
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
   return diffDays;
 }
