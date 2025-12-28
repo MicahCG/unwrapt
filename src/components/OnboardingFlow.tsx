@@ -5,7 +5,7 @@ import { Logo } from '@/components/ui/logo';
 import { useAuth } from '@/components/auth/AuthProvider';
 import UserMenu from '@/components/auth/UserMenu';
 import CalendarStep from '@/components/onboarding/CalendarStep';
-import GiftShowcaseStep from '@/components/onboarding/GiftShowcaseStep';
+import VIPUpsellStep from '@/components/onboarding/VIPUpsellStep';
 import RecipientStep from '@/components/onboarding/RecipientStep';
 import InterestsStep from '@/components/onboarding/InterestsStep';
 import GiftScheduleStep from '@/components/onboarding/GiftScheduleStep';
@@ -437,9 +437,21 @@ const handleSkip = async () => {
       return <CalendarStep onNext={handleStepComplete} onSkip={handleSkip} />;
     }
 
-    // Step 2: Gift Showcase (if we have imported dates)
+// Step 2: VIP Upsell (if we have imported dates from calendar)
     if (currentStep === 2 && onboardingData.importedDates && onboardingData.importedDates.length > 0) {
-      return <GiftShowcaseStep onComplete={() => handleStepComplete({})} />;
+      return (
+        <VIPUpsellStep 
+          importedDates={onboardingData.importedDates}
+          onUpgrade={() => {
+            // Stripe will redirect, so we just log here
+            console.log('User clicked upgrade');
+          }}
+          onSkip={async () => {
+            // Complete onboarding and go to dashboard as free user
+            await completeOnboarding();
+          }}
+        />
+      );
     }
 
     // Check if we have manual recipient data (skip recipient entry)
