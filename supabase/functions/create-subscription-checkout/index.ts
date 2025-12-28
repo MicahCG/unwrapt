@@ -3,6 +3,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { corsHeaders } from "../_shared/cors.ts";
 
+// VIP Monthly subscription price ID from Stripe
+const VIP_MONTHLY_PRICE_ID = "price_1RXpjLJvwzuqyV8LUE0vhqgN";
+
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
   apiVersion: "2023-10-16",
 });
@@ -31,13 +34,25 @@ serve(async (req) => {
     if (userError || !user) throw new Error("User not authenticated");
 
     const body = await req.json();
-    const { priceId, planType } = body; // planType: 'vip_monthly' or 'vip_annual'
-
-    if (!priceId) {
-      throw new Error("Price ID is required");
+    // Accept tier, planType, or priceId for flexibility
+    const { priceId, planType, tier } = body;
+    
+    // Determine the actual Stripe price ID
+    let actualPriceId = priceId;
+    
+    // If no valid priceId, check for tier or planType
+    if (!actualPriceId || actualPriceId === 'vip_monthly' || actualPriceId === 'vip') {
+      const requestedTier = tier || planType || 'vip';
+      if (requestedTier === 'vip' || requestedTier === 'vip_monthly') {
+        actualPriceId = VIP_MONTHLY_PRICE_ID;
+      }
     }
 
-    console.log(`💳 Creating checkout session for user ${user.email}, plan: ${planType}`);
+    if (!actualPriceId) {
+      throw new Error("Unable to determine subscription price");
+    }
+
+    console.log(`💳 Creating checkout session for user ${user.email}, using price: ${actualPriceId}`);
 
     // Get or create Stripe customer
     let customerId: string;
@@ -86,7 +101,7 @@ serve(async (req) => {
       customer: customerId,
       line_items: [
         {
-          price: priceId,
+          price: actualPriceId,
           quantity: 1,
         },
       ],
@@ -95,7 +110,7 @@ serve(async (req) => {
       cancel_url: `${origin}/`,
       metadata: {
         supabase_user_id: user.id,
-        plan_type: planType,
+        plan_type: planType || tier || 'vip_monthly',
       },
     });
 
