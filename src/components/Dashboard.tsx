@@ -8,7 +8,8 @@ import TestDataManager from '@/components/TestDataManager';
 import MonthlyOpportunitiesOverlay from '@/components/MonthlyOpportunitiesOverlay';
 import GiftScheduledSuccess from '@/components/GiftScheduledSuccess';
 import { Logo } from '@/components/ui/logo';
-import { Bell, Star, Heart, Plus, Lock, Crown, Truck } from 'lucide-react';
+import { Bell, Star, Heart, Plus, Lock, Crown, Truck, Loader2 } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import AddRecipientModal from '@/components/AddRecipientModal';
 import ScheduleGiftModal from '@/components/ScheduleGiftModal';
@@ -44,6 +45,33 @@ const Dashboard = () => {
   const [editingRecipient, setEditingRecipient] = useState<any>(null);
   const [showAutomationDetail, setShowAutomationDetail] = useState(false);
   const [detailRecipient, setDetailRecipient] = useState<any>(null);
+  const [isUpgrading, setIsUpgrading] = useState(false);
+
+  // Direct Stripe checkout for VIP upgrade
+  const handleDirectUpgrade = async () => {
+    if (!user) return;
+    
+    setIsUpgrading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-subscription-checkout', {
+        body: { priceId: 'vip_monthly' }
+      });
+
+      if (error) throw error;
+
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error('Error creating checkout session:', error);
+      toast({
+        title: "Error",
+        description: "Failed to start checkout. Please try again.",
+        variant: "destructive"
+      });
+      setIsUpgrading(false);
+    }
+  };
 
   // Fetch user profile with subscription info and wallet balance
   const { data: userProfile, refetch: refetchProfile } = useQuery({
@@ -566,10 +594,15 @@ const Dashboard = () => {
                             </p>
                             <Button
                               className="bg-[#D2B887] hover:bg-[#D2B887]/90 text-[#1A1A1A]"
-                              onClick={() => setShowUpgradeModal(true)}
+                              onClick={handleDirectUpgrade}
+                              disabled={isUpgrading}
                             >
-                              <Crown className="w-4 h-4 mr-2" />
-                              Upgrade Now
+                              {isUpgrading ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              ) : (
+                                <Crown className="w-4 h-4 mr-2" />
+                              )}
+                              {isUpgrading ? 'Redirecting...' : 'Upgrade Now'}
                             </Button>
                           </div>
                         </div>
