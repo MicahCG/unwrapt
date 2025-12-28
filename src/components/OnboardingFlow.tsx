@@ -459,7 +459,8 @@ const handleSkip = async () => {
         case 2:
           return (
             <GiftScheduleStep 
-              onNext={handleStepComplete} 
+              onNext={handleStepComplete}
+              onSkip={handleSkip}
               recipientName={onboardingData.manualRecipientData.fullName}
               interests={[]} // No interests for manual flow
               selectedPersonForGift={{ personName: onboardingData.manualRecipientData.fullName }}
@@ -484,7 +485,8 @@ const handleSkip = async () => {
         case 2:
           return (
             <GiftScheduleStep 
-              onNext={handleStepComplete} 
+              onNext={handleStepComplete}
+              onSkip={handleSkip}
               interests={[]} // No interests for no recipients flow
               selectedPersonForGift={null}
               allowManualRecipientEntry={true}
@@ -517,7 +519,8 @@ const handleSkip = async () => {
         case 3:
           return (
             <GiftScheduleStep 
-              onNext={handleStepComplete} 
+              onNext={handleStepComplete}
+              onSkip={handleSkip}
               recipientName={onboardingData.firstRecipient?.fullName}
               interests={[]} // No interests for manual flow - skip interests step
               selectedPersonForGift={onboardingData.firstRecipient ? { personName: onboardingData.firstRecipient?.fullName } : null}
@@ -550,7 +553,8 @@ const handleSkip = async () => {
         case 3:
           return (
             <GiftScheduleStep 
-              onNext={handleStepComplete} 
+              onNext={handleStepComplete}
+              onSkip={handleSkip}
               recipientName={onboardingData.selectedPersonForGift?.personName}
               interests={onboardingData.interests}
               selectedPersonForGift={onboardingData.selectedPersonForGift}
