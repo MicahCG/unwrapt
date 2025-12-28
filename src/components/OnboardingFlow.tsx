@@ -401,15 +401,10 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
     }
   };
 
-  const handleSkip = () => {
-    console.log('🔧 OnboardingFlow: Skipping step:', currentStep, '-> moving to next');
-    // Skip to next step or complete onboarding
-    const totalSteps = getTotalSteps();
-    if (currentStep === totalSteps) {
-      handleStepComplete({});
-    } else {
-      setCurrentStep(currentStep + 1);
-    }
+const handleSkip = async () => {
+    console.log('🔧 OnboardingFlow: Skipping step:', currentStep, '-> completing onboarding');
+    // Skip directly to dashboard (complete onboarding immediately)
+    await completeOnboarding();
   };
 
   const handleBack = () => {
