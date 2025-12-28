@@ -357,10 +357,10 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Main Content - Two Column Layout */}
-        <div className="px-12 py-12 grid grid-cols-1 xl:grid-cols-[620px_1fr] gap-8">
-          {/* LEFT COLUMN - Upcoming Birthdays */}
-          <div className="space-y-6">
+        {/* Main Content - Centered when no scheduled gifts, two column when gifts exist */}
+        <div className="px-12 py-12 flex justify-center">
+          {/* Upcoming Birthdays */}
+          <div className="space-y-6 w-full max-w-[620px]">
             <Card className="bg-[#EFE7DD] border-[#E4DCD2] rounded-2xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.07)]">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="font-display text-xl text-[#1A1A1A]">
@@ -613,10 +613,6 @@ const Dashboard = () => {
             </Card>
           </div>
 
-          {/* RIGHT COLUMN - Reserved for future features */}
-          <div className="space-y-6">
-            {/* Future features will go here */}
-          </div>
         </div>
       </div>
 
