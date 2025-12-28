@@ -22,9 +22,7 @@ const Landing = () => {
 
   // Use localhost when in development, production URL otherwise
   const getAppUrl = () => {
-    return window.location.hostname === 'localhost'
-      ? 'http://localhost:8080'
-      : 'https://app.unwrapt.io';
+    return window.location.hostname === "localhost" ? "http://localhost:8080" : "https://app.unwrapt.io";
   };
 
   useEffect(() => {
@@ -103,7 +101,7 @@ const Landing = () => {
               style={{ color: "#8B7355" }}
               itemProp="headline"
             >
-              Luxury Gifting Made Effortless
+              Never Miss a Moment
             </h1>
 
             {/* Subheadline */}
@@ -112,8 +110,8 @@ const Landing = () => {
               style={{ color: "#8B7355" }}
               itemProp="description"
             >
-              Unwrapt remembers every occasion, finds the perfect gift, and delivers it — so you can stay connected
-              without the stress
+              We remember every occasion, find the perfect gift, and deliver it so you become the most thoughtful person
+              you know.
             </p>
 
             {/* Hidden SEO Content for AI Crawlers */}
