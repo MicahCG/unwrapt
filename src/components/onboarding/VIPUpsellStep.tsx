@@ -59,38 +59,15 @@ const VIPUpsellStep: React.FC<VIPUpsellStepProps> = ({
 
   return (
     <Card className="animate-fadeInUp">
-      <CardContent className="py-12 px-8 text-center space-y-8">
-        {/* Icon */}
-        <motion.div
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.5, type: "spring" }}
-          className="flex justify-center"
-        >
-          <div className="relative">
-            <div className="bg-gradient-to-br from-brand-gold/20 to-brand-gold/5 p-6 rounded-full">
-              <Zap className="h-16 w-16 text-brand-charcoal" />
-            </div>
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.3, duration: 0.3 }}
-              className="absolute -top-2 -right-2 bg-brand-gold text-brand-charcoal text-xs font-bold px-2 py-1 rounded-full"
-            >
-              VIP
-            </motion.div>
-          </div>
-        </motion.div>
-
+      <CardContent className="py-8 px-6 text-center space-y-6">
         {/* Headline */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.5 }}
-          className="space-y-3"
         >
-          <h2 className="text-3xl md:text-4xl font-bold text-brand-charcoal leading-tight">
-            Automate your gift giving for{' '}
+          <h2 className="text-2xl md:text-3xl font-bold text-brand-charcoal leading-tight">
+            Automate gifts for{' '}
             <span className="text-brand-gold">{firstRecipient}</span>
             {otherCount > 0 && (
               <>
@@ -101,9 +78,6 @@ const VIPUpsellStep: React.FC<VIPUpsellStepProps> = ({
               </>
             )}
           </h2>
-          <p className="text-lg text-brand-charcoal/70">
-            So you never forget a birthday again.
-          </p>
         </motion.div>
 
         {/* Benefits */}
