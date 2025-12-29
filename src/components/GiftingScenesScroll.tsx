@@ -96,14 +96,9 @@ const GiftingScenesScroll: React.FC = () => {
                 transition={{ duration: 0.35, ease: "easeOut" }}
                 className="space-y-4"
               >
-                <div className="relative inline-block">
-                  <span className="pointer-events-none select-none text-5xl md:text-6xl font-serif text-[#E0D2BD]">
-                    {activeScene.keyword}
-                  </span>
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 text-3xl md:text-4xl font-serif text-[#4B3B2A]">
-                    {activeScene.keyword}
-                  </span>
-                </div>
+                <span className="text-3xl md:text-4xl font-serif text-[#E0D2BD]">
+                  {activeScene.keyword}
+                </span>
 
                 <h2 className="text-2xl md:text-3xl font-serif text-[#4B3B2A]">
                   {activeScene.heading}
