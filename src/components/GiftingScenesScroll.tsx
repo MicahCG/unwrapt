@@ -18,22 +18,19 @@ const scenes: Scene[] = [
     id: "remember",
     keyword: "Remember",
     heading: "Never Forget Another Occasion",
-    body:
-      "Birthdays, anniversaries, holidays and milestones are all tracked for you so every important moment gets a gesture, not a scramble.",
+    body: "Birthdays, anniversaries, holidays and milestones are all tracked for you so every important moment gets a gesture, not a scramble.",
   },
   {
     id: "thoughtful",
     keyword: "Thoughtful",
-    heading: "Thoughtful Gifts, Automatically Chosen",
-    body:
-      "Our AI curates gifts that match each person's interests, preferences and relationship to you so every send feels personal and on brand.",
+    heading: "Gifts, Automatically Chosen",
+    body: "Our AI curates gifts that match each person's interests, preferences and relationship to you so every send feels personal and on brand.",
   },
   {
     id: "relationships",
     keyword: "Relationships",
     heading: "Perfect for Clients, Teams and Loved Ones",
-    body:
-      "Nurture client accounts, reward teams and show up for family with consistent, well timed gifting handled quietly in the background.",
+    body: "Nurture client accounts, reward teams and show up for family with consistent, well timed gifting handled quietly in the background.",
   },
 ];
 
@@ -46,9 +43,9 @@ const GiftingScenesScroll: React.FC = () => {
     if (!containerRef.current) return;
 
     const observer = new IntersectionObserver(
-      entries => {
+      (entries) => {
         const visibleEntries = entries
-          .filter(entry => entry.isIntersecting)
+          .filter((entry) => entry.isIntersecting)
           .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
 
         if (visibleEntries[0]) {
@@ -61,10 +58,10 @@ const GiftingScenesScroll: React.FC = () => {
       {
         root: null,
         threshold: [0.25, 0.5, 0.75],
-      }
+      },
     );
 
-    itemRefs.current.forEach(el => {
+    itemRefs.current.forEach((el) => {
       if (el) observer.observe(el);
     });
 
@@ -72,7 +69,7 @@ const GiftingScenesScroll: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const activeScene = scenes.find(scene => scene.id === activeId) ?? scenes[0];
+  const activeScene = scenes.find((scene) => scene.id === activeId) ?? scenes[0];
 
   return (
     <section className="bg-[#F7F1E6] py-24 lg:py-32">
@@ -83,9 +80,7 @@ const GiftingScenesScroll: React.FC = () => {
         {/* Left: Sticky copy area */}
         <div className="lg:sticky lg:top-24 lg:h-[70vh] flex items-center">
           <div className="space-y-8">
-            <p className="text-sm uppercase tracking-[0.25em] text-[#B59A77]">
-              Why busy professionals use Unwrapt
-            </p>
+            <p className="text-sm uppercase tracking-[0.25em] text-[#B59A77]">Why busy professionals use Unwrapt</p>
 
             <AnimatePresence mode="wait">
               <motion.div
@@ -96,17 +91,11 @@ const GiftingScenesScroll: React.FC = () => {
                 transition={{ duration: 0.35, ease: "easeOut" }}
                 className="space-y-4"
               >
-                <span className="text-3xl md:text-4xl font-serif text-[#E0D2BD]">
-                  {activeScene.keyword}
-                </span>
+                <span className="text-3xl md:text-4xl font-serif text-[#E0D2BD]">{activeScene.keyword}</span>
 
-                <h2 className="text-2xl md:text-3xl font-serif text-[#4B3B2A]">
-                  {activeScene.heading}
-                </h2>
+                <h2 className="text-2xl md:text-3xl font-serif text-[#4B3B2A]">{activeScene.heading}</h2>
 
-                <p className="text-base md:text-lg leading-relaxed text-[#6C5840]">
-                  {activeScene.body}
-                </p>
+                <p className="text-base md:text-lg leading-relaxed text-[#6C5840]">{activeScene.body}</p>
               </motion.div>
             </AnimatePresence>
           </div>
@@ -117,7 +106,7 @@ const GiftingScenesScroll: React.FC = () => {
           {scenes.map((scene, index) => (
             <div
               key={scene.id}
-              ref={el => (itemRefs.current[index] = el)}
+              ref={(el) => (itemRefs.current[index] = el)}
               data-scene-id={scene.id}
               className="h-[80vh] md:h-[90vh] flex items-center"
             >
@@ -161,7 +150,9 @@ const GiftingScenesScroll: React.FC = () => {
                         </p>
                       </div>
                       <div className="hidden md:block text-xs text-[#6C5840]">
-                        <span>Scene {index + 1} of {scenes.length}</span>
+                        <span>
+                          Scene {index + 1} of {scenes.length}
+                        </span>
                       </div>
                     </div>
                   </div>
