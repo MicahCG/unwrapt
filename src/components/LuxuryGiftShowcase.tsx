@@ -32,7 +32,7 @@ const LuxuryGiftShowcase = () => {
   ];
 
   return (
-    <section className="py-32 px-6 bg-[hsl(var(--champagne))]">
+    <section className="py-32 px-6" style={{ backgroundColor: "#F8F1E6" }}>
       <div className="max-w-6xl mx-auto">
         {/* Section Header */}
         <div className="text-center mb-16">
