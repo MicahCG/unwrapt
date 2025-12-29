@@ -8,6 +8,7 @@ interface GlassButtonProps {
   href?: string;
   onClick?: () => void;
   className?: string;
+  disabled?: boolean;
 }
 
 export const GlassButton = ({ 
@@ -15,9 +16,10 @@ export const GlassButton = ({
   variant = 'primary', 
   href,
   onClick,
-  className 
+  className,
+  disabled = false
 }: GlassButtonProps) => {
-  const baseStyles = "px-8 py-4 rounded-full font-medium transition-all duration-300 backdrop-blur-[16px] border";
+  const baseStyles = "px-8 py-4 rounded-full font-medium transition-all duration-300 backdrop-blur-[16px] border disabled:opacity-50 disabled:cursor-not-allowed";
   
   const variantStyles = {
     primary: "bg-white/25 border-white/60 text-[hsl(var(--espresso))] hover:bg-white/35 hover:shadow-[0_8px_30px_rgba(200,164,106,0.3)] hover:-translate-y-1",
@@ -35,7 +37,7 @@ export const GlassButton = ({
   }
 
   return (
-    <button onClick={onClick} className={combinedStyles}>
+    <button onClick={onClick} disabled={disabled} className={combinedStyles}>
       {children}
     </button>
   );
