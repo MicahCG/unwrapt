@@ -130,8 +130,27 @@ const Landing = () => {
               <meta itemProp="priceCurrency" content="USD" />
             </div>
 
+            {/* Benefit Cards */}
+            <div className="grid grid-cols-3 gap-4 pt-8 w-full max-w-lg">
+              <div className="flex flex-col items-center p-4 bg-white/30 backdrop-blur-sm border border-white/50 rounded-xl">
+                <Heart className="w-6 h-6 mb-2" style={{ color: "#D4AF7A" }} />
+                <span className="text-2xl font-serif font-semibold" style={{ color: "#8B7355" }}>9,451</span>
+                <span className="text-xs text-center" style={{ color: "#8B7355" }}>Moments Remembered</span>
+              </div>
+              <div className="flex flex-col items-center p-4 bg-white/30 backdrop-blur-sm border border-white/50 rounded-xl">
+                <Clock className="w-6 h-6 mb-2" style={{ color: "#D4AF7A" }} />
+                <span className="text-2xl font-serif font-semibold" style={{ color: "#8B7355" }}>500+ hrs</span>
+                <span className="text-xs text-center" style={{ color: "#8B7355" }}>Saved</span>
+              </div>
+              <div className="flex flex-col items-center p-4 bg-white/30 backdrop-blur-sm border border-white/50 rounded-xl">
+                <Gift className="w-6 h-6 mb-2" style={{ color: "#D4AF7A" }} />
+                <span className="text-2xl font-serif font-semibold" style={{ color: "#8B7355" }}>821</span>
+                <span className="text-xs text-center" style={{ color: "#8B7355" }}>Gifts Delivered</span>
+              </div>
+            </div>
+
             {/* CTA Button */}
-            <div className="flex justify-center pt-4">
+            <div className="flex justify-center pt-6">
               <button
                 onClick={() => {
                   localStorage.setItem("shouldShowOnboardingIntro", "true");
@@ -152,25 +171,6 @@ const Landing = () => {
               >
                 Get Started Free
               </button>
-            </div>
-
-            {/* Benefit Cards */}
-            <div className="grid grid-cols-3 gap-4 pt-8 w-full max-w-lg">
-              <div className="flex flex-col items-center p-4 bg-white/30 backdrop-blur-sm border border-white/50 rounded-xl">
-                <Heart className="w-6 h-6 mb-2" style={{ color: "#D4AF7A" }} />
-                <span className="text-2xl font-serif font-semibold" style={{ color: "#8B7355" }}>9,451</span>
-                <span className="text-xs text-center" style={{ color: "#8B7355" }}>Moments Remembered</span>
-              </div>
-              <div className="flex flex-col items-center p-4 bg-white/30 backdrop-blur-sm border border-white/50 rounded-xl">
-                <Clock className="w-6 h-6 mb-2" style={{ color: "#D4AF7A" }} />
-                <span className="text-2xl font-serif font-semibold" style={{ color: "#8B7355" }}>500+ hrs</span>
-                <span className="text-xs text-center" style={{ color: "#8B7355" }}>Saved</span>
-              </div>
-              <div className="flex flex-col items-center p-4 bg-white/30 backdrop-blur-sm border border-white/50 rounded-xl">
-                <Gift className="w-6 h-6 mb-2" style={{ color: "#D4AF7A" }} />
-                <span className="text-2xl font-serif font-semibold" style={{ color: "#8B7355" }}>821</span>
-                <span className="text-xs text-center" style={{ color: "#8B7355" }}>Gifts Delivered</span>
-              </div>
             </div>
           </article>
         </div>
