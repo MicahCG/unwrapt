@@ -62,10 +62,18 @@ const AnimatedGiftingJourney = () => {
       itemType="https://schema.org/HowTo"
     >
       {/* Sticky Container */}
-      <div className="sticky top-0 h-screen flex items-center justify-center">
-        <div className="max-w-6xl w-full mx-auto">
+      <div className="sticky top-0 h-screen flex items-center justify-center py-12">
+        {/* Floating Card Container */}
+        <div 
+          className="max-w-4xl w-full mx-auto rounded-[32px] p-12 md:p-16"
+          style={{
+            backgroundColor: "#F8F1E6",
+            border: "1px solid #E8DCC8",
+            boxShadow: "0 24px 72px rgba(139, 115, 85, 0.20)",
+          }}
+        >
           {/* Section Header */}
-          <div className="text-center mb-12">
+          <div className="text-center mb-10">
             <h2
               className="font-serif text-4xl md:text-5xl text-[hsl(var(--espresso))]"
               itemProp="name"
@@ -76,7 +84,7 @@ const AnimatedGiftingJourney = () => {
 
           {/* Main Content - Centered */}
           <div className="max-w-2xl mx-auto">
-            <div className="relative min-h-[400px] flex items-center justify-center">
+            <div className="relative min-h-[320px] flex items-center justify-center">
               <div className="relative w-full">
                 {steps.map((step, idx) => (
                   <motion.div
@@ -96,20 +104,19 @@ const AnimatedGiftingJourney = () => {
                     <meta itemProp="position" content={String(idx + 1)} />
 
                     {/* Step Number Badge */}
-                    <div className="text-sm font-medium text-[hsl(var(--soft-gold))] tracking-[0.3em] mb-8 uppercase">
+                    <div className="text-sm font-medium tracking-[0.3em] mb-6 uppercase" style={{ color: "#8B7355" }}>
                       Step {step.number}
                     </div>
 
                     {/* Icon Circle */}
                     <motion.div
-                      className="w-24 h-24 mb-10 rounded-full flex items-center justify-center border-2"
+                      className="w-16 h-16 mb-8 rounded-full flex items-center justify-center border"
                       style={{
-                        backgroundColor: 'hsl(var(--soft-gold))',
-                        borderColor: 'hsl(var(--warm-gold))',
-                        boxShadow: '0 8px 32px hsl(var(--soft-gold))/30'
+                        backgroundColor: '#F3EDE4',
+                        borderColor: '#E8DCC8',
                       }}
                       animate={{
-                        scale: [1, 1.08, 1],
+                        scale: [1, 1.05, 1],
                       }}
                       transition={{
                         duration: 2.5,
@@ -118,16 +125,17 @@ const AnimatedGiftingJourney = () => {
                       }}
                     >
                       <step.icon
-                        className="w-12 h-12"
+                        className="w-7 h-7"
                         style={{
-                          color: 'hsl(var(--espresso))'
+                          color: '#8B7355'
                         }}
                       />
                     </motion.div>
 
                     {/* Step Title */}
                     <h3
-                      className="font-serif text-4xl md:text-5xl text-[hsl(var(--warm-brown))] mb-6 leading-tight"
+                      className="font-serif text-3xl md:text-4xl mb-4 leading-tight"
+                      style={{ color: "#3D3428" }}
                       itemProp="name"
                     >
                       {step.title}
@@ -135,7 +143,8 @@ const AnimatedGiftingJourney = () => {
 
                     {/* Step Description */}
                     <p
-                      className="text-lg text-[hsl(var(--warm-brown))] opacity-80 leading-relaxed max-w-lg mx-auto"
+                      className="text-base leading-relaxed max-w-md mx-auto"
+                      style={{ color: "#6B5D4D" }}
                       itemProp="text"
                     >
                       {step.description}
@@ -147,7 +156,7 @@ const AnimatedGiftingJourney = () => {
           </div>
 
           {/* Progress Indicator */}
-          <div className="text-center mt-12">
+          <div className="text-center mt-8">
             <div className="flex items-center justify-center gap-3">
               {steps.map((_, idx) => (
                 <motion.div
@@ -156,8 +165,8 @@ const AnimatedGiftingJourney = () => {
                   animate={{
                     width: currentStep === idx ? 48 : 8,
                     backgroundColor: currentStep >= idx
-                      ? 'hsl(var(--soft-gold))'
-                      : 'hsl(var(--soft-gold) / 0.2)',
+                      ? '#D4AF7A'
+                      : 'rgba(212, 175, 122, 0.2)',
                   }}
                   transition={{ duration: 0.3, ease: "easeOut" }}
                 />
