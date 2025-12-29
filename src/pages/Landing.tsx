@@ -8,8 +8,10 @@ import GiftBoxOpeningIntro from "@/components/GiftBoxOpeningIntro";
 import GiftingScenesScroll from "@/components/GiftingScenesScroll";
 import AnimatedGiftingJourney from "@/components/AnimatedGiftingJourney";
 import LuxuryGiftShowcase from "@/components/LuxuryGiftShowcase";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 const Landing = () => {
+  const { signInWithGoogle } = useAuth();
   const [email, setEmail] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showNav, setShowNav] = useState(false);
@@ -125,7 +127,12 @@ const Landing = () => {
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 items-center justify-center pt-4">
               <button
-                onClick={() => (window.location.href = getAppUrl())}
+                onClick={() => {
+                  // Mark that user should see onboarding intro after login
+                  localStorage.setItem("shouldShowOnboardingIntro", "true");
+                  // Trigger Google sign-in
+                  signInWithGoogle();
+                }}
                 className="px-10 py-4 rounded-full font-medium text-lg text-white transition-all duration-300
                           hover:scale-[1.02]"
                 style={{

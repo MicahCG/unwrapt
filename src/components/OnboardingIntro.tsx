@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Heart, Gift } from 'lucide-react';
+import { Clock, Heart, Gift, Calendar } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface OnboardingIntroProps {
   onComplete: () => void;
@@ -30,8 +31,10 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
   const [index, setIndex] = useState(0);
   const [typedText, setTypedText] = useState('');
   const [isTypingDone, setIsTypingDone] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   const slide = ONBOARDING_SLIDES[index];
+  const isLastSlide = index === ONBOARDING_SLIDES.length - 1;
 
   // Use localhost when in development, production URL otherwise
   const getAppUrl = () => {
@@ -59,21 +62,18 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
     return () => clearInterval(interval);
   }, [index, slide.headline]);
 
-  // Auto-advance after typing is done
+  // Auto-advance after typing is done (but NOT on last slide - user must click button)
   useEffect(() => {
-    if (!isTypingDone) return;
-    
+    if (!isTypingDone || isLastSlide) return;
+
     const timeout = setTimeout(() => {
       if (index < ONBOARDING_SLIDES.length - 1) {
         setIndex(index + 1);
-      } else {
-        // On last slide, auto-advance to onboarding
-        handleGetStarted();
       }
     }, 2500);
-    
+
     return () => clearTimeout(timeout);
-  }, [isTypingDone, index]);
+  }, [isTypingDone, index, isLastSlide]);
 
   const handleSkip = () => {
     // Mark as seen and redirect to app subdomain
@@ -85,6 +85,43 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
     // Mark as seen and proceed to onboarding
     localStorage.setItem('hasSeenIntro', 'true');
     onComplete();
+  };
+
+  const connectGoogleCalendar = async () => {
+    setIsConnecting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        console.error('No session found');
+        setIsConnecting(false);
+        return;
+      }
+
+      const { data: authData, error: authError } = await supabase.functions.invoke('google-calendar', {
+        body: { action: 'get_auth_url' },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        }
+      });
+
+      if (authError) {
+        console.error('Error getting auth URL:', authError);
+        setIsConnecting(false);
+        return;
+      }
+
+      if (authData?.authUrl) {
+        // Mark that we came from intro before redirecting
+        localStorage.setItem('returningFromCalendarAuth', 'true');
+        localStorage.setItem('hasSeenIntro', 'true');
+        // Redirect to Google Calendar OAuth
+        window.location.href = authData.authUrl;
+      }
+    } catch (error) {
+      console.error('Error connecting calendar:', error);
+      setIsConnecting(false);
+    }
   };
 
   const renderIcon = () => {
@@ -122,6 +159,31 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
         <p className={`onb-body ${isTypingDone ? 'onb-body-visible' : ''}`}>
           {slide.body}
         </p>
+
+        {/* Show Connect Calendar button on last slide after typing is done */}
+        {isLastSlide && isTypingDone && (
+          <button
+            onClick={connectGoogleCalendar}
+            disabled={isConnecting}
+            className="mt-8 px-8 py-3 rounded-full font-medium text-lg text-white transition-all duration-300 hover:scale-[1.02] flex items-center gap-2 mx-auto"
+            style={{
+              backgroundColor: "#D4AF7A",
+              boxShadow: "0 4px 14px rgba(212, 175, 122, 0.25)",
+            }}
+          >
+            {isConnecting ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Connecting...
+              </>
+            ) : (
+              <>
+                <Calendar size={20} />
+                Connect Calendar
+              </>
+            )}
+          </button>
+        )}
 
         <div className="onb-dots">
           {ONBOARDING_SLIDES.map((s, i) => (

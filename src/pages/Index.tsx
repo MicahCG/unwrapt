@@ -14,6 +14,16 @@ const Index = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    // Check if user just signed up and should see onboarding intro
+    const shouldShowIntro = localStorage.getItem('shouldShowOnboardingIntro');
+
+    if (shouldShowIntro === 'true' && user && !loading) {
+      // User just logged in from landing page - show intro
+      setShowIntro(true);
+      localStorage.removeItem('shouldShowOnboardingIntro');
+      return;
+    }
+
     // Only show intro for users without accounts on their first visit
     if (!user && !loading) {
       const hasSeenIntro = localStorage.getItem('hasSeenIntro');
@@ -86,26 +96,38 @@ const Index = () => {
   }
 
   const handleIntroComplete = () => {
-    // This should only happen on app.unwrapt.io
-    // If somehow triggered on unwrapt.io, redirect to app subdomain
-    if (window.location.hostname === 'unwrapt.io') {
-      localStorage.setItem('hasSeenIntro', 'true');
-      window.location.href = 'https://app.unwrapt.io';
-      return;
-    }
-    
-    setShowIntro(false);
+    // Mark intro as seen
     localStorage.setItem('hasSeenIntro', 'true');
-    // Add a small delay before showing login page to create smooth transition
-    setTimeout(() => {
-      setShowLoginPage(true);
-    }, 100);
+    setShowIntro(false);
+
+    // If user is authenticated (came from landing page login), they'll automatically
+    // go to onboarding flow in the next render since hasCompletedOnboarding will be false
+    // If user is not authenticated, show login page
+    if (!user) {
+      // This should only happen on app.unwrapt.io
+      // If somehow triggered on unwrapt.io, redirect to app subdomain
+      if (window.location.hostname === 'unwrapt.io') {
+        window.location.href = 'https://app.unwrapt.io';
+        return;
+      }
+
+      // Add a small delay before showing login page to create smooth transition
+      setTimeout(() => {
+        setShowLoginPage(true);
+      }, 100);
+    }
   };
 
   // If user is authenticated, go directly to their appropriate flow
   if (user) {
     console.log('🔧 Index: User authenticated, checking onboarding status');
-    
+
+    // If user should see intro (from landing page signup), show it first
+    if (showIntro) {
+      console.log('🔧 Index: Showing intro for new authenticated user');
+      return <OnboardingIntro onComplete={handleIntroComplete} />;
+    }
+
     // If user has completed onboarding, show dashboard directly
     if (hasCompletedOnboarding) {
       console.log('🔧 Index: User completed onboarding, showing dashboard');
@@ -115,13 +137,13 @@ const Index = () => {
     // Otherwise, show onboarding flow
     console.log('🔧 Index: User needs onboarding, showing onboarding flow');
     return (
-      <OnboardingFlow 
+      <OnboardingFlow
         onBack={async () => {
           // Force refetch of onboarding status to show dashboard
           console.log('Back from onboarding, refetching status');
           await queryClient.invalidateQueries({ queryKey: ['onboarding-status', user?.id] });
           await queryClient.refetchQueries({ queryKey: ['onboarding-status', user?.id] });
-        }} 
+        }}
       />
     );
   }
