@@ -130,13 +130,11 @@ const Landing = () => {
               <meta itemProp="priceCurrency" content="USD" />
             </div>
 
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 items-center justify-center pt-4">
+            {/* CTA Button */}
+            <div className="flex justify-center pt-4">
               <button
                 onClick={() => {
-                  // Mark that user should see onboarding intro after login
                   localStorage.setItem("shouldShowOnboardingIntro", "true");
-                  // Trigger Google sign-in
                   signInWithGoogle();
                 }}
                 className="px-10 py-4 rounded-full font-medium text-lg text-white transition-all duration-300
@@ -154,20 +152,25 @@ const Landing = () => {
               >
                 Get Started Free
               </button>
+            </div>
 
-              <button
-                onClick={() => document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" })}
-                className="px-10 py-4 rounded-full font-medium text-lg transition-all duration-300
-                          hover:scale-[1.02]"
-                style={{
-                  backgroundColor: "rgba(255, 255, 255, 0.35)",
-                  backdropFilter: "blur(14px)",
-                  border: "1px solid rgba(255, 255, 255, 0.7)",
-                  color: "#6B5444",
-                }}
-              >
-                Learn More
-              </button>
+            {/* Benefit Cards */}
+            <div className="grid grid-cols-3 gap-4 pt-8 w-full max-w-lg">
+              <div className="flex flex-col items-center p-4 bg-white/30 backdrop-blur-sm border border-white/50 rounded-xl">
+                <Heart className="w-6 h-6 mb-2" style={{ color: "#D4AF7A" }} />
+                <span className="text-2xl font-serif font-semibold" style={{ color: "#8B7355" }}>9,451</span>
+                <span className="text-xs text-center" style={{ color: "#8B7355" }}>Moments Remembered</span>
+              </div>
+              <div className="flex flex-col items-center p-4 bg-white/30 backdrop-blur-sm border border-white/50 rounded-xl">
+                <Clock className="w-6 h-6 mb-2" style={{ color: "#D4AF7A" }} />
+                <span className="text-2xl font-serif font-semibold" style={{ color: "#8B7355" }}>500+ hrs</span>
+                <span className="text-xs text-center" style={{ color: "#8B7355" }}>Saved</span>
+              </div>
+              <div className="flex flex-col items-center p-4 bg-white/30 backdrop-blur-sm border border-white/50 rounded-xl">
+                <Gift className="w-6 h-6 mb-2" style={{ color: "#D4AF7A" }} />
+                <span className="text-2xl font-serif font-semibold" style={{ color: "#8B7355" }}>821</span>
+                <span className="text-xs text-center" style={{ color: "#8B7355" }}>Gifts Delivered</span>
+              </div>
             </div>
           </article>
         </div>
