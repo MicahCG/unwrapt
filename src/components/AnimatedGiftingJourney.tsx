@@ -56,7 +56,8 @@ const AnimatedGiftingJourney = () => {
   return (
     <section
       ref={containerRef}
-      className="relative min-h-[300vh] px-6 bg-gradient-to-b from-[hsl(var(--soft-almond))]/30 to-[hsl(var(--champagne))]"
+      className="relative min-h-[300vh] px-6"
+      style={{ backgroundColor: "#F8F1E6" }}
       itemScope
       itemType="https://schema.org/HowTo"
     >

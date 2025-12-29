@@ -8,6 +8,7 @@ import GiftBoxOpeningIntro from "@/components/GiftBoxOpeningIntro";
 import GiftingScenesScroll from "@/components/GiftingScenesScroll";
 import AnimatedGiftingJourney from "@/components/AnimatedGiftingJourney";
 import LuxuryGiftShowcase from "@/components/LuxuryGiftShowcase";
+import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import { useAuth } from "@/components/auth/AuthProvider";
 
 const Landing = () => {
@@ -186,49 +187,10 @@ const Landing = () => {
       <LuxuryGiftShowcase />
 
       {/* Testimonials Section */}
-      <section className="py-32 px-6 bg-[hsl(var(--soft-almond))]/30">
-        <div className="max-w-5xl mx-auto">
-          <h2 className="font-serif text-4xl md:text-5xl text-[hsl(var(--espresso))] text-center mb-20">
-            Loved by Professionals
-          </h2>
-
-          <div className="grid md:grid-cols-2 gap-8">
-            {[
-              {
-                quote:
-                  "Unwrapt has saved me countless hours and strengthened my client relationships. It's like having a personal concierge.",
-                author: "Sarah M.",
-                role: "Management Consultant",
-              },
-              {
-                quote:
-                  "I never realized how much I was missing until Unwrapt started handling my gifting. Game changer for my team culture.",
-                author: "David L.",
-                role: "Tech Founder",
-              },
-            ].map((testimonial, idx) => (
-              <div
-                key={idx}
-                className="bg-white/30 backdrop-blur-sm border border-white/50 rounded-2xl p-8 hover:bg-white/40 transition-all duration-300"
-              >
-                <p className="text-[hsl(var(--charcoal-body))] italic mb-6 leading-relaxed">"{testimonial.quote}"</p>
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-[hsl(var(--soft-gold))]/20 flex items-center justify-center text-[hsl(var(--soft-gold))] font-serif text-lg">
-                    {testimonial.author[0]}
-                  </div>
-                  <div>
-                    <div className="font-medium text-[hsl(var(--espresso))]">{testimonial.author}</div>
-                    <div className="text-sm text-[hsl(var(--charcoal-body))]">{testimonial.role}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <TestimonialsCarousel />
 
       {/* Final CTA */}
-      <section className="py-32 px-6 bg-gradient-to-b from-[hsl(var(--champagne))] to-[hsl(var(--soft-almond))]/50">
+      <section className="py-32 px-6" style={{ backgroundColor: "#F8F1E6" }}>
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="font-serif text-4xl md:text-5xl text-[hsl(var(--espresso))] mb-6">
             Start your gifting concierge — it only takes 2 minutes
