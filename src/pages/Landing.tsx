@@ -139,7 +139,7 @@ const Landing = () => {
               </div>
               <div className="flex flex-col items-center p-4 bg-white/30 backdrop-blur-sm border border-white/50 rounded-xl">
                 <Clock className="w-6 h-6 mb-2" style={{ color: "#D4AF7A" }} />
-                <span className="text-2xl font-serif font-semibold" style={{ color: "#8B7355" }}>500+ hrs</span>
+                <span className="text-2xl font-serif font-semibold" style={{ color: "#8B7355" }}>500 hrs</span>
                 <span className="text-xs text-center" style={{ color: "#8B7355" }}>Saved</span>
               </div>
               <div className="flex flex-col items-center p-4 bg-white/30 backdrop-blur-sm border border-white/50 rounded-xl">
