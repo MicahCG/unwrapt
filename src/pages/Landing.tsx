@@ -71,7 +71,13 @@ const Landing = () => {
         <div className="bg-white/25 backdrop-blur-[16px] border-b border-white/60">
           <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
             <Logo size="md" />
-            <GlassButton variant="primary" href={getAppUrl()}>
+            <GlassButton
+              variant="primary"
+              onClick={() => {
+                localStorage.setItem("shouldShowOnboardingIntro", "true");
+                signInWithGoogle();
+              }}
+            >
               Get Started
             </GlassButton>
           </div>
@@ -227,7 +233,13 @@ const Landing = () => {
           <p className="text-lg text-[hsl(var(--charcoal-body))] mb-10">
             Join professionals who never miss an important moment
           </p>
-          <GlassButton variant="primary" href={getAppUrl()}>
+          <GlassButton
+            variant="primary"
+            onClick={() => {
+              localStorage.setItem("shouldShowOnboardingIntro", "true");
+              signInWithGoogle();
+            }}
+          >
             Get Started Free <ArrowRight className="w-5 h-5 ml-2 inline" />
           </GlassButton>
         </div>
