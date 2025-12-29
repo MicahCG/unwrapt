@@ -222,7 +222,7 @@ const Landing = () => {
             </div>
           </div>
           <div className="mt-8 text-center text-sm text-[hsl(var(--charcoal-body))]/60">
-            © 2024 Unwrapt. All rights reserved.
+            © 2026 Unwrapt. All rights reserved.
           </div>
         </div>
       </footer>
