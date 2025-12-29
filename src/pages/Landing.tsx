@@ -81,7 +81,7 @@ const Landing = () => {
 
       {/* Hero Section */}
       <section
-        className="relative min-h-screen flex items-center justify-center px-6 py-20 overflow-hidden"
+        className="relative min-h-screen flex items-center justify-center px-6 py-20"
         style={{ backgroundColor: "#F8F1E6" }}
         itemScope
         itemType="https://schema.org/Service"
