@@ -22,19 +22,19 @@ const AnimatedGiftingJourney = () => {
       number: "01",
       icon: Users,
       title: "Tell us who matters most",
-      description: "We map the important people in your life — family, friends, clients — and remember their special dates for you.",
+      description: "We map the important people in your life: family, friends, clients. We remember their special dates for you.",
     },
     {
       number: "02",
       icon: Calendar,
       title: "We fetch every important date",
-      description: "Birthdays, anniversaries, milestones… automatically pulled from your contacts, calendar, or added manually.",
+      description: "Birthdays, anniversaries, milestones. Automatically pulled from your contacts, calendar, or added manually.",
     },
     {
       number: "03",
       icon: Gift,
       title: "We curate meaningful gifts",
-      description: "Handmade, rare, and carefully selected items that feel personal — not mass-produced.",
+      description: "Handmade, rare, and carefully selected items that feel personal, not mass-produced.",
     },
     {
       number: "04",
