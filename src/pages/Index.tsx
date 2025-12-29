@@ -10,15 +10,17 @@ import Dashboard from '@/components/Dashboard';
 const Index = () => {
   const { user, loading } = useAuth();
   const [showIntro, setShowIntro] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showLoginPage, setShowLoginPage] = useState(false);
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    // For authenticated users who haven't seen intro, show the slideshow
-    if (user && !loading) {
+    // Only show intro for users without accounts on their first visit
+    if (!user && !loading) {
       const hasSeenIntro = localStorage.getItem('hasSeenIntro');
       if (!hasSeenIntro) {
         setShowIntro(true);
+      } else {
+        setShowLoginPage(true);
       }
     }
   }, [user, loading]);
@@ -72,7 +74,7 @@ const Index = () => {
     hasCompletedOnboarding,
     userId: user?.id,
     showIntro,
-    showOnboarding
+    showLoginPage
   });
 
   if (loading || checkingOnboarding) {
@@ -84,10 +86,20 @@ const Index = () => {
   }
 
   const handleIntroComplete = () => {
-    // Mark as seen and proceed to onboarding flow
+    // This should only happen on app.unwrapt.io
+    // If somehow triggered on unwrapt.io, redirect to app subdomain
+    if (window.location.hostname === 'unwrapt.io') {
+      localStorage.setItem('hasSeenIntro', 'true');
+      window.location.href = 'https://app.unwrapt.io';
+      return;
+    }
+    
     setShowIntro(false);
     localStorage.setItem('hasSeenIntro', 'true');
-    setShowOnboarding(true);
+    // Add a small delay before showing login page to create smooth transition
+    setTimeout(() => {
+      setShowLoginPage(true);
+    }, 100);
   };
 
   // If user is authenticated, go directly to their appropriate flow
@@ -100,12 +112,7 @@ const Index = () => {
       return <Dashboard />;
     }
 
-    // Show intro slideshow for new authenticated users who haven't seen it
-    if (showIntro) {
-      return <OnboardingIntro onComplete={handleIntroComplete} />;
-    }
-
-    // Show onboarding flow after intro is complete
+    // Otherwise, show onboarding flow
     console.log('🔧 Index: User needs onboarding, showing onboarding flow');
     return (
       <OnboardingFlow 
@@ -119,9 +126,20 @@ const Index = () => {
     );
   }
 
-  // For non-authenticated users, show login page
-  console.log('🔧 Index: No user, showing login page');
-  return <LoginPage />;
+  // For non-authenticated users
+  console.log('🔧 Index: No user, determining what to show');
+  
+  // Show intro for first-time visitors
+  if (showIntro) {
+    return <OnboardingIntro onComplete={handleIntroComplete} />;
+  }
+  
+  // Show login page for returning visitors or after intro
+  return (
+    <div className={`transition-opacity duration-500 ${showLoginPage ? 'opacity-100' : 'opacity-0'}`}>
+      <LoginPage />
+    </div>
+  );
 };
 
 export default Index;

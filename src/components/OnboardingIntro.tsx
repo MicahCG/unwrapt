@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Heart, Gift, Calendar } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
+import { Clock, Heart, Gift } from 'lucide-react';
 
 interface OnboardingIntroProps {
   onComplete: () => void;
@@ -32,17 +30,20 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
   const [index, setIndex] = useState(0);
   const [typedText, setTypedText] = useState('');
   const [isTypingDone, setIsTypingDone] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [showCalendarButton, setShowCalendarButton] = useState(false);
 
   const slide = ONBOARDING_SLIDES[index];
-  const isLastSlide = index === ONBOARDING_SLIDES.length - 1;
+
+  // Use localhost when in development, production URL otherwise
+  const getAppUrl = () => {
+    return window.location.hostname === 'localhost'
+      ? 'http://localhost:8080'
+      : 'https://app.unwrapt.io';
+  };
 
   // Typewriter effect
   useEffect(() => {
     setTypedText('');
     setIsTypingDone(false);
-    setShowCalendarButton(false);
     const full = slide.headline;
     let current = 0;
 
@@ -58,65 +59,32 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
     return () => clearInterval(interval);
   }, [index, slide.headline]);
 
-  // Auto-advance after typing is done (except on last slide)
+  // Auto-advance after typing is done
   useEffect(() => {
     if (!isTypingDone) return;
     
-    if (isLastSlide) {
-      // On last slide, show the calendar button after a short delay
-      const buttonTimeout = setTimeout(() => {
-        setShowCalendarButton(true);
-      }, 800);
-      return () => clearTimeout(buttonTimeout);
-    }
-    
-    // Auto-advance to next slide
     const timeout = setTimeout(() => {
-      setIndex(index + 1);
+      if (index < ONBOARDING_SLIDES.length - 1) {
+        setIndex(index + 1);
+      } else {
+        // On last slide, auto-advance to onboarding
+        handleGetStarted();
+      }
     }, 2500);
     
     return () => clearTimeout(timeout);
-  }, [isTypingDone, index, isLastSlide]);
+  }, [isTypingDone, index]);
 
   const handleSkip = () => {
-    // Mark as seen and proceed to onboarding (skip calendar connect)
+    // Mark as seen and redirect to app subdomain
+    localStorage.setItem('hasSeenIntro', 'true');
+    window.location.href = getAppUrl();
+  };
+
+  const handleGetStarted = () => {
+    // Mark as seen and proceed to onboarding
     localStorage.setItem('hasSeenIntro', 'true');
     onComplete();
-  };
-
-  const connectGoogleCalendar = async () => {
-    setIsConnecting(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.error('No session found');
-        setIsConnecting(false);
-        return;
-      }
-
-      // Store that we're in the onboarding calendar flow
-      sessionStorage.setItem('calendarOAuthFlow', 'onboarding');
-
-      const { data, error } = await supabase.functions.invoke('google-calendar', {
-        body: { 
-          action: 'get_auth_url',
-          redirectPath: '/'  // Redirect back to home after OAuth
-        }
-      });
-
-      if (error) throw error;
-
-      if (data?.authUrl) {
-        window.location.href = data.authUrl;
-      }
-    } catch (error) {
-      console.error('Error connecting Google Calendar:', error);
-      setIsConnecting(false);
-    }
-  };
-
-  const handleConnectCalendar = () => {
-    connectGoogleCalendar();
   };
 
   const renderIcon = () => {
@@ -163,38 +131,6 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
             />
           ))}
         </div>
-
-        {/* Calendar connect button on last slide */}
-        {isLastSlide && showCalendarButton && (
-          <div className="mt-8 animate-fade-in space-y-3">
-            <Button
-              size="lg"
-              className="w-full text-lg py-6 bg-brand-gold text-white hover:bg-brand-gold/90 transition-colors"
-              onClick={handleConnectCalendar}
-              disabled={isConnecting}
-            >
-              {isConnecting ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
-                  Connecting...
-                </>
-              ) : (
-                <>
-                  <Calendar className="w-5 h-5 mr-3" />
-                  Connect Google Calendar
-                </>
-              )}
-            </Button>
-            <Button
-              variant="ghost"
-              size="lg"
-              className="w-full text-brand-charcoal/70 hover:text-brand-charcoal hover:bg-transparent"
-              onClick={handleSkip}
-            >
-              Skip for now
-            </Button>
-          </div>
-        )}
 
       </div>
     </div>
