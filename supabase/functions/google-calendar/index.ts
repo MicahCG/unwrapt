@@ -279,59 +279,63 @@ Deno.serve(async (req) => {
       let validAccessToken: string;
 
       // Check if token is expired or will expire in the next 5 minutes
-      if (currentIntegration?.expires_at) {
-        const expiresAt = new Date(currentIntegration.expires_at);
-        const now = new Date();
-        const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
+      const expiresAt = currentIntegration?.expires_at ? new Date(currentIntegration.expires_at) : null;
+      const now = new Date();
+      const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
+      const needsRefresh = expiresAt && expiresAt <= fiveMinutesFromNow;
 
-        if (expiresAt <= fiveMinutesFromNow && currentIntegration.refresh_token) {
-          console.log('🔄 Token expired (onboarding), refreshing...');
-          
-          // Decrypt the refresh token first
-          const decryptedRefreshToken = await decryptToken(currentIntegration.refresh_token);
+      if (needsRefresh && currentIntegration.refresh_token) {
+        console.log('🔄 Token expired (onboarding), refreshing...');
+        
+        // Decrypt the refresh token first
+        const decryptedRefreshToken = await decryptToken(currentIntegration.refresh_token);
 
-          // Refresh the token
-          const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-              client_id: Deno.env.get('GOOGLE_CLIENT_ID') ?? '',
-              client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') ?? '',
-              refresh_token: decryptedRefreshToken,
-              grant_type: 'refresh_token'
-            })
+        // Refresh the token
+        const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: Deno.env.get('GOOGLE_CLIENT_ID') ?? '',
+            client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') ?? '',
+            refresh_token: decryptedRefreshToken,
+            grant_type: 'refresh_token'
+          })
+        });
+
+        const refreshData = await refreshResponse.json();
+
+        if (refreshData.error) {
+          console.error('❌ Token refresh failed (onboarding):', refreshData.error);
+          return new Response(JSON.stringify({ 
+            error: 'Calendar access expired. Please reconnect your Google Calendar.' 
+          }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
-
-          const refreshData = await refreshResponse.json();
-
-          if (refreshData.error) {
-            console.error('❌ Token refresh failed (onboarding):', refreshData.error);
-            return new Response(JSON.stringify({ 
-              error: 'Calendar access expired. Please reconnect your Google Calendar.' 
-            }), {
-              status: 401,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            });
-          }
-
-          // Encrypt and update the stored tokens using service role
-          const encryptedNewAccessToken = await encryptToken(refreshData.access_token);
-          const newExpiresAt = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
-          await supabaseAdmin
-            .from('calendar_integrations')
-            .update({
-              access_token: encryptedNewAccessToken,
-              expires_at: newExpiresAt,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', currentIntegration.id);
-
-          validAccessToken = refreshData.access_token;
-          console.log('✅ Token refreshed successfully (onboarding)');
-        } else if (currentIntegration.access_token) {
-          // Decrypt the existing token
-          validAccessToken = await decryptToken(currentIntegration.access_token);
         }
+
+        // Encrypt and update the stored tokens using service role
+        const encryptedNewAccessToken = await encryptToken(refreshData.access_token);
+        const newExpiresAt = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
+        await supabaseAdmin
+          .from('calendar_integrations')
+          .update({
+            access_token: encryptedNewAccessToken,
+            expires_at: newExpiresAt,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', currentIntegration.id);
+
+        validAccessToken = refreshData.access_token;
+        console.log('✅ Token refreshed successfully (onboarding)');
+      } else if (currentIntegration.access_token) {
+        // Decrypt the existing token
+        validAccessToken = await decryptToken(currentIntegration.access_token);
+      } else {
+        return new Response(JSON.stringify({ error: 'No valid access token found' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
       }
 
       // Onboarding flow - fetch events for the next 12 months so we don't miss recurring dates
@@ -412,59 +416,63 @@ Deno.serve(async (req) => {
       let validAccessToken: string;
 
       // Check if token is expired or will expire in the next 5 minutes
-      if (currentIntegration?.expires_at) {
-        const expiresAt = new Date(currentIntegration.expires_at);
-        const now = new Date();
-        const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
+      const expiresAt = currentIntegration?.expires_at ? new Date(currentIntegration.expires_at) : null;
+      const now = new Date();
+      const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
+      const needsRefresh = expiresAt && expiresAt <= fiveMinutesFromNow;
 
-        if (expiresAt <= fiveMinutesFromNow && currentIntegration.refresh_token) {
-          console.log('🔄 Token expired, refreshing...');
-          
-          // Decrypt the refresh token first
-          const decryptedRefreshToken = await decryptToken(currentIntegration.refresh_token);
+      if (needsRefresh && currentIntegration.refresh_token) {
+        console.log('🔄 Token expired, refreshing...');
+        
+        // Decrypt the refresh token first
+        const decryptedRefreshToken = await decryptToken(currentIntegration.refresh_token);
 
-          // Refresh the token
-          const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-              client_id: Deno.env.get('GOOGLE_CLIENT_ID') ?? '',
-              client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') ?? '',
-              refresh_token: decryptedRefreshToken,
-              grant_type: 'refresh_token'
-            })
+        // Refresh the token
+        const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: Deno.env.get('GOOGLE_CLIENT_ID') ?? '',
+            client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') ?? '',
+            refresh_token: decryptedRefreshToken,
+            grant_type: 'refresh_token'
+          })
+        });
+
+        const refreshData = await refreshResponse.json();
+
+        if (refreshData.error) {
+          console.error('❌ Token refresh failed:', refreshData.error);
+          return new Response(JSON.stringify({ 
+            error: 'Calendar access expired. Please reconnect your Google Calendar.' 
+          }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
-
-          const refreshData = await refreshResponse.json();
-
-          if (refreshData.error) {
-            console.error('❌ Token refresh failed:', refreshData.error);
-            return new Response(JSON.stringify({ 
-              error: 'Calendar access expired. Please reconnect your Google Calendar.' 
-            }), {
-              status: 401,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            });
-          }
-
-          // Encrypt and update the stored tokens using service role
-          const encryptedNewAccessToken = await encryptToken(refreshData.access_token);
-          const newExpiresAt = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
-          await supabaseAdmin
-            .from('calendar_integrations')
-            .update({
-              access_token: encryptedNewAccessToken,
-              expires_at: newExpiresAt,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', currentIntegration.id);
-
-          validAccessToken = refreshData.access_token;
-          console.log('✅ Token refreshed successfully');
-        } else if (currentIntegration.access_token) {
-          // Decrypt the existing token
-          validAccessToken = await decryptToken(currentIntegration.access_token);
         }
+
+        // Encrypt and update the stored tokens using service role
+        const encryptedNewAccessToken = await encryptToken(refreshData.access_token);
+        const newExpiresAt = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
+        await supabaseAdmin
+          .from('calendar_integrations')
+          .update({
+            access_token: encryptedNewAccessToken,
+            expires_at: newExpiresAt,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', currentIntegration.id);
+
+        validAccessToken = refreshData.access_token;
+        console.log('✅ Token refreshed successfully');
+      } else if (currentIntegration.access_token) {
+        // Decrypt the existing token
+        validAccessToken = await decryptToken(currentIntegration.access_token);
+      } else {
+        return new Response(JSON.stringify({ error: 'No valid access token found' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
       }
 
       // NEW: Dashboard flow - fetch comprehensive events for multiple people

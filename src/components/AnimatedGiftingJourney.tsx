@@ -66,14 +66,11 @@ const AnimatedGiftingJourney = () => {
           {/* Section Header */}
           <div className="text-center mb-12">
             <h2
-              className="font-serif text-4xl md:text-5xl text-[hsl(var(--espresso))] mb-4"
+              className="font-serif text-4xl md:text-5xl text-[hsl(var(--espresso))]"
               itemProp="name"
             >
               Your Gifting Journey, Unwrapped
             </h2>
-            <p className="text-lg text-[hsl(var(--charcoal-body))] max-w-2xl mx-auto">
-              Scroll to reveal each step
-            </p>
           </div>
 
           {/* Main Content - Centered */}
@@ -129,7 +126,7 @@ const AnimatedGiftingJourney = () => {
 
                     {/* Step Title */}
                     <h3
-                      className="font-serif text-4xl md:text-5xl text-[hsl(var(--espresso))] mb-6 leading-tight"
+                      className="font-serif text-4xl md:text-5xl text-[hsl(var(--warm-brown))] mb-6 leading-tight"
                       itemProp="name"
                     >
                       {step.title}
@@ -137,7 +134,7 @@ const AnimatedGiftingJourney = () => {
 
                     {/* Step Description */}
                     <p
-                      className="text-lg text-[hsl(var(--charcoal-body))] leading-relaxed max-w-lg mx-auto"
+                      className="text-lg text-[hsl(var(--warm-brown))] opacity-80 leading-relaxed max-w-lg mx-auto"
                       itemProp="text"
                     >
                       {step.description}
@@ -159,15 +156,12 @@ const AnimatedGiftingJourney = () => {
                     width: currentStep === idx ? 48 : 8,
                     backgroundColor: currentStep >= idx
                       ? 'hsl(var(--soft-gold))'
-                      : 'hsl(var(--soft-gold))/20',
+                      : 'hsl(var(--soft-gold) / 0.2)',
                   }}
                   transition={{ duration: 0.3, ease: "easeOut" }}
                 />
               ))}
             </div>
-            <p className="text-sm text-[hsl(var(--charcoal-body))]/60 tracking-wide mt-4">
-              Step {currentStep + 1} of 4
-            </p>
           </div>
         </div>
       </div>
