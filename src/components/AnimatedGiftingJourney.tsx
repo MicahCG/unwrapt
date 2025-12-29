@@ -78,7 +78,7 @@ const AnimatedGiftingJourney = () => {
           {/* Section Header */}
           <div className="text-center mb-10">
             <h2 className="font-serif text-4xl md:text-5xl text-[hsl(var(--espresso))]" itemProp="name">
-              Your Gifting Journey, Unwrapt
+              Your Gifting Journey, <span className="text-[hsl(var(--warm-brown))]">Unwrapt</span>
             </h2>
           </div>
 
