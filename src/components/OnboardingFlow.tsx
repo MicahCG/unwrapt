@@ -628,19 +628,14 @@ const handleSkip = async () => {
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
-          {/* Progress Indicator - moved to body */}
-          <div className="mb-8">
-            <div className="flex items-center justify-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-brand-charcoal/70">
-                  Step {currentStep} of {totalSteps}
-                </span>
-                <div className="w-32 bg-brand-cream-light rounded-full h-2">
-                  <div 
-                    className="bg-brand-charcoal h-2 rounded-full transition-all duration-300 ease-in-out"
-                    style={{ width: `${(currentStep / totalSteps) * 100}%` }}
-                  />
-                </div>
+          {/* Progress bar only - no step text to save vertical space on mobile */}
+          <div className="mb-6">
+            <div className="flex justify-center">
+              <div className="w-48 bg-brand-cream-light rounded-full h-1.5">
+                <div 
+                  className="bg-brand-charcoal h-1.5 rounded-full transition-all duration-300 ease-in-out"
+                  style={{ width: `${(currentStep / totalSteps) * 100}%` }}
+                />
               </div>
             </div>
           </div>
