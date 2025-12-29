@@ -23,7 +23,7 @@ const ONBOARDING_SLIDES = [
     id: 3,
     icon: 'gift',
     headline: 'Unwrapt remembers, so they always feel cherished.',
-    body: "We quietly track the important dates, curate beautiful gifts, and schedule everything for you — so showing up thoughtfully feels effortless."
+    body: "We quietly track important dates, curate beautiful gifts, and schedule everything for you. Showing up thoughtfully feels effortless."
   }
 ];
 
@@ -165,7 +165,7 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
           <button
             onClick={connectGoogleCalendar}
             disabled={isConnecting}
-            className="mt-8 px-8 py-3 rounded-full font-medium text-lg text-white transition-all duration-300 hover:scale-[1.02] flex items-center gap-2 mx-auto"
+            className="mt-8 mb-4 px-8 py-3 rounded-full font-medium text-lg text-white transition-all duration-300 hover:scale-[1.02] flex items-center gap-2 mx-auto"
             style={{
               backgroundColor: "#D4AF7A",
               boxShadow: "0 4px 14px rgba(212, 175, 122, 0.25)",
