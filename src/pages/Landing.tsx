@@ -8,7 +8,7 @@ import GiftBoxOpeningIntro from "@/components/GiftBoxOpeningIntro";
 import GiftingScenesScroll from "@/components/GiftingScenesScroll";
 import AnimatedGiftingJourney from "@/components/AnimatedGiftingJourney";
 import LuxuryGiftShowcase from "@/components/LuxuryGiftShowcase";
-import TestimonialsCarousel from "@/components/TestimonialsCarousel";
+
 import { useAuth } from "@/components/auth/AuthProvider";
 
 const Landing = () => {
@@ -186,8 +186,6 @@ const Landing = () => {
       {/* Luxury Gift Showcase Section */}
       <LuxuryGiftShowcase />
 
-      {/* Testimonials Section */}
-      <TestimonialsCarousel />
 
       {/* Final CTA */}
       <section className="py-32 px-6" style={{ backgroundColor: "#F8F1E6" }}>
