@@ -103,34 +103,37 @@ const AnimatedGiftingJourney = () => {
                   >
                     <meta itemProp="position" content={String(idx + 1)} />
 
-                    {/* Step Number Badge */}
-                    <div className="text-sm font-medium tracking-[0.3em] mb-6 uppercase" style={{ color: "#8B7355" }}>
-                      Step {step.number}
-                    </div>
+                    {/* Step Number + Icon + Title Row */}
+                    <div className="flex items-center justify-center gap-4 mb-4">
+                      {/* Step Number Badge */}
+                      <div className="text-sm font-medium tracking-[0.2em] uppercase" style={{ color: "#8B7355" }}>
+                        Step {step.number}
+                      </div>
 
-                    {/* Icon Circle */}
-                    <motion.div
-                      className="w-16 h-16 mb-8 rounded-full flex items-center justify-center border"
-                      style={{
-                        backgroundColor: '#F3EDE4',
-                        borderColor: '#E8DCC8',
-                      }}
-                      animate={{
-                        scale: [1, 1.05, 1],
-                      }}
-                      transition={{
-                        duration: 2.5,
-                        repeat: Infinity,
-                        ease: "easeInOut"
-                      }}
-                    >
-                      <step.icon
-                        className="w-7 h-7"
+                      {/* Icon Circle */}
+                      <motion.div
+                        className="w-12 h-12 rounded-full flex items-center justify-center border"
                         style={{
-                          color: '#8B7355'
+                          backgroundColor: '#F3EDE4',
+                          borderColor: '#E8DCC8',
                         }}
-                      />
-                    </motion.div>
+                        animate={{
+                          scale: [1, 1.05, 1],
+                        }}
+                        transition={{
+                          duration: 2.5,
+                          repeat: Infinity,
+                          ease: "easeInOut"
+                        }}
+                      >
+                        <step.icon
+                          className="w-5 h-5"
+                          style={{
+                            color: '#8B7355'
+                          }}
+                        />
+                      </motion.div>
+                    </div>
 
                     {/* Step Title */}
                     <h3
