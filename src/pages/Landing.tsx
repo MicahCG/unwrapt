@@ -8,10 +8,10 @@ import GiftBoxOpeningIntro from "@/components/GiftBoxOpeningIntro";
 import GiftingScenesScroll from "@/components/GiftingScenesScroll";
 import AnimatedGiftingJourney from "@/components/AnimatedGiftingJourney";
 import LuxuryGiftShowcase from "@/components/LuxuryGiftShowcase";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 const Landing = () => {
-  const [email, setEmail] = useState("");
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const { signInWithGoogle, loading } = useAuth();
   const [showNav, setShowNav] = useState(false);
   // Clear any old localStorage and always show intro on unwrapt.io
   const [showIntro, setShowIntro] = useState(() => {
@@ -20,11 +20,6 @@ const Landing = () => {
     return true;
   });
 
-  // Use localhost when in development, production URL otherwise
-  const getAppUrl = () => {
-    return window.location.hostname === "localhost" ? "http://localhost:8080" : "https://app.unwrapt.io";
-  };
-
   useEffect(() => {
     const handleScroll = () => {
       setShowNav(window.scrollY > 100);
@@ -32,30 +27,6 @@ const Landing = () => {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-
-  const handleGetStarted = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email) {
-      try {
-        sessionStorage.setItem("userEmail", email);
-
-        const webhookUrl = "https://hook.us2.make.com/cjsyb77bay61w4lrcauvbno5dmvdo7ca";
-        await fetch(webhookUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          mode: "no-cors",
-          body: JSON.stringify({ email }),
-        });
-
-        // Redirect immediately to app
-        window.location.href = getAppUrl();
-      } catch (error) {
-        console.error("Error:", error);
-        // Still redirect even on error
-        window.location.href = getAppUrl();
-      }
-    }
-  };
 
   return (
     <div className="min-h-screen bg-[hsl(var(--champagne))] text-[hsl(var(--espresso))]">
@@ -69,7 +40,7 @@ const Landing = () => {
         <div className="bg-white/25 backdrop-blur-[16px] border-b border-white/60">
           <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
             <Logo size="md" />
-            <GlassButton variant="primary" href={getAppUrl()}>
+            <GlassButton variant="primary" onClick={signInWithGoogle} disabled={loading}>
               Get Started
             </GlassButton>
           </div>
@@ -125,9 +96,10 @@ const Landing = () => {
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 items-center justify-center pt-4">
               <button
-                onClick={() => (window.location.href = getAppUrl())}
+                onClick={signInWithGoogle}
+                disabled={loading}
                 className="px-10 py-4 rounded-full font-medium text-lg text-white transition-all duration-300
-                          hover:scale-[1.02]"
+                          hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 style={{
                   backgroundColor: "#D4AF7A",
                   boxShadow: "0 4px 14px rgba(212, 175, 122, 0.25)",
@@ -139,6 +111,7 @@ const Landing = () => {
                   e.currentTarget.style.boxShadow = "0 4px 14px rgba(212, 175, 122, 0.25)";
                 }}
               >
+                {loading && <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>}
                 Get Started Free
               </button>
 
@@ -220,7 +193,7 @@ const Landing = () => {
           <p className="text-lg text-[hsl(var(--charcoal-body))] mb-10">
             Join professionals who never miss an important moment
           </p>
-          <GlassButton variant="primary" href={getAppUrl()}>
+          <GlassButton variant="primary" onClick={signInWithGoogle} disabled={loading}>
             Get Started Free <ArrowRight className="w-5 h-5 ml-2 inline" />
           </GlassButton>
         </div>
