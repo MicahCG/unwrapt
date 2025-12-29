@@ -190,12 +190,9 @@ const Landing = () => {
       {/* Final CTA */}
       <section className="py-32 px-6" style={{ backgroundColor: "#F8F1E6" }}>
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="font-serif text-4xl md:text-5xl text-[hsl(var(--espresso))] mb-6">
-            Start your gifting concierge — it only takes 2 minutes
+          <h2 className="font-serif text-4xl md:text-5xl text-[hsl(var(--espresso))] mb-10">
+            Set up your gifting concierge in 2 minutes
           </h2>
-          <p className="text-lg text-[hsl(var(--charcoal-body))] mb-10">
-            Join professionals who never miss an important moment
-          </p>
           <GlassButton
             variant="primary"
             onClick={() => {
