@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/logo';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -21,9 +21,30 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [onboardingData, setOnboardingData] = useState<any>({});
   const [isCompleting, setIsCompleting] = useState(false);
+  const [isVipUser, setIsVipUser] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Check if user is already VIP
+  useEffect(() => {
+    const checkVipStatus = async () => {
+      if (!user?.id) return;
+      
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('subscription_tier')
+        .eq('id', user.id)
+        .single();
+      
+      if (profile?.subscription_tier === 'vip') {
+        console.log('🔧 OnboardingFlow: User is already VIP, will skip upsell');
+        setIsVipUser(true);
+      }
+    };
+    
+    checkVipStatus();
+  }, [user?.id]);
 
   // Dynamic total steps based on flow path
   const getTotalSteps = () => {
@@ -437,8 +458,23 @@ const handleSkip = async () => {
       return <CalendarStep onNext={handleStepComplete} onSkip={handleSkip} />;
     }
 
-// Step 2: VIP Upsell (if we have imported dates from calendar)
+// Step 2: VIP Upsell (if we have imported dates from calendar AND user is not already VIP)
     if (currentStep === 2 && onboardingData.importedDates && onboardingData.importedDates.length > 0) {
+      // If user is already VIP, skip upsell and complete onboarding
+      if (isVipUser) {
+        console.log('🔧 OnboardingFlow: User is VIP, skipping upsell step');
+        // Auto-complete for VIP users
+        completeOnboarding();
+        return (
+          <div className="min-h-screen bg-brand-cream flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal mx-auto mb-4"></div>
+              <p className="text-brand-charcoal">Completing your setup...</p>
+            </div>
+          </div>
+        );
+      }
+      
       return (
         <VIPUpsellStep 
           importedDates={onboardingData.importedDates}
