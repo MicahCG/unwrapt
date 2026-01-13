@@ -4,7 +4,7 @@ import Stripe from "https://esm.sh/stripe@14.21.0";
 import { corsHeaders } from "../_shared/cors.ts";
 
 // VIP Monthly subscription price ID from Stripe
-const VIP_MONTHLY_PRICE_ID = "price_1RXpjLJvwzuqyV8LUE0vhqgN";
+const VIP_MONTHLY_PRICE_ID = "price_1SbpNlRvvOzjYUzy9iakOpwv";
 
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
   apiVersion: "2023-10-16",
