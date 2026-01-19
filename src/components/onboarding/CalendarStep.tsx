@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar as CalendarIcon, Loader2, AlertCircle, Sparkles } from "lucide-react";
+import { Calendar as CalendarIcon, Loader2, Sparkles, UserPlus } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -335,17 +335,31 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
     );
   }
 
-// No events found - show error state and go straight to dashboard
+// No events found - show engaging UI with manual entry option
   return (
     <Card className="animate-fadeInUp">
-      <CardContent className="text-center py-8">
-        <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-        <h3 className="text-lg font-semibold mb-2">No Upcoming Events Found</h3>
-        <p className="text-muted-foreground mb-4">
-          We couldn't find any upcoming birthdays or anniversaries in your calendar.
+      <CardHeader className="text-center">
+        <div className="flex justify-center mb-4">
+          <div className="bg-brand-charcoal/10 p-4 rounded-full">
+            <UserPlus className="h-12 w-12 text-brand-charcoal" />
+          </div>
+        </div>
+        <CardTitle className="text-3xl mb-2">
+          No Events, No Problem!
+        </CardTitle>
+        <p className="text-muted-foreground">
+          We didn't find any birthdays or anniversaries in your calendar.<br />
+          No worries, you can add recipients manually.
         </p>
-        <Button onClick={onSkip}>
-          Continue to Dashboard
+      </CardHeader>
+      <CardContent>
+        <Button
+          onClick={() => onNext({ noCalendarEvents: true, startManualEntry: true })}
+          className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+          size="lg"
+        >
+          <UserPlus className="mr-2 h-4 w-4" />
+          Add Your First Recipient
         </Button>
       </CardContent>
     </Card>

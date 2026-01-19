@@ -58,6 +58,11 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
       console.log('🔧 OnboardingFlow: Using 2-step flow (no recipients found)');
       return 2;
     }
+    // For no calendar events flow: Calendar -> Recipient -> VIP Upsell (3 steps)
+    if (onboardingData.noCalendarEvents && onboardingData.startManualEntry) {
+      console.log('🔧 OnboardingFlow: Using 3-step flow (no calendar events, manual entry)');
+      return 3;
+    }
     // For manual recipient entry without data: Calendar -> Recipient -> Gift Schedule (3 steps)
     if (onboardingData.manualRecipientAdded) {
       console.log('🔧 OnboardingFlow: Using 3-step flow (manual recipient added)');
@@ -302,13 +307,18 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
             .insert({
               user_id: user?.id,
               name: updatedData.firstRecipient.fullName,
-              email: updatedData.firstRecipient.email,
-              phone: updatedData.firstRecipient.phone,
-              address: JSON.stringify(updatedData.firstRecipient.address),
-              interests: updatedData.interests || [],
+              email: null,
+              phone: null,
+              street: updatedData.firstRecipient.street || null,
+              city: updatedData.firstRecipient.city || null,
+              state: updatedData.firstRecipient.state || null,
+              zip_code: updatedData.firstRecipient.zipCode || null,
+              country: updatedData.firstRecipient.country || 'United States',
+              interests: [],
               birthday: updatedData.firstRecipient.birthday || null,
-              anniversary: updatedData.firstRecipient.anniversary || null,
+              anniversary: null,
               relationship: updatedData.firstRecipient.relationship,
+              preferred_gift_vibe: updatedData.firstRecipient.preferredGiftVibe || null,
             })
             .select()
             .single();
@@ -411,9 +421,16 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
         setIsCompleting(false);
       }
     } else {
-      // After gift showcase (step 2), complete the onboarding
-      if (currentStep === 2) {
-        console.log('🔧 OnboardingFlow: Gift showcase complete, completing onboarding');
+      // Check if we're in the noCalendarEvents flow (step 2 = RecipientStep, step 3 = VIPUpsell)
+      const isNoCalendarEventsFlow = updatedData.noCalendarEvents && updatedData.startManualEntry;
+
+      if (currentStep === 2 && isNoCalendarEventsFlow) {
+        // NoCalendarEvents flow: RecipientStep done, move to VIPUpsellStep
+        console.log('🔧 OnboardingFlow: RecipientStep complete in noCalendarEvents flow, moving to VIPUpsell');
+        setCurrentStep(3);
+      } else if (currentStep === 2 && updatedData.importedDates && updatedData.importedDates.length > 0) {
+        // Calendar flow: VIPUpsell done (step 2), complete onboarding
+        console.log('🔧 OnboardingFlow: VIPUpsell complete in calendar flow, completing onboarding');
         await completeOnboarding();
       } else {
         console.log('🔧 OnboardingFlow: Not final step, moving from step', currentStep, 'to step', currentStep + 1);
@@ -490,16 +507,74 @@ const handleSkip = async () => {
       );
     }
 
+    // Check for no calendar events flow (Calendar -> Recipient -> VIP Upsell)
+    const isNoCalendarEventsFlow = onboardingData.noCalendarEvents && onboardingData.startManualEntry;
+
     // Check if we have manual recipient data (skip recipient entry)
     const hasManualRecipientData = onboardingData.manualRecipientData;
-    
+
     // Check if we need manual recipient entry flow (3 steps)
     const isManualRecipientFlow = onboardingData.manualRecipientAdded;
-    
+
     // Check if no recipients found (2 steps: Calendar -> Gift Schedule with manual name)
     const isNoRecipientsFlow = onboardingData.noRecipientsFound;
-    
-    if (hasManualRecipientData) {
+
+    // No calendar events flow: Calendar -> Recipient -> VIP Upsell (3 steps)
+    if (isNoCalendarEventsFlow) {
+      switch (currentStep) {
+        case 1:
+          return <CalendarStep onNext={handleStepComplete} onSkip={handleSkip} />;
+        case 2:
+          return (
+            <RecipientStep
+              onNext={handleStepComplete}
+              isManualEntry={true}
+            />
+          );
+        case 3:
+          // If user is already VIP, skip upsell and save recipient then complete
+          if (isVipUser) {
+            console.log('🔧 OnboardingFlow: User is VIP, skipping upsell step');
+            // Trigger final step completion which saves the recipient
+            handleStepComplete({});
+            return (
+              <div className="min-h-screen bg-brand-cream flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal mx-auto mb-4"></div>
+                  <p className="text-brand-charcoal">Completing your setup...</p>
+                </div>
+              </div>
+            );
+          }
+
+          // Get the recipient name for VIP upsell
+          const manualRecipientName = onboardingData.firstRecipient?.fullName || 'your loved one';
+
+          return (
+            <VIPUpsellStep
+              importedDates={[]}
+              recipientName={manualRecipientName}
+              onUpgrade={() => {
+                console.log('User clicked upgrade');
+              }}
+              onSkip={() => {
+                // Trigger final step completion which saves the recipient
+                handleStepComplete({});
+              }}
+            />
+          );
+        default:
+          return (
+            <div className="text-center py-8">
+              <h3 className="text-2xl font-bold mb-4 text-brand-charcoal">Step {currentStep} - Coming Soon!</h3>
+              <p className="text-brand-charcoal/70 mb-6">
+                This step is still being built. Check back soon!
+              </p>
+              <Button onClick={handleBack} className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90">Go Back</Button>
+            </div>
+          );
+      }
+    } else if (hasManualRecipientData) {
       // Shortened flow: Calendar -> Gift Schedule (2 steps)
       switch (currentStep) {
         case 1:

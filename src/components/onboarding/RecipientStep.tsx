@@ -4,8 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Gift, Calendar, MapPin, Heart } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Heart, MapPin, CalendarIcon, Sparkles } from 'lucide-react';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
+import { useQuery } from '@tanstack/react-query';
+import { type GiftVibe, type Product, getAllProducts } from '@/lib/giftVibes';
 
 interface RecipientStepProps {
   onNext: (data: any) => void;
@@ -15,9 +20,9 @@ interface RecipientStepProps {
   requireShippingAddress?: boolean;
 }
 
-const RecipientStep: React.FC<RecipientStepProps> = ({ 
-  onNext, 
-  interests, 
+const RecipientStep: React.FC<RecipientStepProps> = ({
+  onNext,
+  interests,
   selectedPersonForGift,
   isManualEntry = false,
   requireShippingAddress = false
@@ -25,7 +30,7 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
   const [recipientData, setRecipientData] = useState({
     fullName: '',
     relationship: '',
-    birthday: '',
+    birthday: undefined as Date | undefined,
     street: '',
     city: '',
     state: '',
@@ -33,8 +38,23 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
     country: 'United States'
   });
 
-  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [selectedVibe, setSelectedVibe] = useState<GiftVibe | null>(null);
   const [isValid, setIsValid] = useState(false);
+
+  // Fetch products just for displaying inspirational images
+  const { data: allProducts = [] } = useQuery({
+    queryKey: ['products', 'all'],
+    queryFn: () => getAllProducts(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Get sample images for each vibe (just for inspiration)
+  const getVibeImages = (vibe: GiftVibe) => {
+    return allProducts
+      .filter(p => p.gift_vibe === vibe)
+      .slice(0, 3)
+      .map(p => p.featured_image_url);
+  };
 
   // Pre-populate form if we have calendar data
   useEffect(() => {
@@ -42,67 +62,84 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
       const updatedData = {
         ...recipientData,
         fullName: selectedPersonForGift.personName || '',
-        birthday: selectedPersonForGift.type === 'birthday' ? selectedPersonForGift.date : ''
+        birthday: selectedPersonForGift.type === 'birthday' && selectedPersonForGift.date
+          ? new Date(selectedPersonForGift.date)
+          : undefined
       };
       setRecipientData(updatedData);
     }
   }, [selectedPersonForGift]);
 
-  // Same interests as in AddRecipientModal - updated with new product names
-  const predefinedInterests = [
-    'Lavender Fields Coffee', 'Ocean Driftwood Coconut Candle', 'Truffle Chocolate'
+  // Vibe button mappings (user-friendly labels)
+  const vibeButtons = [
+    {
+      label: 'Home & Atmosphere',
+      vibe: 'CALM_COMFORT' as GiftVibe,
+      description: 'Candles, aromatherapy, and cozy home essentials',
+      icon: '🕯️'
+    },
+    {
+      label: 'Personal & Mindful',
+      vibe: 'ARTFUL_UNIQUE' as GiftVibe,
+      description: 'Handcrafted pottery, artisan goods, and unique finds',
+      icon: '🎨'
+    },
+    {
+      label: 'Luxe & Elegant',
+      vibe: 'REFINED_STYLISH' as GiftVibe,
+      description: 'Premium glassware, statement decor, and refined pieces',
+      icon: '✨'
+    }
   ];
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: string | Date | undefined) => {
     const updatedData = { ...recipientData, [field]: value };
     setRecipientData(updatedData);
-    validateForm(updatedData);
+    validateForm(updatedData, selectedVibe);
   };
 
-  const toggleInterest = (interest: string) => {
-    setSelectedInterests(prev => 
-      prev.includes(interest) 
-        ? prev.filter(i => i !== interest)
-        : [...prev, interest]
-    );
-  };
-
-  const validateForm = (data: typeof recipientData) => {
-    // Require name, relationship, and complete address
+  const validateForm = (data: typeof recipientData, vibe: GiftVibe | null) => {
+    // Require name, relationship, address, and vibe
     const hasBasicInfo = Boolean(data.fullName && data.relationship);
     const hasAddress = Boolean(data.street && data.city && data.state && data.zipCode);
-    setIsValid(hasBasicInfo && hasAddress);
+    const hasVibe = Boolean(vibe);
+    setIsValid(hasBasicInfo && hasAddress && hasVibe);
+  };
+
+  const handleVibeSelect = (vibe: GiftVibe) => {
+    setSelectedVibe(vibe);
+    validateForm(recipientData, vibe);
   };
 
   const handleContinue = () => {
-    onNext({ 
+    onNext({
       firstRecipient: {
-        ...recipientData,
-        interests: selectedInterests
+        fullName: recipientData.fullName,
+        relationship: recipientData.relationship,
+        birthday: recipientData.birthday ? format(recipientData.birthday, 'yyyy-MM-dd') : null,
+        street: recipientData.street,
+        city: recipientData.city,
+        state: recipientData.state,
+        zipCode: recipientData.zipCode,
+        country: recipientData.country,
+        preferredGiftVibe: selectedVibe
       },
-      selectedPersonForGift 
-    });
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric'
+      selectedPersonForGift
     });
   };
 
   const getHeaderText = () => {
     if (selectedPersonForGift) {
-      return `What are ${selectedPersonForGift.personName}'s interests?`;
+      return `Add details for ${selectedPersonForGift.personName}`;
     }
     if (isManualEntry) {
-      return "Who would you like to schedule a gift for?";
+      return "Add Your First Recipient";
     }
-    return "What are their interests?";
+    return "Add Recipient Details";
   };
 
   const getSubHeaderText = () => {
-    return "Select interests that will help us find the perfect gifts";
+    return "Enter their details and choose a gift style";
   };
 
   return (
@@ -119,16 +156,8 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
         <p className="text-muted-foreground">
           {getSubHeaderText()}
         </p>
-        {selectedPersonForGift && (
-          <div className="bg-brand-gold/10 p-3 rounded-lg mt-4">
-            <div className="flex items-center justify-center text-sm text-brand-charcoal">
-              <Calendar className="h-4 w-4 mr-2" />
-              {selectedPersonForGift.type} on {formatDate(selectedPersonForGift.date)}
-            </div>
-          </div>
-        )}
       </CardHeader>
-      
+
       <CardContent className="space-y-6">
         {/* Basic Information */}
         <div className="space-y-4">
@@ -163,55 +192,88 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="birthday">Birthday</Label>
-            <Input
-              id="birthday"
-              type="date"
-              value={recipientData.birthday}
-              onChange={(e) => handleInputChange('birthday', e.target.value)}
-            />
+            <Label>Birthday</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !recipientData.birthday && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {recipientData.birthday ? format(recipientData.birthday, "MMMM d, yyyy") : "Select birthday"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={recipientData.birthday}
+                  onSelect={(date) => handleInputChange('birthday', date)}
+                  initialFocus
+                  defaultMonth={recipientData.birthday || new Date(1990, 0)}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
-        {/* Interests Section */}
+        {/* Gift Vibe Selection - Inspirational */}
         <div className="space-y-4 pt-4 border-t">
-          <h3 className="text-lg font-medium flex items-center">
-            <Gift className="h-5 w-5 mr-2" />
-            Select interests:
-          </h3>
-          
-          <div className="flex flex-wrap gap-2">
-            {predefinedInterests.map((interest) => (
-              <Badge
-                key={interest}
-                variant={selectedInterests.includes(interest) ? "default" : "outline"}
-                className={`cursor-pointer transition-colors ${
-                  selectedInterests.includes(interest)
-                    ? 'bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90'
-                    : 'border-brand-charcoal text-brand-charcoal hover:bg-brand-cream-light'
-                }`}
-                onClick={() => toggleInterest(interest)}
-              >
-                {interest}
-              </Badge>
-            ))}
+          <div className="flex items-center space-x-2 mb-3">
+            <Sparkles className="h-5 w-5 text-brand-charcoal" />
+            <h3 className="text-lg font-medium text-brand-charcoal">Gift Style *</h3>
           </div>
+          <p className="text-sm text-brand-charcoal/60 mb-4">
+            What type of gifts would they love?
+          </p>
 
-          {selectedInterests.length > 0 && (
-            <div className="bg-brand-cream/30 p-4 rounded-lg">
-              <h4 className="font-medium mb-2 text-brand-charcoal">Selected interests:</h4>
-              <div className="flex flex-wrap gap-2">
-                {selectedInterests.map((interest) => (
-                  <Badge
-                    key={interest}
-                    className="bg-brand-charcoal text-brand-cream"
-                  >
-                    {interest}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
+          <div className="space-y-3">
+            {vibeButtons.map((vibe) => {
+              const vibeImages = getVibeImages(vibe.vibe);
+              const isSelected = selectedVibe === vibe.vibe;
+
+              return (
+                <button
+                  key={vibe.vibe}
+                  type="button"
+                  onClick={() => handleVibeSelect(vibe.vibe)}
+                  className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                    isSelected
+                      ? 'border-brand-charcoal bg-brand-charcoal/5'
+                      : 'border-brand-cream-light bg-white hover:border-brand-charcoal/30'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xl">{vibe.icon}</span>
+                    <span className="font-medium text-brand-charcoal">{vibe.label}</span>
+                  </div>
+                  <p className="text-sm text-brand-charcoal/60 mb-3 ml-8">{vibe.description}</p>
+
+                  {/* Inspirational product images */}
+                  {vibeImages.length > 0 && (
+                    <div className="flex gap-2 ml-8">
+                      {vibeImages.map((imageUrl, idx) => (
+                        imageUrl && (
+                          <div
+                            key={idx}
+                            className="w-16 h-16 rounded-lg overflow-hidden bg-brand-cream/30"
+                          >
+                            <img
+                              src={imageUrl}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )
+                      ))}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Shipping Address Section */}
@@ -290,12 +352,12 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
         </div>
 
         <div className="pt-6">
-          <Button 
+          <Button
             onClick={handleContinue}
             disabled={!isValid}
             className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
           >
-            Continue with {selectedInterests.length} interests
+            Continue
           </Button>
         </div>
 

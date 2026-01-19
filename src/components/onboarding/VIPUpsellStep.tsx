@@ -12,20 +12,23 @@ interface VIPUpsellStepProps {
     date: string;
     type: 'birthday' | 'anniversary';
   }>;
+  recipientName?: string; // Optional fallback when no imported dates
   onUpgrade: () => void;
   onSkip: () => void;
 }
 
-const VIPUpsellStep: React.FC<VIPUpsellStepProps> = ({ 
-  importedDates, 
+const VIPUpsellStep: React.FC<VIPUpsellStepProps> = ({
+  importedDates,
+  recipientName,
   onUpgrade,
-  onSkip 
+  onSkip
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
   // Get the first recipient name and count of others
-  const firstRecipient = importedDates[0]?.personName || 'your loved ones';
+  // Use recipientName prop as fallback when importedDates is empty
+  const firstRecipient = importedDates[0]?.personName || recipientName || 'your loved ones';
   const otherCount = Math.max(0, importedDates.length - 1);
 
   const handleUpgrade = async () => {

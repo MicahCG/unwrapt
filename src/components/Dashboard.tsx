@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import UserMenu from '@/components/auth/UserMenu';
-import TestDataManager from '@/components/TestDataManager';
 import MonthlyOpportunitiesOverlay from '@/components/MonthlyOpportunitiesOverlay';
 import GiftScheduledSuccess from '@/components/GiftScheduledSuccess';
 import { Logo } from '@/components/ui/logo';
@@ -18,8 +17,6 @@ import EditRecipientModal from '@/components/EditRecipientModal';
 import SubscriptionBadge from '@/components/subscription/SubscriptionBadge';
 import { WalletBalance } from '@/components/wallet/WalletBalance';
 import { AddFundsModal } from '@/components/wallet/AddFundsModal';
-import { TestTierToggle } from '@/components/dev/TestTierToggle';
-import { TestWalletControls } from '@/components/dev/TestWalletControls';
 import { VIPUpgradeModal } from '@/components/subscription/VIPUpgradeModal';
 import { VIPWelcomeModal } from '@/components/onboarding/VIPWelcomeModal';
 import { AutomationToggle, EnableAutomationModal, AutomationDetailModal } from '@/components/automation';
@@ -352,18 +349,6 @@ const Dashboard = () => {
           </div>
         </header>
 
-        {/* Development Test Data Manager */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="px-12 pt-8">
-            <TestDataManager />
-          </div>
-        )}
-
-        {/* Admin Testing Controls */}
-        <div className="px-12 pt-8 space-y-4">
-          <TestTierToggle />
-        </div>
-
         {/* Wallet Balance for VIP users */}
         {userProfile && (
           <div className="px-12 pt-8 space-y-6">
@@ -371,10 +356,6 @@ const Dashboard = () => {
               balance={userProfile.gift_wallet_balance || 0}
               onAddFunds={() => setShowAddFunds(true)}
               tier={userProfile.subscription_tier as 'free' | 'vip'}
-            />
-            <TestWalletControls
-              currentBalance={userProfile.gift_wallet_balance || 0}
-              onBalanceUpdated={() => refetchProfile()}
             />
           </div>
         )}
@@ -647,25 +628,6 @@ const Dashboard = () => {
               </Button>
             )}
 
-            {/* Annual Gifting Plan */}
-            <Card className="bg-[#EFE7DD] border-[#E4DCD2] rounded-2xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.07)]">
-              <h2 className="font-display text-xl text-[#1A1A1A] mb-6">
-                Your Annual Gifting Plan
-              </h2>
-              <div className="flex items-center justify-between py-4">
-                <div className="flex-1 relative">
-                  <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-[#D2B887]/30"></div>
-                  <div className="relative flex justify-between">
-                    {['Jan', 'Mar', 'Jun', 'Oct'].map((month, index) => (
-                      <div key={month} className="flex flex-col items-center">
-                        <div className="w-3 h-3 rounded-full bg-[#D2B887] mb-2"></div>
-                        <span className="text-xs text-[#1A1A1A]/70">{month}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </Card>
           </div>
 
         </div>
