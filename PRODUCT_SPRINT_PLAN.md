@@ -12,9 +12,7 @@
 
 | Theme | Frequency | Severity |
 |-------|-----------|----------|
-| Forced calendar access too early | High | Critical |
 | No gift preview before checkout | High | Critical |
-| Manual event/recipient creation missing | High | High |
 | Landing page incomplete/unpolished | Medium | High |
 | Subscription value unclear | Medium | High |
 | Missing pricing, FAQs, testimonials | Medium | Medium |
@@ -23,57 +21,9 @@
 
 ---
 
-## Sprint 1: Trust-First Onboarding (Priority: Critical)
-
-### Key User Problems Identified
-
-> *"I just didn't want to push through in completing the sign up because I have to connect my calendar."*
-
-> *"The flow feels intrusive. You're asking for valuable data (email, calendar access) and a subscription purchase before user has a clear understanding of your service."*
-
-> *"After sign-up, allow user to manually add recipient before asking for calendar access -- calendar access is a big deal."*
-
-**Users are dropping off because:**
-- Calendar access is required before understanding the product
-- No option to manually add recipients/events
-- Subscription payment requested before seeing value
-- Unclear what data is being accessed and how it's used
-
-### Sprint Goal
-
-Users can complete onboarding and experience core value **without** connecting their calendar, with clear opt-in later.
-
-### Features & UX Improvements
-
-- [ ] **Manual recipient creation as primary path**
-  - Add "Add Recipient Manually" button prominently in onboarding
-  - Fields: Name, relationship, birthday, anniversary, interests
-  - Make calendar sync an optional enhancement, not a requirement
-
-- [ ] **Defer calendar access to post-value moment**
-  - Move calendar connection to Settings or as optional step after first recipient
-  - Show clear benefits of calendar sync when asking
-  - Add "Skip for now" option that doesn't feel punitive
-
-- [ ] **Calendar permission transparency**
-  - Add clear copy: "We only read birthday events. We never modify your calendar."
-  - Show exactly what data will be accessed before OAuth
-  - Privacy-first messaging throughout
-
-- [ ] **Defer subscription until value demonstrated**
-  - Allow users to add 1-3 recipients on free tier before upsell
-  - Show VIP benefits only after they've scheduled their first gift
-  - Remove checkout step from initial onboarding flow
-
-### Success Metrics
-
-- [ ] Increase onboarding completion rate by 40%
-- [ ] Reduce drop-off at calendar connection step by 60%
-- [ ] Increase percentage of users adding 1+ recipient by 50%
+## Sprint 1: Gift Preview Before Checkout (Priority: Critical)
 
 ---
-
-## Sprint 2: Gift Discovery Before Commitment
 
 ### Key User Problems Identified
 
@@ -91,9 +41,19 @@ Users can complete onboarding and experience core value **without** connecting t
 
 ### Sprint Goal
 
-Users can browse the full gift catalog and understand gift quality **before** signing up or paying.
+Users can see gift options before committing to checkout, with subscription deferred to the final step of automation setup.
 
 ### Features & UX Improvements
+
+- [ ] **Show gift preview before checkout in automation flow**
+  - When enabling automation, show the gift that will be scheduled
+  - User sees product image, price, and description before VIP checkout
+  - "This gift will be sent to Sarah for her birthday" preview screen
+
+- [ ] **Defer subscription to final automation step**
+  - Only show VIP subscription checkout when user confirms gift automation
+  - Not during initial onboarding or recipient setup
+  - Clear value proposition at point of purchase: "Subscribe to automate this gift"
 
 - [ ] **Public gift catalog page**
   - Create `/catalog` or `/gifts` public page accessible without login
@@ -106,30 +66,21 @@ Users can browse the full gift catalog and understand gift quality **before** si
   - "Curated With Taste" → Opens full catalog with featured items
   - "Thoughtful & Exclusive" → Opens limited edition/exclusive items
 
-- [ ] **Gift preview in onboarding**
-  - After adding recipient interests, show 3-5 matching gift suggestions
-  - "Based on Sarah's love of cooking, here's what we'd send..."
-  - Build excitement and demonstrate matching logic
-
 - [ ] **Improve catalog display density**
   - Show 4-6 items per row on desktop (currently 2)
   - Responsive grid: 1 column mobile, 2 tablet, 4-6 desktop
   - Quick-view modal for product details
-
-- [ ] **Demo flow on landing page**
-  - Interactive demo showing: Add recipient → See matching gifts → Schedule delivery
-  - No login required to experience the flow
-  - CTA after demo: "Ready to try it for real?"
 
 ### Success Metrics
 
 - [ ] 30% of landing page visitors view catalog before signup
 - [ ] Increase click-through rate on gift showcase sections by 50%
 - [ ] Reduce "checkout surprise" complaints to zero
+- [ ] Higher conversion at automation checkout (users understand what they're paying for)
 
 ---
 
-## Sprint 3: Landing Page Polish & Clarity
+## Sprint 2: Landing Page Polish & Clarity
 
 ### Key User Problems Identified
 
@@ -198,7 +149,7 @@ Landing page feels complete, polished, and answers all common questions without 
 
 ---
 
-## Sprint 4: Interest & Matching Transparency
+## Sprint 3: Interest & Matching Transparency
 
 ### Key User Problems Identified
 
@@ -244,7 +195,7 @@ Users clearly understand how gift matching works and feel confident in the perso
 
 ---
 
-## Sprint 5: Subscription Value Clarity
+## Sprint 4: Subscription Value Clarity
 
 ### Key User Problems Identified
 
@@ -295,22 +246,21 @@ Users understand exactly what they get for $4.99/month and feel it's worthwhile.
 
 | Sprint | Priority | Estimated Duration | Dependencies |
 |--------|----------|-------------------|--------------|
-| Sprint 1: Trust-First Onboarding | 🔴 Critical | 1-2 weeks | None |
-| Sprint 2: Gift Discovery | 🔴 Critical | 1-2 weeks | None |
-| Sprint 3: Landing Page Polish | 🟡 High | 1 week | None |
-| Sprint 4: Interest Transparency | 🟡 High | 1 week | Sprint 1 |
-| Sprint 5: Subscription Value | 🟢 Medium | 1 week | Sprints 1-2 |
+| Sprint 1: Gift Preview Before Checkout | 🔴 Critical | 1-2 weeks | None |
+| Sprint 2: Landing Page Polish | 🟡 High | 1 week | None |
+| Sprint 3: Interest Transparency | 🟡 High | 1 week | None |
+| Sprint 4: Subscription Value | 🟢 Medium | 1 week | Sprint 1 |
 
 ---
 
 ## Quick Wins (Can Ship Immediately)
 
-1. ✅ Add "Skip calendar" option in onboarding
-2. ✅ Add pricing section to landing page
-3. ✅ Add FAQ section to landing page
-4. ✅ Fix empty card placeholders
-5. ✅ Make gift showcase sections link to catalog
-6. ✅ Add "How it works" explainer with clear steps
+1. ✅ Add pricing section to landing page
+2. ✅ Add FAQ section to landing page
+3. ✅ Fix empty card placeholders
+4. ✅ Make gift showcase sections link to catalog
+5. ✅ Add "How it works" explainer with clear steps
+6. ✅ Show gift preview in automation setup before VIP checkout
 
 ---
 
