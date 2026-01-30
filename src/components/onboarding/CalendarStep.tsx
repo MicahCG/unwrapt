@@ -14,6 +14,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
 import howItWorksIllustration from '@/assets/how-it-works-illustration.png';
+import GiftCatalogPreview from './GiftCatalogPreview';
 
 const ONBOARDING_STEPS = [
   {
@@ -407,34 +408,39 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
     );
   }
 
-// No events found - show engaging UI with manual entry option
+// No events found - show engaging UI with gift catalog and manual entry option
   return (
-    <Card className="animate-fadeInUp">
-      <CardHeader className="text-center">
-        <div className="flex justify-center mb-4">
-          <div className="bg-brand-charcoal/10 p-4 rounded-full">
-            <UserPlus className="h-12 w-12 text-brand-charcoal" />
+    <div className="space-y-6">
+      {/* Gift Catalog Preview - Build trust by showing products first */}
+      <GiftCatalogPreview maxProducts={6} />
+
+      <Card className="animate-fadeInUp">
+        <CardHeader className="text-center">
+          <div className="flex justify-center mb-4">
+            <div className="bg-brand-charcoal/10 p-4 rounded-full">
+              <UserPlus className="h-12 w-12 text-brand-charcoal" />
+            </div>
           </div>
-        </div>
-        <CardTitle className="text-3xl mb-2">
-          No Events, No Problem!
-        </CardTitle>
-        <p className="text-muted-foreground">
-          We didn't find any birthdays or anniversaries in your calendar.<br />
-          No worries, you can add recipients manually.
-        </p>
-      </CardHeader>
-      <CardContent>
-        <Button
-          onClick={() => onNext({ noCalendarEvents: true, startManualEntry: true })}
-          className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
-          size="lg"
-        >
-          <UserPlus className="mr-2 h-4 w-4" />
-          Add Your First Recipient
-        </Button>
-      </CardContent>
-    </Card>
+          <CardTitle className="text-3xl mb-2">
+            No Events, No Problem!
+          </CardTitle>
+          <p className="text-muted-foreground">
+            We didn't find any birthdays or anniversaries in your calendar.<br />
+            No worries, you can add recipients manually.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <Button
+            onClick={() => onNext({ noCalendarEvents: true, startManualEntry: true })}
+            className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+            size="lg"
+          >
+            <UserPlus className="mr-2 h-4 w-4" />
+            Add Your First Recipient
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
