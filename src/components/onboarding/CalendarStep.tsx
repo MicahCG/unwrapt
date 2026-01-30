@@ -2,35 +2,36 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar as CalendarIcon, Loader2, Sparkles, UserPlus, Gift, Wand2, ChevronRight } from "lucide-react";
+import { Calendar as CalendarIcon, Loader2, Sparkles, UserPlus, Gift, Wand2, Heart } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { format } from 'date-fns';
 import { useToast } from "@/hooks/use-toast";
-
-const ONBOARDING_STEPS = [
-  {
-    icon: Gift,
-    title: "Add someone special",
-    description: "We'll find birthdays & anniversaries from your calendar",
-  },
-  {
-    icon: CalendarIcon,
-    title: "Set their dates",
-    description: "Or add them manually anytime",
-  },
-  {
-    icon: Wand2,
-    title: "We handle the rest",
-    description: "Curated gifts delivered on time, automatically",
-  },
-];
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
+import howItWorksIllustration from '@/assets/how-it-works-illustration.png';
+
+const ONBOARDING_STEPS = [
+  {
+    icon: Heart,
+    title: "Tell us who matters",
+    description: "Connect your calendar or add loved ones manually",
+  },
+  {
+    icon: Gift,
+    title: "We pick the perfect gift",
+    description: "Curated by our team based on their interests",
+  },
+  {
+    icon: Wand2,
+    title: "Sit back and relax",
+    description: "Gifts arrive on time. You look like a hero.",
+  },
+];
 
 interface CalendarStepProps {
   onNext: (data: any) => void;
@@ -225,52 +226,51 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
   // If not connected, show connection screen with how-it-works overview
   if (!isConnected) {
     return (
-      <Card className="animate-fadeInUp">
-        <CardHeader className="text-center pb-2">
+      <Card className="animate-fadeInUp overflow-hidden">
+        {/* Hero Illustration */}
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full"
+        >
+          <img 
+            src={howItWorksIllustration} 
+            alt="How Unwrapt works" 
+            className="w-full h-auto object-cover"
+          />
+        </motion.div>
+
+        <CardHeader className="text-center pb-2 pt-4">
           <CardTitle className="text-2xl mb-1">
-            How Unwrapt Works
+            Gifting made effortless
           </CardTitle>
           <p className="text-muted-foreground text-sm">
-            Three simple steps to never forget a special occasion
+            Never miss another birthday or anniversary
           </p>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* 3-Step Overview */}
-          <div className="space-y-3">
+        <CardContent className="space-y-5">
+          {/* 3-Step Overview - Simplified */}
+          <div className="space-y-2">
             {ONBOARDING_STEPS.map((step, index) => (
               <motion.div
                 key={index}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.1 * (index + 1), duration: 0.3 }}
-                className={`flex items-start gap-3 p-3 rounded-xl ${
-                  index === 0 
-                    ? 'bg-brand-gold/10 border border-brand-gold/30' 
-                    : 'bg-muted/30'
-                }`}
+                transition={{ delay: 0.2 + 0.1 * index, duration: 0.3 }}
+                className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/30"
               >
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  index === 0 
-                    ? 'bg-brand-gold text-white' 
-                    : 'bg-brand-charcoal/10 text-brand-charcoal/50'
-                }`}>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-brand-gold/15 text-brand-gold">
                   <step.icon className="w-4 h-4" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className={`font-medium text-sm ${
-                    index === 0 ? 'text-brand-charcoal' : 'text-brand-charcoal/60'
-                  }`}>
+                  <h3 className="font-medium text-sm text-brand-charcoal">
                     {step.title}
                   </h3>
-                  <p className={`text-xs ${
-                    index === 0 ? 'text-brand-charcoal/70' : 'text-brand-charcoal/40'
-                  }`}>
+                  <p className="text-xs text-muted-foreground">
                     {step.description}
                   </p>
                 </div>
-                {index === 0 && (
-                  <ChevronRight className="w-4 h-4 text-brand-gold flex-shrink-0 mt-2" />
-                )}
               </motion.div>
             ))}
           </div>
