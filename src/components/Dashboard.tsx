@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import UserMenu from '@/components/auth/UserMenu';
 import MonthlyOpportunitiesOverlay from '@/components/MonthlyOpportunitiesOverlay';
 import GiftScheduledSuccess from '@/components/GiftScheduledSuccess';
+import WelcomeGuide from '@/components/WelcomeGuide';
 import { Logo } from '@/components/ui/logo';
 import { Bell, Star, Heart, Plus, Lock, Crown, Truck, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
@@ -44,6 +45,14 @@ const Dashboard = () => {
   const [showAutomationDetail, setShowAutomationDetail] = useState(false);
   const [detailRecipient, setDetailRecipient] = useState<any>(null);
   const [isUpgrading, setIsUpgrading] = useState(false);
+  const [showWelcomeGuide, setShowWelcomeGuide] = useState(false);
+  const [welcomeGuideDismissed, setWelcomeGuideDismissed] = useState(false);
+
+  // Check if welcome guide should be shown (new user with no recipients)
+  useEffect(() => {
+    const dismissed = localStorage.getItem('welcomeGuideDismissed') === 'true';
+    setWelcomeGuideDismissed(dismissed);
+  }, []);
 
   // Direct Stripe checkout for VIP upgrade
   const handleDirectUpgrade = async () => {
@@ -371,6 +380,15 @@ const Dashboard = () => {
         <div className="px-12 py-12 flex justify-center">
           {/* Upcoming Birthdays */}
           <div className="space-y-6 w-full max-w-[620px]">
+            {/* Welcome Guide for new users with no recipients */}
+            {sortedRecipients.length === 0 && !welcomeGuideDismissed && (
+              <WelcomeGuide
+                userName={user?.user_metadata?.full_name || user?.email}
+                onAddRecipient={() => setShowAddRecipient(true)}
+                onDismiss={() => setWelcomeGuideDismissed(true)}
+              />
+            )}
+
             <Card className="bg-[#EFE7DD] border-[#E4DCD2] rounded-2xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.07)]">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="font-display text-xl text-[#1A1A1A]">
@@ -390,15 +408,8 @@ const Dashboard = () => {
               
               <div className="relative space-y-4">
                 {sortedRecipients.length === 0 ? (
-                  <div className="text-center py-8 text-[#1A1A1A]/60">
-                    <p className="mb-4">No recipients yet</p>
-                    <Button
-                      onClick={() => setShowAddRecipient(true)}
-                      className="bg-[#D2B887] hover:bg-[#D2B887]/90 text-[#1A1A1A]"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Your First Recipient
-                    </Button>
+                  <div className="text-center py-6 text-[#1A1A1A]/60">
+                    <p className="text-sm">Your recipients will appear here once added.</p>
                   </div>
                 ) : (
                   <>
