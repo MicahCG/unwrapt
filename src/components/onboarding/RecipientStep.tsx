@@ -147,11 +147,7 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
     <div className="space-y-6">
       {/* Gift Catalog Preview - Shows first to build trust */}
       {isManualEntry && (
-        <GiftCatalogPreview
-          selectedVibe={selectedVibe}
-          onVibeSelect={handleVibeSelect}
-          maxProducts={6}
-        />
+        <GiftCatalogPreview maxProducts={4} />
       )}
 
       <Card className="animate-fadeInUp">
