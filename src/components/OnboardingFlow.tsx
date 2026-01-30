@@ -440,8 +440,22 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
   };
 
 const handleSkip = async () => {
-    console.log('🔧 OnboardingFlow: Skipping step:', currentStep, '-> completing onboarding');
-    // Skip directly to dashboard (complete onboarding immediately)
+    console.log('🔧 OnboardingFlow: Skip clicked at step:', currentStep);
+    
+    // If at calendar step (step 1), skip to manual recipient entry
+    if (currentStep === 1) {
+      console.log('🔧 OnboardingFlow: Skipping calendar, moving to manual recipient entry');
+      setOnboardingData((prev: any) => ({ 
+        ...prev, 
+        noCalendarEvents: true, 
+        startManualEntry: true 
+      }));
+      setCurrentStep(2);
+      return;
+    }
+    
+    // For other steps, complete onboarding
+    console.log('🔧 OnboardingFlow: Completing onboarding from skip');
     await completeOnboarding();
   };
 
