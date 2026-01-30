@@ -6,11 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Heart, MapPin, CalendarIcon, Sparkles } from 'lucide-react';
+import { Heart, MapPin, CalendarIcon, UserPlus, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { type GiftVibe, type Product, getAllProducts } from '@/lib/giftVibes';
+import GiftCatalogPreview from './GiftCatalogPreview';
 
 interface RecipientStepProps {
   onNext: (data: any) => void;
@@ -143,22 +144,32 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
   };
 
   return (
-    <Card className="animate-fadeInUp">
-      <CardHeader className="text-center">
-        <div className="flex justify-center mb-4">
-          <div className="bg-brand-charcoal/10 p-4 rounded-full">
-            <Heart className="h-12 w-12 text-brand-charcoal" />
-          </div>
-        </div>
-        <CardTitle className="text-3xl mb-2">
-          {getHeaderText()}
-        </CardTitle>
-        <p className="text-muted-foreground">
-          {getSubHeaderText()}
-        </p>
-      </CardHeader>
+    <div className="space-y-6">
+      {/* Gift Catalog Preview - Shows first to build trust */}
+      {isManualEntry && (
+        <GiftCatalogPreview
+          selectedVibe={selectedVibe}
+          onVibeSelect={handleVibeSelect}
+          maxProducts={6}
+        />
+      )}
 
-      <CardContent className="space-y-6">
+      <Card className="animate-fadeInUp">
+        <CardHeader className="text-center">
+          <div className="flex justify-center mb-4">
+            <div className="bg-brand-charcoal/10 p-4 rounded-full">
+              <UserPlus className="h-12 w-12 text-brand-charcoal" />
+            </div>
+          </div>
+          <CardTitle className="text-3xl mb-2">
+            {getHeaderText()}
+          </CardTitle>
+          <p className="text-muted-foreground">
+            {getSubHeaderText()}
+          </p>
+        </CardHeader>
+
+        <CardContent className="space-y-6">
         {/* Basic Information */}
         <div className="space-y-4">
           <div className="space-y-2">
@@ -365,7 +376,8 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
           * Required fields
         </p>
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   );
 };
 
