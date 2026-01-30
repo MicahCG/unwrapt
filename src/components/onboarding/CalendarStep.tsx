@@ -2,13 +2,31 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar as CalendarIcon, Loader2, Sparkles, UserPlus } from "lucide-react";
+import { Calendar as CalendarIcon, Loader2, Sparkles, UserPlus, Gift, Wand2, ChevronRight } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { format } from 'date-fns';
 import { useToast } from "@/hooks/use-toast";
+
+const ONBOARDING_STEPS = [
+  {
+    icon: Gift,
+    title: "Add someone special",
+    description: "We'll find birthdays & anniversaries from your calendar",
+  },
+  {
+    icon: CalendarIcon,
+    title: "Set their dates",
+    description: "Or add them manually anytime",
+  },
+  {
+    icon: Wand2,
+    title: "We handle the rest",
+    description: "Curated gifts delivered on time, automatically",
+  },
+];
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -204,24 +222,70 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
     console.log('📅 CalendarStep: onNext called successfully');
   };
 
-  // If not connected, show connection screen
+  // If not connected, show connection screen with how-it-works overview
   if (!isConnected) {
     return (
       <Card className="animate-fadeInUp">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="bg-brand-charcoal/10 p-4 rounded-full">
-              <CalendarIcon className="h-12 w-12 text-brand-charcoal" />
-            </div>
-          </div>
-          <CardTitle className="text-3xl mb-2">
-            Connect Your Calendar
+        <CardHeader className="text-center pb-2">
+          <CardTitle className="text-2xl mb-1">
+            How Unwrapt Works
           </CardTitle>
-          <p className="text-muted-foreground">
-            Connect Google Calendar to automatically find birthdays and anniversaries.
+          <p className="text-muted-foreground text-sm">
+            Three simple steps to never forget a special occasion
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* 3-Step Overview */}
+          <div className="space-y-3">
+            {ONBOARDING_STEPS.map((step, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 * (index + 1), duration: 0.3 }}
+                className={`flex items-start gap-3 p-3 rounded-xl ${
+                  index === 0 
+                    ? 'bg-brand-gold/10 border border-brand-gold/30' 
+                    : 'bg-muted/30'
+                }`}
+              >
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  index === 0 
+                    ? 'bg-brand-gold text-white' 
+                    : 'bg-brand-charcoal/10 text-brand-charcoal/50'
+                }`}>
+                  <step.icon className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className={`font-medium text-sm ${
+                    index === 0 ? 'text-brand-charcoal' : 'text-brand-charcoal/60'
+                  }`}>
+                    {step.title}
+                  </h3>
+                  <p className={`text-xs ${
+                    index === 0 ? 'text-brand-charcoal/70' : 'text-brand-charcoal/40'
+                  }`}>
+                    {step.description}
+                  </p>
+                </div>
+                {index === 0 && (
+                  <ChevronRight className="w-4 h-4 text-brand-gold flex-shrink-0 mt-2" />
+                )}
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">Let's start</span>
+            </div>
+          </div>
+
+          {/* Calendar Connection Button */}
           <Button 
             onClick={connectGoogleCalendar}
             disabled={isConnecting}
@@ -240,6 +304,14 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ onNext, onSkip }) => {
               </>
             )}
           </Button>
+
+          {/* Skip Option */}
+          <button
+            onClick={onSkip}
+            className="w-full text-sm text-muted-foreground hover:text-brand-charcoal transition-colors"
+          >
+            Skip and add recipients manually
+          </button>
         </CardContent>
       </Card>
     );
