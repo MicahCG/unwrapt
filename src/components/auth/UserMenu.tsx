@@ -29,12 +29,14 @@ const UserMenu: React.FC<UserMenuProps> = ({ hideSettings = false }) => {
   const [isCalendarLoading, setIsCalendarLoading] = useState(false);
   const [justSynced, setJustSynced] = useState(false);
 
-  if (!user) return null;
-
-  // Check calendar integration on mount
-  useEffect(() => {
-    checkCalendarIntegration();
+  // Check calendar integration on mount - must be before conditional return
+  React.useEffect(() => {
+    if (user) {
+      checkCalendarIntegration();
+    }
   }, [user]);
+
+  if (!user) return null;
 
   const checkCalendarIntegration = async () => {
     if (!user) return;
@@ -46,7 +48,9 @@ const UserMenu: React.FC<UserMenuProps> = ({ hideSettings = false }) => {
 
       if (!error && integrations && integrations.length > 0) {
         const integration = integrations[0];
-        setIsCalendarConnected(integration.is_connected && !integration.is_expired);
+        // Show as connected if integration exists - access token expiry is handled by refresh token
+        // The is_expired flag refers to short-lived access tokens, not the integration itself
+        setIsCalendarConnected(integration.is_connected);
       } else {
         setIsCalendarConnected(false);
       }
