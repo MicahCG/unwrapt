@@ -11,21 +11,40 @@ function extractPersonFromEvent(eventSummary: string) {
   const summary = eventSummary.toLowerCase();
   let personName = '';
   
+  // Pattern: "Name's Birthday" or "Name's Bday"
   if (summary.includes("'s birthday") || summary.includes("'s bday")) {
     const splitChar = summary.includes("'s birthday") ? "'s birthday" : "'s bday";
-    personName = eventSummary.split(splitChar)[0].trim();
-  } else if (summary.includes("'s anniversary")) {
-    personName = eventSummary.split("'s")[0].trim();
-  } else if (summary.includes(" birthday") || summary.includes(" bday")) {
-    personName = eventSummary.replace(/birthday|bday/i, '').trim();
-  } else if (summary.includes(" anniversary")) {
-    personName = eventSummary.replace(/anniversary/i, '').trim();
-  } else if (summary.includes("birthday -") || summary.includes("bday -")) {
-    const splitStr = summary.includes("birthday -") ? "birthday -" : "bday -";
-    personName = eventSummary.split(splitStr)[1].trim();
-  } else if (summary.includes("anniversary -")) {
-    personName = eventSummary.split("anniversary -")[1].trim();
-  } else {
+    personName = eventSummary.split(new RegExp(splitChar, 'i'))[0].trim();
+  } 
+  // Pattern: "Name's Anniversary"
+  else if (summary.includes("'s anniversary")) {
+    personName = eventSummary.split(/'s/i)[0].trim();
+  } 
+  // Pattern: "Name Birthday" or "Name Bday" (no apostrophe)
+  else if (summary.includes(" birthday") || summary.includes(" bday")) {
+    // Extract everything before "birthday" or "bday"
+    personName = eventSummary.replace(/\s*(birthday|bday)\s*/i, '').trim();
+  } 
+  // Pattern: "Name Anniversary"
+  else if (summary.includes(" anniversary")) {
+    personName = eventSummary.replace(/\s*anniversary\s*/i, '').trim();
+  } 
+  // Pattern: "Birthday - Name" or "Bday - Name"
+  else if (summary.includes("birthday -") || summary.includes("bday -")) {
+    const parts = eventSummary.split(/-/);
+    if (parts.length > 1) {
+      personName = parts[1].trim();
+    }
+  } 
+  // Pattern: "Anniversary - Name"
+  else if (summary.includes("anniversary -")) {
+    const parts = eventSummary.split(/-/);
+    if (parts.length > 1) {
+      personName = parts[1].trim();
+    }
+  }
+  // Pattern: Just "Birthday" with a name-like word
+  else {
     // Fallback: try to extract any name-like pattern
     const words = eventSummary.split(' ');
     personName = words.find(word => 
@@ -40,6 +59,7 @@ function extractPersonFromEvent(eventSummary: string) {
     personName = personName.slice(0, -2);
   }
   
+  console.log(`📛 Extracted person name from "${eventSummary}": "${personName}"`);
   return personName;
 }
 
@@ -508,6 +528,8 @@ Deno.serve(async (req) => {
         })
       }
 
+      console.log(`📅 Total calendar events fetched: ${calendarData.items?.length || 0}`);
+      
       // Expanded filtering for dashboard - include more gift-worthy occasions
       const giftWorthyEvents = calendarData.items?.filter((event: any) => {
         const summary = event.summary?.toLowerCase() || ''
@@ -591,6 +613,11 @@ Deno.serve(async (req) => {
                       extractPersonFromEvent(event.summary) : null
         }
       }) || []
+
+      console.log(`🎁 Gift-worthy events found: ${giftWorthyEvents.length}`);
+      giftWorthyEvents.forEach((e: any) => {
+        console.log(`  - ${e.summary} (${e.category}) on ${e.date} - person: ${e.personName || 'N/A'}`);
+      });
 
       return new Response(JSON.stringify({ events: giftWorthyEvents }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
