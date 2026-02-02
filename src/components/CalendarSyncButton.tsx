@@ -139,13 +139,26 @@ const CalendarSyncButton = () => {
         .select('name, birthday, anniversary')
         .eq('user_id', user.id);
 
+      console.log('📊 Calendar people to check:', calendarPeople);
+      console.log('📊 Existing recipients:', existingRecipients);
+      
       const newPeople = calendarPeople.filter(person => {
         const isDuplicate = existingRecipients?.some(existing => {
           const nameMatch = existing.name.toLowerCase().trim() === person.name.toLowerCase().trim();
-          const birthdayMatch = existing.birthday === person.birthday;
-          const anniversaryMatch = existing.anniversary === person.anniversary;
+          // Normalize dates for comparison
+          const personBday = normalizeDate(person.birthday);
+          const existingBday = normalizeDate(existing.birthday);
+          const personAnniv = normalizeDate(person.anniversary);
+          const existingAnniv = normalizeDate(existing.anniversary);
+          
+          const birthdayMatch = personBday && existingBday && personBday === existingBday;
+          const anniversaryMatch = personAnniv && existingAnniv && personAnniv === existingAnniv;
+          
+          console.log(`🔍 Comparing: "${person.name}" vs "${existing.name}" | name: ${nameMatch} | bday: ${personBday} vs ${existingBday} = ${birthdayMatch} | anniv: ${anniversaryMatch}`);
+          
           return nameMatch && (birthdayMatch || anniversaryMatch);
         });
+        console.log(`  → ${person.name}: isDuplicate=${isDuplicate}`);
         return !isDuplicate;
       });
 
