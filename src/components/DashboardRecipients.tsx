@@ -409,6 +409,7 @@ const DashboardRecipients = () => {
           <h2 className="text-lg sm:text-xl font-semibold text-brand-charcoal">Your Recipients</h2>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <CalendarSyncButton />
           <Button 
             size="sm"
             className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90 w-full sm:w-auto"

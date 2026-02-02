@@ -5,7 +5,7 @@ import { Calendar, Loader2, Check } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 
 const CalendarSyncButton = () => {
   const { user } = useAuth();
@@ -16,39 +16,48 @@ const CalendarSyncButton = () => {
 
   const normalizeDate = (date: string | null) => {
     if (!date) return null;
-    // Ensure we only store the YYYY-MM-DD part for Supabase date columns
     return date.split('T')[0];
   };
 
-  const extractPersonFromEvent = (eventSummary: string) => {
-    const summary = eventSummary.toLowerCase();
-    let personName = '';
-    
-    if (summary.includes("'s birthday") || summary.includes("'s bday")) {
-      const splitChar = summary.includes("'s birthday") ? "'s birthday" : "'s bday";
-      personName = eventSummary.split(splitChar)[0].trim();
-    } else if (summary.includes("'s anniversary")) {
-      personName = eventSummary.split("'s")[0].trim();
-    } else if (summary.includes(" birthday") || summary.includes(" bday")) {
-      personName = eventSummary.replace(/birthday|bday/i, '').trim();
-    } else if (summary.includes(" anniversary")) {
-      personName = eventSummary.replace(/anniversary/i, '').trim();
-    } else if (summary.includes("birthday -") || summary.includes("bday -")) {
-      const splitStr = summary.includes("birthday -") ? "birthday -" : "bday -";
-      personName = eventSummary.split(splitStr)[1].trim();
-    } else if (summary.includes("anniversary -")) {
-      personName = eventSummary.split("anniversary -")[1].trim();
-    } else {
-      // Fallback: try to extract any name-like pattern
-      const words = eventSummary.split(' ');
-      personName = words.find(word => 
-        word.length > 2 && 
-        word[0] === word[0].toUpperCase() &&
-        !['Birthday', 'Bday', 'Anniversary', 'The', 'And', 'Or'].includes(word)
-      ) || '';
+  // Check calendar connection status
+  const { data: isConnected } = useQuery({
+    queryKey: ['calendar-connection', user?.id],
+    queryFn: async () => {
+      const { data: integrations, error } = await supabase
+        .rpc('get_my_calendar_integration');
+
+      if (error || !integrations || integrations.length === 0) {
+        return false;
+      }
+      return integrations[0]?.is_connected ?? false;
+    },
+    enabled: !!user
+  });
+
+  const connectGoogleCalendar = async () => {
+    setSyncing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No active session found');
+
+      const { data: authData, error: authError } = await supabase.functions.invoke('google-calendar', {
+        body: { action: 'get_auth_url' },
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+
+      if (authError) throw new Error(authError.message || 'Failed to get authorization URL');
+      if (authData?.authUrl) {
+        window.location.href = authData.authUrl;
+      }
+    } catch (error) {
+      console.error('Calendar connection error:', error);
+      toast({
+        title: "Connection Failed",
+        description: error instanceof Error ? error.message : 'Failed to connect calendar',
+        variant: "destructive"
+      });
+      setSyncing(false);
     }
-    
-    return personName;
   };
 
   const handleCalendarSync = async () => {
@@ -57,43 +66,18 @@ const CalendarSyncButton = () => {
     setSyncing(true);
     
     try {
-      // Get current session for auth headers
       const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        throw new Error('No active session found');
-      }
+      if (!session) throw new Error('No active session found');
 
-      // Check if user has calendar integration using secure function (tokens are never exposed)
-      const { data: integrations, error: integrationError } = await supabase
-        .rpc('get_my_calendar_integration');
-
-      const integration = integrations?.[0];
-
-      if (integrationError || !integration?.is_connected) {
-        toast({
-          title: "No Calendar Connected",
-          description: "Please connect your Google Calendar first to sync recipients.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Fetch calendar events - edge function handles tokens securely server-side
       console.log('🔄 Syncing calendar events...');
       const { data: eventsData, error: eventsError } = await supabase.functions.invoke('google-calendar', {
-        body: { 
-          action: 'fetch_dashboard_events'
-        },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        }
+        body: { action: 'fetch_dashboard_events' },
+        headers: { Authorization: `Bearer ${session.access_token}` }
       });
 
       if (eventsError) {
         console.error('❌ Calendar sync error:', eventsError);
         
-        // Check if it's an auth error (token expired)
         if (eventsError.status === 401 || eventsError.message?.includes('Calendar access expired')) {
           toast({
             title: "Calendar Access Expired",
@@ -109,7 +93,6 @@ const CalendarSyncButton = () => {
       const events = eventsData?.events || [];
       console.log('📅 Found calendar events:', events.length);
 
-      // Filter for birthday and anniversary events only
       const importantEvents = events.filter((event: any) => 
         event.category === 'birthday' || event.category === 'anniversary'
       );
@@ -122,7 +105,6 @@ const CalendarSyncButton = () => {
         return;
       }
 
-      // Group events by person
       const peopleMap = new Map<string, any>();
       
       importantEvents.forEach((event: any) => {
@@ -152,23 +134,18 @@ const CalendarSyncButton = () => {
       const calendarPeople = Array.from(peopleMap.values());
       console.log('👥 Found unique people in calendar:', calendarPeople.length);
 
-      // Get existing recipients to avoid duplicates
       const { data: existingRecipients } = await supabase
         .from('recipients')
         .select('name, birthday, anniversary')
         .eq('user_id', user.id);
 
-      // Filter out people who are already recipients
       const newPeople = calendarPeople.filter(person => {
         const isDuplicate = existingRecipients?.some(existing => {
           const nameMatch = existing.name.toLowerCase().trim() === person.name.toLowerCase().trim();
           const birthdayMatch = existing.birthday === person.birthday;
           const anniversaryMatch = existing.anniversary === person.anniversary;
-          
-          // Consider it a duplicate if name matches and at least one date matches
           return nameMatch && (birthdayMatch || anniversaryMatch);
         });
-        
         return !isDuplicate;
       });
 
@@ -177,10 +154,11 @@ const CalendarSyncButton = () => {
           title: "Already Up to Date",
           description: "All people from your calendar are already in your recipients list.",
         });
+        setJustSynced(true);
+        setTimeout(() => setJustSynced(false), 3000);
         return;
       }
 
-      // Create new recipients
       const newRecipients = newPeople.map(person => ({
         user_id: user.id,
         name: person.name,
@@ -202,7 +180,6 @@ const CalendarSyncButton = () => {
 
       console.log('✅ Successfully imported recipients:', insertedRecipients.length);
 
-      // Refresh the recipients query
       queryClient.invalidateQueries({ queryKey: ['recipients', user.id] });
 
       setJustSynced(true);
@@ -215,10 +192,9 @@ const CalendarSyncButton = () => {
 
     } catch (error) {
       console.error('💥 Calendar sync error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to sync calendar';
       toast({
         title: "Sync Failed",
-        description: errorMessage,
+        description: error instanceof Error ? error.message : 'Failed to sync calendar',
         variant: "destructive"
       });
     } finally {
@@ -226,20 +202,26 @@ const CalendarSyncButton = () => {
     }
   };
 
+  const handleClick = () => {
+    if (isConnected) {
+      handleCalendarSync();
+    } else {
+      connectGoogleCalendar();
+    }
+  };
+
   return (
     <Button
       variant="outline"
       size="sm"
-      onClick={handleCalendarSync}
+      onClick={handleClick}
       disabled={syncing}
-      className={`border-brand-charcoal text-brand-charcoal hover:bg-brand-cream ${
-        justSynced ? 'status-success' : ''
-      }`}
+      className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream w-full sm:w-auto"
     >
       {syncing ? (
         <>
           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          Syncing...
+          {isConnected ? 'Syncing...' : 'Connecting...'}
         </>
       ) : justSynced ? (
         <>
@@ -249,7 +231,7 @@ const CalendarSyncButton = () => {
       ) : (
         <>
           <Calendar className="h-4 w-4 mr-2" />
-          Sync Calendar
+          {isConnected ? 'Sync Calendar' : 'Connect Calendar'}
         </>
       )}
     </Button>
