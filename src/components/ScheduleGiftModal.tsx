@@ -661,6 +661,22 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           );
         })()}
 
+        {/* Order Already Placed Notice */}
+        {existingGift && (!!existingGift.shopify_order_id || existingGift.status === 'ordered') && (
+          <div className="mx-8 mt-4 mb-2 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-sm font-medium text-amber-800 mb-1">
+              Order Already Placed
+            </p>
+            <p className="text-xs text-amber-700">
+              This gift has already been ordered. If you'd like to make changes, please contact{' '}
+              <a href="mailto:team@unwrapt.io" className="underline font-medium hover:text-amber-900">
+                team@unwrapt.io
+              </a>
+              {' '}and we'll respond within 24 hours.
+            </p>
+          </div>
+        )}
+
         {/* Two-Column Layout */}
         <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
           {/* Left Column: Form Fields */}
