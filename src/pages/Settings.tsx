@@ -75,7 +75,7 @@ const Settings = () => {
     if (profile) {
       setFullName(profile.full_name || '');
       setEmail(profile.email || user?.email || '');
-      setPhone((profile as any).phone || '');
+      setPhone((profile as Record<string, any>).phone || '');
     } else if (user) {
       setFullName(user.user_metadata?.full_name || '');
       setEmail(user.email || '');
@@ -97,7 +97,7 @@ const Settings = () => {
           full_name: sanitizedName,
           email: sanitizedEmail,
           phone: sanitizedPhone,
-        })
+        } as any)
         .eq('id', user.id);
 
       if (error) throw error;
