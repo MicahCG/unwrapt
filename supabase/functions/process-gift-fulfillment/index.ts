@@ -205,25 +205,22 @@ serve(async (req) => {
       });
     }
 
-    // For manual triggers, handle wallet charging if not already paid
+    // For manual triggers, handle wallet charging directly if not already paid
     if (manualTrigger && giftData.payment_status !== 'paid') {
-      console.log('🎁 Process-gift-fulfillment: Manual trigger - charging wallet for gift...');
-      const estimatedCost = giftData.estimated_cost || 42;
+      console.log('🎁 Process-gift-fulfillment: Manual trigger - charging wallet directly...');
+      const chargeAmount = giftData.estimated_cost || 42;
       
-      // Reserve and charge wallet funds
-      const { data: chargeResult, error: chargeError } = await supabaseService
-        .functions.invoke('wallet-charge-reserved', {
-          body: { 
-            scheduledGiftId,
-            amount: estimatedCost,
-            userId: giftData.user_id
-          }
-        });
+      // Get current wallet balance
+      const { data: profile, error: profileError } = await supabaseService
+        .from('profiles')
+        .select('gift_wallet_balance')
+        .eq('id', giftData.user_id)
+        .single();
 
-      if (chargeError) {
-        console.error('🎁 Process-gift-fulfillment: Wallet charge failed:', chargeError);
+      if (profileError || !profile) {
+        console.error('🎁 Process-gift-fulfillment: Could not fetch user profile:', profileError);
         return new Response(JSON.stringify({ 
-          error: "Failed to charge wallet. Please ensure you have sufficient funds.",
+          error: "Could not fetch wallet balance.",
           success: false
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -231,13 +228,60 @@ serve(async (req) => {
         });
       }
 
-      console.log('🎁 Process-gift-fulfillment: Wallet charged successfully:', chargeResult);
+      const currentBalance = profile.gift_wallet_balance || 0;
+      if (currentBalance < chargeAmount) {
+        console.error(`🎁 Process-gift-fulfillment: Insufficient balance: $${currentBalance} < $${chargeAmount}`);
+        return new Response(JSON.stringify({ 
+          error: `Insufficient wallet balance. You have $${currentBalance.toFixed(2)} but need $${chargeAmount.toFixed(2)}.`,
+          success: false
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
+      }
 
-      // Update payment status
+      const newBalance = currentBalance - chargeAmount;
+
+      // Create wallet transaction record
+      const { error: txnError } = await supabaseService
+        .from('wallet_transactions')
+        .insert({
+          user_id: giftData.user_id,
+          amount: -chargeAmount,
+          balance_after: newBalance,
+          transaction_type: 'charge',
+          status: 'completed',
+          scheduled_gift_id: scheduledGiftId,
+        });
+
+      if (txnError) {
+        console.error('🎁 Process-gift-fulfillment: Wallet transaction insert failed:', txnError);
+        return new Response(JSON.stringify({ 
+          error: "Failed to record wallet transaction.",
+          success: false
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+        });
+      }
+
+      // Deduct from wallet balance
+      const { error: balanceError } = await supabaseService
+        .from('profiles')
+        .update({ gift_wallet_balance: newBalance })
+        .eq('id', giftData.user_id);
+
+      if (balanceError) {
+        console.error('🎁 Process-gift-fulfillment: Balance update failed:', balanceError);
+      }
+
+      // Update gift payment status
       await supabaseService
         .from('scheduled_gifts')
-        .update({ payment_status: 'paid', payment_amount: estimatedCost })
+        .update({ payment_status: 'paid', payment_amount: chargeAmount })
         .eq('id', scheduledGiftId);
+
+      console.log(`🎁 Process-gift-fulfillment: Wallet charged $${chargeAmount}, new balance: $${newBalance}`);
     }
 
     // Then get the recipient data separately to avoid relationship issues
