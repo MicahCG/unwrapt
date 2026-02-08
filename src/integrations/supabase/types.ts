@@ -255,6 +255,7 @@ export type Database = {
           full_name: string | null
           gift_wallet_balance: number | null
           id: string
+          phone: string | null
           stripe_payment_method_id: string | null
           subscription_status: string | null
           subscription_tier: string | null
@@ -274,6 +275,7 @@ export type Database = {
           full_name?: string | null
           gift_wallet_balance?: number | null
           id: string
+          phone?: string | null
           stripe_payment_method_id?: string | null
           subscription_status?: string | null
           subscription_tier?: string | null
@@ -293,6 +295,7 @@ export type Database = {
           full_name?: string | null
           gift_wallet_balance?: number | null
           id?: string
+          phone?: string | null
           stripe_payment_method_id?: string | null
           subscription_status?: string | null
           subscription_tier?: string | null
