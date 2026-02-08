@@ -56,7 +56,7 @@ serve(async (req) => {
     const requestBody = await req.json();
     console.log('🎁 Process-gift-fulfillment: Request body:', requestBody);
 
-    const { scheduledGiftId } = requestBody;
+    const { scheduledGiftId, manualTrigger } = requestBody;
 
     if (!scheduledGiftId) {
       console.error('🎁 Process-gift-fulfillment: Missing scheduledGiftId');
@@ -69,8 +69,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`🎁 Process-gift-fulfillment: Processing gift fulfillment for: ${scheduledGiftId}`);
-
+    console.log(`🎁 Process-gift-fulfillment: Processing gift fulfillment for: ${scheduledGiftId} (manualTrigger: ${!!manualTrigger})`);
     // Verify the gift exists and get user_id
     const { data: giftCheck, error: giftCheckError } = await supabaseService
       .from('scheduled_gifts')
@@ -173,18 +172,25 @@ serve(async (req) => {
     console.log('🎁 Process-gift-fulfillment: Querying database for gift data...');
 
     // First get the gift data
-    const { data: giftData, error: giftError } = await supabaseService
+    // When manually triggered (Order Now button), don't require payment_status = 'paid'
+    // The wallet charge will happen as part of this flow
+    let giftQuery = supabaseService
       .from('scheduled_gifts')
       .select('*')
-      .eq('id', scheduledGiftId)
-      .eq('payment_status', 'paid')
-      .single();
+      .eq('id', scheduledGiftId);
+    
+    if (!manualTrigger) {
+      giftQuery = giftQuery.eq('payment_status', 'paid');
+    }
+
+    const { data: giftData, error: giftError } = await giftQuery.single();
 
     console.log('🎁 Process-gift-fulfillment: Gift query result:', { 
       found: !!giftData, 
       id: giftData?.id,
       payment_status: giftData?.payment_status,
       recipient_id: giftData?.recipient_id,
+      manualTrigger: !!manualTrigger,
       error: giftError 
     });
 
@@ -197,6 +203,41 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 404,
       });
+    }
+
+    // For manual triggers, handle wallet charging if not already paid
+    if (manualTrigger && giftData.payment_status !== 'paid') {
+      console.log('🎁 Process-gift-fulfillment: Manual trigger - charging wallet for gift...');
+      const estimatedCost = giftData.estimated_cost || 42;
+      
+      // Reserve and charge wallet funds
+      const { data: chargeResult, error: chargeError } = await supabaseService
+        .functions.invoke('wallet-charge-reserved', {
+          body: { 
+            scheduledGiftId,
+            amount: estimatedCost,
+            userId: giftData.user_id
+          }
+        });
+
+      if (chargeError) {
+        console.error('🎁 Process-gift-fulfillment: Wallet charge failed:', chargeError);
+        return new Response(JSON.stringify({ 
+          error: "Failed to charge wallet. Please ensure you have sufficient funds.",
+          success: false
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
+      }
+
+      console.log('🎁 Process-gift-fulfillment: Wallet charged successfully:', chargeResult);
+
+      // Update payment status
+      await supabaseService
+        .from('scheduled_gifts')
+        .update({ payment_status: 'paid', payment_amount: estimatedCost })
+        .eq('id', scheduledGiftId);
     }
 
     // Then get the recipient data separately to avoid relationship issues
