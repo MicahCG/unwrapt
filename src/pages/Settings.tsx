@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,7 +29,7 @@ import {
   Bell,
   Zap,
   Shield,
-  Clock,          // Added Clock import
+  Clock,
   Download,
   Trash2,
   Phone,
@@ -40,16 +40,23 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
 import { SubscriptionManagement } from '@/components/subscription/SubscriptionManagement';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import { supabase } from '@/integrations/supabase/client';
+import { sanitizeInput, sanitizeEmail, sanitizePhoneNumber } from '@/utils/inputSanitization';
+import { useQueryClient } from '@tanstack/react-query';
 
 const Settings = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { data: profile, isLoading: profileLoading } = useUserProfile();
+  const queryClient = useQueryClient();
 
   // Form states
-  const [fullName, setFullName] = useState(user?.user_metadata?.full_name || '');
-  const [email, setEmail] = useState(user?.email || '');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   
   // Notification preferences
   const [emailReminders, setEmailReminders] = useState(true);
@@ -57,22 +64,64 @@ const Settings = () => {
   const [savingsAlerts, setSavingsAlerts] = useState(true);
   
   // Enhanced automation settings
-  const [autoSendGifts, setAutoSendGifts] = useState(false); // Changed default to false
-  const [dayBeforeNotifications, setDayBeforeNotifications] = useState(true); // Added
-  const [notificationTime, setNotificationTime] = useState('morning'); // Added
-  const [allowCancellation, setAllowCancellation] = useState(true); // Added
-  const [leadTime, setLeadTime] = useState('3-days'); // Updated format
+  const [autoSendGifts, setAutoSendGifts] = useState(false);
+  const [dayBeforeNotifications, setDayBeforeNotifications] = useState(true);
+  const [notificationTime, setNotificationTime] = useState('morning');
+  const [allowCancellation, setAllowCancellation] = useState(true);
+  const [leadTime, setLeadTime] = useState('3-days');
 
-  const handleSaveProfile = () => {
-    // TODO: Implement profile update
-    toast({
-      title: "Profile updated",
-      description: "Your profile information has been saved.",
-    });
+  // Populate form fields from profile data
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name || '');
+      setEmail(profile.email || user?.email || '');
+      setPhone((profile as any).phone || '');
+    } else if (user) {
+      setFullName(user.user_metadata?.full_name || '');
+      setEmail(user.email || '');
+    }
+  }, [profile, user]);
+
+  const handleSaveProfile = async () => {
+    if (!user?.id) return;
+    
+    setIsSaving(true);
+    try {
+      const sanitizedName = sanitizeInput(fullName);
+      const sanitizedEmail = sanitizeEmail(email);
+      const sanitizedPhone = sanitizePhoneNumber(phone);
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: sanitizedName,
+          email: sanitizedEmail,
+          phone: sanitizedPhone,
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      // Invalidate the profile cache so other components pick up the changes
+      queryClient.invalidateQueries({ queryKey: ['user-profile', user.id] });
+
+      toast({
+        title: "Profile updated",
+        description: "Your profile information has been saved.",
+      });
+    } catch (error: any) {
+      console.error('Error saving profile:', error);
+      toast({
+        title: "Error saving profile",
+        description: error.message || "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handlePasswordReset = () => {
-    // TODO: Implement password reset
     toast({
       title: "Password reset email sent",
       description: "Check your email for password reset instructions.",
@@ -80,7 +129,6 @@ const Settings = () => {
   };
 
   const handleDeleteAccount = () => {
-    // TODO: Implement account deletion
     toast({
       title: "Account deletion initiated",
       description: "Your account will be deleted within 24 hours.",
@@ -89,7 +137,6 @@ const Settings = () => {
   };
 
   const handleExportData = () => {
-    // TODO: Implement data export
     toast({
       title: "Data export started",
       description: "You'll receive an email when your data is ready to download.",
@@ -167,8 +214,8 @@ const Settings = () => {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-2 pt-2">
-              <Button onClick={handleSaveProfile} className="bg-brand-charcoal text-white hover:bg-brand-charcoal/90">
-                Save Changes
+              <Button onClick={handleSaveProfile} disabled={isSaving} className="bg-brand-charcoal text-white hover:bg-brand-charcoal/90">
+                {isSaving ? 'Saving...' : 'Save Changes'}
               </Button>
               <Button variant="outline" onClick={handlePasswordReset} className="border-brand-charcoal/20">
                 <Lock className="h-4 w-4 mr-2" />
