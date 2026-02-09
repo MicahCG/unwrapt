@@ -28,9 +28,6 @@ import {
   User,
   Bell,
   Zap,
-  Shield,
-  Clock,
-  Download,
   Trash2,
   Phone,
   Mail,
@@ -186,12 +183,6 @@ const Settings = () => {
     }
   };
 
-  const handleExportData = () => {
-    toast({
-      title: "Data export started",
-      description: "You'll receive an email when your data is ready to download.",
-    });
-  };
 
   return (
     <div className="min-h-screen bg-brand-cream">
@@ -346,29 +337,6 @@ const Settings = () => {
           </CardContent>
         </Card>
 
-
-        {/* Privacy Section */}
-        <Card className="border-brand-charcoal/10">
-          <CardHeader>
-            <CardTitle className="flex items-center text-brand-charcoal">
-              <Shield className="h-5 w-5 mr-2" />
-              Privacy
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-3">
-              <Button
-                variant="outline"
-                onClick={handleExportData}
-                className="w-full justify-start border-brand-charcoal/20"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export My Data
-              </Button>
-              <p className="text-sm text-brand-charcoal/60">Download a copy of all your data</p>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Bottom spacing for mobile */}
         <div className="pb-8"></div>
