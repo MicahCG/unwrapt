@@ -6,6 +6,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { normalizeRecipientName } from '@/lib/dateUtils';
 
 const CalendarSyncButton = () => {
   const { user } = useAuth();
@@ -143,8 +144,10 @@ const CalendarSyncButton = () => {
       console.log('📊 Existing recipients:', existingRecipients);
       
       const newPeople = calendarPeople.filter(person => {
+        const normalizedPersonName = normalizeRecipientName(person.name);
         const isDuplicate = existingRecipients?.some(existing => {
-          const nameMatch = existing.name.toLowerCase().trim() === person.name.toLowerCase().trim();
+          const normalizedExistingName = normalizeRecipientName(existing.name);
+          const nameMatch = normalizedExistingName === normalizedPersonName;
           // Normalize dates for comparison
           const personBday = normalizeDate(person.birthday);
           const existingBday = normalizeDate(existing.birthday);
@@ -154,9 +157,13 @@ const CalendarSyncButton = () => {
           const birthdayMatch = personBday && existingBday && personBday === existingBday;
           const anniversaryMatch = personAnniv && existingAnniv && personAnniv === existingAnniv;
           
-          console.log(`🔍 Comparing: "${person.name}" vs "${existing.name}" | name: ${nameMatch} | bday: ${personBday} vs ${existingBday} = ${birthdayMatch} | anniv: ${anniversaryMatch}`);
+          // Also match by name alone if names are identical after normalization
+          // This prevents "Stella" and "Stella's" from creating duplicates
+          const nameOnlyMatch = nameMatch;
           
-          return nameMatch && (birthdayMatch || anniversaryMatch);
+          console.log(`🔍 Comparing: "${person.name}" vs "${existing.name}" | normalized: "${normalizedPersonName}" vs "${normalizedExistingName}" | name: ${nameMatch} | bday: ${personBday} vs ${existingBday} = ${birthdayMatch}`);
+          
+          return nameOnlyMatch || (nameMatch && (birthdayMatch || anniversaryMatch));
         });
         console.log(`  → ${person.name}: isDuplicate=${isDuplicate}`);
         return !isDuplicate;
