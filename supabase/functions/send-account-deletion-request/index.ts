@@ -33,7 +33,7 @@ const handler = async (req: Request): Promise<Response> => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "Unwrapt <support@unwrapt.com>",
+        from: "Unwrapt <onboarding@resend.dev>",
         to: ["team@unwrapt.io"],
         subject: `Account Deletion Request - ${userEmail}`,
         html: `
