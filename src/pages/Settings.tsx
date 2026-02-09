@@ -62,6 +62,7 @@ const Settings = () => {
   const [emailReminders, setEmailReminders] = useState(true);
   const [marketingEmails, setMarketingEmails] = useState(true);
   const [savingsAlerts, setSavingsAlerts] = useState(true);
+  const [isSavingNotifications, setIsSavingNotifications] = useState(false);
   
   // Enhanced automation settings
   const [autoSendGifts, setAutoSendGifts] = useState(false);
@@ -76,6 +77,9 @@ const Settings = () => {
       setFullName(profile.full_name || '');
       setEmail(profile.email || user?.email || '');
       setPhone((profile as Record<string, any>).phone || '');
+      setEmailReminders((profile as Record<string, any>).email_reminders ?? true);
+      setMarketingEmails((profile as Record<string, any>).marketing_emails ?? true);
+      setSavingsAlerts((profile as Record<string, any>).savings_alerts ?? true);
     } else if (user) {
       setFullName(user.user_metadata?.full_name || '');
       setEmail(user.email || '');
@@ -118,6 +122,35 @@ const Settings = () => {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveNotificationPreference = async (key: string, value: boolean) => {
+    if (!user?.id) return;
+    setIsSavingNotifications(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ [key]: value } as any)
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['user-profile', user.id] });
+
+      toast({
+        title: "Preference updated",
+        description: "Your notification preference has been saved.",
+      });
+    } catch (error: any) {
+      console.error('Error saving notification preference:', error);
+      toast({
+        title: "Error saving preference",
+        description: error.message || "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingNotifications(false);
     }
   };
 
@@ -285,7 +318,7 @@ const Settings = () => {
                     <p className="text-sm text-brand-charcoal/60">Get notified about upcoming occasions</p>
                   </div>
                 </div>
-                <Switch checked={emailReminders} onCheckedChange={setEmailReminders} />
+                <Switch checked={emailReminders} disabled={isSavingNotifications} onCheckedChange={(val) => { setEmailReminders(val); handleSaveNotificationPreference('email_reminders', val); }} />
               </div>
 
               <div className="flex items-center justify-between">
@@ -296,7 +329,7 @@ const Settings = () => {
                     <p className="text-sm text-brand-charcoal/60">Tips and gift recommendations</p>
                   </div>
                 </div>
-                <Switch checked={marketingEmails} onCheckedChange={setMarketingEmails} />
+                <Switch checked={marketingEmails} disabled={isSavingNotifications} onCheckedChange={(val) => { setMarketingEmails(val); handleSaveNotificationPreference('marketing_emails', val); }} />
               </div>
 
               <div className="flex items-center justify-between">
@@ -307,7 +340,7 @@ const Settings = () => {
                     <p className="text-sm text-brand-charcoal/60">Get notified when we find deals under your budget</p>
                   </div>
                 </div>
-                <Switch checked={savingsAlerts} onCheckedChange={setSavingsAlerts} />
+                <Switch checked={savingsAlerts} disabled={isSavingNotifications} onCheckedChange={(val) => { setSavingsAlerts(val); handleSaveNotificationPreference('savings_alerts', val); }} />
               </div>
             </div>
           </CardContent>

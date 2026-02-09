@@ -252,10 +252,13 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           email: string | null
+          email_reminders: boolean
           full_name: string | null
           gift_wallet_balance: number | null
           id: string
+          marketing_emails: boolean
           phone: string | null
+          savings_alerts: boolean
           stripe_payment_method_id: string | null
           subscription_status: string | null
           subscription_tier: string | null
@@ -272,10 +275,13 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           email?: string | null
+          email_reminders?: boolean
           full_name?: string | null
           gift_wallet_balance?: number | null
           id: string
+          marketing_emails?: boolean
           phone?: string | null
+          savings_alerts?: boolean
           stripe_payment_method_id?: string | null
           subscription_status?: string | null
           subscription_tier?: string | null
@@ -292,10 +298,13 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           email?: string | null
+          email_reminders?: boolean
           full_name?: string | null
           gift_wallet_balance?: number | null
           id?: string
+          marketing_emails?: boolean
           phone?: string | null
+          savings_alerts?: boolean
           stripe_payment_method_id?: string | null
           subscription_status?: string | null
           subscription_tier?: string | null
