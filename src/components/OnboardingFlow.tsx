@@ -12,6 +12,7 @@ import GiftScheduleStep from '@/components/onboarding/GiftScheduleStep';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
+import { normalizeRecipientName } from '@/lib/dateUtils';
 
 interface OnboardingFlowProps {
   onBack: () => void;
@@ -119,13 +120,13 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
 
     // Filter out people who are already recipients
     const newPeople = calendarPeople.filter(person => {
+      const normalizedPersonName = normalizeRecipientName(person.name);
       const isDuplicate = existingRecipients?.some(existing => {
-        const nameMatch = existing.name.toLowerCase().trim() === person.name.toLowerCase().trim();
-        const birthdayMatch = existing.birthday === person.birthday;
-        const anniversaryMatch = existing.anniversary === person.anniversary;
+        const normalizedExistingName = normalizeRecipientName(existing.name);
+        const nameMatch = normalizedExistingName === normalizedPersonName;
         
-        // Consider it a duplicate if name matches and at least one date matches
-        return nameMatch && (birthdayMatch || anniversaryMatch);
+        // Match by normalized name alone to prevent "Stella" / "Stella's" duplicates
+        return nameMatch;
       });
       
       return !isDuplicate;

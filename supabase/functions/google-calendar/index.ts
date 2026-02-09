@@ -6,47 +6,60 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Normalize smart/curly quotes to straight quotes for consistent matching
+function normalizeQuotes(text: string): string {
+  return text.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")
+             .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"');
+}
+
+// Strip possessive suffix from a name ("'s" with both straight and curly quotes)
+function stripPossessive(name: string): string {
+  return name
+    .replace(/[\u2019\u2018\u201B\u2032\u2035']s\s*$/i, '') // Remove 's at end
+    .trim();
+}
+
 // Helper function to extract person names
 function extractPersonFromEvent(eventSummary: string) {
-  const summary = eventSummary.toLowerCase();
+  // Normalize curly/smart quotes to straight quotes before any matching
+  const normalizedSummary = normalizeQuotes(eventSummary);
+  const summary = normalizedSummary.toLowerCase();
   let personName = '';
   
   // Pattern: "Name's Birthday" or "Name's Bday"
   if (summary.includes("'s birthday") || summary.includes("'s bday")) {
     const splitChar = summary.includes("'s birthday") ? "'s birthday" : "'s bday";
-    personName = eventSummary.split(new RegExp(splitChar, 'i'))[0].trim();
+    personName = normalizedSummary.split(new RegExp(splitChar, 'i'))[0].trim();
   } 
   // Pattern: "Name's Anniversary"
   else if (summary.includes("'s anniversary")) {
-    personName = eventSummary.split(/'s/i)[0].trim();
+    personName = normalizedSummary.split(/'s/i)[0].trim();
   } 
   // Pattern: "Name Birthday" or "Name Bday" (no apostrophe)
   else if (summary.includes(" birthday") || summary.includes(" bday")) {
-    // Extract everything before "birthday" or "bday"
-    personName = eventSummary.replace(/\s*(birthday|bday)\s*/i, '').trim();
+    personName = normalizedSummary.replace(/\s*(birthday|bday)\s*/i, '').trim();
   } 
   // Pattern: "Name Anniversary"
   else if (summary.includes(" anniversary")) {
-    personName = eventSummary.replace(/\s*anniversary\s*/i, '').trim();
+    personName = normalizedSummary.replace(/\s*anniversary\s*/i, '').trim();
   } 
   // Pattern: "Birthday - Name" or "Bday - Name"
   else if (summary.includes("birthday -") || summary.includes("bday -")) {
-    const parts = eventSummary.split(/-/);
+    const parts = normalizedSummary.split(/-/);
     if (parts.length > 1) {
       personName = parts[1].trim();
     }
   } 
   // Pattern: "Anniversary - Name"
   else if (summary.includes("anniversary -")) {
-    const parts = eventSummary.split(/-/);
+    const parts = normalizedSummary.split(/-/);
     if (parts.length > 1) {
       personName = parts[1].trim();
     }
   }
   // Pattern: Just "Birthday" with a name-like word
   else {
-    // Fallback: try to extract any name-like pattern
-    const words = eventSummary.split(' ');
+    const words = normalizedSummary.split(' ');
     personName = words.find(word => 
       word.length > 2 && 
       word[0] === word[0].toUpperCase() &&
@@ -54,10 +67,8 @@ function extractPersonFromEvent(eventSummary: string) {
     ) || '';
   }
   
-  // Remove any remaining "'s" suffix from the extracted name
-  if (personName.endsWith("'s")) {
-    personName = personName.slice(0, -2);
-  }
+  // Always strip possessive suffix (handles both straight and curly quotes)
+  personName = stripPossessive(personName);
   
   console.log(`📛 Extracted person name from "${eventSummary}": "${personName}"`);
   return personName;

@@ -1,7 +1,25 @@
 /**
- * Date utilities for handling birthdays and anniversaries
+ * Date and name utilities for handling birthdays, anniversaries, and recipient deduplication
  * Ensures dates are always in user's local timezone
  */
+
+/**
+ * Normalize a recipient name for deduplication comparison.
+ * Strips possessive suffixes ("'s" with both straight and curly quotes),
+ * normalizes whitespace, and lowercases.
+ */
+export function normalizeRecipientName(name: string): string {
+  return name
+    // Normalize curly/smart quotes to straight quotes
+    .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
+    // Strip trailing possessive "'s"
+    .replace(/'s\s*$/i, '')
+    // Normalize whitespace
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
 
 /**
  * Parse a date string (YYYY-MM-DD) in local timezone
