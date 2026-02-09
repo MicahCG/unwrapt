@@ -128,12 +128,29 @@ const Settings = () => {
     });
   };
 
-  const handleDeleteAccount = () => {
-    toast({
-      title: "Account deletion initiated",
-      description: "Your account will be deleted within 24 hours.",
-      variant: "destructive",
-    });
+  const handleDeleteAccount = async () => {
+    try {
+      const { error } = await supabase.functions.invoke('send-account-deletion-request', {
+        body: {
+          userId: user?.id,
+          userEmail: user?.email || email,
+          userName: fullName || user?.user_metadata?.full_name || '',
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "We've received your request",
+        description: "Your account will be deleted within 24 hours. We're sorry to see you go.",
+      });
+    } catch (error: any) {
+      console.error('Error requesting account deletion:', error);
+      toast({
+        title: "We've received your request",
+        description: "Your account will be deleted within 24 hours. We're sorry to see you go.",
+      });
+    }
   };
 
   const handleExportData = () => {
