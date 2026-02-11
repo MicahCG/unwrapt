@@ -204,7 +204,7 @@ async function handleOrderCancelled(supabase: any, order: any) {
   // Find scheduled gift linked to this Shopify order
   const { data: gifts, error } = await supabase
     .from('scheduled_gifts')
-    .select('id, user_id, status')
+    .select('id, user_id, status, payment_amount, estimated_cost, occasion, recipient_id, wallet_reserved, wallet_reservation_amount')
     .eq('shopify_order_id', orderId);
 
   if (error || !gifts?.length) {
@@ -213,19 +213,96 @@ async function handleOrderCancelled(supabase: any, order: any) {
   }
 
   for (const gift of gifts) {
-    console.log(`🔄 Reverting gift ${gift.id} from "${gift.status}" to "cancelled"`);
+    const refundAmount = gift.payment_amount || gift.estimated_cost || gift.wallet_reservation_amount || 0;
+
+    // Refund wallet balance if there was a charge
+    if (refundAmount > 0) {
+      console.log(`💰 Refunding $${refundAmount} to user ${gift.user_id}`);
+
+      // Get current balance
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('gift_wallet_balance, email, full_name')
+        .eq('id', gift.user_id)
+        .single();
+
+      if (profile) {
+        const newBalance = (profile.gift_wallet_balance || 0) + refundAmount;
+
+        // Update wallet balance
+        await supabase
+          .from('profiles')
+          .update({ gift_wallet_balance: newBalance, updated_at: new Date().toISOString() })
+          .eq('id', gift.user_id);
+
+        // Create refund transaction record
+        await supabase
+          .from('wallet_transactions')
+          .insert({
+            user_id: gift.user_id,
+            amount: refundAmount,
+            balance_after: newBalance,
+            transaction_type: 'refund',
+            status: 'completed',
+            scheduled_gift_id: gift.id,
+          });
+
+        console.log(`✅ Wallet refunded. New balance: $${newBalance}`);
+      }
+    }
+
+    // Get recipient name for the email
+    const { data: recipient } = await supabase
+      .from('recipients')
+      .select('name')
+      .eq('id', gift.recipient_id)
+      .single();
+
+    // Get user profile for email
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('email, full_name')
+      .eq('id', gift.user_id)
+      .single();
+
+    // Delete the scheduled gift so the UI resets to allow scheduling a new gift
+    console.log(`🗑️ Deleting scheduled gift ${gift.id} to reset recipient UI`);
     await supabase
       .from('scheduled_gifts')
-      .update({
-        status: 'cancelled',
-        shopify_order_id: null,
-        shopify_tracking_number: null,
-        updated_at: new Date().toISOString(),
-      })
+      .delete()
       .eq('id', gift.id);
+
+    // Send cancellation email to the user
+    if (userProfile?.email) {
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+        const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+        await fetch(`${supabaseUrl}/functions/v1/send-notification-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseKey}`,
+          },
+          body: JSON.stringify({
+            type: 'order_cancelled',
+            recipientEmail: userProfile.email,
+            userName: userProfile.full_name,
+            data: {
+              recipientName: recipient?.name || 'your recipient',
+              occasion: gift.occasion,
+              amount: refundAmount,
+            },
+          }),
+        });
+        console.log(`📧 Cancellation email sent to ${userProfile.email}`);
+      } catch (emailError) {
+        console.error('⚠️ Failed to send cancellation email:', emailError);
+      }
+    }
   }
 
-  console.log(`✅ Updated ${gifts.length} gift(s) as cancelled`);
+  console.log(`✅ Processed ${gifts.length} cancelled gift(s) - deleted and refunded`);
 }
 
 async function handleOrderFulfilled(supabase: any, order: any) {

@@ -25,7 +25,8 @@ type EmailType =
   | 'automation_paused'
   | 'trial_ending'
   | 'trial_ended'
-  | 'subscription_cancelled';
+  | 'subscription_cancelled'
+  | 'order_cancelled';
 
 interface EmailRequest {
   type: EmailType;
@@ -161,6 +162,8 @@ function getEmailSubject(type: EmailType, data: any): string {
       return `Your VIP trial has ended - Upgrade to continue`;
     case 'subscription_cancelled':
       return `Your VIP subscription has been cancelled`;
+    case 'order_cancelled':
+      return `❌ Gift order for ${data?.recipientName} has been cancelled`;
     default:
       return 'Notification from Unwrapt';
   }
@@ -640,6 +643,33 @@ function getEmailContent(type: EmailType, userName: string | undefined, data: an
             <p>Changed your mind? You can resubscribe anytime to restore your VIP access.</p>
             <div class="cta">
               <a href="${appUrl}/settings" class="button">Manage Subscription</a>
+            </div>
+          </div>
+          ${getFooter()}
+        </div>
+      `;
+
+    case 'order_cancelled':
+      return `
+        ${baseStyles}
+        <div class="container">
+          <div class="header-warning">
+            <h2>❌ Gift Order Cancelled</h2>
+            <p>${greeting}</p>
+          </div>
+          <div class="content">
+            <p>We're sorry to let you know that the gift order for <strong>${data?.recipientName}</strong> has been cancelled by the supplier.</p>
+            <div class="info-box">
+              <h3>What Happened</h3>
+              <p>The order placed for <strong>${data?.recipientName}'s ${data?.occasion || 'gift'}</strong> was cancelled during fulfillment. This can happen due to stock issues or supplier availability.</p>
+              <p><strong>Your payment of $${data?.amount?.toFixed(2) || '0.00'} has been refunded to your wallet.</strong></p>
+            </div>
+            <div class="info-box success">
+              <h3>What You Can Do</h3>
+              <p>You can schedule a new gift for ${data?.recipientName} right from your dashboard. We'll help you find the perfect alternative!</p>
+            </div>
+            <div class="cta">
+              <a href="${appUrl}" class="button primary">Schedule a New Gift</a>
             </div>
           </div>
           ${getFooter()}
