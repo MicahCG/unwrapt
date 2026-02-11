@@ -662,7 +662,7 @@ function getEmailContent(type: EmailType, userName: string | undefined, data: an
             <div class="info-box">
               <h3>What Happened</h3>
               <p>The order placed for <strong>${data?.recipientName}'s ${data?.occasion || 'gift'}</strong> was cancelled during fulfillment. This can happen due to stock issues or supplier availability.</p>
-              <p><strong>Your payment of $${data?.amount?.toFixed(2) || '0.00'} has been refunded to your wallet.</strong></p>
+              <p><strong>${data?.recipientName} will not be receiving a gift for this occasion.</strong></p>
             </div>
             <div class="info-box success">
               <h3>What You Can Do</h3>
