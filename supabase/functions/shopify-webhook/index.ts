@@ -98,6 +98,13 @@ serve(async (req) => {
     console.log('✅ Webhook signature verified');
     const payload = JSON.parse(body);
 
+    // Initialize Supabase client for order-related webhooks
+    const supabaseService = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
+    );
+
     // Handle different webhook types
     switch (topic) {
       case 'products/create':
@@ -112,6 +119,14 @@ serve(async (req) => {
       
       case 'collections/update':
         await handleCollectionChange(payload);
+        break;
+
+      case 'orders/cancelled':
+        await handleOrderCancelled(supabaseService, payload);
+        break;
+
+      case 'orders/fulfilled':
+        await handleOrderFulfilled(supabaseService, payload);
         break;
       
       default:
@@ -178,4 +193,72 @@ async function handleCollectionChange(collection: any) {
   
   // Invalidate specific collection cache
   await invalidateCache(`shopify-collection:${collection.handle}`);
+}
+
+async function handleOrderCancelled(supabase: any, order: any) {
+  const orderId = order.id?.toString();
+  console.log(`❌ Order cancelled: ${order.name} (ID: ${orderId})`);
+
+  if (!orderId) return;
+
+  // Find scheduled gift linked to this Shopify order
+  const { data: gifts, error } = await supabase
+    .from('scheduled_gifts')
+    .select('id, user_id, status')
+    .eq('shopify_order_id', orderId);
+
+  if (error || !gifts?.length) {
+    console.log(`ℹ️ No matching scheduled gift found for order ${orderId}`);
+    return;
+  }
+
+  for (const gift of gifts) {
+    console.log(`🔄 Reverting gift ${gift.id} from "${gift.status}" to "cancelled"`);
+    await supabase
+      .from('scheduled_gifts')
+      .update({
+        status: 'cancelled',
+        shopify_order_id: null,
+        shopify_tracking_number: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', gift.id);
+  }
+
+  console.log(`✅ Updated ${gifts.length} gift(s) as cancelled`);
+}
+
+async function handleOrderFulfilled(supabase: any, order: any) {
+  const orderId = order.id?.toString();
+  console.log(`📬 Order fulfilled: ${order.name} (ID: ${orderId})`);
+
+  if (!orderId) return;
+
+  // Extract tracking number if available
+  const trackingNumber = order.fulfillments?.[0]?.tracking_number || null;
+
+  const { data: gifts, error } = await supabase
+    .from('scheduled_gifts')
+    .select('id')
+    .eq('shopify_order_id', orderId);
+
+  if (error || !gifts?.length) {
+    console.log(`ℹ️ No matching scheduled gift found for order ${orderId}`);
+    return;
+  }
+
+  for (const gift of gifts) {
+    console.log(`📦 Marking gift ${gift.id} as delivered`);
+    await supabase
+      .from('scheduled_gifts')
+      .update({
+        status: 'delivered',
+        fulfilled_at: new Date().toISOString(),
+        shopify_tracking_number: trackingNumber,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', gift.id);
+  }
+
+  console.log(`✅ Updated ${gifts.length} gift(s) as delivered`);
 }
