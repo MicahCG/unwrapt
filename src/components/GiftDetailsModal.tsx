@@ -19,6 +19,8 @@ interface GiftDetailsModalProps {
 const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClose, onDelete }) => {
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -26,6 +28,8 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClo
   const isPaidButNotOrdered = gift?.payment_status === 'paid' && 
     gift?.status !== 'ordered' && 
     !gift?.shopify_order_id;
+
+  const canCancel = gift?.status !== 'cancelled' && gift?.status !== 'delivered';
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -48,11 +52,15 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClo
     switch (status?.toLowerCase()) {
       case 'scheduled': return 'bg-slate-100 text-slate-800';
       case 'delivered': return 'status-success';
+      case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-slate-100 text-slate-800';
     }
   };
 
   const getStatusLabel = (status: string, paymentStatus?: string, shopifyOrderId?: string) => {
+    if (status?.toLowerCase() === 'cancelled') {
+      return 'Cancelled';
+    }
     if (status?.toLowerCase() === 'delivered') {
       return 'Delivered';
     }
@@ -107,6 +115,38 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClo
       });
     } finally {
       setIsPlacingOrder(false);
+    }
+  };
+
+  const handleCancelGift = async () => {
+    if (!user || !gift?.id) return;
+    setIsCancelling(true);
+    try {
+      const { error } = await supabase
+        .from('scheduled_gifts')
+        .update({
+          status: 'cancelled',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', gift.id)
+        .eq('user_id', user.id);
+      if (error) throw error;
+      toast({
+        title: "Gift Cancelled",
+        description: "This gift has been cancelled. If you placed an order in CJ, please cancel it separately by emailing team@unwrapt.io.",
+      });
+      setShowCancelConfirm(false);
+      onClose();
+      window.location.reload();
+    } catch (error) {
+      console.error('Error cancelling gift:', error);
+      toast({
+        title: "Failed to Cancel",
+        description: "Please try again or contact team@unwrapt.io.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -305,25 +345,59 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClo
               )}
             </div>
 
-            {/* Support Section */}
+            {/* Cancel & Support Section */}
             <div className="pt-4 border-t space-y-4">
-              <div>
-                <h4 className="text-lg font-medium text-brand-charcoal mb-2">
-                  Questions/Issues about this order?
-                </h4>
-                <p className="text-sm text-brand-charcoal/70 mb-4">
-                  Contact our support team for any questions or concerns about your gift order.
-                </p>
-                <div className="flex justify-between items-center">
-                  <Button
-                    variant="outline"
-                    onClick={handleContactSupport}
-                    disabled={isSendingEmail}
-                    className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream"
-                  >
-                    <Mail className="h-4 w-4 mr-2" />
-                    {isSendingEmail ? 'Sending...' : 'Contact Support'}
-                  </Button>
+              {canCancel && !showCancelConfirm && (
+                <div>
+                  <p className="text-sm text-brand-charcoal/70 mb-3">
+                    Need to cancel? Please email <strong>team@unwrapt.io</strong> and also cancel your order below.
+                  </p>
+                  <div className="flex justify-between items-center">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setShowCancelConfirm(true)}
+                    >
+                      Cancel Gift
+                    </Button>
+                    <Button
+                      onClick={onClose}
+                      className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
+                    >
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {showCancelConfirm && (
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4">
+                  <p className="text-sm font-medium text-destructive mb-1">Are you sure?</p>
+                  <p className="text-xs text-brand-charcoal/70 mb-3">
+                    This will mark the gift as cancelled in Unwrapt. If you've already placed an order in CJ, make sure to cancel it there too by emailing <strong>team@unwrapt.io</strong>.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleCancelGift}
+                      disabled={isCancelling}
+                    >
+                      {isCancelling ? 'Cancelling...' : 'Yes, Cancel Gift'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowCancelConfirm(false)}
+                    >
+                      No, Keep It
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {!canCancel && (
+                <div className="flex justify-end">
                   <Button
                     onClick={onClose}
                     className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
@@ -331,7 +405,7 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClo
                     Close
                   </Button>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </DialogContent>
