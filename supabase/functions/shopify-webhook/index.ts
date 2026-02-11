@@ -204,7 +204,7 @@ async function handleOrderCancelled(supabase: any, order: any) {
   // Find scheduled gift linked to this Shopify order
   const { data: gifts, error } = await supabase
     .from('scheduled_gifts')
-    .select('id, user_id, status, payment_amount, estimated_cost, occasion, recipient_id, wallet_reserved, wallet_reservation_amount')
+    .select('id, user_id, status, payment_amount, estimated_cost, occasion, recipient_id')
     .eq('shopify_order_id', orderId);
 
   if (error || !gifts?.length) {
@@ -213,43 +213,7 @@ async function handleOrderCancelled(supabase: any, order: any) {
   }
 
   for (const gift of gifts) {
-    const refundAmount = gift.payment_amount || gift.estimated_cost || gift.wallet_reservation_amount || 0;
-
-    // Refund wallet balance if there was a charge
-    if (refundAmount > 0) {
-      console.log(`💰 Refunding $${refundAmount} to user ${gift.user_id}`);
-
-      // Get current balance
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('gift_wallet_balance, email, full_name')
-        .eq('id', gift.user_id)
-        .single();
-
-      if (profile) {
-        const newBalance = (profile.gift_wallet_balance || 0) + refundAmount;
-
-        // Update wallet balance
-        await supabase
-          .from('profiles')
-          .update({ gift_wallet_balance: newBalance, updated_at: new Date().toISOString() })
-          .eq('id', gift.user_id);
-
-        // Create refund transaction record
-        await supabase
-          .from('wallet_transactions')
-          .insert({
-            user_id: gift.user_id,
-            amount: refundAmount,
-            balance_after: newBalance,
-            transaction_type: 'refund',
-            status: 'completed',
-            scheduled_gift_id: gift.id,
-          });
-
-        console.log(`✅ Wallet refunded. New balance: $${newBalance}`);
-      }
-    }
+    const chargedAmount = gift.payment_amount || gift.estimated_cost || 0;
 
     // Get recipient name for the email
     const { data: recipient } = await supabase
@@ -291,7 +255,7 @@ async function handleOrderCancelled(supabase: any, order: any) {
             data: {
               recipientName: recipient?.name || 'your recipient',
               occasion: gift.occasion,
-              amount: refundAmount,
+              amount: chargedAmount,
             },
           }),
         });
@@ -302,7 +266,7 @@ async function handleOrderCancelled(supabase: any, order: any) {
     }
   }
 
-  console.log(`✅ Processed ${gifts.length} cancelled gift(s) - deleted and refunded`);
+  console.log(`✅ Processed ${gifts.length} cancelled gift(s) - deleted and notified`);
 }
 
 async function handleOrderFulfilled(supabase: any, order: any) {
