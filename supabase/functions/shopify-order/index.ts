@@ -344,6 +344,7 @@ serve(async (req) => {
     if (!testMode) {
       const updateData = {
         status: 'ordered',
+        shopify_order_id: orderResult.id?.toString() || null,
         updated_at: new Date().toISOString(),
         gift_description: `Order: ${orderResult.name} | Product: ${productName} | ${matchReason}`.substring(0, 500)
       };
