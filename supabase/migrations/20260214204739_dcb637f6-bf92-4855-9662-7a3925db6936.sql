@@ -1,0 +1,1 @@
+DELETE FROM public.scheduled_gifts WHERE recipient_id = '6f49fa7c-fe82-42f6-ac73-9c5c4f57b162';
