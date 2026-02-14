@@ -1,0 +1,1 @@
+DELETE FROM public.scheduled_gifts WHERE id = '24dc899a-af7f-4a39-bb72-33bcfe755b14';
