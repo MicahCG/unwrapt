@@ -1,0 +1,1 @@
+ALTER TABLE public.wallet_transactions FORCE ROW LEVEL SECURITY;
