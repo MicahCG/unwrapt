@@ -4,10 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Heart, MapPin, CalendarIcon, UserPlus, Sparkles } from 'lucide-react';
-import { format } from 'date-fns';
+import { Heart, MapPin, UserPlus, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { type GiftVibe, type Product, getAllProducts } from '@/lib/giftVibes';
@@ -31,7 +28,8 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
   const [recipientData, setRecipientData] = useState({
     fullName: '',
     relationship: '',
-    birthday: undefined as Date | undefined,
+    birthdayMonth: '',
+    birthdayDay: '',
     street: '',
     city: '',
     state: '',
@@ -63,10 +61,12 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
       const updatedData = {
         ...recipientData,
         fullName: selectedPersonForGift.personName || '',
-        birthday: selectedPersonForGift.type === 'birthday' && selectedPersonForGift.date
-          ? new Date(selectedPersonForGift.date)
-          : undefined
       };
+      if (selectedPersonForGift.type === 'birthday' && selectedPersonForGift.date) {
+        const d = new Date(selectedPersonForGift.date);
+        updatedData.birthdayMonth = String(d.getMonth() + 1);
+        updatedData.birthdayDay = String(d.getDate());
+      }
       setRecipientData(updatedData);
     }
   }, [selectedPersonForGift]);
@@ -117,7 +117,9 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
       firstRecipient: {
         fullName: recipientData.fullName,
         relationship: recipientData.relationship,
-        birthday: recipientData.birthday ? format(recipientData.birthday, 'yyyy-MM-dd') : null,
+        birthday: recipientData.birthdayMonth && recipientData.birthdayDay
+          ? `2000-${recipientData.birthdayMonth.padStart(2, '0')}-${recipientData.birthdayDay.padStart(2, '0')}`
+          : null,
         street: recipientData.street,
         city: recipientData.city,
         state: recipientData.state,
@@ -198,31 +200,30 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
             </Select>
           </div>
 
-          <div className="space-y-2">
+           <div className="space-y-2">
             <Label>Birthday</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !recipientData.birthday && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {recipientData.birthday ? format(recipientData.birthday, "MMMM d, yyyy") : "Select birthday"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={recipientData.birthday}
-                  onSelect={(date) => handleInputChange('birthday', date)}
-                  initialFocus
-                  defaultMonth={recipientData.birthday || new Date(1990, 0)}
-                />
-              </PopoverContent>
-            </Popover>
+            <div className="grid grid-cols-2 gap-3">
+              <Select value={recipientData.birthdayMonth} onValueChange={(value) => handleInputChange('birthdayMonth', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Month" />
+                </SelectTrigger>
+                <SelectContent>
+                  {['January','February','March','April','May','June','July','August','September','October','November','December'].map((m, i) => (
+                    <SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={recipientData.birthdayDay} onValueChange={(value) => handleInputChange('birthdayDay', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Day" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 31 }, (_, i) => (
+                    <SelectItem key={i + 1} value={String(i + 1)}>{i + 1}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
