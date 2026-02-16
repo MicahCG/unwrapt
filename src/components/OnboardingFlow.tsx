@@ -311,6 +311,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onBack }) => {
               email: null,
               phone: null,
               street: updatedData.firstRecipient.street || null,
+              apartment: updatedData.firstRecipient.apartment || null,
               city: updatedData.firstRecipient.city || null,
               state: updatedData.firstRecipient.state || null,
               zip_code: updatedData.firstRecipient.zipCode || null,
