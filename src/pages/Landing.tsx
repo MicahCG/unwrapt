@@ -36,9 +36,9 @@ const Landing = () => {
   };
 
   const stats = [
-    { icon: Heart, value: "9,451", label: "Moments Remembered" },
-    { icon: Clock, value: "500 hrs", label: "Saved" },
-    { icon: Gift, value: "821", label: "Gifts Delivered" },
+    { icon: Heart, value: "2,340+", label: "Occasions Tracked" },
+    { icon: Clock, value: "120 hrs", label: "Shopping Time Saved" },
+    { icon: Gift, value: "680+", label: "Gifts Delivered" },
   ];
 
   return (
@@ -143,24 +143,25 @@ const Landing = () => {
             </button>
 
             {/* Stat Cards */}
-            <div className="grid grid-cols-3 gap-3 sm:gap-6 w-full max-w-md">
+            <div className="grid grid-cols-3 gap-4 sm:gap-5 w-full max-w-lg">
               {stats.map((stat, i) => (
                 <motion.div
                   key={stat.label}
-                  className="flex flex-col items-center p-4 sm:p-5 rounded-2xl"
+                  className="flex flex-col items-center py-6 px-3 rounded-2xl backdrop-blur-sm"
                   style={{
-                    backgroundColor: "rgba(255,255,255,0.45)",
-                    border: "1px solid rgba(255,255,255,0.6)",
+                    backgroundColor: "rgba(248, 241, 230, 0.7)",
+                    boxShadow: "0 2px 16px rgba(139, 115, 85, 0.08), inset 0 1px 0 rgba(255,255,255,0.5)",
+                    border: "1px solid rgba(228, 220, 210, 0.6)",
                   }}
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 2.6 + i * 0.1, ease: "easeOut" }}
+                  transition={{ duration: 0.5, delay: 2.6 + i * 0.12, ease: "easeOut" }}
                 >
-                  <stat.icon className="w-5 h-5 mb-2" style={{ color: "#B59A77" }} />
-                  <span className="text-xl sm:text-2xl font-serif font-semibold" style={{ color: "#3D3428" }}>
+                  <stat.icon className="w-5 h-5 mb-3" style={{ color: "#B59A77" }} strokeWidth={1.5} />
+                  <span className="text-2xl sm:text-3xl font-serif font-semibold tracking-tight" style={{ color: "#3D3428" }}>
                     {stat.value}
                   </span>
-                  <span className="text-[10px] sm:text-xs text-center mt-0.5" style={{ color: "#8B7355" }}>
+                  <span className="text-[11px] sm:text-xs text-center mt-1 tracking-wide" style={{ color: "#8B7355" }}>
                     {stat.label}
                   </span>
                 </motion.div>
