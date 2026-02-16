@@ -125,8 +125,8 @@ const Landing = () => {
               style={{ color: "#6B5D4D" }}
               itemProp="description"
             >
-              We remember every occasion, find the perfect gift, and deliver it
-              so you become the most thoughtful person you know.
+              Tell us who matters most. We'll handle the perfect gift,
+              every time, delivered right on time.
             </p>
 
             {/* CTA */}
