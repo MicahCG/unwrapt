@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Heart, Clock, Gift } from "lucide-react";
 import { GlassButton } from "@/components/GlassButton";
 import { Logo } from "@/components/ui/logo";
+import ceramicCollection from "@/assets/ceramic-collection.png";
 import GiftBoxOpeningIntro from "@/components/GiftBoxOpeningIntro";
 import GiftingScenesScroll from "@/components/GiftingScenesScroll";
 import AnimatedGiftingJourney from "@/components/AnimatedGiftingJourney";
@@ -78,6 +79,19 @@ const Landing = () => {
         <meta itemProp="name" content="Unwrapt - Automatic Gift Scheduling Service" />
         <meta itemProp="serviceType" content="Automatic gift scheduling and delivery" />
         <meta itemProp="description" content="Premium gift scheduling service with smart reminders, personalized gift ideas, and automatic delivery" />
+
+        {/* Background product image */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
+          <motion.img
+            src={ceramicCollection}
+            alt=""
+            aria-hidden="true"
+            className="w-[700px] md:w-[900px] max-w-none opacity-[0.07] object-cover rounded-full blur-[2px]"
+            initial={{ opacity: 0, scale: 1.1 }}
+            animate={{ opacity: 0.07, scale: 1 }}
+            transition={{ duration: 1.5, delay: 2.4, ease: "easeOut" }}
+          />
+        </div>
 
         <div className="relative z-10 w-full max-w-[880px] mx-auto">
           <motion.div
