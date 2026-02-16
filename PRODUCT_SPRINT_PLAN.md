@@ -81,7 +81,7 @@ Users can see gift options before committing to checkout, with subscription defe
 
 ---
 
-## Sprint 2: Landing Page Polish & Clarity ✅ MOSTLY COMPLETE
+## Sprint 2: Landing Page Polish & Clarity ✅ COMPLETE
 
 ### Key User Problems Identified
 
@@ -120,16 +120,17 @@ Landing page feels complete, polished, and answers all common questions without 
   - ✅ AnimatedGiftingJourney with smooth spring animations
   - ✅ Sticky container with 300vh scroll height for reading time
 
-- [ ] **Add pricing section**
-  - ⏳ Clear pricing tiers needed on landing page
-  - ⏳ What's included in Free vs VIP tier
-  - ⏳ Gift price ranges visible
+  - [x] **Add pricing section**
+    - ✅ Free vs VIP side-by-side comparison on landing page
+    - ✅ Clear feature lists for each tier
+    - ✅ Gift price range note ($25–$75)
 
-- [ ] **Add FAQ section**
-  - ⏳ "Where do you deliver?" (US only)
-  - ⏳ "How do you match gifts to interests?"
-  - ⏳ "What data do you access from my calendar?"
-  - ⏳ "Can I preview gifts before they're sent?"
+  - [x] **Add FAQ section**
+    - ✅ "Where do you deliver?" (US only)
+    - ✅ "How do you match gifts to interests?"
+    - ✅ "What data do you access from my calendar?"
+    - ✅ "Can I preview gifts before they're sent?"
+    - ✅ Default gift handling explanation included
 
 - [x] **Social proof/testimonials**
   - ✅ Hero stats: "9,451 Moments Remembered", "500 hrs Saved", "821 Gifts Delivered"
@@ -255,7 +256,7 @@ Users understand exactly what they get for $4.99/month and feel it's worthwhile.
 | Sprint | Priority | Status | Completion |
 |--------|----------|--------|------------|
 | Sprint 1: Gift Preview Before Checkout | 🔴 Critical | ✅ Complete | 100% |
-| Sprint 2: Landing Page Polish | 🟡 High | 🟡 Mostly Complete | ~75% |
+| Sprint 2: Landing Page Polish | 🟡 High | ✅ Complete | 100% |
 | Sprint 3: Interest Transparency | 🟡 High | 🟡 Partial | ~50% |
 | Sprint 4: Subscription Value | 🟢 Medium | 🟡 Partial | ~40% |
 
