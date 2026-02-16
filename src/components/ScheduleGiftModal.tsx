@@ -662,14 +662,17 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         })()}
 
         {/* Cancellation Disclaimer */}
-        {formData.occasion_date && (
-          <div className="mx-8 mt-2 mb-0 p-3 bg-[#F5F3F0] border border-[#E4DCD2] rounded-lg">
-            <p className="text-xs text-[#1A1A1A]/60">
-              Need to cancel? Contact{' '}
-              <a href="mailto:team@unwrapt.io" className="underline font-medium text-[#1A1A1A]/80 hover:text-[#1A1A1A]">
+        {formData.occasion_date && !(existingGift && (!!existingGift.shopify_order_id || existingGift.status === 'ordered')) && (
+          <div className="mx-8 mt-4 mb-2 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-sm font-medium text-amber-800 mb-1">
+              Need to Cancel?
+            </p>
+            <p className="text-xs text-amber-700">
+              If you'd like to cancel this gift, please contact{' '}
+              <a href="mailto:team@unwrapt.io" className="underline font-medium hover:text-amber-900">
                 team@unwrapt.io
               </a>
-              {' '}before the order is placed and we'll take care of it within 24 hours.
+              {' '}before the order is placed and we'll respond within 24 hours.
             </p>
           </div>
         )}
