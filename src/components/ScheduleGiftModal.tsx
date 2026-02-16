@@ -216,14 +216,14 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
       await supabase.functions.invoke('send-notification-email', {
         body: {
           type: 'gift_scheduled',
-          userEmail: user?.email,
+          recipientEmail: user?.email,
           userName: user?.user_metadata?.full_name || user?.email?.split('@')[0],
-          recipientName: cleanName(recipient.name),
-          giftDetails: {
+          data: {
+            recipientName: cleanName(recipient.name),
             occasion: 'Birthday',
             occasionDate: giftDetails.occasion_date,
             giftType: giftDetails.gift_type,
-            price: giftDetails.price
+            priceRange: giftDetails.price
           }
         }
       });
