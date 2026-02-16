@@ -71,18 +71,22 @@ const Landing = () => {
           showNav ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0"
         }`}
       >
-        <div className="bg-white/25 backdrop-blur-[16px] border-b border-white/60">
+          <div className="bg-white/25 backdrop-blur-[16px] border-b border-white/60">
           <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
             <Logo size="md" />
-            <GlassButton
-              variant="primary"
-              onClick={() => {
-                localStorage.setItem("shouldShowOnboardingIntro", "true");
-                signInWithGoogle();
-              }}
-            >
-              Get Started
-            </GlassButton>
+            <div className="flex items-center gap-6">
+              <a href="#pricing" className="hidden sm:inline text-sm font-medium hover:opacity-70 transition-opacity" style={{ color: "#8B7355" }}>Pricing</a>
+              <a href="#faq" className="hidden sm:inline text-sm font-medium hover:opacity-70 transition-opacity" style={{ color: "#8B7355" }}>FAQ</a>
+              <GlassButton
+                variant="primary"
+                onClick={() => {
+                  localStorage.setItem("shouldShowOnboardingIntro", "true");
+                  signInWithGoogle();
+                }}
+              >
+                Get Started
+              </GlassButton>
+            </div>
           </div>
         </div>
       </nav>
@@ -153,7 +157,7 @@ const Landing = () => {
             </div>
 
             {/* CTA Button */}
-            <div className="flex justify-center pt-6">
+            <div className="flex flex-col items-center pt-6 gap-8">
               <button
                 onClick={() => {
                   localStorage.setItem("shouldShowOnboardingIntro", "true");
@@ -172,8 +176,15 @@ const Landing = () => {
                   e.currentTarget.style.boxShadow = "0 4px 14px rgba(212, 175, 122, 0.25)";
                 }}
               >
-                Get Started Free
+              Get Started Free
               </button>
+
+              {/* Scroll indicator */}
+              <a href="#pricing" className="animate-bounce opacity-60 hover:opacity-100 transition-opacity" aria-label="Scroll down">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8B7355" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 5v14M5 12l7 7 7-7" />
+                </svg>
+              </a>
             </div>
           </article>
         </div>

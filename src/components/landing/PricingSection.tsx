@@ -22,7 +22,7 @@ const PricingSection = () => {
   const { signInWithGoogle } = useAuth();
 
   return (
-    <section className="py-28 px-6" style={{ backgroundColor: "#F8F1E6" }}>
+    <section id="pricing" className="py-28 px-6 scroll-mt-20" style={{ backgroundColor: "#F8F1E6" }}>
       <div className="max-w-4xl mx-auto">
         <h2
           className="font-serif text-4xl md:text-5xl text-center mb-4 tracking-tight"
