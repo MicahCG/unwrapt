@@ -326,6 +326,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           occasion_type: 'birthday',
           gift_type: selectedProduct.title,
           gift_variant_id: selectedProduct.shopify_variant_id,
+          gift_image_url: selectedProduct.featured_image_url,
           estimated_cost: totalCost,
           price_range: `$${selectedProduct.price.toFixed(2)}`,
           delivery_date: deliveryDate,
@@ -797,6 +798,52 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
           {/* Right Column: Gift Gallery */}
           <div className="flex-1 px-8 py-6 lg:overflow-y-auto bg-gradient-to-br from-[#FAF8F3] to-[#EFE7DD]/30">
+            {/* Show ordered gift prominently when order is already placed */}
+            {existingGift && (!!existingGift.shopify_order_id || existingGift.status === 'ordered') ? (
+              <div>
+                <div className="mb-4">
+                  <h3 className="font-semibold text-[#1A1A1A] flex items-center gap-2">
+                    <Package className="w-4 h-4 text-emerald-600" />
+                    Your Selected Gift
+                  </h3>
+                  <p className="text-xs text-[#1A1A1A]/60 mt-1">
+                    This gift has been ordered and is being processed
+                  </p>
+                </div>
+                <div className="bg-white rounded-xl overflow-hidden border-2 border-emerald-300 shadow-md max-w-sm">
+                  {existingGift.gift_image_url && (
+                    <div className="aspect-square overflow-hidden bg-[#FAF8F3]">
+                      <img
+                        src={existingGift.gift_image_url}
+                        alt={existingGift.gift_type || 'Selected gift'}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                  <div className="p-4">
+                    <h4 className="font-medium text-[#1A1A1A] mb-2">
+                      {existingGift.gift_type || 'Gift'}
+                    </h4>
+                    <div className="flex items-center justify-between">
+                      {existingGift.price_range && (
+                        <p className="text-lg font-bold text-[#1A1A1A]">
+                          {existingGift.price_range}
+                        </p>
+                      )}
+                      <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">
+                        Order Placed ✓
+                      </Badge>
+                    </div>
+                    {existingGift.shopify_order_id && (
+                      <p className="text-xs text-[#1A1A1A]/50 mt-2">
+                        Order #{existingGift.shopify_order_id}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+            <div>
             <div className="mb-4">
               <h3 className="font-semibold text-[#1A1A1A] flex items-center gap-2">
                 <Heart className="w-4 h-4 text-[#D2B887]" />
@@ -866,6 +913,8 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
                   </button>
                 ))}
               </div>
+            )}
+            </div>
             )}
           </div>
         </div>
