@@ -241,6 +241,7 @@ serve(async (req) => {
       'line_items[0][quantity]': '1',
       'metadata[scheduled_gift_id]': scheduledGiftId,
       'metadata[user_id]': user.id,
+      'metadata[transaction_type]': 'gift_payment',
       'metadata[gift_type]': sanitizedGiftType,
       'metadata[occasion]': sanitizedOccasion,
       'metadata[variant_id]': variantId || '',

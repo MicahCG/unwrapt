@@ -41,6 +41,65 @@ serve(async (req) => {
         const session = event.data.object as Stripe.Checkout.Session;
         const transactionType = session.metadata?.transaction_type;
         
+        // Handle gift payment
+        if (transactionType === "gift_payment") {
+          const scheduledGiftId = session.metadata?.scheduled_gift_id;
+          const userId = session.metadata?.user_id;
+          
+          if (!scheduledGiftId || !userId) {
+            console.error("❌ Missing scheduled_gift_id or user_id in gift payment metadata");
+            break;
+          }
+          
+          console.log(`🎁 Gift payment completed for gift: ${scheduledGiftId}, user: ${userId}`);
+          
+          // Update payment status
+          const { error: paymentError } = await supabaseClient
+            .from("payments")
+            .update({ 
+              status: "paid",
+              stripe_payment_intent_id: session.payment_intent as string,
+              updated_at: new Date().toISOString()
+            })
+            .eq("stripe_session_id", session.id);
+          
+          if (paymentError) {
+            console.error("❌ Error updating payment:", paymentError);
+          }
+          
+          // Update gift payment status
+          const { error: giftError } = await supabaseClient
+            .from("scheduled_gifts")
+            .update({ 
+              payment_status: "paid",
+              payment_amount: session.amount_total,
+              updated_at: new Date().toISOString()
+            })
+            .eq("id", scheduledGiftId);
+          
+          if (giftError) {
+            console.error("❌ Error updating gift:", giftError);
+          }
+          
+          // Trigger fulfillment (Shopify order)
+          console.log("🚀 Triggering gift fulfillment from webhook...");
+          try {
+            const fulfillmentResult = await supabaseClient.functions.invoke('process-gift-fulfillment', {
+              body: { scheduledGiftId }
+            });
+            
+            if (fulfillmentResult.error) {
+              console.error("❌ Fulfillment error:", fulfillmentResult.error);
+            } else {
+              console.log("✅ Fulfillment triggered successfully from webhook");
+            }
+          } catch (fulfillmentError) {
+            console.error("❌ Fulfillment trigger failed:", fulfillmentError);
+          }
+          
+          break;
+        }
+
         // Handle wallet deposit
         if (transactionType === "wallet_deposit") {
           const userId = session.metadata?.user_id;

@@ -122,7 +122,7 @@ const PaymentSuccess = () => {
     }
   };
 
-  // Check gift payment was processed
+  // Check gift payment was processed — also triggers verify-payment to fulfill the order
   const checkGiftPayment = async () => {
     if (!user?.id) {
       setIsVerifying(false);
@@ -131,26 +131,52 @@ const PaymentSuccess = () => {
 
     const sessionId = searchParams.get('session_id') || searchParams.get('checkout_session_id');
     
+    if (!sessionId) {
+      console.error('PaymentSuccess: No session ID for gift payment verification');
+      return false;
+    }
+
     try {
-      // Check for payment record with this session
+      // Call verify-payment to confirm payment with Stripe, update DB, and trigger fulfillment
+      console.log('PaymentSuccess: Calling verify-payment for gift session:', sessionId);
+      const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-payment', {
+        body: { sessionId }
+      });
+
+      if (verifyError) {
+        console.error('PaymentSuccess: verify-payment error:', verifyError);
+        // Fall back to checking payment record directly
+      } else if (verifyData?.paymentStatus === 'paid') {
+        console.log('PaymentSuccess: Gift payment verified and fulfillment triggered');
+        setVerificationComplete(true);
+        setShowConfetti(true);
+        await invalidateQueries();
+        toast({
+          title: "Gift Order Placed!",
+          description: "Your gift is being prepared and will ship soon.",
+        });
+        return true;
+      }
+
+      // Fallback: check if payment record was already updated (e.g. by webhook)
       const { data: payment, error } = await supabase
         .from('payments')
         .select('*')
         .eq('user_id', user.id)
         .eq('stripe_session_id', sessionId)
+        .eq('status', 'paid')
         .single();
 
       if (error && error.code !== 'PGRST116') throw error;
 
-      // If payment exists, mark as complete (webhook may still be processing)
       if (payment) {
-        console.log('PaymentSuccess: Gift payment record found');
+        console.log('PaymentSuccess: Gift payment already marked paid');
         setVerificationComplete(true);
         setShowConfetti(true);
         await invalidateQueries();
         toast({
-          title: "Payment Successful!",
-          description: "Your gift order has been placed.",
+          title: "Gift Order Placed!",
+          description: "Your gift is being prepared and will ship soon.",
         });
         return true;
       }
