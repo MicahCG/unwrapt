@@ -83,7 +83,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "Unwrapt <onboarding@resend.dev>",
+        from: "Unwrapt <notifications@unwrapt.com>",
         to: [recipientEmail],
         subject: subject,
         html: htmlContent,
