@@ -320,6 +320,7 @@ export type Database = {
         Row: {
           address: Json | null
           anniversary: string | null
+          apartment: string | null
           automation_enabled: boolean | null
           birthday: string | null
           city: string | null
@@ -344,6 +345,7 @@ export type Database = {
         Insert: {
           address?: Json | null
           anniversary?: string | null
+          apartment?: string | null
           automation_enabled?: boolean | null
           birthday?: string | null
           city?: string | null
@@ -368,6 +370,7 @@ export type Database = {
         Update: {
           address?: Json | null
           anniversary?: string | null
+          apartment?: string | null
           automation_enabled?: boolean | null
           birthday?: string | null
           city?: string | null

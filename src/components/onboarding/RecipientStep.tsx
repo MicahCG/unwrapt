@@ -4,10 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Heart, MapPin, UserPlus, Sparkles } from 'lucide-react';
+import { Heart, MapPin, UserPlus, Sparkles, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { type GiftVibe, type Product, getAllProducts } from '@/lib/giftVibes';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import GiftCatalogPreview from './GiftCatalogPreview';
 
 interface RecipientStepProps {
@@ -31,6 +33,7 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
     birthdayMonth: '',
     birthdayDay: '',
     street: '',
+    apartment: '',
     city: '',
     state: '',
     zipCode: '',
@@ -39,6 +42,9 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
 
   const [selectedVibe, setSelectedVibe] = useState<GiftVibe | null>(null);
   const [isValid, setIsValid] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [addressErrors, setAddressErrors] = useState<string[]>([]);
+  const [addressVerified, setAddressVerified] = useState(false);
 
   // Fetch products just for displaying inspirational images
   const { data: allProducts = [] } = useQuery({
@@ -97,10 +103,14 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
     const updatedData = { ...recipientData, [field]: value };
     setRecipientData(updatedData);
     validateForm(updatedData, selectedVibe);
+    // Reset address verification when address fields change
+    if (['street', 'city', 'state', 'zipCode', 'country'].includes(field)) {
+      setAddressVerified(false);
+      setAddressErrors([]);
+    }
   };
 
   const validateForm = (data: typeof recipientData, vibe: GiftVibe | null) => {
-    // Require name, relationship, address, and vibe
     const hasBasicInfo = Boolean(data.fullName && data.relationship);
     const hasAddress = Boolean(data.street && data.city && data.state && data.zipCode);
     const hasVibe = Boolean(vibe);
@@ -112,7 +122,50 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
     validateForm(recipientData, vibe);
   };
 
-  const handleContinue = () => {
+  const validateAddress = async (): Promise<boolean> => {
+    setIsValidating(true);
+    setAddressErrors([]);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('validate-address', {
+        body: {
+          street: recipientData.street.trim(),
+          city: recipientData.city.trim(),
+          state: recipientData.state.trim(),
+          zipCode: recipientData.zipCode.trim(),
+          country: recipientData.country,
+        }
+      });
+
+      if (error) {
+        console.error('Address validation error:', error);
+        // Don't block on validation service errors
+        return true;
+      }
+
+      if (data?.valid) {
+        setAddressVerified(true);
+        return true;
+      } else {
+        setAddressErrors(data?.errors || ['Address could not be verified']);
+        return false;
+      }
+    } catch (err) {
+      console.error('Address validation failed:', err);
+      // Don't block on network errors
+      return true;
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const handleContinue = async () => {
+    const isAddressValid = await validateAddress();
+    if (!isAddressValid) {
+      toast.error('Please fix the address errors before continuing');
+      return;
+    }
+
     onNext({
       firstRecipient: {
         fullName: recipientData.fullName,
@@ -121,6 +174,7 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
           ? `2000-${recipientData.birthdayMonth.padStart(2, '0')}-${recipientData.birthdayDay.padStart(2, '0')}`
           : null,
         street: recipientData.street,
+        apartment: recipientData.apartment || null,
         city: recipientData.city,
         state: recipientData.state,
         zipCode: recipientData.zipCode,
@@ -200,7 +254,7 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
             </Select>
           </div>
 
-           <div className="space-y-2">
+          <div className="space-y-2">
             <Label>Birthday</Label>
             <div className="grid grid-cols-2 gap-3">
               <Select value={recipientData.birthdayMonth} onValueChange={(value) => handleInputChange('birthdayMonth', value)}>
@@ -306,6 +360,17 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
             />
           </div>
 
+          {/* Apartment / Unit */}
+          <div className="space-y-2">
+            <Label htmlFor="apartment">Apt / Suite / Unit</Label>
+            <Input
+              id="apartment"
+              placeholder="Apt 4B, Suite 200, etc."
+              value={recipientData.apartment}
+              onChange={(e) => handleInputChange('apartment', e.target.value)}
+            />
+          </div>
+
           {/* City and State */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -357,15 +422,41 @@ const RecipientStep: React.FC<RecipientStepProps> = ({
               </Select>
             </div>
           </div>
+
+          {/* Address verification feedback */}
+          {addressErrors.length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 space-y-1">
+              {addressErrors.map((err, i) => (
+                <div key={i} className="flex items-start gap-2 text-sm text-red-700">
+                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>{err}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {addressVerified && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2 text-sm text-green-700">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <span>Address verified</span>
+            </div>
+          )}
         </div>
 
         <div className="pt-6">
           <Button
             onClick={handleContinue}
-            disabled={!isValid}
+            disabled={!isValid || isValidating}
             className="w-full bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
           >
-            Continue
+            {isValidating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Verifying address...
+              </>
+            ) : (
+              'Continue'
+            )}
           </Button>
         </div>
 
