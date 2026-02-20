@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/components/auth/AuthProvider";
+import { HelmetProvider } from "react-helmet-async";
 import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import AppStart from "./pages/AppStart";
@@ -29,6 +30,7 @@ const queryClient = new QueryClient();
 
 function App() {
   return (
+    <HelmetProvider>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
@@ -68,6 +70,7 @@ function App() {
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
+    </HelmetProvider>
   );
 }
 

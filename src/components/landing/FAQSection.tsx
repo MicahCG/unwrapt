@@ -5,6 +5,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Helmet } from "react-helmet-async";
 
 const faqs = [
   {
@@ -36,6 +37,23 @@ const faqs = [
 const FAQSection = () => {
   return (
     <section id="faq" className="py-28 px-6 scroll-mt-20" style={{ backgroundColor: "#F8F1E6" }}>
+      {/* FAQPage JSON-LD for rich snippets */}
+      <Helmet>
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: faqs.map((faq) => ({
+              "@type": "Question",
+              name: faq.question,
+              acceptedAnswer: {
+                "@type": "Answer",
+                text: faq.answer,
+              },
+            })),
+          })}
+        </script>
+      </Helmet>
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-16">
           <p className="text-xs uppercase tracking-[0.35em] mb-4" style={{ color: "#B59A77" }}>

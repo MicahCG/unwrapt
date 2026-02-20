@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import SEOHead from '@/components/seo/SEOHead';
 
 const TermsOfService = () => {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ const TermsOfService = () => {
 
   return (
     <div className="min-h-screen bg-gradient-primary">
+      <SEOHead title="Terms of Service" description="Unwrapt terms of service. Review our terms and conditions for using the automatic gift scheduling platform." canonical="https://unwrapt.io/terms" />
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="bg-white rounded-2xl shadow-elegant p-8 md:p-12">
           <div className="mb-8">

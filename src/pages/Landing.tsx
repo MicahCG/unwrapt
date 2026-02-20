@@ -12,6 +12,7 @@ import PricingSection from "@/components/landing/PricingSection";
 import FAQSection from "@/components/landing/FAQSection";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { motion } from "framer-motion";
+import SEOHead from "@/components/seo/SEOHead";
 
 const Landing = () => {
   const { signInWithGoogle } = useAuth();
@@ -43,6 +44,11 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen bg-[hsl(var(--ivory))]" style={{ color: "#4B3B2A" }}>
+      <SEOHead
+        title="Automatic Gift Scheduling & Thoughtful Gift Ideas"
+        description="Never forget special occasions. Unwrapt automatically schedules and delivers personalized, premium gifts for birthdays, anniversaries, and holidays. Smart reminders, curated gifts, effortless planning."
+        canonical="https://unwrapt.io/"
+      />
       {showIntro && <GiftBoxOpeningIntro />}
 
       {/* Sticky Navigation */}
