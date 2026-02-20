@@ -5,7 +5,7 @@
   <!-- Landing Page -->
   <url>
     <loc>https://unwrapt.io/</loc>
-    <lastmod>2025-11-17</lastmod>
+    <lastmod>2026-02-20</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <image:image>
@@ -17,39 +17,23 @@
   <!-- Main Landing -->
   <url>
     <loc>https://unwrapt.io/landing</loc>
-    <lastmod>2025-11-17</lastmod>
+    <lastmod>2026-02-20</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
+    <priority>0.9</priority>
   </url>
 
   <!-- App -->
   <url>
     <loc>https://unwrapt.io/app</loc>
-    <lastmod>2025-11-17</lastmod>
+    <lastmod>2026-02-20</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
-  </url>
-
-  <!-- Settings -->
-  <url>
-    <loc>https://unwrapt.io/settings</loc>
-    <lastmod>2025-11-17</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-
-  <!-- Analytics -->
-  <url>
-    <loc>https://unwrapt.io/analytics</loc>
-    <lastmod>2025-11-17</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
   </url>
 
   <!-- Gift History -->
   <url>
     <loc>https://unwrapt.io/gift-history</loc>
-    <lastmod>2025-11-17</lastmod>
+    <lastmod>2026-02-20</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -57,30 +41,46 @@
   <!-- Wishlist -->
   <url>
     <loc>https://unwrapt.io/wishlist</loc>
-    <lastmod>2025-11-17</lastmod>
+    <lastmod>2026-02-20</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
+  </url>
+
+  <!-- Settings -->
+  <url>
+    <loc>https://unwrapt.io/settings</loc>
+    <lastmod>2026-02-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+  <!-- Analytics -->
+  <url>
+    <loc>https://unwrapt.io/analytics</loc>
+    <lastmod>2026-02-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
   </url>
 
   <!-- Notifications -->
   <url>
     <loc>https://unwrapt.io/notifications</loc>
-    <lastmod>2025-11-17</lastmod>
+    <lastmod>2026-02-20</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
+    <priority>0.5</priority>
   </url>
 
   <!-- Legal Pages -->
   <url>
     <loc>https://unwrapt.io/privacy</loc>
-    <lastmod>2025-11-17</lastmod>
+    <lastmod>2026-02-20</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
 
   <url>
     <loc>https://unwrapt.io/terms</loc>
-    <lastmod>2025-11-17</lastmod>
+    <lastmod>2026-02-20</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
