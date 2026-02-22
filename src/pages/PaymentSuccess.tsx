@@ -242,8 +242,11 @@ const PaymentSuccess = () => {
     }
 
     const processVerification = async () => {
-      // Wait for paymentType to be set
-      if (paymentType === 'unknown') return;
+      // Wait for paymentType to be determined from URL params
+      if (paymentType === 'unknown') {
+        setIsVerifying(true);
+        return;
+      }
 
       let checkFn: () => Promise<boolean>;
       
