@@ -13,7 +13,7 @@ export const TestTierToggle = () => {
   const [isUpdating, setIsUpdating] = useState(false);
 
   // Allow dev override for specific test account so we always see the toggle
-  const isDevOverride = user?.email === 'giraudelc@gmail.com';
+  const isDevOverride = user?.email === 'giraudelc@gmail.com' || user?.email === 'chunkeydude64@gmail.com';
 
   // Check if user is admin (or dev override)
   const { data: isAdmin } = useQuery({
