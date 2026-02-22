@@ -534,247 +534,124 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         side="right"
         className="w-full sm:w-[840px] sm:max-w-[90vw] p-0 bg-[#FAF8F3] border-l-2 border-[#E4DCD2] overflow-hidden flex flex-col"
       >
-        {/* Header */}
-        <SheetHeader className="px-8 pt-8 pb-6 border-b border-[#E4DCD2] bg-white/50 backdrop-blur-sm">
-          <SheetTitle className="font-display text-2xl text-[#1A1A1A]">
+        {/* Header - Compact */}
+        <SheetHeader className="px-6 pt-5 pb-3 border-b border-[#E4DCD2] bg-white/50 backdrop-blur-sm">
+          <SheetTitle className="font-display text-xl text-[#1A1A1A]">
             Schedule Gift for {cleanName(recipient.name)}
           </SheetTitle>
-          <p className="text-sm text-[#1A1A1A]/60 mt-1">
-            Choose a gift vibe and perfect item for their birthday
-          </p>
         </SheetHeader>
 
-        {/* Automation Timeline - Only show when occasion date is set */}
-        {formData.occasion_date && (() => {
-          const occasionDate = parseISO(formData.occasion_date);
-          const today = new Date();
-          
-          // Determine states based on existing gift data
-          const fundsReserved = existingGift?.wallet_reserved || existingGift?.payment_status === 'paid';
-          const orderPlaced = !!existingGift?.shopify_order_id || existingGift?.status === 'ordered';
-          const delivered = existingGift?.status === 'delivered';
-          
-          // Calculate dates
-          const fundsReserveDate = subDays(occasionDate, 14);
-          const orderDate = subDays(occasionDate, 10);
-          const deliveryDate = subDays(occasionDate, 3);
-          
-          // Past dates that haven't happened yet
-          const fundsPastDue = fundsReserveDate < today && !fundsReserved;
-          const orderPastDue = orderDate < today && !orderPlaced;
-          
-          return (
-            <div className="px-8 py-4 border-b border-[#E4DCD2] bg-white/40">
-              <div className="flex items-center gap-2 mb-3">
-                <Calendar className="w-4 h-4 text-[#C4A36F]" />
-                <span className="text-sm font-medium text-[#1A1A1A]">Gift Delivery Timeline</span>
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                {/* Funds Reserved */}
-                <div className="flex-1 text-center">
-                  <div className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center mb-1 ${
-                    fundsReserved 
-                      ? 'bg-emerald-100' 
-                      : fundsPastDue 
-                        ? 'bg-amber-100' 
-                        : 'bg-[#C4A36F]/10'
-                  }`}>
-                    <CreditCard className={`w-4 h-4 ${
-                      fundsReserved 
-                        ? 'text-emerald-600' 
-                        : fundsPastDue 
-                          ? 'text-amber-600' 
-                          : 'text-[#C4A36F]'
-                    }`} />
-                  </div>
-                  <p className={`text-xs font-medium ${
-                    fundsReserved 
-                      ? 'text-emerald-700' 
-                      : fundsPastDue 
-                        ? 'text-amber-700' 
-                        : 'text-[#1A1A1A]'
-                  }`}>
-                    {fundsReserved ? 'Funds Reserved ✓' : fundsPastDue ? 'Funds Pending' : 'Reserve Funds'}
-                  </p>
-                  <p className="text-xs text-[#1A1A1A]/60">
-                    {fundsReserved ? 'Completed' : format(fundsReserveDate, 'MMM d')}
-                  </p>
-                </div>
-                
-                <div className={`w-8 h-px ${fundsReserved ? 'bg-emerald-300' : 'bg-[#C4A36F]/30'}`} />
-                
-                {/* Order Placed */}
-                <div className="flex-1 text-center">
-                  <div className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center mb-1 ${
-                    orderPlaced 
-                      ? 'bg-emerald-100' 
-                      : orderPastDue 
-                        ? 'bg-amber-100' 
-                        : 'bg-[#C4A36F]/10'
-                  }`}>
-                    <Package className={`w-4 h-4 ${
-                      orderPlaced 
-                        ? 'text-emerald-600' 
-                        : orderPastDue 
-                          ? 'text-amber-600' 
-                          : 'text-[#C4A36F]'
-                    }`} />
-                  </div>
-                  <p className={`text-xs font-medium ${
-                    orderPlaced 
-                      ? 'text-emerald-700' 
-                      : orderPastDue 
-                        ? 'text-amber-700' 
-                        : 'text-[#1A1A1A]'
-                  }`}>
-                    {orderPlaced ? 'Order Placed ✓' : orderPastDue ? 'Order Pending' : 'Place Order'}
-                  </p>
-                  <p className="text-xs text-[#1A1A1A]/60">
-                    {orderPlaced ? 'Completed' : format(orderDate, 'MMM d')}
-                  </p>
-                </div>
-                
-                <div className={`w-8 h-px ${orderPlaced ? 'bg-emerald-300' : 'bg-[#C4A36F]/30'}`} />
-                
-                {/* Arrives By */}
-                <div className="flex-1 text-center">
-                  <div className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center mb-1 ${
-                    delivered 
-                      ? 'bg-emerald-100' 
-                      : 'bg-[#C4A36F]/10'
-                  }`}>
-                    <Truck className={`w-4 h-4 ${
-                      delivered 
-                        ? 'text-emerald-600' 
-                        : 'text-[#C4A36F]'
-                    }`} />
-                  </div>
-                  <p className={`text-xs font-medium ${
-                    delivered 
-                      ? 'text-emerald-700' 
-                      : 'text-[#1A1A1A]'
-                  }`}>
-                    {delivered ? 'Delivered ✓' : 'Arrives By'}
-                  </p>
-                  <p className="text-xs text-[#1A1A1A]/60">
-                    {delivered ? 'Completed' : format(deliveryDate, 'MMM d')}
-                  </p>
+        {/* Compact Info Bar: Timeline + Cancel + Address */}
+        <div className="px-6 py-2 space-y-2 border-b border-[#E4DCD2] bg-white/40">
+          {/* Timeline - Inline */}
+          {formData.occasion_date && (() => {
+            const occasionDate = parseISO(formData.occasion_date);
+            const fundsReserved = existingGift?.wallet_reserved || existingGift?.payment_status === 'paid';
+            const orderPlaced = !!existingGift?.shopify_order_id || existingGift?.status === 'ordered';
+            const delivered = existingGift?.status === 'delivered';
+            const fundsReserveDate = subDays(occasionDate, 14);
+            const orderDate = subDays(occasionDate, 10);
+            const deliveryDate = subDays(occasionDate, 3);
+            
+            return (
+              <div className="flex items-center gap-3 text-xs">
+                <Calendar className="w-3.5 h-3.5 text-[#C4A36F] flex-shrink-0" />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={fundsReserved ? 'text-emerald-700 font-medium' : 'text-[#1A1A1A]/70'}>
+                    {fundsReserved ? '✓ Funds' : `Funds ${format(fundsReserveDate, 'MMM d')}`}
+                  </span>
+                  <span className="text-[#C4A36F]/40">→</span>
+                  <span className={orderPlaced ? 'text-emerald-700 font-medium' : 'text-[#1A1A1A]/70'}>
+                    {orderPlaced ? '✓ Ordered' : `Order ${format(orderDate, 'MMM d')}`}
+                  </span>
+                  <span className="text-[#C4A36F]/40">→</span>
+                  <span className={delivered ? 'text-emerald-700 font-medium' : 'text-[#1A1A1A]/70'}>
+                    {delivered ? '✓ Delivered' : `Arrives ${format(deliveryDate, 'MMM d')}`}
+                  </span>
                 </div>
               </div>
-            </div>
-          );
-        })()}
+            );
+          })()}
 
-        {/* Cancellation Disclaimer */}
-        {formData.occasion_date && !(existingGift && (!!existingGift.shopify_order_id || existingGift.status === 'ordered')) && (
-          <div className="mx-8 mt-4 mb-2 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-            <p className="text-sm font-medium text-amber-800 mb-1">
-              Need to Cancel?
-            </p>
+          {/* Cancel notice - inline */}
+          {formData.occasion_date && !(existingGift && (!!existingGift.shopify_order_id || existingGift.status === 'ordered')) && (
             <p className="text-xs text-amber-700">
-              If you'd like to cancel this gift, please contact{' '}
-              <a href="mailto:team@unwrapt.io" className="underline font-medium hover:text-amber-900">
-                team@unwrapt.io
-              </a>
-              {' '}before the order is placed and we'll respond within 24 hours.
+              Need to cancel? Contact <a href="mailto:team@unwrapt.io" className="underline font-medium">team@unwrapt.io</a> before the order is placed.
             </p>
-          </div>
-        )}
+          )}
 
-        {/* Order Already Placed Notice */}
-        {existingGift && (!!existingGift.shopify_order_id || existingGift.status === 'ordered') && (
-          <div className="mx-8 mt-4 mb-2 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-            <p className="text-sm font-medium text-amber-800 mb-1">
-              Order Already Placed
-            </p>
+          {existingGift && (!!existingGift.shopify_order_id || existingGift.status === 'ordered') && (
             <p className="text-xs text-amber-700">
-              This gift has already been ordered. If you'd like to make changes, please contact{' '}
-              <a href="mailto:team@unwrapt.io" className="underline font-medium hover:text-amber-900">
-                team@unwrapt.io
-              </a>
-              {' '}and we'll respond within 24 hours.
+              Order placed. Contact <a href="mailto:team@unwrapt.io" className="underline font-medium">team@unwrapt.io</a> for changes.
             </p>
-          </div>
-        )}
+          )}
 
-        {/* Shipping Address - Prominent Section */}
-        <div className="mx-8 mt-3 mb-1">
+          {/* Address - Compact inline */}
           {(() => {
             const hasAddress = formData.street && formData.city && formData.state && formData.zip_code;
-
             return (
-              <div className={`p-4 rounded-xl border-2 transition-all ${
-                !hasAddress 
-                  ? 'border-amber-300 bg-amber-50/80' 
-                  : 'border-[#E4DCD2] bg-white/60'
+              <div className={`p-3 rounded-lg border transition-all ${
+                !hasAddress ? 'border-amber-300 bg-amber-50/80' : 'border-[#E4DCD2] bg-white/60'
               }`}>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
-                      hasAddress ? 'bg-emerald-100' : 'bg-amber-100'
-                    }`}>
-                      <MapPin className={`w-4 h-4 ${hasAddress ? 'text-emerald-600' : 'text-amber-600'}`} />
-                    </div>
-                    <span className="text-sm font-semibold text-[#1A1A1A]">
-                      {hasAddress ? 'Shipping Address' : '📍 Add Shipping Address'}
-                    </span>
+                    <MapPin className={`w-3.5 h-3.5 ${hasAddress ? 'text-emerald-600' : 'text-amber-600'}`} />
+                    {hasAddress && !editingAddress ? (
+                      <span className="text-sm text-[#1A1A1A]/80">
+                        {[formData.street, formData.city, formData.state, formData.zip_code].filter(Boolean).join(', ')}
+                      </span>
+                    ) : (
+                      <span className="text-sm font-medium text-[#1A1A1A]">
+                        {hasAddress ? 'Shipping Address' : 'Add Shipping Address'}
+                      </span>
+                    )}
                   </div>
                   {hasAddress && (
                     <button
                       type="button"
                       onClick={() => setEditingAddress(!editingAddress)}
-                      className="text-xs font-medium text-[#C4A36F] hover:text-[#b8943f] transition-colors px-2 py-1 rounded hover:bg-[#C4A36F]/10"
+                      className="text-xs font-medium text-[#C4A36F] hover:text-[#b8943f] px-2 py-0.5 rounded hover:bg-[#C4A36F]/10"
                     >
                       {editingAddress ? 'Done' : 'Edit'}
                     </button>
                   )}
                 </div>
 
-                {hasAddress && !editingAddress && (
-                  <p className="text-sm text-[#1A1A1A]/80 ml-9">
-                    {[formData.street, formData.city, formData.state, formData.zip_code].filter(Boolean).join(', ')}
-                  </p>
-                )}
-
                 {(!hasAddress || editingAddress) && (
-                  <div className="space-y-2 mt-3 ml-9">
+                  <div className="space-y-2 mt-2">
                     {!hasAddress && (
-                      <p className="text-xs text-amber-700 mb-2">
-                        A shipping address is required to send this gift
-                      </p>
+                      <p className="text-xs text-amber-700">A shipping address is required</p>
                     )}
                     <Input
                       placeholder="Street Address *"
                       value={formData.street}
                       onChange={(e) => setFormData(prev => ({ ...prev, street: e.target.value }))}
-                      className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm h-10"
+                      className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm h-9"
                     />
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-4 gap-2">
                       <Input
                         placeholder="City *"
                         value={formData.city}
                         onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
-                        className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm h-10"
+                        className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm h-9"
                       />
                       <Input
                         placeholder="State *"
                         value={formData.state}
                         onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
-                        className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm h-10"
+                        className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm h-9"
                       />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
                       <Input
-                        placeholder="ZIP Code *"
+                        placeholder="ZIP *"
                         value={formData.zip_code}
                         onChange={(e) => setFormData(prev => ({ ...prev, zip_code: e.target.value }))}
-                        className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm h-10"
+                        className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm h-9"
                       />
                       <Select
                         value={formData.country}
                         onValueChange={(value) => setFormData(prev => ({ ...prev, country: value }))}
                       >
-                        <SelectTrigger className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm h-10">
+                        <SelectTrigger className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm h-9">
                           <SelectValue placeholder="Country" />
                         </SelectTrigger>
                         <SelectContent className="bg-white border-[#E4DCD2]">
