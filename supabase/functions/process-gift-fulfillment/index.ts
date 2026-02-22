@@ -70,10 +70,10 @@ serve(async (req) => {
     }
 
     console.log(`🎁 Process-gift-fulfillment: Processing gift fulfillment for: ${scheduledGiftId} (manualTrigger: ${!!manualTrigger})`);
-    // Verify the gift exists and get user_id
+    // Verify the gift exists and get user_id + current status
     const { data: giftCheck, error: giftCheckError } = await supabaseService
       .from('scheduled_gifts')
-      .select('user_id')
+      .select('user_id, status, shopify_order_id')
       .eq('id', scheduledGiftId)
       .single();
 
@@ -83,6 +83,19 @@ serve(async (req) => {
         JSON.stringify({ error: 'Gift not found', success: false }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // IDEMPOTENCY CHECK: If the gift already has a Shopify order, skip fulfillment
+    if (giftCheck.status === 'ordered' || giftCheck.status === 'fulfilled' || giftCheck.shopify_order_id) {
+      console.log(`🎁 Process-gift-fulfillment: Gift ${scheduledGiftId} already fulfilled (status: ${giftCheck.status}, shopify_order_id: ${giftCheck.shopify_order_id}). Skipping duplicate.`);
+      return new Response(JSON.stringify({
+        success: true,
+        message: "Gift already fulfilled - skipping duplicate order",
+        alreadyFulfilled: true
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
     }
 
     // For client calls, verify ownership
@@ -407,12 +420,16 @@ serve(async (req) => {
 
     console.log('🎁 Process-gift-fulfillment: Shopify order created successfully');
 
-    // Update the gift status to indicate it's been sent to Shopify
+    // Update the gift status and store the Shopify order ID for idempotency
     console.log('🎁 Process-gift-fulfillment: Updating gift status...');
+    const orderData = typedOrderResult.data as Record<string, unknown>;
+    const shopifyOrderId = orderData?.shopifyOrderId;
+    
     const { error: updateError } = await supabaseService
       .from('scheduled_gifts')
       .update({
         status: 'ordered',
+        shopify_order_id: shopifyOrderId ? String(shopifyOrderId) : null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', scheduledGiftId);
