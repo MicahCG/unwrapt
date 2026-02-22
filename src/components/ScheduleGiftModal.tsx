@@ -694,6 +694,21 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           </div>
         )}
 
+        {/* Shipping Address Summary */}
+        {(recipient.street || recipient.city) && (
+          <div className="mx-8 mt-3 mb-1 p-3 bg-white/60 border border-[#E4DCD2] rounded-lg flex items-start gap-2">
+            <MapPin className="w-4 h-4 text-[#C4A36F] mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-xs font-medium text-[#1A1A1A]/80">Shipping to</p>
+              <p className="text-sm text-[#1A1A1A]">
+                {[recipient.street, recipient.city, recipient.state, recipient.zip_code]
+                  .filter(Boolean)
+                  .join(', ')}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Two-Column Layout */}
         <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
           {/* Left Column: Form Fields */}
