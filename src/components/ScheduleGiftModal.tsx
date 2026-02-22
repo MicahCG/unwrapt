@@ -710,22 +710,19 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         </div>
 
         {/* Gift Gallery - Full Width */}
-        <div className="flex-1 overflow-y-auto px-8 py-6 bg-gradient-to-br from-[#FAF8F3] to-[#EFE7DD]/30">
+        <div className="flex-1 overflow-y-auto px-6 py-4 bg-gradient-to-br from-[#FAF8F3] to-[#EFE7DD]/30">
             {/* Show ordered gift prominently when order is already placed */}
             {existingGift && (!!existingGift.shopify_order_id || existingGift.status === 'ordered') ? (
               <div>
-                <div className="mb-4">
-                  <h3 className="font-semibold text-[#1A1A1A] flex items-center gap-2">
+                <div className="mb-3">
+                  <h3 className="font-semibold text-[#1A1A1A] flex items-center gap-2 text-sm">
                     <Package className="w-4 h-4 text-emerald-600" />
                     Your Selected Gift
                   </h3>
-                  <p className="text-xs text-[#1A1A1A]/60 mt-1">
-                    This gift has been ordered and is being processed
-                  </p>
                 </div>
-                <div className="bg-white rounded-xl overflow-hidden border-2 border-emerald-300 shadow-md max-w-sm">
+                <div className="bg-white rounded-xl overflow-hidden border-2 border-emerald-300 shadow-md max-w-sm flex">
                   {existingGift.gift_image_url && (
-                    <div className="aspect-square overflow-hidden bg-[#FAF8F3]">
+                    <div className="w-24 h-24 flex-shrink-0 overflow-hidden bg-[#FAF8F3]">
                       <img
                         src={existingGift.gift_image_url}
                         alt={existingGift.gift_type || 'Selected gift'}
@@ -733,68 +730,63 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
                       />
                     </div>
                   )}
-                  <div className="p-4">
-                    <h4 className="font-medium text-[#1A1A1A] mb-2">
+                  <div className="p-3 flex-1">
+                    <h4 className="font-medium text-sm text-[#1A1A1A] mb-1">
                       {existingGift.gift_type || 'Gift'}
                     </h4>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
                       {existingGift.price_range && (
-                        <p className="text-lg font-bold text-[#1A1A1A]">
-                          {existingGift.price_range}
-                        </p>
+                        <p className="text-sm font-bold text-[#1A1A1A]">{existingGift.price_range}</p>
                       )}
-                      <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">
+                      <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-xs">
                         Order Placed ✓
                       </Badge>
                     </div>
-                    {existingGift.shopify_order_id && (
-                      <p className="text-xs text-[#1A1A1A]/50 mt-2">
-                        Order #{existingGift.shopify_order_id}
-                      </p>
-                    )}
                   </div>
                 </div>
               </div>
             ) : (
             <div>
-            <div className="mb-4">
-              <h3 className="font-semibold text-[#1A1A1A] flex items-center gap-2">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-sm text-[#1A1A1A] flex items-center gap-2">
                 <Heart className="w-4 h-4 text-[#D2B887]" />
-                Choose the Perfect Gift
+                Choose a Gift
               </h3>
-              <p className="text-xs text-[#1A1A1A]/60 mt-1">
-                {selectedVibe ? `Showing ${vibeButtons.find(v => v.vibe === selectedVibe)?.label} gifts` : 'Select a gift vibe to browse'}
-              </p>
+              {filteredProducts.length > 0 && (
+                <span className="text-xs text-[#1A1A1A]/50">
+                  {filteredProducts.length} option{filteredProducts.length !== 1 ? 's' : ''} available
+                </span>
+              )}
             </div>
 
             {productsLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#D2B887]"></div>
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#D2B887]"></div>
               </div>
             ) : !selectedVibe ? (
-              <div className="flex items-center justify-center py-12">
+              <div className="flex items-center justify-center py-8">
                 <p className="text-sm text-[#1A1A1A]/50">Select a gift vibe to browse products</p>
               </div>
             ) : filteredProducts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 gap-4">
+              <div className="flex flex-col items-center justify-center py-8 gap-2">
                 <p className="text-sm text-[#1A1A1A]/50">No products found for this vibe</p>
                 <p className="text-xs text-[#1A1A1A]/40">Total products available: {allProducts.length}</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {filteredProducts.map((product) => (
                   <button
                     key={product.id}
                     type="button"
                     onClick={() => setSelectedProduct(product)}
-                    className={`group relative bg-white rounded-xl overflow-hidden border-2 transition-all shadow-sm hover:shadow-md ${
+                    className={`group relative bg-white rounded-lg overflow-hidden border-2 transition-all shadow-sm hover:shadow-md text-left ${
                       selectedProduct?.id === product.id
                         ? 'border-[#D2B887] ring-2 ring-[#D2B887]/20'
                         : 'border-[#E4DCD2] hover:border-[#D2B887]/50'
                     }`}
                   >
-                    {/* Product Image */}
-                    <div className="aspect-square overflow-hidden bg-[#FAF8F3]">
+                    {/* Product Image - Compact */}
+                    <div className="aspect-[4/3] overflow-hidden bg-[#FAF8F3]">
                       <img
                         src={product.featured_image_url || ''}
                         alt={product.title}
@@ -802,24 +794,19 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
                       />
                     </div>
 
-                    {/* Product Info */}
-                    <div className="p-4 text-left">
-                      <h4 className="font-medium text-sm text-[#1A1A1A] line-clamp-2 mb-2">
+                    {/* Product Info - Compact */}
+                    <div className="p-2.5">
+                      <h4 className="font-medium text-xs text-[#1A1A1A] line-clamp-1 mb-1">
                         {product.title}
                       </h4>
-                      <div className="flex items-center justify-between">
-                        <p className="text-lg font-bold text-[#1A1A1A]">
-                          ${product.price.toFixed(2)}
-                        </p>
-                        <Badge variant="secondary" className="text-xs bg-[#D2B887]/10 text-[#D2B887] border-[#D2B887]/20">
-                          {GIFT_VIBE_OPTIONS.find(v => v.vibe === product.gift_vibe)?.label}
-                        </Badge>
-                      </div>
+                      <p className="text-sm font-bold text-[#1A1A1A]">
+                        ${product.price.toFixed(2)}
+                      </p>
                     </div>
 
                     {/* Selected Indicator */}
                     {selectedProduct?.id === product.id && (
-                      <div className="absolute top-3 right-3 bg-[#D2B887] text-white rounded-full p-1.5">
+                      <div className="absolute top-2 right-2 bg-[#D2B887] text-white rounded-full p-1">
                         <Heart className="w-3 h-3 fill-current" />
                       </div>
                     )}
