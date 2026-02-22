@@ -792,55 +792,48 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           })()}
         </div>
 
-        {/* Two-Column Layout */}
-        <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
-          {/* Left Column: Form Fields */}
-          <div className="lg:w-[280px] flex-shrink-0 px-8 py-6 space-y-6 lg:overflow-y-auto bg-white/30">
-            {/* Birthday Date */}
-            <div className="space-y-2">
-              <Label htmlFor="occasion_date" className="text-sm font-medium text-[#1A1A1A]">
-                Birthday Date *
-              </Label>
-              <Input
-                id="occasion_date"
-                type="date"
-                value={formData.occasion_date}
-                onChange={(e) => setFormData(prev => ({ ...prev, occasion_date: e.target.value }))}
-                required
-                className="bg-white border-[#E4DCD2] text-[#1A1A1A]"
-              />
-            </div>
-
-            {/* Gift Vibe Selection */}
-            <div className="space-y-3">
-              <Label className="text-sm font-medium text-[#1A1A1A]">
-                Gift Vibe *
-              </Label>
-              <div className="space-y-2">
-                {vibeButtons.map((vibe) => (
-                  <button
-                    key={vibe.vibe}
-                    type="button"
-                    onClick={() => setSelectedVibe(vibe.vibe)}
-                    className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
-                      selectedVibe === vibe.vibe
-                        ? 'border-[#D2B887] bg-[#D2B887]/10'
-                        : 'border-[#E4DCD2] bg-white hover:border-[#D2B887]/50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-lg">{vibe.icon}</span>
-                      <span className="font-medium text-sm text-[#1A1A1A]">{vibe.label}</span>
-                    </div>
-                    <p className="text-xs text-[#1A1A1A]/60 ml-7">{vibe.description}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
+        {/* Controls Bar: Date + Vibe */}
+        <div className="px-8 py-3 border-b border-[#E4DCD2] bg-white/30 flex flex-wrap items-end gap-4">
+          {/* Birthday Date */}
+          <div className="space-y-1">
+            <Label htmlFor="occasion_date" className="text-xs font-medium text-[#1A1A1A]">
+              Birthday Date *
+            </Label>
+            <Input
+              id="occasion_date"
+              type="date"
+              value={formData.occasion_date}
+              onChange={(e) => setFormData(prev => ({ ...prev, occasion_date: e.target.value }))}
+              required
+              className="bg-white border-[#E4DCD2] text-[#1A1A1A] h-9 w-[160px] text-sm"
+            />
           </div>
 
-          {/* Right Column: Gift Gallery */}
-          <div className="flex-1 px-8 py-6 lg:overflow-y-auto bg-gradient-to-br from-[#FAF8F3] to-[#EFE7DD]/30">
+          {/* Gift Vibe - Horizontal Pills */}
+          <div className="flex-1 space-y-1">
+            <Label className="text-xs font-medium text-[#1A1A1A]">Gift Vibe *</Label>
+            <div className="flex gap-2 flex-wrap">
+              {vibeButtons.map((vibe) => (
+                <button
+                  key={vibe.vibe}
+                  type="button"
+                  onClick={() => setSelectedVibe(vibe.vibe)}
+                  className={`px-3 py-1.5 rounded-full border-2 transition-all text-sm flex items-center gap-1.5 ${
+                    selectedVibe === vibe.vibe
+                      ? 'border-[#D2B887] bg-[#D2B887]/15 font-medium'
+                      : 'border-[#E4DCD2] bg-white hover:border-[#D2B887]/50'
+                  }`}
+                >
+                  <span>{vibe.icon}</span>
+                  <span className="text-[#1A1A1A]">{vibe.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Gift Gallery - Full Width */}
+        <div className="flex-1 overflow-y-auto px-8 py-6 bg-gradient-to-br from-[#FAF8F3] to-[#EFE7DD]/30">
             {/* Show ordered gift prominently when order is already placed */}
             {existingGift && (!!existingGift.shopify_order_id || existingGift.status === 'ordered') ? (
               <div>
@@ -960,7 +953,6 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             </div>
             )}
           </div>
-        </div>
 
         {/* Sticky Bottom Summary Bar */}
         <div className="border-t-2 border-[#E4DCD2] bg-white px-8 py-4 shadow-lg">
