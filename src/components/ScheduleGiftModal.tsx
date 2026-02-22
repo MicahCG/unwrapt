@@ -755,60 +755,83 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
               </div>
             </div>
 
-            {/* Shipping Address */}
-            <div className="space-y-4 pt-4 border-t border-[#E4DCD2]">
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-[#1A1A1A]/60" />
-                <Label className="text-sm font-medium text-[#1A1A1A]">Shipping Address</Label>
-              </div>
-
-              <div className="space-y-3">
-                <Input
-                  placeholder="Street Address *"
-                  value={formData.street}
-                  onChange={(e) => setFormData(prev => ({ ...prev, street: e.target.value }))}
-                  className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm"
-                />
-
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    placeholder="City *"
-                    value={formData.city}
-                    onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
-                    className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm"
-                  />
-                  <Input
-                    placeholder="State *"
-                    value={formData.state}
-                    onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
-                    className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    placeholder="ZIP Code *"
-                    value={formData.zip_code}
-                    onChange={(e) => setFormData(prev => ({ ...prev, zip_code: e.target.value }))}
-                    className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm"
-                  />
-                  <Select
-                    value={formData.country}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, country: value }))}
+            {/* Shipping Address - Collapsible when pre-filled */}
+            {(() => {
+              const hasAddress = formData.street && formData.city && formData.state && formData.zip_code;
+              return (
+                <div className="space-y-3 pt-4 border-t border-[#E4DCD2]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = document.getElementById('address-fields');
+                      if (el) el.classList.toggle('hidden');
+                    }}
+                    className="flex items-center justify-between w-full"
                   >
-                    <SelectTrigger className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm">
-                      <SelectValue placeholder="Country" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white border-[#E4DCD2]">
-                      <SelectItem value="United States">USA</SelectItem>
-                      <SelectItem value="Canada">Canada</SelectItem>
-                      <SelectItem value="United Kingdom">UK</SelectItem>
-                      <SelectItem value="Australia">Australia</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-[#1A1A1A]/60" />
+                      <Label className="text-sm font-medium text-[#1A1A1A] cursor-pointer">Shipping Address</Label>
+                    </div>
+                    {hasAddress && (
+                      <span className="text-xs text-[#C4A36F] font-medium">Edit ›</span>
+                    )}
+                  </button>
+
+                  {hasAddress && (
+                    <p className="text-xs text-[#1A1A1A]/70 ml-6">
+                      {[formData.street, formData.city, formData.state, formData.zip_code].filter(Boolean).join(', ')}
+                    </p>
+                  )}
+
+                  <div id="address-fields" className={hasAddress ? 'hidden space-y-3' : 'space-y-3'}>
+                    <Input
+                      placeholder="Street Address *"
+                      value={formData.street}
+                      onChange={(e) => setFormData(prev => ({ ...prev, street: e.target.value }))}
+                      className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm"
+                    />
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        placeholder="City *"
+                        value={formData.city}
+                        onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                        className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm"
+                      />
+                      <Input
+                        placeholder="State *"
+                        value={formData.state}
+                        onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
+                        className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        placeholder="ZIP Code *"
+                        value={formData.zip_code}
+                        onChange={(e) => setFormData(prev => ({ ...prev, zip_code: e.target.value }))}
+                        className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm"
+                      />
+                      <Select
+                        value={formData.country}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, country: value }))}
+                      >
+                        <SelectTrigger className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm">
+                          <SelectValue placeholder="Country" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-[#E4DCD2]">
+                          <SelectItem value="United States">USA</SelectItem>
+                          <SelectItem value="Canada">Canada</SelectItem>
+                          <SelectItem value="United Kingdom">UK</SelectItem>
+                          <SelectItem value="Australia">Australia</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              );
+            })()}
           </div>
 
           {/* Right Column: Gift Gallery */}
