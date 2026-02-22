@@ -587,6 +587,15 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             </p>
           )}
 
+          {/* Problem with order notice */}
+          <p className="text-xs text-[#1A1A1A]/50">
+            Having an issue with your order? Contact{' '}
+            <a href="mailto:team@unwrapt.io" className="underline font-medium text-[#C4A36F] hover:text-[#b8943f]">
+              team@unwrapt.io
+            </a>
+            {' '}and we'll respond within 24 hours.
+          </p>
+
           {/* Address - Compact inline */}
           {(() => {
             const hasAddress = formData.street && formData.city && formData.state && formData.zip_code;
