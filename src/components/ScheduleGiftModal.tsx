@@ -41,6 +41,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
   const [editingAddress, setEditingAddress] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showScrollHint, setShowScrollHint] = useState(true);
 
   // Fetch user wallet balance
   const { data: userProfile } = useQuery({
@@ -710,7 +711,27 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         </div>
 
         {/* Gift Gallery - Full Width */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 bg-gradient-to-br from-[#FAF8F3] to-[#EFE7DD]/30">
+        <div
+          className="flex-1 overflow-y-auto px-6 py-4 bg-gradient-to-br from-[#FAF8F3] to-[#EFE7DD]/30 relative"
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+            if (nearBottom && showScrollHint) setShowScrollHint(false);
+          }}
+        >
+          {/* Scroll hint overlay */}
+          {showScrollHint && filteredProducts.length > 3 && (
+            <div className="pointer-events-none sticky bottom-0 left-0 right-0 z-10 -mb-4">
+              <div className="h-16 bg-gradient-to-t from-[#FAF8F3] to-transparent flex items-end justify-center pb-2">
+                <div className="pointer-events-auto animate-bounce flex items-center gap-1.5 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-md border border-[#E4DCD2] text-xs text-[#1A1A1A]/70">
+                  <span>Scroll for more gifts</span>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-[#C4A36F]">
+                    <path d="M6 2v8m0 0l3-3m-3 3L3 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          )}
             {/* Show ordered gift prominently when order is already placed */}
             {existingGift && (!!existingGift.shopify_order_id || existingGift.status === 'ordered') ? (
               <div>
