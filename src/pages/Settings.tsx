@@ -37,6 +37,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
 import { SubscriptionManagement } from '@/components/subscription/SubscriptionManagement';
+import { AdminDeleteUser } from '@/components/admin/AdminDeleteUser';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { sanitizeInput, sanitizeEmail, sanitizePhoneNumber } from '@/utils/inputSanitization';
@@ -337,6 +338,9 @@ const Settings = () => {
           </CardContent>
         </Card>
 
+
+        {/* Admin Tools - only visible to admins */}
+        <AdminDeleteUser />
 
         {/* Bottom spacing for mobile */}
         <div className="pb-8"></div>
