@@ -280,7 +280,7 @@ async function handleOrderFulfilled(supabase: any, order: any) {
 
   const { data: gifts, error } = await supabase
     .from('scheduled_gifts')
-    .select('id')
+    .select('id, user_id, recipient_id, occasion, occasion_date, delivery_date, gift_description')
     .eq('shopify_order_id', orderId);
 
   if (error || !gifts?.length) {
@@ -299,7 +299,50 @@ async function handleOrderFulfilled(supabase: any, order: any) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', gift.id);
+
+    // Send shipping notification email to the user
+    const { data: recipient } = await supabase
+      .from('recipients')
+      .select('name')
+      .eq('id', gift.recipient_id)
+      .single();
+
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('email, full_name')
+      .eq('id', gift.user_id)
+      .single();
+
+    if (userProfile?.email) {
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+        const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+        await fetch(`${supabaseUrl}/functions/v1/send-notification-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseKey}`,
+          },
+          body: JSON.stringify({
+            type: 'gift_sent',
+            recipientEmail: userProfile.email,
+            userName: userProfile.full_name,
+            data: {
+              recipientName: recipient?.name || 'your recipient',
+              occasion: gift.occasion,
+              trackingNumber: trackingNumber,
+              deliveryDate: gift.delivery_date || gift.occasion_date,
+              giftDescription: gift.gift_description,
+            },
+          }),
+        });
+        console.log(`📧 Shipping notification email sent to ${userProfile.email} (tracking: ${trackingNumber})`);
+      } catch (emailError) {
+        console.error('⚠️ Failed to send shipping notification email:', emailError);
+      }
+    }
   }
 
-  console.log(`✅ Updated ${gifts.length} gift(s) as delivered`);
+  console.log(`✅ Updated ${gifts.length} gift(s) as delivered and notified users`);
 }
