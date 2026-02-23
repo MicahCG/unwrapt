@@ -71,8 +71,8 @@ export const AutomationDetailModal: React.FC<AutomationDetailModalProps> = ({
   const occasionType = recipient.birthday ? 'Birthday' : 'Anniversary';
   const nextOccurrence = occasionDate ? getNextOccurrence(occasionDate) : new Date();
   
-  const reserveDate = subDays(nextOccurrence, 14);
-  const shipDate = subDays(nextOccurrence, 3);
+  const reserveDate = subDays(nextOccurrence, 28);
+  const shipDate = subDays(nextOccurrence, 21);
   
   const automatedGift = recipient.scheduled_gifts?.find(g => g.automation_enabled);
   const isReserved = automatedGift?.wallet_reserved || automatedGift?.payment_status === 'paid';

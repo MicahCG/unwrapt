@@ -315,7 +315,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
       }
 
       // Create scheduled gift
-      const deliveryDate = new Date(new Date(formData.occasion_date).getTime() - 4 * 24 * 60 * 60 * 1000)
+      const deliveryDate = new Date(new Date(formData.occasion_date).getTime() - 3 * 24 * 60 * 60 * 1000)
         .toISOString().split('T')[0];
 
       console.log('Creating scheduled gift with recipient_id:', recipient.id);
@@ -550,8 +550,8 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             const fundsReserved = existingGift?.wallet_reserved || existingGift?.payment_status === 'paid';
             const orderPlaced = !!existingGift?.shopify_order_id || existingGift?.status === 'ordered';
             const delivered = existingGift?.status === 'delivered';
-            const fundsReserveDate = subDays(occasionDate, 14);
-            const orderDate = subDays(occasionDate, 10);
+            const fundsReserveDate = subDays(occasionDate, 28);
+            const orderDate = subDays(occasionDate, 21);
             const deliveryDate = subDays(occasionDate, 3);
             
             return (

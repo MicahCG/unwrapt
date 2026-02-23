@@ -564,7 +564,7 @@ export const VIPWelcomeModal = ({ open, onComplete }: VIPWelcomeModalProps) => {
         <div className="flex gap-3">
           <div className="text-2xl">📅</div>
           <div>
-            <p className="font-medium text-[#1A1A1A]">14 days before each occasion</p>
+            <p className="font-medium text-[#1A1A1A]">4 weeks before each occasion</p>
             <p className="text-sm text-[#1A1A1A]/60">We reserve funds from your wallet</p>
           </div>
         </div>
@@ -572,23 +572,23 @@ export const VIPWelcomeModal = ({ open, onComplete }: VIPWelcomeModalProps) => {
         <div className="flex gap-3">
           <div className="text-2xl">📬</div>
           <div>
-            <p className="font-medium text-[#1A1A1A]">10 days before</p>
-            <p className="text-sm text-[#1A1A1A]/60">You'll confirm the shipping address</p>
+            <p className="font-medium text-[#1A1A1A]">3 weeks before</p>
+            <p className="text-sm text-[#1A1A1A]/60">We place the order & confirm shipping</p>
           </div>
         </div>
 
         <div className="flex gap-3">
           <div className="text-2xl">📦</div>
           <div>
-            <p className="font-medium text-[#1A1A1A]">3 days before</p>
-            <p className="text-sm text-[#1A1A1A]/60">Gift ships and arrives on time</p>
+            <p className="font-medium text-[#1A1A1A]">~3 days before</p>
+            <p className="text-sm text-[#1A1A1A]/60">Gift arrives on time via CJ shipping (~2.5 weeks)</p>
           </div>
         </div>
       </div>
 
       <div className="p-3 mb-6 bg-blue-50 rounded-lg max-w-md mx-auto">
         <p className="text-xs text-blue-800">
-          💡 Your wallet balance won't be touched until 14 days before each occasion. You can add more funds anytime.
+          💡 Your wallet balance won't be touched until 4 weeks before each occasion. You can add more funds anytime.
         </p>
       </div>
 
