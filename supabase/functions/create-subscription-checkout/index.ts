@@ -48,8 +48,12 @@ serve(async (req) => {
       }
     }
 
-    if (!actualPriceId) {
-      throw new Error("Unable to determine subscription price");
+    // Server-side price validation: only allow approved price IDs
+    const APPROVED_PRICE_IDS = [VIP_MONTHLY_PRICE_ID];
+    
+    if (!actualPriceId || !APPROVED_PRICE_IDS.includes(actualPriceId)) {
+      console.error(`❌ Rejected unauthorized price ID: ${actualPriceId}`);
+      throw new Error("Invalid or unauthorized subscription price");
     }
 
     console.log(`💳 Creating checkout session for user ${user.email}, using price: ${actualPriceId}`);
