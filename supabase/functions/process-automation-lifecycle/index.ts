@@ -113,8 +113,8 @@ async function processGiftStage(supabaseClient: any, gift: any, recipient: any, 
     return;
   }
 
-  // STAGE 1: Fund reservation (14 days or less before, if not reserved yet)
-  if (daysUntilDelivery <= 14 && daysUntilDelivery > 0 && !gift.wallet_reserved) {
+  // STAGE 1: Fund reservation (28 days or less before, if not reserved yet)
+  if (daysUntilDelivery <= 28 && daysUntilDelivery > 0 && !gift.wallet_reserved) {
     await handleFundReservation(supabaseClient, gift, recipient);
     return;
   }
@@ -130,8 +130,8 @@ async function processGiftStage(supabaseClient: any, gift: any, recipient: any, 
     }
   }
 
-  // STAGE 3: Address request (10 days or less, if gift not confirmed yet)
-  if (daysUntilDelivery <= 10 && daysUntilDelivery > 1 && gift.wallet_reserved && gift.status !== 'confirmed' && !gift.address_requested_at) {
+  // STAGE 3: Address request (25 days or less, if gift not confirmed yet)
+  if (daysUntilDelivery <= 25 && daysUntilDelivery > 1 && gift.wallet_reserved && gift.status !== 'confirmed' && !gift.address_requested_at) {
     await handleAddressRequest(supabaseClient, gift, recipient);
     return;
   }

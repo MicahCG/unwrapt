@@ -304,9 +304,9 @@ export const EnableAutomationModal = ({
             <div className="bg-blue-50 p-4 rounded-lg">
               <h4 className="font-medium text-blue-900 mb-2">How it works:</h4>
               <ul className="text-sm text-blue-800 space-y-1">
-                <li>• 14 days before: We'll reserve funds in your wallet</li>
-                <li>• 10 days before: We'll request the shipping address</li>
-                <li>• 3 days before: Gift ships to arrive on time</li>
+                <li>• 4 weeks before: We'll reserve funds in your wallet</li>
+                <li>• 3 weeks before: We'll place the order & confirm shipping</li>
+                <li>• Gift ships via CJ and arrives ~3 days before the occasion</li>
                 <li>• You can customize or pause anytime</li>
               </ul>
             </div>

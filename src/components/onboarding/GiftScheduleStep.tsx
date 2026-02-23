@@ -178,7 +178,7 @@ const GiftScheduleStep: React.FC<GiftScheduleStepProps> = ({
       const recipientData = typeof recipientResult === 'object' ? recipientResult.address : null;
 
       // Create the actual scheduled gift in the database
-      const deliveryDate = new Date(new Date(occasionDate!).getTime() - 4 * 24 * 60 * 60 * 1000)
+      const deliveryDate = new Date(new Date(occasionDate!).getTime() - 3 * 24 * 60 * 60 * 1000)
         .toISOString().split('T')[0];
 
       const { data: giftData, error: giftError } = await supabase
