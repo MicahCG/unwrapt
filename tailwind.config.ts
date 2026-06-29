@@ -32,32 +32,32 @@ export default {
 			foreground: 'hsl(var(--foreground))',
 			
 			primary: {
-				DEFAULT: '#4A4A4A', // Dark charcoal from the logo
-				foreground: '#F5F2ED' // Light cream
+				DEFAULT: '#2A2520', // Agent-first ink/charcoal
+				foreground: '#F4ECDD' // Warm cream
 			},
 			secondary: {
-				DEFAULT: '#F5F2ED', // Light cream background
-				foreground: '#4A4A4A' // Dark charcoal text
+				DEFAULT: '#F3ECDD', // Subtle chip cream
+				foreground: '#2A2520' // Ink text
 			},
 			destructive: {
 				DEFAULT: 'hsl(var(--destructive))',
 				foreground: 'hsl(var(--destructive-foreground))'
 			},
 			muted: {
-				DEFAULT: '#F8F6F1', // Slightly darker cream
-				foreground: '#6B6B6B' // Medium gray
+				DEFAULT: '#FAF6EE', // Card / elevated surface
+				foreground: '#9A8E7C' // Muted warm gray
 			},
 			accent: {
-				DEFAULT: '#F5F2ED', // Updated to match light brown/tan
-				foreground: '#4A4A4A'
+				DEFAULT: '#B65B3C', // Terracotta accent
+				foreground: '#FBF6EC'
 			},
 			popover: {
 				DEFAULT: 'hsl(var(--popover))',
 				foreground: 'hsl(var(--popover-foreground))'
 			},
 			card: {
-				DEFAULT: '#FFFFFF', // Pure white for cards
-				foreground: '#4A4A4A'
+				DEFAULT: '#FAF6EE', // Warm card surface
+				foreground: '#2A2520'
 			},
 			sidebar: {
 				DEFAULT: 'hsl(var(--sidebar-background))',
@@ -70,116 +70,128 @@ export default {
 				ring: 'hsl(var(--sidebar-ring))'
 			},
 			
-			// Brand specific colors - these will override any default Tailwind colors
+			// Brand specific colors - agent-first 2.0 palette
 			brand: {
-				charcoal: '#4A4A4A',
-				cream: '#F5F2ED',
-				'cream-light': '#F8F6F1',
-				gold: '#D4A574',     // Warm golden beige
-				peach: '#F2D5C4',    // Soft peach
-				blush: '#F5E6E8',    // Soft blush pink
-				beige: '#E8D5C4'     // Golden beige
+				charcoal: '#2A2520',      // Ink / primary text & buttons
+				ink: '#2A2520',
+				cream: '#EDE6D8',         // App background
+				'cream-light': '#FAF6EE', // Card / elevated surface
+				surface: '#FAF6EE',       // Card surface (alias)
+				chip: '#F3ECDD',          // Subtle chip / pill background
+				accent: '#B65B3C',        // Terracotta accent
+				'accent-soft': '#FBEFE5', // Soft terracotta wash
+				sage: '#6E7B5B',          // Success / in-motion green
+				'sage-soft': '#EEF0E4',   // Soft sage wash
+				slate: '#5E6B72',         // Cool slate (alt avatar)
+				secondary: '#6B6256',     // Secondary body text
+				muted: '#9A8E7C',         // Muted label text
+				subtle: '#837868',        // Subtle text
+				buttonText: '#F4ECDD',    // Text on dark buttons
+				gold: '#B79E7C',          // Warm tan (was golden beige)
+				peach: '#FBEFE5',         // Soft peach wash
+				blush: '#F3ECDD',         // Soft blush -> chip cream
+				beige: '#E0D5BD'          // Golden beige
 			},
 			
 			// Override ALL color ranges that might conflict
 			slate: {
-				50: '#F8F6F1',
-				100: '#F5F2ED',
-				200: '#E5E0D8',
-				300: '#D0C8BD',
+				50: '#FAF6EE',
+				100: '#EDE6D8',
+				200: '#E4DCD2',
+				300: '#D8CDBB',
 				400: '#A8A8A8',
 				500: '#6B6B6B',
-				600: '#4A4A4A',
-				700: '#3A3A3A',
-				800: '#2A2A2A',
+				600: '#2A2520',
+				700: '#3A332B',
+				800: '#2A2520',
 				900: '#1A1A1A',
 				950: '#0F0F0F'
 			},
 			gray: {
-				50: '#F8F6F1',
-				100: '#F5F2ED',
-				200: '#E5E0D8',
-				300: '#D0C8BD',
+				50: '#FAF6EE',
+				100: '#EDE6D8',
+				200: '#E4DCD2',
+				300: '#D8CDBB',
 				400: '#A8A8A8',
 				500: '#6B6B6B',
-				600: '#4A4A4A',
-				700: '#3A3A3A',
-				800: '#2A2A2A',
+				600: '#2A2520',
+				700: '#3A332B',
+				800: '#2A2520',
 				900: '#1A1A1A',
 				950: '#0F0F0F'
 			},
 			zinc: {
-				50: '#F8F6F1',
-				100: '#F5F2ED',
-				200: '#E5E0D8',
-				300: '#D0C8BD',
+				50: '#FAF6EE',
+				100: '#EDE6D8',
+				200: '#E4DCD2',
+				300: '#D8CDBB',
 				400: '#A8A8A8',
 				500: '#6B6B6B',
-				600: '#4A4A4A',
-				700: '#3A3A3A',
-				800: '#2A2A2A',
+				600: '#2A2520',
+				700: '#3A332B',
+				800: '#2A2520',
 				900: '#1A1A1A',
 				950: '#0F0F0F'
 			},
 			neutral: {
-				50: '#F8F6F1',
-				100: '#F5F2ED',
-				200: '#E5E0D8',
-				300: '#D0C8BD',
+				50: '#FAF6EE',
+				100: '#EDE6D8',
+				200: '#E4DCD2',
+				300: '#D8CDBB',
 				400: '#A8A8A8',
 				500: '#6B6B6B',
-				600: '#4A4A4A',
-				700: '#3A3A3A',
-				800: '#2A2A2A',
+				600: '#2A2520',
+				700: '#3A332B',
+				800: '#2A2520',
 				900: '#1A1A1A',
 				950: '#0F0F0F'
 			},
 			stone: {
-				50: '#F8F6F1',
-				100: '#F5F2ED',
-				200: '#E5E0D8',
-				300: '#D0C8BD',
+				50: '#FAF6EE',
+				100: '#EDE6D8',
+				200: '#E4DCD2',
+				300: '#D8CDBB',
 				400: '#A8A8A8',
 				500: '#6B6B6B',
-				600: '#4A4A4A',
-				700: '#3A3A3A',
-				800: '#2A2A2A',
+				600: '#2A2520',
+				700: '#3A332B',
+				800: '#2A2520',
 				900: '#1A1A1A',
 				950: '#0F0F0F'
 			},
 			red: {
-				50: '#F8F6F1',
-				100: '#F5F2ED',
-				200: '#E5E0D8',
-				300: '#D0C8BD',
+				50: '#FAF6EE',
+				100: '#EDE6D8',
+				200: '#E4DCD2',
+				300: '#D8CDBB',
 				400: '#A8A8A8',
 				500: '#6B6B6B',
-				600: '#4A4A4A',
-				700: '#3A3A3A',
-				800: '#2A2A2A',
+				600: '#2A2520',
+				700: '#3A332B',
+				800: '#2A2520',
 				900: '#1A1A1A',
 				950: '#0F0F0F'
 			},
 			orange: {
-				50: '#F8F6F1',
-				100: '#F5F2ED',
-				200: '#E5E0D8',
-				300: '#D0C8BD',
+				50: '#FAF6EE',
+				100: '#EDE6D8',
+				200: '#E4DCD2',
+				300: '#D8CDBB',
 				400: '#A8A8A8',
 				500: '#6B6B6B',
-				600: '#4A4A4A',
-				700: '#3A3A3A',
-				800: '#2A2A2A',
+				600: '#2A2520',
+				700: '#3A332B',
+				800: '#2A2520',
 				900: '#1A1A1A',
 				950: '#0F0F0F'
 			},
 			amber: {
-				50: '#F8F6F1',
-				100: '#F5F2ED',
-				200: '#E5E0D8',
-				300: '#D0C8BD',
-				400: '#F5F2ED', // Use light brown/tan here
-				500: '#F5F2ED',
+				50: '#FAF6EE',
+				100: '#EDE6D8',
+				200: '#E4DCD2',
+				300: '#D8CDBB',
+				400: '#EDE6D8', // Use light brown/tan here
+				500: '#EDE6D8',
 				600: '#E6C547',
 				700: '#B8A032',
 				800: '#9A8629',
@@ -187,12 +199,12 @@ export default {
 				950: '#5F5318'
 			},
 			yellow: {
-				50: '#F8F6F1',
-				100: '#F5F2ED',
-				200: '#E5E0D8',
-				300: '#D0C8BD',
-				400: '#F5F2ED',
-				500: '#F5F2ED',
+				50: '#FAF6EE',
+				100: '#EDE6D8',
+				200: '#E4DCD2',
+				300: '#D8CDBB',
+				400: '#EDE6D8',
+				500: '#EDE6D8',
 				600: '#E6C547',
 				700: '#B8A032',
 				800: '#9A8629',
@@ -226,144 +238,144 @@ export default {
 				950: '#000000'
 			},
 			emerald: {
-				50: '#F8F6F1',
-				100: '#F5F2ED',
-				200: '#E5E0D8',
-				300: '#D0C8BD',
+				50: '#FAF6EE',
+				100: '#EDE6D8',
+				200: '#E4DCD2',
+				300: '#D8CDBB',
 				400: '#A8A8A8',
 				500: '#000000',
-				600: '#3A3A3A',
-				700: '#2A2A2A',
+				600: '#3A332B',
+				700: '#2A2520',
 				800: '#1A1A1A',
 				900: '#0F0F0F',
 				950: '#050505'
 			},
 			teal: {
-				50: '#F8F6F1',
-				100: '#F5F2ED',
-				200: '#E5E0D8',
-				300: '#D0C8BD',
+				50: '#FAF6EE',
+				100: '#EDE6D8',
+				200: '#E4DCD2',
+				300: '#D8CDBB',
 				400: '#A8A8A8',
 				500: '#000000',
-				600: '#3A3A3A',
-				700: '#2A2A2A',
+				600: '#3A332B',
+				700: '#2A2520',
 				800: '#1A1A1A',
 				900: '#0F0F0F',
 				950: '#050505'
 			},
 			cyan: {
-				50: '#F8F6F1',
-				100: '#F5F2ED',
-				200: '#E5E0D8',
-				300: '#D0C8BD',
+				50: '#FAF6EE',
+				100: '#EDE6D8',
+				200: '#E4DCD2',
+				300: '#D8CDBB',
 				400: '#A8A8A8',
 				500: '#000000',
-				600: '#3A3A3A',
-				700: '#2A2A2A',
+				600: '#3A332B',
+				700: '#2A2520',
 				800: '#1A1A1A',
 				900: '#0F0F0F',
 				950: '#050505'
 			},
 			sky: {
-				50: '#F8F6F1',
-				100: '#F5F2ED',
-				200: '#E5E0D8',
-				300: '#D0C8BD',
+				50: '#FAF6EE',
+				100: '#EDE6D8',
+				200: '#E4DCD2',
+				300: '#D8CDBB',
 				400: '#A8A8A8',
 				500: '#000000',
-				600: '#3A3A3A',
-				700: '#2A2A2A',
+				600: '#3A332B',
+				700: '#2A2520',
 				800: '#1A1A1A',
 				900: '#0F0F0F',
 				950: '#050505'
 			},
 			blue: {
-				50: '#F8F6F1',
-				100: '#F5F2ED',
-				200: '#E5E0D8',
-				300: '#D0C8BD',
+				50: '#FAF6EE',
+				100: '#EDE6D8',
+				200: '#E4DCD2',
+				300: '#D8CDBB',
 				400: '#A8A8A8',
 				500: '#000000',
-				600: '#3A3A3A',
-				700: '#2A2A2A',
+				600: '#3A332B',
+				700: '#2A2520',
 				800: '#1A1A1A',
 				900: '#0F0F0F',
 				950: '#050505'
 			},
 			indigo: {
-				50: '#F8F6F1',
-				100: '#F5F2ED',
-				200: '#E5E0D8',
-				300: '#D0C8BD',
+				50: '#FAF6EE',
+				100: '#EDE6D8',
+				200: '#E4DCD2',
+				300: '#D8CDBB',
 				400: '#A8A8A8',
 				500: '#000000',
-				600: '#3A3A3A',
-				700: '#2A2A2A',
+				600: '#3A332B',
+				700: '#2A2520',
 				800: '#1A1A1A',
 				900: '#0F0F0F',
 				950: '#050505'
 			},
 			violet: {
-				50: '#F8F6F1',
-				100: '#F5F2ED',
-				200: '#E5E0D8',
-				300: '#D0C8BD',
+				50: '#FAF6EE',
+				100: '#EDE6D8',
+				200: '#E4DCD2',
+				300: '#D8CDBB',
 				400: '#A8A8A8',
 				500: '#000000',
-				600: '#3A3A3A',
-				700: '#2A2A2A',
+				600: '#3A332B',
+				700: '#2A2520',
 				800: '#1A1A1A',
 				900: '#0F0F0F',
 				950: '#050505'
 			},
 			purple: {
-				50: '#F8F6F1',
-				100: '#F5F2ED',
-				200: '#E5E0D8',
-				300: '#D0C8BD',
+				50: '#FAF6EE',
+				100: '#EDE6D8',
+				200: '#E4DCD2',
+				300: '#D8CDBB',
 				400: '#A8A8A8',
 				500: '#000000',
-				600: '#3A3A3A',
-				700: '#2A2A2A',
+				600: '#3A332B',
+				700: '#2A2520',
 				800: '#1A1A1A',
 				900: '#0F0F0F',
 				950: '#050505'
 			},
 			fuchsia: {
-				50: '#F8F6F1',
-				100: '#F5F2ED',
-				200: '#E5E0D8',
-				300: '#D0C8BD',
+				50: '#FAF6EE',
+				100: '#EDE6D8',
+				200: '#E4DCD2',
+				300: '#D8CDBB',
 				400: '#A8A8A8',
 				500: '#000000',
-				600: '#3A3A3A',
-				700: '#2A2A2A',
+				600: '#3A332B',
+				700: '#2A2520',
 				800: '#1A1A1A',
 				900: '#0F0F0F',
 				950: '#050505'
 			},
 			pink: {
-				50: '#F8F6F1',
-				100: '#F5F2ED',
-				200: '#E5E0D8',
-				300: '#D0C8BD',
+				50: '#FAF6EE',
+				100: '#EDE6D8',
+				200: '#E4DCD2',
+				300: '#D8CDBB',
 				400: '#A8A8A8',
 				500: '#000000',
-				600: '#3A3A3A',
-				700: '#2A2A2A',
+				600: '#3A332B',
+				700: '#2A2520',
 				800: '#1A1A1A',
 				900: '#0F0F0F',
 				950: '#050505'
 			},
 			rose: {
-				50: '#F8F6F1',
-				100: '#F5F2ED',
-				200: '#E5E0D8',
-				300: '#D0C8BD',
+				50: '#FAF6EE',
+				100: '#EDE6D8',
+				200: '#E4DCD2',
+				300: '#D8CDBB',
 				400: '#A8A8A8',
 				500: '#000000',
-				600: '#3A3A3A',
-				700: '#2A2A2A',
+				600: '#3A332B',
+				700: '#2A2520',
 				800: '#1A1A1A',
 				900: '#0F0F0F',
 				950: '#050505'
@@ -372,9 +384,10 @@ export default {
 		// ... keep existing code (extend section)
 		extend: {
 			fontFamily: {
-				'display': ['"Playfair Display"', 'serif'],
-				'serif': ['"Playfair Display"', 'serif'],
-				'sans': ['"Inter"', 'sans-serif'],
+				'display': ['"Newsreader"', 'Georgia', 'serif'],
+				'serif': ['"Newsreader"', 'Georgia', 'serif'],
+				'sans': ['"Hanken Grotesk"', '"Inter"', 'system-ui', 'sans-serif'],
+				'mono': ['"DM Mono"', 'ui-monospace', 'monospace'],
 			},
 			borderRadius: {
 				lg: 'var(--radius)',

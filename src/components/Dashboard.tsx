@@ -1,33 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card } from '@/components/ui/card';
-import UserMenu from '@/components/auth/UserMenu';
 import MonthlyOpportunitiesOverlay from '@/components/MonthlyOpportunitiesOverlay';
 import GiftScheduledSuccess from '@/components/GiftScheduledSuccess';
-import WelcomeGuide from '@/components/WelcomeGuide';
-import { Logo } from '@/components/ui/logo';
-import { Bell, Star, Heart, Plus, Lock, Crown, Truck, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { Users, Zap, Calendar, Wallet } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import AddRecipientModal from '@/components/AddRecipientModal';
 import ScheduleGiftModal from '@/components/ScheduleGiftModal';
 import EditRecipientModal from '@/components/EditRecipientModal';
-import SubscriptionBadge from '@/components/subscription/SubscriptionBadge';
-import { WalletBalance } from '@/components/wallet/WalletBalance';
 import { AddFundsModal } from '@/components/wallet/AddFundsModal';
 import { VIPUpgradeModal } from '@/components/subscription/VIPUpgradeModal';
 import { VIPWelcomeModal } from '@/components/onboarding/VIPWelcomeModal';
 import { AutomationToggle, EnableAutomationModal, AutomationDetailModal } from '@/components/automation';
-import { GiftsAwaitingConfirmation } from '@/components/GiftsAwaitingConfirmation';
-import { format } from 'date-fns';
+import { MobileShell, Eyebrow, PrimaryButton, Display } from '@/components/unwrapt2/MobileShell';
+import { MargotAvatar, PersonAvatar } from '@/components/unwrapt2/MargotAvatar';
+import { ApprovalScreen } from '@/components/unwrapt2/ApprovalScreen';
+import { U, toneForIndex, initialsOf } from '@/components/unwrapt2/theme';
 import { cleanName } from '@/lib/utils';
 import { getNextOccurrence, formatOccasionDate, getDaysUntil, getDaysUntilExact } from '@/lib/dateUtils';
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [showMonthlyOpportunities, setShowMonthlyOpportunities] = useState(false);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [successRecipient, setSuccessRecipient] = useState(null);
@@ -45,37 +40,21 @@ const Dashboard = () => {
   const [showAutomationDetail, setShowAutomationDetail] = useState(false);
   const [detailRecipient, setDetailRecipient] = useState<any>(null);
   const [isUpgrading, setIsUpgrading] = useState(false);
-  const [showWelcomeGuide, setShowWelcomeGuide] = useState(false);
-  const [welcomeGuideDismissed, setWelcomeGuideDismissed] = useState(false);
-
-  // Check if welcome guide should be shown (new user with no recipients)
-  useEffect(() => {
-    const dismissed = localStorage.getItem('welcomeGuideDismissed') === 'true';
-    setWelcomeGuideDismissed(dismissed);
-  }, []);
+  const [approval, setApproval] = useState<{ gift: any; recipient: any } | null>(null);
 
   // Direct Stripe checkout for VIP upgrade
   const handleDirectUpgrade = async () => {
     if (!user) return;
-    
     setIsUpgrading(true);
     try {
       const { data, error } = await supabase.functions.invoke('create-subscription-checkout', {
-        body: { priceId: 'vip_monthly' }
+        body: { priceId: 'vip_monthly' },
       });
-
       if (error) throw error;
-
-      if (data?.url) {
-        window.location.href = data.url;
-      }
+      if (data?.url) window.location.href = data.url;
     } catch (error) {
       console.error('Error creating checkout session:', error);
-      toast({
-        title: "Error",
-        description: "Failed to start checkout. Please try again.",
-        variant: "destructive"
-      });
+      toast({ title: 'Error', description: 'Failed to start checkout. Please try again.', variant: 'destructive' });
       setIsUpgrading(false);
     }
   };
@@ -85,39 +64,26 @@ const Dashboard = () => {
     queryKey: ['user-profile', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      
       const { data, error } = await supabase
         .from('profiles')
         .select('subscription_tier, trial_ends_at, gift_wallet_balance')
         .eq('id', user.id)
         .single();
-      
       if (error) throw error;
       return data;
     },
-    enabled: !!user?.id
+    enabled: !!user?.id,
   });
 
-  // Subscribe to real-time wallet balance updates
+  // Real-time wallet balance updates
   useEffect(() => {
     if (!user?.id) return;
-
     const channel = supabase
       .channel('wallet-balance-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'profiles',
-          filter: `id=eq.${user.id}`,
-        },
-        () => {
-          refetchProfile();
-        }
-      )
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` }, () => {
+        refetchProfile();
+      })
       .subscribe();
-
     return () => {
       supabase.removeChannel(channel);
     };
@@ -126,17 +92,10 @@ const Dashboard = () => {
   // Trigger VIP onboarding when user upgrades from free to VIP
   useEffect(() => {
     if (!userProfile?.subscription_tier) return;
-
     const currentTier = userProfile.subscription_tier;
-
-    // Only show onboarding if:
-    // 1. User just switched TO VIP (previousTier exists and was not VIP)
-    if (currentTier === 'vip' &&
-        previousTier !== null &&
-        previousTier !== 'vip') {
+    if (currentTier === 'vip' && previousTier !== null && previousTier !== 'vip') {
       setShowVIPOnboarding(true);
     }
-
     setPreviousTier(currentTier);
   }, [userProfile?.subscription_tier, previousTier]);
 
@@ -145,84 +104,52 @@ const Dashboard = () => {
     queryKey: ['recipients', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      
-      console.log('📊 Dashboard: Fetching recipients for user:', user.id);
-      
       const { data, error } = await supabase
         .from('recipients')
-        .select(`
-          *,
-          scheduled_gifts(*)
-        `)
+        .select(`*, scheduled_gifts(*)`)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
-      
-      if (error) {
-        console.error('❌ Dashboard: Error fetching recipients:', error);
-        throw error;
-      }
-      
-      console.log(`✅ Dashboard: Fetched ${data?.length || 0} recipients`);
+      if (error) throw error;
       return data || [];
     },
     enabled: !!user?.id,
-    staleTime: 0, // Always refetch to ensure fresh data
-    refetchOnWindowFocus: true
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
-
 
   // Check for recently scheduled gift to show success animation
   const { data: recentGift } = useQuery({
     queryKey: ['recent-gift', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      
       const giftSuccess = sessionStorage.getItem('giftScheduledSuccess');
       if (!giftSuccess) return null;
-      
       const { recipientId, timestamp } = JSON.parse(giftSuccess);
-      const now = Date.now();
-      if (now - timestamp > 30000) {
+      if (Date.now() - timestamp > 30000) {
         sessionStorage.removeItem('giftScheduledSuccess');
         return null;
       }
-      
       const { data: recipient, error } = await supabase
         .from('recipients')
-        .select(`
-          *,
-          scheduled_gifts:scheduled_gifts(
-            id,
-            gift_description,
-            status,
-            created_at
-          )
-        `)
+        .select(`*, scheduled_gifts:scheduled_gifts(id, gift_description, status, created_at)`)
         .eq('id', recipientId)
         .eq('user_id', user.id)
         .single();
-      
       if (error || !recipient) {
         sessionStorage.removeItem('giftScheduledSuccess');
         return null;
       }
-      
       const recentScheduledGift = recipient.scheduled_gifts
-        ?.filter(gift => gift.created_at)
+        ?.filter((gift) => gift.created_at)
         ?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())?.[0];
-      
-      return {
-        ...recipient,
-        recentGift: recentScheduledGift
-      };
+      return { ...recipient, recentGift: recentScheduledGift };
     },
-    enabled: !!user?.id
+    enabled: !!user?.id,
   });
 
   useEffect(() => {
     const today = new Date().toDateString();
     const opportunitiesShownDate = localStorage.getItem('opportunitiesShownDate');
-    
     if (opportunitiesShownDate !== today) {
       setShowMonthlyOpportunities(true);
       localStorage.setItem('opportunitiesShownDate', today);
@@ -236,465 +163,365 @@ const Dashboard = () => {
     }
   }, [recentGift, showMonthlyOpportunities]);
 
-  const handleMonthlyOpportunitiesComplete = () => {
-    setShowMonthlyOpportunities(false);
-  };
-
+  const handleMonthlyOpportunitiesComplete = () => setShowMonthlyOpportunities(false);
   const handleSuccessComplete = () => {
     setShowSuccessAnimation(false);
     setSuccessRecipient(null);
     sessionStorage.removeItem('giftScheduledSuccess');
   };
 
-  const getOccasionIcon = (occasion: string) => {
-    if (occasion.toLowerCase().includes('birthday')) return <Bell className="w-5 h-5 text-[#D2B887]" />;
-    if (occasion.toLowerCase().includes('anniversary')) return <Star className="w-5 h-5 text-[#D2B887]" />;
-    return <Heart className="w-5 h-5 text-[#D2B887]" />;
-  };
-
   const handleScheduleGift = (recipient: any) => {
     setSelectedRecipient(recipient);
     setShowScheduleGift(true);
   };
-
   const handleEnableAutomation = (recipient: any) => {
     setAutomationRecipient(recipient);
     setShowEnableAutomation(true);
   };
-
   const handleDisableAutomation = async (recipientId: string) => {
     if (!user) return;
-
     try {
-      await supabase
-        .from('scheduled_gifts')
-        .update({ automation_enabled: false })
-        .eq('recipient_id', recipientId)
-        .eq('user_id', user.id);
-
-      // Refetch recipients to update UI
-      window.location.reload(); // Simple refresh for now
+      await supabase.from('scheduled_gifts').update({ automation_enabled: false }).eq('recipient_id', recipientId).eq('user_id', user.id);
+      window.location.reload();
     } catch (error) {
       console.error('Error disabling automation:', error);
     }
   };
 
   // Sort recipients by next upcoming birthday/anniversary
-  const sortedRecipients = [...recipients].sort((a, b) => {
-    const aDateString = a.birthday || a.anniversary;
-    const bDateString = b.birthday || b.anniversary;
+  const sortedRecipients = useMemo(() => {
+    return [...recipients].sort((a, b) => {
+      const aDateString = a.birthday || a.anniversary;
+      const bDateString = b.birthday || b.anniversary;
+      if (!aDateString && !bDateString) return 0;
+      if (!aDateString) return 1;
+      if (!bDateString) return -1;
+      return getNextOccurrence(aDateString).getTime() - getNextOccurrence(bDateString).getTime();
+    });
+  }, [recipients]);
 
-    // Handle cases where one or both don't have dates
-    if (!aDateString && !bDateString) return 0;
-    if (!aDateString) return 1;
-    if (!bDateString) return -1;
+  // Derive concierge inbox state from loaded data.
+  const giftNeedsReview = (g: any) => g?.wallet_reserved && !g?.fulfilled_at && g?.status !== 'ordered' && g?.status !== 'delivered';
 
-    // Get next occurrences using timezone-safe utility
-    const aDate = getNextOccurrence(aDateString);
-    const bDate = getNextOccurrence(bDateString);
+  const needsReview = useMemo(() => {
+    const out: { gift: any; recipient: any }[] = [];
+    recipients.forEach((r: any) => (r.scheduled_gifts || []).forEach((g: any) => {
+      if (giftNeedsReview(g)) out.push({ gift: g, recipient: r });
+    }));
+    return out;
+  }, [recipients]);
 
-    // Sort by earliest upcoming date
-    const diff = aDate.getTime() - bDate.getTime();
+  const inMotionCount = useMemo(() => {
+    let n = 0;
+    recipients.forEach((r: any) => (r.scheduled_gifts || []).forEach((g: any) => {
+      if (g.status === 'ordered') n++;
+    }));
+    return n;
+  }, [recipients]);
 
-    // Debug log for testing
-    if (import.meta.env.DEV) {
-      console.log('📅 Sorting:', {
-        a: { name: a.name, date: aDateString, next: aDate.toLocaleDateString(), days: getDaysUntil(aDateString) },
-        b: { name: b.name, date: bDateString, next: bDate.toLocaleDateString(), days: getDaysUntil(bDateString) },
-        diff
-      });
-    }
+  const greeting = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 18) return 'Good afternoon';
+    return 'Good evening';
+  })();
+  const displayName = (user?.user_metadata?.full_name || user?.email || 'there').split(' ')[0].split('@')[0];
+  const tier = (userProfile?.subscription_tier as 'free' | 'vip') || 'free';
+  const planLabel = tier === 'vip' ? 'VIP' : (userProfile?.trial_ends_at ? 'Free trial' : 'Free');
+  const isFree = tier === 'free';
 
-    return diff;
-  });
-
-  // Log rendering info with current date context
-  const today = new Date();
-  console.log('📊 Dashboard: Rendering with', recipients.length, 'recipients.');
-  console.log('📅 Current Date:', today.toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  }));
-  console.log('👤 Tier:', userProfile?.subscription_tier || 'loading...');
+  const heroRecipient = sortedRecipients[0];
+  const heroNextDate = heroRecipient ? (heroRecipient.birthday || heroRecipient.anniversary) : null;
+  const heroDays = heroNextDate ? getDaysUntil(heroNextDate) : null;
 
   return (
     <>
-      {showMonthlyOpportunities && (
-        <MonthlyOpportunitiesOverlay onComplete={handleMonthlyOpportunitiesComplete} />
-      )}
-      
+      {showMonthlyOpportunities && <MonthlyOpportunitiesOverlay onComplete={handleMonthlyOpportunitiesComplete} />}
       {successRecipient && (
-        <GiftScheduledSuccess
-          recipient={successRecipient}
-          onComplete={handleSuccessComplete}
-          isVisible={showSuccessAnimation}
+        <GiftScheduledSuccess recipient={successRecipient} onComplete={handleSuccessComplete} isVisible={showSuccessAnimation} />
+      )}
+
+      {approval && (
+        <ApprovalScreen
+          gift={approval.gift}
+          recipient={approval.recipient}
+          onClose={() => setApproval(null)}
+          onApproved={() => setApproval(null)}
         />
       )}
-      
-      <div className="min-h-screen bg-[#FAF8F3]">
-        {/* Header */}
-        <header className="border-b border-[#E4DCD2] bg-[#FAF8F3]">
-          <div className="px-12 py-6 flex items-center justify-between">
-            <Logo size="lg" />
-            <UserMenu />
-          </div>
-          <div className="px-12 pb-8 text-center">
-            <div className="flex items-center justify-center gap-3 mb-2">
-              <h1 className="font-display text-2xl text-[#1A1A1A]">
-                Your Unwrapt Concierge
-              </h1>
-              {userProfile && (
-                <SubscriptionBadge 
-                  tier={userProfile.subscription_tier as 'free' | 'vip'}
-                  trialEndsAt={userProfile.trial_ends_at}
-                />
-              )}
+
+      <MobileShell
+        contentClassName="px-5 pt-12 pb-3"
+        footer={
+          <>
+            <div className="mb-2.5 flex gap-2 overflow-x-auto">
+              <div onClick={() => setShowAddRecipient(true)} className="flex-shrink-0 cursor-pointer whitespace-nowrap" style={{ padding: '9px 14px', borderRadius: 14, background: U.chip, border: '1px solid rgba(42,37,32,0.1)', fontSize: 13, fontWeight: 600, color: '#5A5147' }}>
+                ＋ Add someone
+              </div>
+              <div onClick={() => navigate('/gift-history')} className="flex-shrink-0 cursor-pointer whitespace-nowrap" style={{ padding: '9px 14px', borderRadius: 14, background: U.chip, border: '1px solid rgba(42,37,32,0.1)', fontSize: 13, fontWeight: 600, color: '#5A5147' }}>
+                ✦ Gift history
+              </div>
             </div>
-            <p className="text-[#1A1A1A]/70 text-sm">
-              Here to help you prepare every upcoming gift with ease.
-            </p>
+            <div className="flex items-center gap-2.5" style={{ padding: '7px 7px 7px 18px', borderRadius: 24, background: U.surface, border: '1px solid rgba(42,37,32,0.1)' }}>
+              <input placeholder="Ask Margot anything…" className="flex-1" style={{ border: 'none', background: 'transparent', fontSize: 14.5, color: U.ink }} />
+              <div className="flex items-center justify-center" style={{ width: 38, height: 38, borderRadius: '50%', background: U.accent, color: U.buttonText, fontSize: 17, flexShrink: 0 }}>↑</div>
+            </div>
+          </>
+        }
+      >
+        {/* Header */}
+        <div className="flex items-end justify-between">
+          <div>
+            <Eyebrow className="mb-0.5">{greeting}, {displayName}</Eyebrow>
+            <span className="font-display" style={{ fontSize: 27, letterSpacing: '-0.4px' }}>Your inbox</span>
           </div>
-        </header>
-
-        {/* Wallet Balance for VIP users */}
-        {userProfile && (
-          <div className="px-12 pt-8 space-y-6">
-            <WalletBalance
-              balance={userProfile.gift_wallet_balance || 0}
-              onAddFunds={() => setShowAddFunds(true)}
-              tier={userProfile.subscription_tier as 'free' | 'vip'}
-            />
+          <div className="flex items-center gap-2.5">
+            <span className="font-mono uppercase" style={{ fontSize: 9, letterSpacing: '1px', color: U.accent, border: '1px solid rgba(182,91,60,0.4)', padding: '3px 7px', borderRadius: 8 }}>{planLabel}</span>
+            <div onClick={() => navigate('/settings')} className="flex cursor-pointer items-center justify-center" style={{ width: 34, height: 34, borderRadius: '50%', background: '#E5DBC6', fontFamily: "'Newsreader', serif", fontStyle: 'italic', fontSize: 15, color: '#5A5147' }}>
+              {initialsOf(displayName).charAt(0)}
+            </div>
           </div>
-        )}
-
-        {/* Gifts Awaiting Confirmation for VIP users */}
-        {userProfile?.subscription_tier === 'vip' && (
-          <div className="px-12 pt-6">
-            <GiftsAwaitingConfirmation />
-          </div>
-        )}
-
-        {/* Main Content - Centered when no scheduled gifts, two column when gifts exist */}
-        <div className="px-12 py-12 flex justify-center">
-          {/* Upcoming Birthdays */}
-          <div className="space-y-6 w-full max-w-[620px]">
-            {/* Welcome Guide for new users with no recipients */}
-            {sortedRecipients.length === 0 && !welcomeGuideDismissed && (
-              <WelcomeGuide
-                userName={user?.user_metadata?.full_name || user?.email}
-                onAddRecipient={() => setShowAddRecipient(true)}
-                onDismiss={() => setWelcomeGuideDismissed(true)}
-              />
-            )}
-
-            <Card className="bg-[#EFE7DD] border-[#E4DCD2] rounded-2xl p-6 shadow-[0px_4px_12px_rgba(0,0,0,0.07)]">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="font-display text-xl text-[#1A1A1A]">
-                  Upcoming Birthdays
-                </h2>
-                {sortedRecipients.length > 0 && (
-                  <Button
-                    onClick={() => setShowAddRecipient(true)}
-                    size="sm"
-                    className="bg-[#D2B887] hover:bg-[#D2B887]/90 text-[#1A1A1A] h-8 w-8 p-0 rounded-full"
-                    title="Add New Recipient"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
-              
-              <div className="relative space-y-4">
-                {sortedRecipients.length === 0 ? (
-                  <div className="text-center py-6 text-[#1A1A1A]/60">
-                    <p className="text-sm">Your recipients will appear here once added.</p>
-                  </div>
-                ) : (
-                  <>
-                    {sortedRecipients.map((recipient, index) => {
-                      const nextOccasionDate = recipient.birthday || recipient.anniversary;
-                      const occasionType = recipient.birthday ? 'Birthday' : 'Anniversary';
-                      const isFreeUser = userProfile?.subscription_tier === 'free';
-                      const isLocked = isFreeUser && index >= 3;
-                      const daysUntil = nextOccasionDate ? getDaysUntil(nextOccasionDate) : null;
-
-                      // Find active order for this recipient
-                      const activeOrder = recipient.scheduled_gifts?.find((gift: any) =>
-                        (gift.status === 'ordered' || gift.status === 'delivered') &&
-                        gift.delivery_date
-                      );
-                      const deliveryDaysUntil = activeOrder?.delivery_date ? getDaysUntilExact(activeOrder.delivery_date) : null;
-
-                      // Find the most relevant automated gift for the NEXT upcoming occasion
-                      // Priority: ordered > paid > reserved > pending
-                      const nextOccasionGiftDate = nextOccasionDate ? getNextOccurrence(nextOccasionDate) : null;
-                      const relevantAutomatedGift = recipient.scheduled_gifts
-                        ?.filter((g: any) => g.automation_enabled && g.occasion_date)
-                        ?.sort((a: any, b: any) => {
-                          const aDate = new Date(a.occasion_date);
-                          const bDate = new Date(b.occasion_date);
-                          // Sort by closest to next occurrence
-                          const aDiff = Math.abs(aDate.getTime() - (nextOccasionGiftDate?.getTime() || 0));
-                          const bDiff = Math.abs(bDate.getTime() - (nextOccasionGiftDate?.getTime() || 0));
-                          return aDiff - bDiff;
-                        })[0];
-
-                      return (
-                        <div
-                          key={recipient.id}
-                          className={`p-4 bg-[#FAF8F3]/50 rounded-xl border border-[#E4DCD2] ${
-                            isLocked ? 'blur-sm pointer-events-none' : 'hover:bg-[#FAF8F3]'
-                          } transition-colors`}
-                        >
-                          <div
-                            className="flex items-start justify-between cursor-pointer"
-                            onClick={() => !isLocked && handleScheduleGift(recipient)}
-                          >
-                            <div className="flex items-start gap-4">
-                              <div className="w-10 h-10 rounded-full bg-[#D2B887]/20 flex items-center justify-center flex-shrink-0">
-                                <span className="text-[#1A1A1A] font-medium">
-                                  {cleanName(recipient.name).charAt(0)}
-                                </span>
-                              </div>
-                              <div>
-                                <h3 className="font-medium text-[#1A1A1A]">{cleanName(recipient.name)}</h3>
-                                {nextOccasionDate ? (
-                                  <div className="flex items-baseline gap-2 mt-0.5">
-                                    <p className="text-base font-medium text-[#D2B887]">
-                                      {formatOccasionDate(nextOccasionDate)}
-                                    </p>
-                                    {daysUntil !== null && (
-                                      <span className="text-xs text-[#1A1A1A]/50">
-                                        {daysUntil === 0 ? '• Today!' : daysUntil === 1 ? '• Tomorrow' : `• in ${daysUntil} days`}
-                                      </span>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <p className="text-sm text-[#1A1A1A]/50">No date set</p>
-                                )}
-
-                                {/* Order Status - show if an order has been placed */}
-                                {activeOrder && (
-                                  <div className="mt-2 pt-2 border-t border-[#E4DCD2]/50">
-                                    <div className="flex items-center gap-3">
-                                      {/* Product Image */}
-                                      {activeOrder.gift_image_url && (
-                                        <div className="w-12 h-12 rounded-lg overflow-hidden bg-[#FAF8F3] border border-[#E4DCD2] flex-shrink-0">
-                                          <img
-                                            src={activeOrder.gift_image_url}
-                                            alt={activeOrder.gift_type || 'Gift'}
-                                            className="w-full h-full object-cover"
-                                          />
-                                        </div>
-                                      )}
-
-                                      <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                          <Truck className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                                          <span className="text-sm font-medium text-emerald-700">
-                                            {activeOrder.status === 'delivered' ? 'Delivered' : 'Order Placed'}
-                                          </span>
-                                          {activeOrder.shopify_order_id && (
-                                            <span className="text-xs text-[#1A1A1A]/40">
-                                              #{activeOrder.shopify_order_id.slice(-6)}
-                                            </span>
-                                          )}
-                                        </div>
-                                        {activeOrder.gift_type && (
-                                          <p className="text-xs text-[#1A1A1A]/70 mt-0.5 truncate">
-                                            {activeOrder.gift_type}
-                                          </p>
-                                        )}
-                                        {activeOrder.delivery_date && deliveryDaysUntil !== null && (
-                                          <p className="text-xs text-[#1A1A1A]/60 mt-0.5">
-                                            {deliveryDaysUntil < 0 
-                                              ? `Delivered ${formatOccasionDate(activeOrder.delivery_date)}`
-                                              : deliveryDaysUntil === 0 
-                                                ? 'Delivers today'
-                                                : `Delivers ${formatOccasionDate(activeOrder.delivery_date)} (in ${deliveryDaysUntil} ${deliveryDaysUntil === 1 ? 'day' : 'days'})`
-                                            }
-                                          </p>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            {nextOccasionDate && getOccasionIcon(occasionType)}
-                          </div>
-
-                          {/* Automation Toggle for VIP users */}
-                          {!isLocked && nextOccasionDate && userProfile?.subscription_tier === 'vip' && (() => {
-                            // If there's an active order and the relevant automated gift is for the SAME occasion, don't show duplicate status
-                            const activeOrderDate = activeOrder?.occasion_date;
-                            const automatedGiftDate = relevantAutomatedGift?.occasion_date;
-                            const isSameOccasion = activeOrderDate && automatedGiftDate &&
-                              new Date(activeOrderDate).getTime() === new Date(automatedGiftDate).getTime();
-
-                            // Only show automation toggle if:
-                            // 1. No active order exists, OR
-                            // 2. The automated gift is for a different (future) occasion
-                            if (activeOrder && isSameOccasion) {
-                              return null;
-                            }
-
-                            return (
-                              <div className="mt-3 pt-3 border-t border-[#E4DCD2]" onClick={(e) => e.stopPropagation()}>
-                                <AutomationToggle
-                                  recipientId={recipient.id}
-                                  recipientName={cleanName(recipient.name)}
-                                  estimatedCost={42.00}
-                                  onEnableAutomation={() => handleEnableAutomation(recipient)}
-                                  onDisableAutomation={() => handleDisableAutomation(recipient.id)}
-                                  onViewDetails={() => {
-                                    setDetailRecipient(recipient);
-                                    setShowAutomationDetail(true);
-                                  }}
-                                  tier={userProfile.subscription_tier as 'free' | 'vip'}
-                                  isEnabled={recipient.automation_enabled || recipient.scheduled_gifts?.some((g: any) => g.automation_enabled)}
-                                  hasCompleteAddress={!!(recipient.street && recipient.city && recipient.state && recipient.zip_code)}
-                                  hasGiftSelected={!!(recipient.default_gift_variant_id || recipient.preferred_gift_vibe)}
-                                  scheduledGift={relevantAutomatedGift}
-                                  walletBalance={userProfile.gift_wallet_balance || 0}
-                                />
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      );
-                    })}
-                    
-                    {/* Centered CTA overlay for blurred recipients (Free users only) */}
-                    {userProfile?.subscription_tier === 'free' && sortedRecipients.length > 3 && (
-                      <div
-                        className="absolute left-0 right-0 flex items-start justify-center pointer-events-none z-20 pt-6"
-                        style={{
-                          top: `calc(${3 * 76}px + ${3 * 16}px)`, // Position at start of 4th recipient (after 3 visible ones)
-                          height: `calc(${(sortedRecipients.length - 3) * 76}px + ${(sortedRecipients.length - 4) * 16}px)` // Height covering all blurred recipients
-                        }}
-                      >
-                        <div className="bg-[#FAF8F3]/95 backdrop-blur-sm rounded-2xl p-6 shadow-lg border-2 border-[#D2B887] pointer-events-auto max-w-md">
-                          <div className="text-center">
-                            <Lock className="w-8 h-8 mx-auto mb-3 text-[#D2B887]" />
-                            <h3 className="font-display text-xl text-[#1A1A1A] mb-2">
-                              Upgrade to VIP
-                            </h3>
-                            <p className="text-sm text-[#1A1A1A]/70 mb-4">
-                              Unlock unlimited recipients and automation features
-                            </p>
-                            
-                            {/* Benefits grid */}
-                            <div className="grid grid-cols-2 gap-2 mb-4">
-                              <div className="flex items-center gap-2 bg-white/60 rounded-full px-3 py-2 border border-[#E4DCD2]">
-                                <Users className="w-4 h-4 text-[#D2B887]" />
-                                <span className="text-xs text-[#1A1A1A]">Unlimited recipients</span>
-                              </div>
-                              <div className="flex items-center gap-2 bg-white/60 rounded-full px-3 py-2 border border-[#E4DCD2]">
-                                <Zap className="w-4 h-4 text-[#D2B887]" />
-                                <span className="text-xs text-[#1A1A1A]">Full gift automation</span>
-                              </div>
-                              <div className="flex items-center gap-2 bg-white/60 rounded-full px-3 py-2 border border-[#E4DCD2]">
-                                <Calendar className="w-4 h-4 text-[#D2B887]" />
-                                <span className="text-xs text-[#1A1A1A]">Advanced scheduling</span>
-                              </div>
-                              <div className="flex items-center gap-2 bg-white/60 rounded-full px-3 py-2 border border-[#E4DCD2]">
-                                <Wallet className="w-4 h-4 text-[#D2B887]" />
-                                <span className="text-xs text-[#1A1A1A]">Gift wallet & auto-reload</span>
-                              </div>
-                            </div>
-                            
-                            <Button
-                              className="bg-[#D2B887] hover:bg-[#D2B887]/90 text-[#1A1A1A] w-full"
-                              onClick={handleDirectUpgrade}
-                              disabled={isUpgrading}
-                            >
-                              {isUpgrading ? (
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              ) : (
-                                <Crown className="w-4 h-4 mr-2" />
-                              )}
-                              {isUpgrading ? 'Redirecting...' : 'Upgrade Now'}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </Card>
-
-            {/* Add New Recipient Button */}
-            {sortedRecipients.length > 0 && (
-              <Button
-                onClick={() => setShowAddRecipient(true)}
-                variant="outline"
-                className="w-full border-[#E4DCD2] bg-transparent hover:bg-[#EFE7DD] text-[#1A1A1A]"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add New Recipient
-              </Button>
-            )}
-
-          </div>
-
         </div>
-      </div>
 
-      {/* Modals */}
+        {/* Margot status */}
+        <div className="my-4 flex items-center gap-2.5" style={{ padding: '11px 14px', borderRadius: 14, background: U.chip }}>
+          <MargotAvatar size={26} />
+          <span style={{ fontSize: 13.5, color: '#5A5147' }}>
+            <strong>Margot</strong> · {needsReview.length} {needsReview.length === 1 ? 'needs' : 'need'} you, {inMotionCount} in motion
+          </span>
+        </div>
+
+        {/* Trial / activate banner */}
+        {isFree && (
+          <div onClick={() => setShowUpgradeModal(true)} className="mb-4 flex cursor-pointer items-center gap-2.5" style={{ padding: '12px 14px', borderRadius: 14, background: U.accentSoft, border: '1px solid rgba(182,91,60,0.25)' }}>
+            <span style={{ fontSize: 15 }}>✦</span>
+            <div className="flex-1" style={{ fontSize: 13, color: '#5A5147' }}>
+              <strong>{userProfile?.trial_ends_at ? 'Free trial' : 'Activate Unwrapt'}</strong> · unlock unlimited people & full autopilot
+            </div>
+            <span className="font-mono uppercase" style={{ fontSize: 10, letterSpacing: '1px', color: U.accent }}>Activate</span>
+          </div>
+        )}
+
+        {/* People strip */}
+        {sortedRecipients.length > 0 && (
+          <div className="mb-4">
+            <Eyebrow className="mb-2.5">Your people</Eyebrow>
+            <div className="flex gap-3.5 overflow-x-auto pb-0.5">
+              {sortedRecipients.map((p: any, i: number) => (
+                <div key={p.id} onClick={() => handleScheduleGift(p)} className="flex flex-shrink-0 cursor-pointer flex-col items-center gap-1.5" style={{ width: 56 }}>
+                  <PersonAvatar initials={initialsOf(cleanName(p.name))} tone={toneForIndex(i)} size={52} />
+                  <span style={{ fontSize: 11.5, color: '#5A5147', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 56 }}>{cleanName(p.name).split(' ')[0]}</span>
+                </div>
+              ))}
+              <div onClick={() => setShowAddRecipient(true)} className="flex flex-shrink-0 cursor-pointer flex-col items-center gap-1.5" style={{ width: 56 }}>
+                <div className="flex items-center justify-center" style={{ width: 52, height: 52, borderRadius: '50%', border: '1.5px dashed rgba(42,37,32,0.25)', color: U.accent, fontSize: 24 }}>+</div>
+                <span style={{ fontSize: 11.5, color: U.muted }}>Add</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Needs-you hero cards (gifts awaiting confirmation) */}
+        {needsReview.map(({ gift, recipient }) => {
+          const name = cleanName(recipient.name);
+          const occ = gift.occasion_date || recipient.birthday || recipient.anniversary;
+          const days = occ ? getDaysUntil(occ) : null;
+          return (
+            <div key={gift.id} className="mb-3.5" style={{ borderRadius: 24, overflow: 'hidden', border: '1px solid rgba(182,91,60,0.25)', background: 'linear-gradient(180deg,#FBEFE5,#FAF6EE)' }}>
+              <div className="flex items-center justify-between" style={{ padding: '18px 18px 0' }}>
+                <Eyebrow color={U.accent}>{gift.occasion || 'Occasion'}{days != null ? ` · in ${days} days` : ''}</Eyebrow>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: U.accent }} />
+              </div>
+              <div className="flex items-center gap-3.5" style={{ padding: '10px 18px 0' }}>
+                <PersonAvatar initials={initialsOf(name)} tone={U.accent} size={46} />
+                <div>
+                  <div className="font-display" style={{ fontSize: 19, letterSpacing: '-0.3px' }}>{name}'s gift is ready</div>
+                  <div style={{ fontSize: 12.5, color: U.muted }}>{recipient.relationship || 'Someone special'}</div>
+                </div>
+              </div>
+              <div style={{ padding: '14px 18px 4px' }}>
+                <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5, color: '#5A5147' }}>
+                  <em className="font-display" style={{ fontStyle: 'italic', color: U.ink }}>"I found something I think they'll love — it fits what you've told me."</em>
+                </p>
+              </div>
+              <div className="flex items-center gap-3" style={{ padding: '14px 18px 18px' }}>
+                <div className="flex flex-1 items-center gap-2.5" style={{ padding: 9, borderRadius: 13, background: '#fff', border: '1px solid rgba(42,37,32,0.07)' }}>
+                  {gift.gift_image_url ? (
+                    <img src={gift.gift_image_url} alt="" style={{ width: 42, height: 42, borderRadius: 9, objectFit: 'cover', flexShrink: 0 }} />
+                  ) : (
+                    <div style={{ width: 42, height: 42, borderRadius: 9, flexShrink: 0, background: 'repeating-linear-gradient(135deg,#E8DFCC,#E8DFCC 6px,#E0D5BD 6px,#E0D5BD 12px)' }} />
+                  )}
+                  <div className="min-w-0">
+                    <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{gift.gift_description || gift.gift_type || 'Curated gift'}</div>
+                    <div className="font-mono" style={{ fontSize: 12, color: U.subtle }}>{gift.estimated_cost ? `$${Math.round(gift.estimated_cost)}` : (gift.price_range || '')}</div>
+                  </div>
+                </div>
+                <button onClick={() => setApproval({ gift, recipient })} style={{ appearance: 'none', border: 'none', cursor: 'pointer', background: U.ink, color: U.buttonText, fontWeight: 600, fontSize: 14.5, padding: '14px 20px', borderRadius: 14, whiteSpace: 'nowrap' }}>
+                  Review
+                </button>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Upcoming people list */}
+        {sortedRecipients.length === 0 ? (
+          <div className="mt-2" style={{ borderRadius: 22, border: `1px dashed rgba(42,37,32,0.18)`, padding: '28px 20px', textAlign: 'center' }}>
+            <MargotAvatar size={40} className="mx-auto mb-3" />
+            <Display style={{ fontSize: 21 }}>Let's find your people</Display>
+            <p className="mx-auto mt-1.5" style={{ fontSize: 13.5, color: U.muted, maxWidth: 260, lineHeight: 1.5 }}>
+              Add someone you care about and I'll watch for the moments that matter.
+            </p>
+            <div className="mt-4">
+              <PrimaryButton onClick={() => setShowAddRecipient(true)}>Add someone</PrimaryButton>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            <Eyebrow className="mb-0.5">Upcoming</Eyebrow>
+            {sortedRecipients.map((recipient: any, index: number) => {
+              const nextOccasionDate = recipient.birthday || recipient.anniversary;
+              const occasionType = recipient.birthday ? 'Birthday' : 'Anniversary';
+              const isLocked = isFree && index >= 3;
+              const daysUntil = nextOccasionDate ? getDaysUntil(nextOccasionDate) : null;
+
+              const activeOrder = recipient.scheduled_gifts?.find((gift: any) =>
+                (gift.status === 'ordered' || gift.status === 'delivered') && gift.delivery_date);
+              const deliveryDaysUntil = activeOrder?.delivery_date ? getDaysUntilExact(activeOrder.delivery_date) : null;
+
+              const nextOccasionGiftDate = nextOccasionDate ? getNextOccurrence(nextOccasionDate) : null;
+              const relevantAutomatedGift = recipient.scheduled_gifts
+                ?.filter((g: any) => g.automation_enabled && g.occasion_date)
+                ?.sort((a: any, b: any) => {
+                  const aDiff = Math.abs(new Date(a.occasion_date).getTime() - (nextOccasionGiftDate?.getTime() || 0));
+                  const bDiff = Math.abs(new Date(b.occasion_date).getTime() - (nextOccasionGiftDate?.getTime() || 0));
+                  return aDiff - bDiff;
+                })[0];
+
+              if (isLocked) {
+                return (
+                  <div key={recipient.id} style={{ borderRadius: 18, border: `1px solid ${U.border}`, background: U.surface, padding: '16px 18px', filter: 'blur(3px)', pointerEvents: 'none' }}>
+                    <div className="flex items-center gap-3">
+                      <PersonAvatar initials={initialsOf(cleanName(recipient.name))} tone={toneForIndex(index)} size={38} />
+                      <div><div style={{ fontWeight: 600, fontSize: 15 }}>{cleanName(recipient.name)}</div></div>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div key={recipient.id} style={{ borderRadius: 20, border: `1px solid ${U.border}`, background: U.surface, padding: '16px 18px' }}>
+                  <div className="flex cursor-pointer items-center justify-between" onClick={() => handleScheduleGift(recipient)}>
+                    <div className="flex items-center gap-3">
+                      <PersonAvatar initials={initialsOf(cleanName(recipient.name))} tone={toneForIndex(index)} size={38} />
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 15 }}>{cleanName(recipient.name)}</div>
+                        {nextOccasionDate ? (
+                          <div className="flex items-baseline gap-2" style={{ fontSize: 12.5, color: U.muted }}>
+                            <span>{occasionType} · {formatOccasionDate(nextOccasionDate)}</span>
+                            {daysUntil != null && <span>{daysUntil === 0 ? '· Today!' : daysUntil === 1 ? '· Tomorrow' : `· in ${daysUntil}d`}</span>}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: 12.5, color: U.muted }}>No date set</div>
+                        )}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 20, color: U.muted }}>›</span>
+                  </div>
+
+                  {/* Active order status */}
+                  {activeOrder && (
+                    <div className="mt-2.5 flex items-center gap-3 pt-2.5" style={{ borderTop: `1px solid ${U.border}` }}>
+                      {activeOrder.gift_image_url && (
+                        <img src={activeOrder.gift_image_url} alt="" style={{ width: 40, height: 40, borderRadius: 9, objectFit: 'cover' }} />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: U.sage }} />
+                          <span style={{ fontSize: 13, fontWeight: 600, color: U.sage }}>
+                            {activeOrder.status === 'delivered' ? 'Delivered' : 'On its way'}
+                          </span>
+                        </div>
+                        {activeOrder.delivery_date && deliveryDaysUntil != null && (
+                          <p style={{ margin: 0, fontSize: 12, color: U.muted }}>
+                            {deliveryDaysUntil < 0 ? `Delivered ${formatOccasionDate(activeOrder.delivery_date)}` : deliveryDaysUntil === 0 ? 'Delivers today' : `Delivers ${formatOccasionDate(activeOrder.delivery_date)}`}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Automation toggle (VIP) — preserves existing logic */}
+                  {nextOccasionDate && tier === 'vip' && (() => {
+                    const activeOrderDate = activeOrder?.occasion_date;
+                    const automatedGiftDate = relevantAutomatedGift?.occasion_date;
+                    const isSameOccasion = activeOrderDate && automatedGiftDate &&
+                      new Date(activeOrderDate).getTime() === new Date(automatedGiftDate).getTime();
+                    if (activeOrder && isSameOccasion) return null;
+                    return (
+                      <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${U.border}` }} onClick={(e) => e.stopPropagation()}>
+                        <AutomationToggle
+                          recipientId={recipient.id}
+                          recipientName={cleanName(recipient.name)}
+                          estimatedCost={42.0}
+                          onEnableAutomation={() => handleEnableAutomation(recipient)}
+                          onDisableAutomation={() => handleDisableAutomation(recipient.id)}
+                          onViewDetails={() => {
+                            setDetailRecipient(recipient);
+                            setShowAutomationDetail(true);
+                          }}
+                          tier={tier}
+                          isEnabled={recipient.automation_enabled || recipient.scheduled_gifts?.some((g: any) => g.automation_enabled)}
+                          hasCompleteAddress={!!(recipient.street && recipient.city && recipient.state && recipient.zip_code)}
+                          hasGiftSelected={!!(recipient.default_gift_variant_id || recipient.preferred_gift_vibe)}
+                          scheduledGift={relevantAutomatedGift}
+                          walletBalance={userProfile?.gift_wallet_balance || 0}
+                        />
+                      </div>
+                    );
+                  })()}
+                </div>
+              );
+            })}
+
+            {/* Free-tier upgrade prompt */}
+            {isFree && sortedRecipients.length > 3 && (
+              <div style={{ borderRadius: 18, background: U.accentSoft, border: '1px solid rgba(182,91,60,0.25)', padding: '16px 18px', textAlign: 'center' }}>
+                <Display style={{ fontSize: 19 }}>Look after everyone</Display>
+                <p className="mx-auto mb-3 mt-1" style={{ fontSize: 13, color: '#5A5147', maxWidth: 280 }}>
+                  Your free trial covers 3 people. Activate for unlimited people, luxury gifts & full autopilot.
+                </p>
+                <PrimaryButton onClick={handleDirectUpgrade} disabled={isUpgrading}>
+                  {isUpgrading ? 'Redirecting…' : 'Activate Unwrapt'}
+                </PrimaryButton>
+              </div>
+            )}
+
+            {tier === 'vip' && (userProfile?.gift_wallet_balance != null) && (
+              <div onClick={() => setShowAddFunds(true)} className="flex cursor-pointer items-center justify-between" style={{ borderRadius: 16, background: U.chip, padding: '13px 16px' }}>
+                <span style={{ fontSize: 13, color: '#5A5147' }}>Gift wallet</span>
+                <span className="font-mono" style={{ fontSize: 14, fontWeight: 500 }}>${(userProfile?.gift_wallet_balance || 0).toFixed(2)} · Add funds</span>
+              </div>
+            )}
+          </div>
+        )}
+      </MobileShell>
+
+      {/* Modals — unchanged logic */}
       {showAddRecipient && (
-        <AddRecipientModal
-          isOpen={showAddRecipient}
-          onClose={() => setShowAddRecipient(false)}
-          onRecipientAdded={() => {
-            setShowAddRecipient(false);
-          }}
-        />
+        <AddRecipientModal isOpen={showAddRecipient} onClose={() => setShowAddRecipient(false)} onRecipientAdded={() => setShowAddRecipient(false)} />
       )}
-
       {showScheduleGift && selectedRecipient && (
-        <ScheduleGiftModal
-          isOpen={showScheduleGift}
-          onClose={() => setShowScheduleGift(false)}
-          recipient={selectedRecipient}
-        />
+        <ScheduleGiftModal isOpen={showScheduleGift} onClose={() => setShowScheduleGift(false)} recipient={selectedRecipient} />
       )}
-
       {showAddFunds && userProfile && (
-        <AddFundsModal
-          isOpen={showAddFunds}
-          onClose={() => setShowAddFunds(false)}
-          currentBalance={userProfile.gift_wallet_balance || 0}
-        />
+        <AddFundsModal isOpen={showAddFunds} onClose={() => setShowAddFunds(false)} currentBalance={userProfile.gift_wallet_balance || 0} />
       )}
-
       {showEditRecipient && editingRecipient && (
-        <EditRecipientModal
-          isOpen={showEditRecipient}
-          onClose={() => {
-            setShowEditRecipient(false);
-            setEditingRecipient(null);
-          }}
-          recipient={editingRecipient}
-        />
+        <EditRecipientModal isOpen={showEditRecipient} onClose={() => { setShowEditRecipient(false); setEditingRecipient(null); }} recipient={editingRecipient} />
       )}
-
-      <VIPUpgradeModal
-        isOpen={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-      />
-
-      <VIPWelcomeModal
-        open={showVIPOnboarding}
-        onComplete={() => {
-          setShowVIPOnboarding(false);
-          refetchProfile();
-        }}
-      />
-
+      <VIPUpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
+      <VIPWelcomeModal open={showVIPOnboarding} onComplete={() => { setShowVIPOnboarding(false); refetchProfile(); }} />
       {showEnableAutomation && automationRecipient && (
         <EnableAutomationModal
           open={showEnableAutomation}
@@ -704,28 +531,17 @@ const Dashboard = () => {
           occasionType={automationRecipient.birthday ? 'birthday' : 'anniversary'}
           occasionDate={automationRecipient.birthday || automationRecipient.anniversary}
           currentGiftVibe={automationRecipient.preferred_gift_vibe}
-          onSuccess={() => {
-            setShowEnableAutomation(false);
-            setAutomationRecipient(null);
-            window.location.reload();
-          }}
+          onSuccess={() => { setShowEnableAutomation(false); setAutomationRecipient(null); window.location.reload(); }}
         />
       )}
-
       {showAutomationDetail && detailRecipient && userProfile && (
         <AutomationDetailModal
           open={showAutomationDetail}
           onOpenChange={setShowAutomationDetail}
           recipient={detailRecipient}
           walletBalance={userProfile.gift_wallet_balance || 0}
-          onEditAddress={() => {
-            setEditingRecipient(detailRecipient);
-            setShowEditRecipient(true);
-          }}
-          onEditGift={() => {
-            setAutomationRecipient(detailRecipient);
-            setShowEnableAutomation(true);
-          }}
+          onEditAddress={() => { setEditingRecipient(detailRecipient); setShowEditRecipient(true); }}
+          onEditGift={() => { setAutomationRecipient(detailRecipient); setShowEnableAutomation(true); }}
         />
       )}
     </>

@@ -5,57 +5,61 @@
 
 @layer base {
   :root {
-    /* New Luxury Color Palette */
-    --ivory: 40 43% 97%;        /* #FAF8F3 */
-    --sand: 33 33% 90%;          /* #EFE7DD */
-    --cream-border: 30 24% 87%;  /* #E4DCD2 */
-    --champagne-gold: 43 33% 68%; /* #D2B887 */
-    --charcoal-text: 0 0% 10%;   /* #1A1A1A */
-    
-    /* Onboarding brand colors */
-    --unwrapt-bg-1: #f8f1e9;
-    --unwrapt-bg-2: #f3dfcf;
-    --unwrapt-bg-3: #f5eadd;
-    --unwrapt-card-bg: #ffffff;
-    --unwrapt-text-main: #2f2b28;
-    --unwrapt-text-subtle: #6c645d;
-    --unwrapt-accent: #e6b77a;
-    --unwrapt-button: #2f2b28;
-    --unwrapt-button-text: #ffffff;
-    --unwrapt-radius-card: 28px;
-    --unwrapt-shadow-card: 0 24px 60px rgba(15, 7, 0, 0.18);
-    --unwrapt-font-heading: "Cormorant Garamond", "Playfair Display", serif;
-    --unwrapt-font-body: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif;
-    
-    --background: var(--ivory);
+    /* Agent-first 2.0 palette (HSL channels for shadcn) */
+    --ivory: 40 50% 96%;          /* #FAF6EE  card / elevated */
+    --cream: 40 35% 89%;          /* #EDE6D8  app background */
+    --sand: 40 45% 92%;           /* warm surface */
+    --chip: 40 38% 91%;           /* #F3ECDD  subtle chip */
+    --cream-border: 33 22% 84%;   /* #DBD0C2  hairline border */
+    --terracotta: 15 50% 47%;     /* #B65B3C  accent */
+    --sage: 84 16% 42%;           /* #6E7B5B  success */
+    --charcoal-text: 30 14% 15%;  /* #2A2520  ink */
+    --warm-muted: 36 13% 54%;     /* #9A8E7C  muted text */
+
+    /* Onboarding brand colors (agent-first) */
+    --unwrapt-bg-1: #EDE6D8;
+    --unwrapt-bg-2: #E7DECB;
+    --unwrapt-bg-3: #F1EADC;
+    --unwrapt-card-bg: #FAF6EE;
+    --unwrapt-text-main: #2A2520;
+    --unwrapt-text-subtle: #837868;
+    --unwrapt-accent: #B65B3C;
+    --unwrapt-button: #2A2520;
+    --unwrapt-button-text: #F4ECDD;
+    --unwrapt-radius-card: 22px;
+    --unwrapt-shadow-card: 0 24px 60px rgba(42, 37, 32, 0.14);
+    --unwrapt-font-heading: "Newsreader", Georgia, serif;
+    --unwrapt-font-body: "Hanken Grotesk", system-ui, -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+
+    --background: var(--cream);
     --foreground: var(--charcoal-text);
 
-    --card: var(--sand);
+    --card: var(--ivory);
     --card-foreground: var(--charcoal-text);
 
-    --popover: var(--sand);
+    --popover: var(--ivory);
     --popover-foreground: var(--charcoal-text);
 
-    --primary: var(--champagne-gold);
-    --primary-foreground: var(--charcoal-text);
+    --primary: var(--charcoal-text);
+    --primary-foreground: 39 50% 91%;
 
-    --secondary: var(--sand);
+    --secondary: var(--chip);
     --secondary-foreground: var(--charcoal-text);
 
-    --muted: var(--sand);
-    --muted-foreground: var(--charcoal-text);
+    --muted: var(--ivory);
+    --muted-foreground: var(--warm-muted);
 
-    --accent: var(--champagne-gold);
-    --accent-foreground: var(--charcoal-text);
+    --accent: var(--terracotta);
+    --accent-foreground: 40 60% 96%;
 
     --destructive: 0 84 60;
     --destructive-foreground: 60 9.1% 97.8%;
 
     --border: var(--cream-border);
     --input: var(--cream-border);
-    --ring: var(--champagne-gold);
+    --ring: var(--terracotta);
 
-    --radius: 1.5rem;
+    --radius: 1.25rem;
 
     --sidebar-background: 0 0 100;
     --sidebar-foreground: 0 0 29;
@@ -105,55 +109,58 @@
 
   html {
     min-height: 100%;
-    background: hsl(var(--ivory));
+    background: hsl(var(--cream));
   }
 
   body {
     @apply text-foreground;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Hanken Grotesk', 'Inter', system-ui, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
     min-height: 100%;
-    background: hsl(var(--ivory));
+    background: hsl(var(--cream));
   }
 
-  /* Ensure viewport always shows luxury colors */
+  /* Ensure viewport always shows the warm app background */
   html, body, #root {
-    background: hsl(var(--ivory)) !important;
+    background: hsl(var(--cream)) !important;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Newsreader', Georgia, serif;
+    font-weight: 400;
+    letter-spacing: -0.01em;
   }
 }
 
 /* Brand specific utility classes */
 @layer utilities {
   .text-brand-charcoal {
-    color: #4A4A4A;
+    color: #2A2520;
   }
 
   .bg-brand-cream {
-    background-color: #F5F2ED;
+    background-color: #EDE6D8;
   }
 
   .bg-brand-charcoal {
-    background-color: #4A4A4A;
+    background-color: #2A2520;
   }
 
   .border-brand-charcoal {
-    border-color: #4A4A4A;
+    border-color: #2A2520;
   }
 
   .border-brand-cream {
-    border-color: #F5F2ED;
+    border-color: #EDE6D8;
   }
 
   .hover\:bg-brand-cream:hover {
-    background-color: #F5F2ED;
+    background-color: #EDE6D8;
   }
 
   .hover\:bg-brand-charcoal:hover {
-    background-color: #4A4A4A;
+    background-color: #2A2520;
   }
 
   /* Status indicator utilities */
@@ -316,26 +323,26 @@
 
 /* Dialog and modal overlays */
 .dialog-overlay {
-  background-color: rgba(74, 74, 74, 0.6) !important;
+  background-color: rgba(42, 37, 32, 0.6) !important;
 }
 
 .sheet-overlay {
-  background-color: rgba(74, 74, 74, 0.6) !important;
+  background-color: rgba(42, 37, 32, 0.6) !important;
 }
 
 .alert-dialog-overlay {
-  background-color: rgba(74, 74, 74, 0.6) !important;
+  background-color: rgba(42, 37, 32, 0.6) !important;
 }
 
 .drawer-overlay {
-  background-color: rgba(74, 74, 74, 0.6) !important;
+  background-color: rgba(42, 37, 32, 0.6) !important;
 }
 
 /* Modal content styling */
 .modal-content {
   background-color: white !important;
-  color: #4A4A4A !important;
-  border-color: #E5E0D8 !important;
+  color: #2A2520 !important;
+  border-color: #E4DCD2 !important;
 }
 
 /* Custom animations for smooth interactions */
@@ -509,4 +516,59 @@
   box-shadow: 0 4px 12px rgba(47, 43, 40, 0.2);
 }
 
+/* ============================================================
+   Agent-first (Unwrapt 2.0) shared aesthetic helpers
+   ============================================================ */
+@layer utilities {
+  /* Monospaced eyebrow / kicker labels (DM Mono) */
+  .u-mono {
+    font-family: 'DM Mono', ui-monospace, monospace;
+  }
+  .u-eyebrow {
+    font-family: 'DM Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #9A8E7C;
+  }
+  /* Primary dark pill button used across the 2.0 screens */
+  .u-btn-primary {
+    appearance: none;
+    border: none;
+    cursor: pointer;
+    background: #2A2520;
+    color: #F4ECDD;
+    font-weight: 600;
+    font-size: 16.5px;
+    padding: 17px;
+    border-radius: 17px;
+    width: 100%;
+    letter-spacing: 0.2px;
+    transition: transform .15s ease, opacity .15s ease;
+  }
+  .u-btn-primary:hover { opacity: .94; }
+  .u-btn-primary:active { transform: scale(.99); }
+  .u-btn-primary:disabled { opacity: .5; cursor: default; }
+
+  /* Soft warm card */
+  .u-card {
+    background: #FAF6EE;
+    border: 1px solid rgba(42, 37, 32, 0.09);
+    border-radius: 22px;
+  }
+}
+
+@keyframes u-fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes u-pop { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes u-pulseDisc {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(182,91,60,.32); }
+  50% { transform: scale(1.05); box-shadow: 0 0 0 16px rgba(182,91,60,0); }
+}
+@keyframes u-shimmer { 0% { background-position: -220px 0; } 100% { background-position: 220px 0; } }
+@keyframes u-blink { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+
+.animate-u-fadeUp { animation: u-fadeUp .5s ease both; }
+.animate-u-pop { animation: u-pop .3s ease both; }
+.animate-u-pulse-disc { animation: u-pulseDisc 1.7s ease-in-out infinite; }
+.animate-u-blink { animation: u-blink 1.2s infinite; }
 
