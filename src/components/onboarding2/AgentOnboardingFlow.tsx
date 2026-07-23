@@ -96,7 +96,9 @@ function groupEventsIntoPeople(events: CalendarEvent[]): Person[] {
       if (event.type === 'anniversary' && !p.anniversary) p.anniversary = event.date;
     }
   });
-  return Array.from(map.values());
+  // Pre-select only the first FREE_TIER_LIMIT people; the rest stay off by
+  // default so users opt in rather than having to deselect everyone.
+  return Array.from(map.values()).map((p, i) => ({ ...p, selected: i < FREE_TIER_LIMIT }));
 }
 
 function formatDateLabel(p: Person): string {
