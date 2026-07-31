@@ -13,15 +13,23 @@ import FAQSection from "@/components/landing/FAQSection";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { motion } from "framer-motion";
 import SEOHead from "@/components/seo/SEOHead";
+import {
+  getExperimentVariant,
+  trackExperimentExposure,
+} from "@/lib/experiments";
+import { trackProductEvent } from "@/lib/productAnalytics";
 
 const Landing = () => {
   const { signInWithGoogle } = useAuth();
   const [showNav, setShowNav] = useState(false);
-  const [showIntro, setShowIntro] = useState(() => {
-    localStorage.removeItem("hasSeenLandingIntro");
-    localStorage.removeItem("hasSeenIntro");
-    return true;
-  });
+  const [showIntro, setShowIntro] = useState(
+    () => localStorage.getItem("hasSeenLandingIntro") !== "true",
+  );
+  const [ctaVariant] = useState(() =>
+    getExperimentVariant("landing_primary_cta_copy_v1"),
+  );
+  const primaryCta =
+    ctaVariant === "plan_first_gift" ? "Plan My First Gift" : "Get Started Free";
 
   useEffect(() => {
     const handleScroll = () => {
@@ -31,15 +39,40 @@ const Landing = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const handleGetStarted = () => {
+  useEffect(() => {
+    if (!showIntro) return;
+
+    const timer = window.setTimeout(() => {
+      localStorage.setItem("hasSeenLandingIntro", "true");
+      setShowIntro(false);
+    }, 2300);
+
+    return () => window.clearTimeout(timer);
+  }, [showIntro]);
+
+  useEffect(() => {
+    trackExperimentExposure("landing_primary_cta_copy_v1", ctaVariant);
+  }, [ctaVariant]);
+
+  const handleGetStarted = async (placement: string) => {
+    await trackProductEvent(
+      "landing_cta_clicked",
+      { placement },
+      { key: "landing_primary_cta_copy_v1", variant: ctaVariant },
+    );
+    await trackProductEvent(
+      "auth_started",
+      { provider: "google", placement },
+      { key: "landing_primary_cta_copy_v1", variant: ctaVariant },
+    );
     localStorage.setItem("shouldShowOnboardingIntro", "true");
     signInWithGoogle();
   };
 
   const stats = [
-    { icon: Heart, value: "2,340+", label: "Occasions Tracked" },
-    { icon: Clock, value: "120 hrs", label: "Shopping Time Saved" },
-    { icon: Gift, value: "680+", label: "Gifts Delivered" },
+    { icon: Heart, value: "Always", label: "Important moments remembered" },
+    { icon: Clock, value: "< 1 min", label: "Typical approval time" },
+    { icon: Gift, value: "You decide", label: "Before anything ships" },
   ];
 
   return (
@@ -53,22 +86,26 @@ const Landing = () => {
 
       {/* Sticky Navigation */}
       <nav
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-          showNav ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0"
-        }`}
+        className="fixed top-0 left-0 right-0 z-50 translate-y-0 opacity-100 transition-all duration-500"
       >
-        <div className="bg-white/60 backdrop-blur-xl border-b border-[hsl(var(--cream-border))]">
+        <div
+          className={`backdrop-blur-xl border-b transition-colors duration-500 ${
+            showNav
+              ? "bg-white/80 border-[hsl(var(--cream-border))]"
+              : "bg-[hsl(var(--ivory))]/80 border-transparent"
+          }`}
+        >
           <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
             <Logo size="md" />
             <div className="flex items-center gap-8">
               <a href="#pricing" className="hidden sm:inline text-sm tracking-wide hover:opacity-70 transition-opacity" style={{ color: "#8B7355" }}>Pricing</a>
               <a href="#faq" className="hidden sm:inline text-sm tracking-wide hover:opacity-70 transition-opacity" style={{ color: "#8B7355" }}>FAQ</a>
               <button
-                onClick={handleGetStarted}
+                onClick={() => handleGetStarted("navigation")}
                 className="px-6 py-2.5 rounded-full text-sm font-medium text-white transition-all duration-300 hover:scale-[1.02]"
                 style={{ backgroundColor: "#8B7355" }}
               >
-                Get Started
+                {ctaVariant === "plan_first_gift" ? "Plan a Gift" : "Get Started"}
               </button>
             </div>
           </div>
@@ -137,14 +174,14 @@ const Landing = () => {
 
             {/* CTA */}
             <button
-              onClick={handleGetStarted}
+              onClick={() => handleGetStarted("hero")}
               className="group px-12 py-4 rounded-full font-medium text-lg text-white transition-all duration-300 hover:scale-[1.02] mb-16"
               style={{
                 backgroundColor: "#8B7355",
                 boxShadow: "0 8px 32px rgba(139, 115, 85, 0.25)",
               }}
             >
-              Get Started Free
+              {primaryCta}
               <ArrowRight className="w-5 h-5 ml-2 inline transition-transform group-hover:translate-x-1" />
             </button>
 
@@ -215,7 +252,7 @@ const Landing = () => {
       <div className="h-px w-full" style={{ background: "linear-gradient(90deg, transparent, #D4C4A8, transparent)" }} />
 
       {/* Pricing Section */}
-      <PricingSection />
+      <PricingSection ctaVariant={ctaVariant} />
 
       <div className="h-px w-full" style={{ background: "linear-gradient(90deg, transparent, #D4C4A8, transparent)" }} />
 
@@ -237,14 +274,14 @@ const Landing = () => {
             Add your people, connect your calendar, and let Unwrapt handle the rest.
           </p>
           <button
-            onClick={handleGetStarted}
+            onClick={() => handleGetStarted("final")}
             className="group px-12 py-4 rounded-full font-medium text-lg text-white transition-all duration-300 hover:scale-[1.02]"
             style={{
               backgroundColor: "#8B7355",
               boxShadow: "0 8px 32px rgba(139, 115, 85, 0.25)",
             }}
           >
-            Get Started Free <ArrowRight className="w-5 h-5 ml-2 inline transition-transform group-hover:translate-x-1" />
+            {primaryCta} <ArrowRight className="w-5 h-5 ml-2 inline transition-transform group-hover:translate-x-1" />
           </button>
         </div>
       </section>

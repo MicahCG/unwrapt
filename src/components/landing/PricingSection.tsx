@@ -2,6 +2,7 @@ import React from "react";
 import { Check, Sparkles } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { motion } from "framer-motion";
+import { trackProductEvent } from "@/lib/productAnalytics";
 
 const freeFeatures = [
   "Up to 3 recipients",
@@ -16,13 +17,27 @@ const vipFeatures = [
   "Smart calendar sync",
   "Gift wallet with auto-reload",
   "Priority gift selection",
-  "14-day advance gift preview",
+  "Approve every gift before it ships",
 ];
 
-const PricingSection = () => {
+interface PricingSectionProps {
+  ctaVariant: string;
+}
+
+const PricingSection = ({ ctaVariant }: PricingSectionProps) => {
   const { signInWithGoogle } = useAuth();
 
-  const handleGetStarted = () => {
+  const handleGetStarted = async (plan: "free" | "vip") => {
+    await trackProductEvent(
+      "landing_cta_clicked",
+      { placement: "pricing", plan },
+      { key: "landing_primary_cta_copy_v1", variant: ctaVariant },
+    );
+    await trackProductEvent(
+      "auth_started",
+      { provider: "google", placement: "pricing", plan },
+      { key: "landing_primary_cta_copy_v1", variant: ctaVariant },
+    );
     localStorage.setItem("shouldShowOnboardingIntro", "true");
     signInWithGoogle();
   };
@@ -74,11 +89,11 @@ const PricingSection = () => {
               ))}
             </ul>
             <button
-              onClick={handleGetStarted}
+              onClick={() => handleGetStarted("free")}
               className="w-full py-3 rounded-full font-medium text-sm transition-all duration-300 hover:scale-[1.02]"
               style={{ border: "1px solid #8B7355", color: "#8B7355" }}
             >
-              Get Started Free
+              {ctaVariant === "plan_first_gift" ? "Plan My First Gift" : "Get Started Free"}
             </button>
           </motion.div>
 
@@ -118,7 +133,7 @@ const PricingSection = () => {
               ))}
             </ul>
             <button
-              onClick={handleGetStarted}
+              onClick={() => handleGetStarted("vip")}
               className="w-full py-3 rounded-full font-medium text-sm text-white transition-all duration-300 hover:scale-[1.02]"
               style={{
                 backgroundColor: "#8B7355",
@@ -131,7 +146,7 @@ const PricingSection = () => {
         </div>
 
         <p className="text-center text-sm mt-10" style={{ color: "#B59A77" }}>
-          Gifts range from $25 to $75. You only pay for gifts when they ship.
+          Gift cost is always shown before approval. No surprise purchases.
         </p>
       </div>
     </section>
