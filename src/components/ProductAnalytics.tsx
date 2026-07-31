@@ -1,13 +1,24 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { trackPageView } from '@/lib/productAnalytics';
+import {
+  retryQueuedAnalyticsEvents,
+  trackPageView,
+} from '@/lib/productAnalytics';
 
 const ProductAnalytics = () => {
   const location = useLocation();
 
   useEffect(() => {
-    void trackPageView(`${location.pathname}${location.search}`);
-  }, [location.pathname, location.search]);
+    void trackPageView(location.pathname);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const retry = () => void retryQueuedAnalyticsEvents();
+
+    retry();
+    window.addEventListener('online', retry);
+    return () => window.removeEventListener('online', retry);
+  }, []);
 
   return null;
 };

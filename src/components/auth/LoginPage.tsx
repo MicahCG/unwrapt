@@ -8,8 +8,8 @@ import { trackProductEvent } from '@/lib/productAnalytics';
 
 const LoginPage: React.FC = () => {
   const { signInWithGoogle, loading } = useAuth();
-  const handleGoogleSignIn = async () => {
-    await trackProductEvent('auth_started', { provider: 'google', placement: 'login' });
+  const handleGoogleSignIn = () => {
+    void trackProductEvent('auth_started', { provider: 'google', placement: 'login' });
     signInWithGoogle();
   };
 

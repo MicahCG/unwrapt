@@ -27,6 +27,7 @@ import CalendarOAuthCallback from "./components/auth/CalendarOAuthCallback";
 import ScrollToTop from "@/components/ScrollToTop";
 import ProductAnalytics from "@/components/ProductAnalytics";
 import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +42,7 @@ function App() {
           <Toaster />
           <Sonner />
           <VercelAnalytics />
+          <SpeedInsights />
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <ScrollToTop />
             <ProductAnalytics />

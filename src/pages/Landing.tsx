@@ -15,6 +15,7 @@ import { motion } from "framer-motion";
 import SEOHead from "@/components/seo/SEOHead";
 import {
   getExperimentVariant,
+  isExperimentEnabled,
   trackExperimentExposure,
 } from "@/lib/experiments";
 import { trackProductEvent } from "@/lib/productAnalytics";
@@ -28,6 +29,9 @@ const Landing = () => {
   const [ctaVariant] = useState(() =>
     getExperimentVariant("landing_primary_cta_copy_v1"),
   );
+  const ctaExperiment = isExperimentEnabled("landing_primary_cta_copy_v1")
+    ? { key: "landing_primary_cta_copy_v1", variant: ctaVariant }
+    : undefined;
   const primaryCta =
     ctaVariant === "plan_first_gift" ? "Plan My First Gift" : "Get Started Free";
 
@@ -54,16 +58,16 @@ const Landing = () => {
     trackExperimentExposure("landing_primary_cta_copy_v1", ctaVariant);
   }, [ctaVariant]);
 
-  const handleGetStarted = async (placement: string) => {
-    await trackProductEvent(
+  const handleGetStarted = (placement: string) => {
+    void trackProductEvent(
       "landing_cta_clicked",
       { placement },
-      { key: "landing_primary_cta_copy_v1", variant: ctaVariant },
+      ctaExperiment,
     );
-    await trackProductEvent(
+    void trackProductEvent(
       "auth_started",
       { provider: "google", placement },
-      { key: "landing_primary_cta_copy_v1", variant: ctaVariant },
+      ctaExperiment,
     );
     localStorage.setItem("shouldShowOnboardingIntro", "true");
     signInWithGoogle();
@@ -252,7 +256,7 @@ const Landing = () => {
       <div className="h-px w-full" style={{ background: "linear-gradient(90deg, transparent, #D4C4A8, transparent)" }} />
 
       {/* Pricing Section */}
-      <PricingSection ctaVariant={ctaVariant} />
+      <PricingSection ctaVariant={ctaVariant} experiment={ctaExperiment} />
 
       <div className="h-px w-full" style={{ background: "linear-gradient(90deg, transparent, #D4C4A8, transparent)" }} />
 

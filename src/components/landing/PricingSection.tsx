@@ -22,21 +22,22 @@ const vipFeatures = [
 
 interface PricingSectionProps {
   ctaVariant: string;
+  experiment?: { key: string; variant: string };
 }
 
-const PricingSection = ({ ctaVariant }: PricingSectionProps) => {
+const PricingSection = ({ ctaVariant, experiment }: PricingSectionProps) => {
   const { signInWithGoogle } = useAuth();
 
-  const handleGetStarted = async (plan: "free" | "vip") => {
-    await trackProductEvent(
+  const handleGetStarted = (plan: "free" | "vip") => {
+    void trackProductEvent(
       "landing_cta_clicked",
       { placement: "pricing", plan },
-      { key: "landing_primary_cta_copy_v1", variant: ctaVariant },
+      experiment,
     );
-    await trackProductEvent(
+    void trackProductEvent(
       "auth_started",
       { provider: "google", placement: "pricing", plan },
-      { key: "landing_primary_cta_copy_v1", variant: ctaVariant },
+      experiment,
     );
     localStorage.setItem("shouldShowOnboardingIntro", "true");
     signInWithGoogle();

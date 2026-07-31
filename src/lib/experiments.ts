@@ -12,10 +12,13 @@ type ExperimentDefinition = {
 
 const EXPERIMENTS: Record<ExperimentKey, ExperimentDefinition> = {
   landing_primary_cta_copy_v1: {
-    enabled: true,
+    enabled: import.meta.env.VITE_LANDING_CTA_EXPERIMENT_ENABLED === 'true',
     variants: ['control', 'plan_first_gift'],
   },
 };
+
+export const isExperimentEnabled = (key: ExperimentKey) =>
+  EXPERIMENTS[key].enabled;
 
 const hash = (value: string) => {
   let result = 2166136261;
@@ -40,13 +43,16 @@ export const trackExperimentExposure = (
   key: ExperimentKey,
   variant: string,
 ) => {
+  if (!isExperimentEnabled(key)) return;
+
   const exposureKey = `unwrapt_exposure:${key}:${variant}`;
   if (sessionStorage.getItem(exposureKey) === 'true') return;
 
-  sessionStorage.setItem(exposureKey, 'true');
   void trackProductEvent(
     'experiment_exposed',
     {},
     { key, variant },
-  );
+  ).then((recorded) => {
+    if (recorded) sessionStorage.setItem(exposureKey, 'true');
+  });
 };
