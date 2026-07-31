@@ -296,7 +296,7 @@ const Dashboard = () => {
           <div onClick={() => setShowUpgradeModal(true)} className="mb-4 flex cursor-pointer items-center gap-2.5" style={{ padding: '12px 14px', borderRadius: 14, background: U.accentSoft, border: '1px solid rgba(182,91,60,0.25)' }}>
             <span style={{ fontSize: 15 }}>✦</span>
             <div className="flex-1" style={{ fontSize: 13, color: '#5A5147' }}>
-              <strong>{userProfile?.trial_ends_at ? 'Free trial' : 'Activate Unwrapt'}</strong> · unlock unlimited people & full autopilot
+              <strong>{userProfile?.trial_ends_at ? 'Trial active' : 'Upgrade Unwrapt'}</strong> · unlock unlimited people and priority recommendations
             </div>
             <span className="font-mono uppercase" style={{ fontSize: 10, letterSpacing: '1px', color: U.accent }}>Activate</span>
           </div>
@@ -489,7 +489,7 @@ const Dashboard = () => {
               <div style={{ borderRadius: 18, background: U.accentSoft, border: '1px solid rgba(182,91,60,0.25)', padding: '16px 18px', textAlign: 'center' }}>
                 <Display style={{ fontSize: 19 }}>Look after everyone</Display>
                 <p className="mx-auto mb-3 mt-1" style={{ fontSize: 13, color: '#5A5147', maxWidth: 280 }}>
-                  Your free trial covers 3 people. Activate for unlimited people, luxury gifts & full autopilot.
+                  Your free plan covers 3 people. Upgrade for unlimited people and priority recommendations.
                 </p>
                 <PrimaryButton onClick={handleDirectUpgrade} disabled={isUpgrading}>
                   {isUpgrading ? 'Redirecting…' : 'Activate Unwrapt'}

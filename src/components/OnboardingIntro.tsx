@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Heart, Gift, Calendar } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { Clock, Heart, Gift, ArrowRight } from 'lucide-react';
 
 interface OnboardingIntroProps {
   onComplete: () => void;
@@ -31,7 +30,6 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
   const [index, setIndex] = useState(0);
   const [typedText, setTypedText] = useState('');
   const [isTypingDone, setIsTypingDone] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
 
   const slide = ONBOARDING_SLIDES[index];
   const isLastSlide = index === ONBOARDING_SLIDES.length - 1;
@@ -87,43 +85,6 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
     onComplete();
   };
 
-  const connectGoogleCalendar = async () => {
-    setIsConnecting(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session) {
-        console.error('No session found');
-        setIsConnecting(false);
-        return;
-      }
-
-      const { data: authData, error: authError } = await supabase.functions.invoke('google-calendar', {
-        body: { action: 'get_auth_url' },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        }
-      });
-
-      if (authError) {
-        console.error('Error getting auth URL:', authError);
-        setIsConnecting(false);
-        return;
-      }
-
-      if (authData?.authUrl) {
-        // Mark that we came from intro before redirecting
-        localStorage.setItem('returningFromCalendarAuth', 'true');
-        localStorage.setItem('hasSeenIntro', 'true');
-        // Redirect to Google Calendar OAuth
-        window.location.href = authData.authUrl;
-      }
-    } catch (error) {
-      console.error('Error connecting calendar:', error);
-      setIsConnecting(false);
-    }
-  };
-
   const renderIcon = () => {
     const iconProps = { size: 28, strokeWidth: 1.5 };
     switch (slide.icon) {
@@ -160,28 +121,18 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
           {slide.body}
         </p>
 
-        {/* Show Connect Calendar button on last slide after typing is done */}
+        {/* Continue to sign-in. Calendar access is offered separately after authentication. */}
         {isLastSlide && isTypingDone && (
           <button
-            onClick={connectGoogleCalendar}
-            disabled={isConnecting}
+            onClick={handleGetStarted}
             className="mt-8 mb-4 px-8 py-3 rounded-full font-medium text-lg text-white transition-all duration-300 hover:scale-[1.02] flex items-center gap-2 mx-auto"
             style={{
               backgroundColor: "#D4AF7A",
               boxShadow: "0 4px 14px rgba(212, 175, 122, 0.25)",
             }}
           >
-            {isConnecting ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Connecting...
-              </>
-            ) : (
-              <>
-                <Calendar size={20} />
-                Connect Calendar
-              </>
-            )}
+            Continue
+            <ArrowRight size={20} />
           </button>
         )}
 

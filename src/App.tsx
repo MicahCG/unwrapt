@@ -25,10 +25,15 @@ import Onboarding from "./pages/Onboarding";
 import OAuthCallback from "./components/auth/OAuthCallback";
 import CalendarOAuthCallback from "./components/auth/CalendarOAuthCallback";
 import ScrollToTop from "@/components/ScrollToTop";
+import ProductAnalytics from "@/components/ProductAnalytics";
+import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 const queryClient = new QueryClient();
 
 function App() {
+  const isMarketingHost = ['unwrapt.io', 'www.unwrapt.io'].includes(window.location.hostname);
+
   return (
     <HelmetProvider>
     <QueryClientProvider client={queryClient}>
@@ -36,8 +41,11 @@ function App() {
         <AuthProvider>
           <Toaster />
           <Sonner />
+          <VercelAnalytics />
+          <SpeedInsights />
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <ScrollToTop />
+            <ProductAnalytics />
             <Routes>
               {/* Landing page route - marketing site only on unwrapt.io */}
               <Route path="/landing" element={<Landing />} />
@@ -45,7 +53,7 @@ function App() {
               <Route path="/terms" element={<TermsOfService />} />
               
               {/* Root path routing: unwrapt.io = marketing, app.unwrapt.io = app */}
-              <Route path="/" element={window.location.hostname === 'unwrapt.io' ? <Landing /> : <Index />} />
+              <Route path="/" element={isMarketingHost ? <Landing /> : <Index />} />
               
               {/* App flow routes - primarily on app subdomain */}
               <Route path="/app" element={<AppStart />} />

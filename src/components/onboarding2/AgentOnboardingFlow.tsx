@@ -8,6 +8,7 @@ import { MobileShell, Eyebrow, PrimaryButton, Display } from '@/components/unwra
 import { MargotAvatar, PersonAvatar } from '@/components/unwrapt2/MargotAvatar';
 import { U, toneForIndex, initialsOf } from '@/components/unwrapt2/theme';
 import { format } from 'date-fns';
+import { trackProductEvent } from '@/lib/productAnalytics';
 
 interface AgentOnboardingFlowProps {
   /** Called once recipients are created so the parent can show the dashboard. */
@@ -58,13 +59,6 @@ const RANGE_PRESETS = [
   { id: 'everyday', label: 'Everyday', range: '$50–150', lo: 50, hi: 150 },
   { id: 'generous', label: 'Generous', range: '$150–350', lo: 150, hi: 350 },
   { id: 'luxury', label: 'Luxury', range: '$350+', lo: 350, hi: 600 },
-];
-
-const AUTOPILOT_OPTIONS = [
-  { id: 'always', label: 'Always ask first', desc: 'I recommend. You approve every gift before it ships.' },
-  { id: 'ask100', label: 'Auto-approve under $100', desc: 'Small gestures handled. I check in with you above $100.' },
-  { id: 'ask250', label: 'Auto-approve under $250', desc: 'Most gifts handled for you. I check in above $250.' },
-  { id: 'full', label: 'Full autopilot', badge: '$19/mo', desc: 'I handle everything, start to finish. Review anytime.' },
 ];
 
 function firstNameOf(name: string) {
@@ -129,7 +123,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
 
   // Guardrails
   const [budget, setBudget] = useState({ lo: 50, hi: 150 });
-  const [autopilot, setAutopilot] = useState('ask100');
+  const [autopilot] = useState('always');
 
   // Manual add-person draft
   const [draft, setDraft] = useState({ name: '', relationship: 'Friend', date: '' });
@@ -138,6 +132,10 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
 
   const selectedPeople = useMemo(() => people.filter((p) => p.selected), [people]);
   const activePerson = useMemo(() => people.find((p) => p.id === activeId) || null, [people, activeId]);
+
+  useEffect(() => {
+    void trackProductEvent('onboarding_step_viewed', { step: screen });
+  }, [screen]);
 
   // ── Calendar integration (faithful to the original CalendarStep logic) ──────
   useEffect(() => {
@@ -310,7 +308,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         .from('recipients')
         .select('name')
         .eq('user_id', user.id);
-      const existingNames = new Set((existing || []).map((r: any) => normalizeRecipientName(r.name)));
+      const existingNames = new Set((existing || []).map((r) => normalizeRecipientName(r.name)));
 
       const toCreate = chosen.filter((p) => !existingNames.has(normalizeRecipientName(p.name)));
 
@@ -338,7 +336,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             default_gift_budget_min: budget.lo,
             default_gift_budget_max: budget.hi,
             autopilot_level: autopilot,
-          } as any)
+          } as never)
           .eq('id', user.id);
       } catch (e) {
         /* preference columns may not exist yet — non-fatal */
@@ -359,6 +357,11 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         description: toCreate.length
           ? `${toCreate.length} ${toCreate.length === 1 ? 'person' : 'people'} added — I'll start watching for gift moments.`
           : "Welcome to Unwrapt. I'll take it from here.",
+      });
+
+      void trackProductEvent('onboarding_completed', {
+        people_count: selectedPeople.length,
+        import_method: people.some((person) => person.fromCalendar) ? 'calendar' : 'manual',
       });
 
       setTimeout(async () => {
@@ -544,7 +547,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             <div className="mb-3 flex items-center gap-2.5" style={{ padding: '11px 13px', borderRadius: 13, background: U.accentSoft, border: '1px solid rgba(182,91,60,0.25)' }}>
               <span style={{ fontSize: 14 }}>✦</span>
               <div className="flex-1" style={{ fontSize: 12.5, color: '#5A5147' }}>
-                Your free trial covers <strong>{FREE_TIER_LIMIT} people</strong>. Activate to look after everyone.
+                Your free plan covers <strong>{FREE_TIER_LIMIT} people</strong>. Upgrade to look after everyone.
               </div>
             </div>
           )}
@@ -854,36 +857,38 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             })}
           </div>
 
-          <Eyebrow className="mb-3">How much I can approve alone</Eyebrow>
-          <div className="flex flex-col gap-2.5">
-            {AUTOPILOT_OPTIONS.map((o) => {
-              const sel = autopilot === o.id;
-              return (
-                <div
-                  key={o.id}
-                  onClick={() => setAutopilot(o.id)}
-                  className="flex cursor-pointer items-start gap-3.5"
-                  style={{ padding: 16, borderRadius: 18, background: sel ? '#F1E7D5' : U.surface, border: sel ? `1.5px solid ${U.ink}` : '1px solid rgba(42,37,32,0.1)' }}
-                >
-                  <div
-                    style={{
-                      width: 22, height: 22, borderRadius: '50%', flexShrink: 0, marginTop: 1,
-                      border: sel ? `6.5px solid ${U.ink}` : '1.5px solid rgba(42,37,32,0.25)',
-                      background: sel ? U.surface : 'transparent',
-                    }}
-                  />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span style={{ fontWeight: 600, fontSize: 15.5 }}>{o.label}</span>
-                      {o.badge && (
-                        <span className="font-mono" style={{ fontSize: 10, letterSpacing: '0.5px', color: U.accent, border: '1px solid rgba(182,91,60,0.4)', padding: '1px 7px', borderRadius: 8 }}>{o.badge}</span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: 13, color: U.muted, marginTop: 2, lineHeight: 1.4 }}>{o.desc}</div>
-                  </div>
-                </div>
-              );
-            })}
+          <Eyebrow className="mb-3">Your approval preference</Eyebrow>
+          <div
+            className="flex items-start gap-3.5"
+            style={{
+              padding: 16,
+              borderRadius: 18,
+              background: '#F1E7D5',
+              border: `1.5px solid ${U.ink}`,
+            }}
+          >
+            <div
+              className="flex items-center justify-center"
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                flexShrink: 0,
+                background: U.ink,
+                color: U.buttonText,
+                fontSize: 13,
+                fontWeight: 700,
+              }}
+            >
+              ✓
+            </div>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 15.5 }}>Always ask before purchase</div>
+              <div style={{ fontSize: 13, color: U.muted, marginTop: 2, lineHeight: 1.4 }}>
+                Margot recommends the gift and explains why it fits. Nothing is purchased
+                until you approve the item and total.
+              </div>
+            </div>
           </div>
           <div className="mt-4.5 flex gap-2.5" style={{ padding: 14, borderRadius: 16, background: U.chip, marginTop: 18 }}>
             <span style={{ fontSize: 16 }}>🕊</span>
@@ -896,49 +901,51 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       );
     }
 
-    // ════════ TRIAL (card capture) ════════
+    // ════════ FREE PLAN CONFIRMATION ════════
     case 'trial':
       return (
         <MobileShell
           contentClassName="px-6 pt-14 pb-4"
           footer={
             <>
-              <PrimaryButton onClick={completeOnboarding}>Start free trial</PrimaryButton>
+              <PrimaryButton onClick={completeOnboarding}>Finish setup</PrimaryButton>
               <p className="mt-3 text-center font-mono" style={{ fontSize: 12, color: U.muted, letterSpacing: '0.4px' }}>
-                $0 today · charged only when your first gift ships
+                No card required · approve every gift before purchase
               </p>
             </>
           }
         >
           <div onClick={() => setScreen('guardrails')} className="mb-3.5 cursor-pointer" style={{ fontSize: 22, color: U.subtle }}>‹</div>
-          <Eyebrow className="mb-3">One last thing</Eyebrow>
-          <Display style={{ fontSize: 31, lineHeight: 1.08 }}>Start your free trial</Display>
+          <Eyebrow className="mb-3">Ready when you are</Eyebrow>
+          <Display style={{ fontSize: 31, lineHeight: 1.08 }}>Your concierge is set up</Display>
           <p className="mb-5 mt-2.5" style={{ fontSize: 15, lineHeight: 1.5, color: U.textSecondary }}>
-            Add a card so I can act the moment something's worth giving.{' '}
-            <strong>You won't be charged until your first gift ships</strong> — cancel anytime before then.
+            Margot will watch the moments you added and bring you a recommendation when
+            there is something worth giving. <strong>You stay in control of every purchase.</strong>
           </p>
           <div className="mb-3.5" style={{ background: U.surface, border: `1px solid ${U.border}`, borderRadius: 20, padding: '4px 16px' }}>
-            <div className="flex items-center gap-3" style={{ padding: '15px 0', borderBottom: '1px solid rgba(42,37,32,0.07)' }}>
-              <Eyebrow style={{ width: 58 }}>Card</Eyebrow>
-              <input placeholder="1234  5678  9012  3456" className="flex-1 font-mono" style={{ border: 'none', background: 'transparent', fontSize: 15, color: U.ink }} />
-              <div style={{ width: 30, height: 20, borderRadius: 4, background: '#E0D5BD', flexShrink: 0 }} />
+            <div className="flex items-center justify-between gap-3" style={{ padding: '15px 0', borderBottom: '1px solid rgba(42,37,32,0.07)' }}>
+              <Eyebrow>People</Eyebrow>
+              <span style={{ fontSize: 14.5, fontWeight: 600 }}>{selectedPeople.length} selected</span>
             </div>
-            <div className="flex items-center gap-3" style={{ padding: '15px 0' }}>
-              <Eyebrow style={{ width: 58 }}>Expiry</Eyebrow>
-              <input placeholder="MM / YY" className="flex-1 font-mono" style={{ border: 'none', background: 'transparent', fontSize: 15, color: U.ink }} />
-              <input placeholder="CVC" className="font-mono" style={{ width: 54, border: 'none', background: 'transparent', fontSize: 15, color: U.ink, textAlign: 'right' }} />
+            <div className="flex items-center justify-between gap-3" style={{ padding: '15px 0', borderBottom: '1px solid rgba(42,37,32,0.07)' }}>
+              <Eyebrow>Budget</Eyebrow>
+              <span style={{ fontSize: 14.5, fontWeight: 600 }}>${budget.lo}–${budget.hi} per gift</span>
+            </div>
+            <div className="flex items-center justify-between gap-3" style={{ padding: '15px 0' }}>
+              <Eyebrow>Approval</Eyebrow>
+              <span style={{ fontSize: 14.5, fontWeight: 600 }}>Always ask first</span>
             </div>
           </div>
           <div className="mb-3.5" style={{ background: U.chip, borderRadius: 18, padding: '16px 18px' }}>
-            <Eyebrow className="mb-2.5" color={U.subtle}>Free during your trial</Eyebrow>
+            <Eyebrow className="mb-2.5" color={U.subtle}>Included in your free plan</Eyebrow>
             <div className="flex flex-col gap-2.5" style={{ fontSize: 13.5, color: '#5A5147' }}>
               <div className="flex gap-2.5"><span style={{ color: U.sage }}>✓</span><span>Up to {FREE_TIER_LIMIT} people, fully looked after</span></div>
               <div className="flex gap-2.5"><span style={{ color: U.sage }}>✓</span><span>Thoughtful recommendations &amp; occasion reminders</span></div>
-              <div className="flex gap-2.5"><span style={{ color: U.muted }}>✦</span><span>Activate anytime for unlimited people, luxury gifts &amp; full autopilot</span></div>
+              <div className="flex gap-2.5"><span style={{ color: U.muted }}>✦</span><span>Upgrade anytime for unlimited people and priority recommendations</span></div>
             </div>
           </div>
           <div className="flex items-center gap-2" style={{ color: U.muted, fontSize: 12 }}>
-            <span>⏿</span><span>Secured &amp; encrypted. We never store your full card number.</span>
+            <span>⏿</span><span>Your preferences can be changed anytime in Settings.</span>
           </div>
         </MobileShell>
       );
