@@ -22,6 +22,7 @@ import PaymentSuccess from "./pages/PaymentSuccess";
 import ProductionTesting from "./pages/ProductionTesting";
 import NotFound from "./pages/NotFound";
 import Onboarding from "./pages/Onboarding";
+import GiftChoice from "./pages/GiftChoice";
 import OAuthCallback from "./components/auth/OAuthCallback";
 import CalendarOAuthCallback from "./components/auth/CalendarOAuthCallback";
 import ScrollToTop from "@/components/ScrollToTop";
@@ -51,6 +52,7 @@ function App() {
               <Route path="/landing" element={<Landing />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<TermsOfService />} />
+              <Route path="/gift-choice/:token" element={<GiftChoice />} />
               
               {/* Root path routing: unwrapt.io = marketing, app.unwrapt.io = app */}
               <Route path="/" element={isMarketingHost ? <Landing /> : <Index />} />
