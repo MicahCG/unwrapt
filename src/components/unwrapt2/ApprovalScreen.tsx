@@ -8,10 +8,18 @@ import { MargotAvatar } from './MargotAvatar';
 import { U } from './theme';
 import { cleanName } from '@/lib/utils';
 import { formatOccasionDate, getDaysUntil } from '@/lib/dateUtils';
+import { createFulfillmentRoute, type FulfillmentRoute } from '@/lib/fulfillment';
+import { trackProductEvent } from '@/lib/productAnalytics';
+import type { Database } from '@/integrations/supabase/types';
+
+type ScheduledGift = Database['public']['Tables']['scheduled_gifts']['Row'];
+type Recipient = Database['public']['Tables']['recipients']['Row'];
+
+const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Please try again.';
 
 interface ApprovalScreenProps {
-  gift: any;        // scheduled_gifts row
-  recipient: any;   // recipients row
+  gift: ScheduledGift;
+  recipient: Recipient;
   onClose: () => void;
   onApproved?: () => void;
 }
@@ -25,7 +33,7 @@ export const ApprovalScreen: React.FC<ApprovalScreenProps> = ({ gift, recipient,
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [approving, setApproving] = useState(false);
+  const [activeAction, setActiveAction] = useState<FulfillmentRoute | null>(null);
 
   const name = cleanName(recipient?.name || 'them');
   const first = name.split(' ')[0];
@@ -37,21 +45,48 @@ export const ApprovalScreen: React.FC<ApprovalScreenProps> = ({ gift, recipient,
 
   const approve = async () => {
     if (!user || !gift?.id) return;
-    setApproving(true);
+    setActiveAction('exact_gift');
     try {
       const { error } = await supabase.functions.invoke('confirm-gift', { body: { giftId: gift.id } });
       if (error) throw error;
+      await createFulfillmentRoute(gift.id, 'exact_gift');
       await queryClient.invalidateQueries({ queryKey: ['recipients', user.id] });
-      toast({ title: 'Gift confirmed', description: `${first}'s gift will be processed and shipped soon.` });
+      await queryClient.invalidateQueries({ queryKey: ['fulfillment-orders'] });
+      void trackProductEvent('fulfillment_route_created', { route: 'exact_gift' });
+      toast({ title: 'Exact gift approved', description: `${first}'s gift is ready for a verified partner handoff.` });
       onApproved?.();
       onClose();
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast({
         title: "Couldn't confirm",
-        description: e?.message || 'Please try again.',
+        description: errorMessage(e),
         variant: 'destructive',
       });
-      setApproving(false);
+      setActiveAction(null);
+    }
+  };
+
+  const chooseAlternateRoute = async (route: 'recipient_choice' | 'concierge') => {
+    if (!user || !gift?.id) return;
+    setActiveAction(route);
+    try {
+      const result = await createFulfillmentRoute(gift.id, route);
+      if (route === 'recipient_choice' && result.choiceUrl) {
+        await navigator.clipboard.writeText(result.choiceUrl);
+        toast({
+          title: 'Private choice link copied',
+          description: `Send it to ${first}. It expires in 14 days, and they can choose without exposing personal details here.`,
+        });
+      } else {
+        toast({ title: 'Concierge review requested', description: 'This gift is now in the human-review queue.' });
+      }
+      void trackProductEvent('fulfillment_route_created', { route });
+      await queryClient.invalidateQueries({ queryKey: ['fulfillment-orders'] });
+      onApproved?.();
+      onClose();
+    } catch (e: unknown) {
+      toast({ title: "Couldn't create that route", description: errorMessage(e), variant: 'destructive' });
+      setActiveAction(null);
     }
   };
 
@@ -61,13 +96,30 @@ export const ApprovalScreen: React.FC<ApprovalScreenProps> = ({ gift, recipient,
         contentClassName="px-5 pt-14 pb-3"
         footer={
           <>
-            <PrimaryButton onClick={approve} disabled={approving} className="mb-2.5">
-              {approving ? 'Confirming…' : `Approve & send${priceLabel ? ` — ${priceLabel}` : ''}`}
+            <PrimaryButton onClick={approve} disabled={Boolean(activeAction)} className="mb-2.5">
+              {activeAction === 'exact_gift' ? 'Confirming…' : `Approve exact gift${priceLabel ? ` — ${priceLabel}` : ''}`}
             </PrimaryButton>
             <button
+              onClick={() => chooseAlternateRoute('recipient_choice')}
+              disabled={Boolean(activeAction)}
+              className="mb-2.5 w-full disabled:opacity-60"
+              style={{ appearance: 'none', cursor: 'pointer', background: U.surface, border: `1px solid ${U.borderStrong}`, color: U.ink, fontWeight: 650, fontSize: 13.5, padding: '12px 6px', borderRadius: 13 }}
+            >
+              {activeAction === 'recipient_choice' ? 'Creating private link…' : `Let ${first} choose instead`}
+            </button>
+            <button
+              onClick={() => chooseAlternateRoute('concierge')}
+              disabled={Boolean(activeAction)}
+              className="mb-2.5 w-full disabled:opacity-60"
+              style={{ appearance: 'none', cursor: 'pointer', background: 'transparent', border: `1px solid ${U.border}`, color: U.inkSoft, fontWeight: 600, fontSize: 13, padding: '10px 6px', borderRadius: 13 }}
+            >
+              {activeAction === 'concierge' ? 'Requesting review…' : 'Ask the concierge'}
+            </button>
+            <button
               onClick={onClose}
-              className="w-full"
-              style={{ appearance: 'none', cursor: 'pointer', background: 'transparent', border: `1px solid ${U.borderStrong}`, color: U.ink, fontWeight: 600, fontSize: 13.5, padding: '12px 6px', borderRadius: 13 }}
+              disabled={Boolean(activeAction)}
+              className="w-full disabled:opacity-60"
+              style={{ appearance: 'none', cursor: 'pointer', background: 'transparent', border: 0, color: U.subtle, fontWeight: 600, fontSize: 13, padding: '8px 6px' }}
             >
               Not now
             </button>
@@ -114,7 +166,7 @@ export const ApprovalScreen: React.FC<ApprovalScreenProps> = ({ gift, recipient,
               {priceLabel && <div className="font-mono" style={{ fontSize: 18, fontWeight: 500, flexShrink: 0 }}>{priceLabel}</div>}
             </div>
             <div className="mb-3.5 flex items-center gap-2 font-mono" style={{ fontSize: 11, color: U.muted }}>
-              <span>free returns</span><span>·</span><span>arrives before the day</span>
+              <span>partner fulfillment</span><span>·</span><span>status tracked in Unwrapt</span>
             </div>
             <div className="flex items-center gap-2.5" style={{ padding: '11px 13px', borderRadius: 13, background: U.chip }}>
               <Eyebrow color={U.subtle}>Match</Eyebrow>

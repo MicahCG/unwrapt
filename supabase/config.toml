@@ -62,3 +62,7 @@ verify_jwt = true
 
 [functions.validate-address]
 verify_jwt = false
+
+# Supports authenticated sender actions and a separate hashed recipient-choice token.
+[functions.fulfillment-router]
+verify_jwt = false

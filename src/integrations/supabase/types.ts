@@ -95,6 +95,218 @@ export type Database = {
         }
         Relationships: []
       }
+      fulfillment_events: {
+        Row: {
+          actor_id: string | null
+          actor_type: string
+          created_at: string
+          event_type: string
+          from_status: string | null
+          fulfillment_order_id: string
+          id: number
+          metadata: Json
+          to_status: string | null
+          user_id: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_type: string
+          created_at?: string
+          event_type: string
+          from_status?: string | null
+          fulfillment_order_id: string
+          id?: number
+          metadata?: Json
+          to_status?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          actor_type?: string
+          created_at?: string
+          event_type?: string
+          from_status?: string | null
+          fulfillment_order_id?: string
+          id?: number
+          metadata?: Json
+          to_status?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fulfillment_events_fulfillment_order_id_fkey"
+            columns: ["fulfillment_order_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillment_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fulfillment_options: {
+        Row: {
+          created_at: string
+          currency: string
+          description: string | null
+          fulfillment_order_id: string
+          id: string
+          image_url: string | null
+          is_selected: boolean
+          metadata: Json
+          price: number | null
+          product_id: string | null
+          product_url: string | null
+          provider: string
+          provider_product_id: string | null
+          provider_variant_id: string | null
+          rank: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          description?: string | null
+          fulfillment_order_id: string
+          id?: string
+          image_url?: string | null
+          is_selected?: boolean
+          metadata?: Json
+          price?: number | null
+          product_id?: string | null
+          product_url?: string | null
+          provider?: string
+          provider_product_id?: string | null
+          provider_variant_id?: string | null
+          rank?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          description?: string | null
+          fulfillment_order_id?: string
+          id?: string
+          image_url?: string | null
+          is_selected?: boolean
+          metadata?: Json
+          price?: number | null
+          product_id?: string | null
+          product_url?: string | null
+          provider?: string
+          provider_product_id?: string | null
+          provider_variant_id?: string | null
+          rank?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fulfillment_options_fulfillment_order_id_fkey"
+            columns: ["fulfillment_order_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillment_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_options_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fulfillment_orders: {
+        Row: {
+          approved_at: string | null
+          choice_expires_at: string | null
+          choice_token_hash: string | null
+          confidence: string
+          created_at: string
+          delivered_at: string | null
+          exception_reason: string | null
+          external_order_id: string | null
+          id: string
+          metadata: Json
+          partner_checkout_url: string | null
+          partner_status: string | null
+          provider: string
+          recipient_id: string
+          recipient_selected_at: string | null
+          route: string
+          scheduled_gift_id: string
+          status: string
+          submitted_at: string | null
+          tracking_url: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          choice_expires_at?: string | null
+          choice_token_hash?: string | null
+          confidence: string
+          created_at?: string
+          delivered_at?: string | null
+          exception_reason?: string | null
+          external_order_id?: string | null
+          id?: string
+          metadata?: Json
+          partner_checkout_url?: string | null
+          partner_status?: string | null
+          provider?: string
+          recipient_id: string
+          recipient_selected_at?: string | null
+          route: string
+          scheduled_gift_id: string
+          status?: string
+          submitted_at?: string | null
+          tracking_url?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          choice_expires_at?: string | null
+          choice_token_hash?: string | null
+          confidence?: string
+          created_at?: string
+          delivered_at?: string | null
+          exception_reason?: string | null
+          external_order_id?: string | null
+          id?: string
+          metadata?: Json
+          partner_checkout_url?: string | null
+          partner_status?: string | null
+          provider?: string
+          recipient_id?: string
+          recipient_selected_at?: string | null
+          route?: string
+          scheduled_gift_id?: string
+          status?: string
+          submitted_at?: string | null
+          tracking_url?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fulfillment_orders_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "recipients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_orders_scheduled_gift_id_fkey"
+            columns: ["scheduled_gift_id"]
+            isOneToOne: true
+            referencedRelation: "scheduled_gifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_queue: {
         Row: {
           created_at: string | null
@@ -183,6 +395,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      product_analytics_events: {
+        Row: {
+          anonymous_id: string
+          client_created_at: string
+          event_id: string
+          event_name: string
+          experiment_key: string | null
+          id: number
+          page_path: string
+          properties: Json
+          received_at: string
+          referrer_host: string | null
+          session_id: string
+          user_id: string | null
+          variant: string | null
+        }
+        Insert: {
+          anonymous_id: string
+          client_created_at: string
+          event_id: string
+          event_name: string
+          experiment_key?: string | null
+          id?: never
+          page_path: string
+          properties?: Json
+          received_at?: string
+          referrer_host?: string | null
+          session_id: string
+          user_id?: string | null
+          variant?: string | null
+        }
+        Update: {
+          anonymous_id?: string
+          client_created_at?: string
+          event_id?: string
+          event_name?: string
+          experiment_key?: string | null
+          id?: never
+          page_path?: string
+          properties?: Json
+          received_at?: string
+          referrer_host?: string | null
+          session_id?: string
+          user_id?: string | null
+          variant?: string | null
+        }
+        Relationships: []
       }
       products: {
         Row: {
@@ -698,6 +958,10 @@ export type Database = {
           provider: string
           updated_at: string
         }[]
+      }
+      get_product_analytics_summary: {
+        Args: { p_end: string; p_start: string }
+        Returns: Json
       }
       get_products_by_vibe_and_budget: {
         Args: {
