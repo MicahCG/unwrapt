@@ -1,19 +1,15 @@
 import React from 'react';
 import { U } from './theme';
 
-interface MargotAvatarProps {
+interface TheaAvatarProps {
   size?: number;
-  /** Adds the soft pulsing "thinking" halo. */
   pulse?: boolean;
   className?: string;
 }
 
-/**
- * Margot — the gifting concierge. A terracotta disc with an italic serif "M",
- * lifted straight from the agent-first prototype.
- */
-export const MargotAvatar: React.FC<MargotAvatarProps> = ({ size = 34, pulse = false, className }) => (
+export const TheaAvatar: React.FC<TheaAvatarProps> = ({ size = 34, pulse = false, className }) => (
   <div
+    aria-hidden="true"
     className={`${pulse ? 'animate-u-pulse-disc' : ''} ${className || ''}`}
     style={{
       width: size,
@@ -26,16 +22,8 @@ export const MargotAvatar: React.FC<MargotAvatarProps> = ({ size = 34, pulse = f
       flexShrink: 0,
     }}
   >
-    <span
-      style={{
-        fontFamily: "'Newsreader', Georgia, serif",
-        fontStyle: 'italic',
-        fontSize: Math.round(size * 0.53),
-        color: U.cream,
-        lineHeight: 1,
-      }}
-    >
-      M
+    <span style={{ fontFamily: "'Newsreader', Georgia, serif", fontStyle: 'italic', fontSize: Math.round(size * 0.53), color: U.cream, lineHeight: 1 }}>
+      T
     </span>
   </div>
 );
@@ -49,6 +37,7 @@ interface PersonAvatarProps {
 
 export const PersonAvatar: React.FC<PersonAvatarProps> = ({ initials, tone, size = 44, dim }) => (
   <div
+    aria-hidden="true"
     style={{
       width: size,
       height: size,
@@ -70,4 +59,4 @@ export const PersonAvatar: React.FC<PersonAvatarProps> = ({ initials, tone, size
   </div>
 );
 
-export default MargotAvatar;
+export default TheaAvatar;

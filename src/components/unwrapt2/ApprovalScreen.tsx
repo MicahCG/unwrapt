@@ -4,7 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { MobileShell, Eyebrow, PrimaryButton, Display } from './MobileShell';
-import { MargotAvatar } from './MargotAvatar';
+import { TheaAvatar } from './TheaAvatar';
 import { U } from './theme';
 import { cleanName } from '@/lib/utils';
 import { formatOccasionDate, getDaysUntil } from '@/lib/dateUtils';
@@ -130,12 +130,12 @@ export const ApprovalScreen: React.FC<ApprovalScreenProps> = ({ gift, recipient,
         <div className="mb-1.5 flex items-center gap-3">
           <div onClick={onClose} className="cursor-pointer" style={{ fontSize: 22, color: U.subtle, width: 24 }}>‹</div>
           <div className="flex-1">
-            <Eyebrow>From Margot · just now</Eyebrow>
+            <Eyebrow>From Thea · just now</Eyebrow>
           </div>
-          <MargotAvatar size={30} />
+          <TheaAvatar size={30} />
         </div>
 
-        {/* Margot note */}
+        {/* Thea note */}
         <div className="mb-4 mt-3" style={{ background: U.surface, border: `1px solid ${U.border}`, borderRadius: 20, padding: '15px 17px' }}>
           <p style={{ margin: 0, fontSize: 15, lineHeight: 1.5, color: U.inkSoft }}>
             {first}'s {gift?.occasion || 'occasion'} is {days != null ? (days <= 0 ? 'here' : `in ${days} days`) : 'coming up'}. I found

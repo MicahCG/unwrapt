@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { normalizeRecipientName } from '@/lib/dateUtils';
 import { MobileShell, Eyebrow, PrimaryButton, Display } from '@/components/unwrapt2/MobileShell';
-import { MargotAvatar, PersonAvatar } from '@/components/unwrapt2/MargotAvatar';
+import { TheaAvatar, PersonAvatar } from '@/components/unwrapt2/TheaAvatar';
 import { U, toneForIndex, initialsOf } from '@/components/unwrapt2/theme';
 import { format } from 'date-fns';
 import { trackProductEvent } from '@/lib/productAnalytics';
@@ -119,7 +119,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   const [activeId, setActiveId] = useState<string | null>(null);
 
   // Intel chat state
-  const [intelMessages, setIntelMessages] = useState<{ from: 'margot' | 'user'; text: string }[]>([]);
+  const [intelMessages, setIntelMessages] = useState<{ from: 'thea' | 'user'; text: string }[]>([]);
   const [intelFacts, setIntelFacts] = useState<string[]>([]);
   const [intelInput, setIntelInput] = useState('');
 
@@ -277,7 +277,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     setIntelInput('');
     setIntelMessages([
       {
-        from: 'margot',
+        from: 'thea',
         text: `Tell me about ${first}. Pick up to ${MAX_INTERESTS} things they genuinely enjoy, and I'll show you what I could choose.`,
       },
     ]);
@@ -296,7 +296,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     );
     const reply = INTEREST_REPLIES[interest]?.(first) || `${interest} noted. I'll fold that into ${first}'s gifts.`;
     setTimeout(() => {
-      setIntelMessages((m) => [...m, { from: 'margot', text: reply }]);
+      setIntelMessages((m) => [...m, { from: 'thea', text: reply }]);
     }, 550);
   };
 
@@ -393,10 +393,10 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     return (
       <MobileShell glow animate={false}>
         <div className="flex h-full flex-col items-center justify-center text-center">
-          <MargotAvatar size={66} pulse />
+          <TheaAvatar size={66} pulse />
           <Display className="mt-7 text-[27px]">Setting up your concierge…</Display>
           <p className="mt-2 text-[15px]" style={{ color: U.subtle }}>
-            Saving your people and getting Margot ready.
+            Saving your people and getting Thea ready.
           </p>
         </div>
       </MobileShell>
@@ -425,8 +425,8 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           </div>
           <div className="mt-auto pt-16">
             <div className="mb-6 flex items-center gap-3">
-              <MargotAvatar size={34} />
-              <span style={{ fontSize: 13.5, color: U.subtle }}>Hi, I'm Margot, your gifting concierge</span>
+              <TheaAvatar size={34} />
+              <span style={{ fontSize: 13.5, color: U.subtle }}>Hi, I'm Thea, your personal gifting agent</span>
             </div>
             <Display style={{ fontSize: 47, lineHeight: 1.02, letterSpacing: '-0.03em' }}>
               Never forget<br />another<br />
@@ -446,7 +446,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         return (
           <MobileShell animate={false}>
             <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-              <MargotAvatar size={66} pulse />
+              <TheaAvatar size={66} pulse />
               <Display className="mt-7 text-[27px]">Reading your calendar…</Display>
               <p className="mt-2" style={{ fontSize: 15, color: U.subtle, maxWidth: 260, lineHeight: 1.5 }}>
                 Finding the people who matter and the dates that count.
@@ -536,7 +536,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           }
         >
           <div className="mb-4 flex items-center gap-2.5">
-            <MargotAvatar size={30} />
+            <TheaAvatar size={30} />
             <Eyebrow>Step 2 of 4</Eyebrow>
           </div>
           <Display style={{ fontSize: 31, lineHeight: 1.1 }}>
@@ -610,10 +610,10 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         >
           <div className="mb-1 flex items-center gap-3">
             <div onClick={() => setScreen(people.length ? 'found' : 'import')} className="cursor-pointer" style={{ fontSize: 22, color: U.subtle, width: 24 }}>‹</div>
-            <MargotAvatar size={34} />
+            <TheaAvatar size={34} />
             <div className="flex-1">
               <div style={{ fontWeight: 600, fontSize: 15.5 }}>Add someone</div>
-              <Eyebrow>Margot</Eyebrow>
+              <Eyebrow>Thea</Eyebrow>
             </div>
           </div>
           <p className="font-display mb-4 mt-4" style={{ fontSize: 20, lineHeight: 1.3 }}>Who would you like me to look after?</p>
@@ -665,7 +665,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       );
     }
 
-    // ════════ INTEL (Margot chat) ════════
+    // ════════ INTEL (Thea chat) ════════
     case 'intel': {
       const first = firstNameOf(activePerson?.name || '');
       const available = INTEREST_TAXONOMY.filter((t) => !intelFacts.includes(t)).slice(0, 9);
@@ -680,24 +680,24 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             {/* header */}
             <div className="flex items-center gap-3" style={{ padding: '56px 20px 14px', borderBottom: `1px solid rgba(42,37,32,0.07)` }}>
               <div onClick={() => setScreen(people.length > 1 || activePerson?.fromCalendar ? 'found' : 'import')} className="cursor-pointer" style={{ fontSize: 22, color: U.subtle, width: 26 }}>‹</div>
-              <MargotAvatar size={38} />
+              <TheaAvatar size={38} />
               <div className="flex-1">
                 <div style={{ fontWeight: 600, fontSize: 15.5 }}>Getting to know {first}</div>
-                <Eyebrow>Margot · {intelFacts.length}/{MAX_INTERESTS} interests</Eyebrow>
+                <Eyebrow>Thea · {intelFacts.length}/{MAX_INTERESTS} interests</Eyebrow>
               </div>
             </div>
             {/* messages */}
             <div className="flex flex-1 flex-col gap-3 overflow-y-auto" style={{ padding: '20px 20px 8px' }}>
               {intelMessages.map((m, i) => (
-                <div key={i} className="flex" style={{ justifyContent: m.from === 'margot' ? 'flex-start' : 'flex-end' }}>
+                <div key={i} className="flex" style={{ justifyContent: m.from === 'thea' ? 'flex-start' : 'flex-end' }}>
                   <div
                     style={{
                       maxWidth: '80%', padding: '13px 16px', borderRadius: 20, fontSize: 15, lineHeight: 1.45,
-                      background: m.from === 'margot' ? U.surface : U.ink,
-                      color: m.from === 'margot' ? U.ink : U.buttonText,
-                      border: m.from === 'margot' ? `1px solid ${U.border}` : `1px solid ${U.ink}`,
-                      borderBottomLeftRadius: m.from === 'margot' ? 6 : 20,
-                      borderBottomRightRadius: m.from === 'margot' ? 20 : 6,
+                      background: m.from === 'thea' ? U.surface : U.ink,
+                      color: m.from === 'thea' ? U.ink : U.buttonText,
+                      border: m.from === 'thea' ? `1px solid ${U.border}` : `1px solid ${U.ink}`,
+                      borderBottomLeftRadius: m.from === 'thea' ? 6 : 20,
+                      borderBottomRightRadius: m.from === 'thea' ? 20 : 6,
                     }}
                   >
                     {m.text}
@@ -784,7 +784,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             ‹
           </button>
           <div className="mb-2 flex items-center gap-2.5">
-            <MargotAvatar size={28} />
+            <TheaAvatar size={28} />
             <Eyebrow>Personalized for {first}</Eyebrow>
           </div>
           <Display style={{ fontSize: 31, lineHeight: 1.08 }}>This is where their interests can lead.</Display>
@@ -814,7 +814,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         >
           <div onClick={() => enterIntel(activePerson.id)} className="mb-3.5 cursor-pointer" style={{ fontSize: 22, color: U.subtle }}>‹</div>
           <div className="mb-2 flex items-center gap-2.5">
-            <MargotAvatar size={26} />
+            <TheaAvatar size={26} />
             <span style={{ fontSize: 13.5, color: U.subtle }}>Here's how I understand {first}</span>
           </div>
           <Display style={{ fontSize: 30, lineHeight: 1.1 }}>A living profile<br />that gets sharper.</Display>
@@ -931,7 +931,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             <div>
               <div style={{ fontWeight: 600, fontSize: 15.5 }}>Always ask before purchase</div>
               <div style={{ fontSize: 13, color: U.muted, marginTop: 2, lineHeight: 1.4 }}>
-                Margot recommends the gift and explains why it fits. Nothing is purchased
+                Thea recommends the gift and explains why it fits. Nothing is purchased
                 until you approve the item and total.
               </div>
             </div>
@@ -965,7 +965,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           <Eyebrow className="mb-3">Ready when you are</Eyebrow>
           <Display style={{ fontSize: 31, lineHeight: 1.08 }}>Your concierge is set up</Display>
           <p className="mb-5 mt-2.5" style={{ fontSize: 15, lineHeight: 1.5, color: U.textSecondary }}>
-            Margot will watch the moments you added and bring you a recommendation when
+            Thea will watch the moments you added and bring you a recommendation when
             there is something worth giving. <strong>You stay in control of every purchase.</strong>
           </p>
           <div className="mb-3.5" style={{ background: U.surface, border: `1px solid ${U.border}`, borderRadius: 20, padding: '4px 16px' }}>

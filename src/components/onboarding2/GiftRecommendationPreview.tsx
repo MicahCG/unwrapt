@@ -59,7 +59,7 @@ const GiftRecommendationPreview: React.FC<GiftRecommendationPreviewProps> = ({
       <div style={{ padding: 20, borderRadius: 20, background: U.surface, border: `1px solid ${U.border}` }}>
         <Gift size={24} color={U.accent} aria-hidden="true" />
         <p className="mt-3 text-[15px] leading-6" style={{ color: U.textSecondary }}>
-          Margot saved {recipientFirstName}'s taste profile. Gift options will appear on the dashboard as the catalog refreshes.
+          Thea saved {recipientFirstName}'s taste profile. Gift options will appear on the dashboard as the catalog refreshes.
         </p>
       </div>
     );
@@ -99,7 +99,7 @@ const GiftRecommendationPreview: React.FC<GiftRecommendationPreviewProps> = ({
         </article>
       ))}
       <p className="px-1 text-[11.5px] leading-5" style={{ color: U.muted }}>
-        Preview only. Margot will explain the final match and ask before any purchase.
+        Preview only. Thea will explain the final match and ask before any purchase.
       </p>
     </div>
   );

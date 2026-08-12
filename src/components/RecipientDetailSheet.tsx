@@ -4,7 +4,8 @@ import { CalendarDays, Check, Gift, MapPin, Pencil, Plus, Sparkles, X } from 'lu
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { PersonAvatar } from '@/components/unwrapt2/MargotAvatar';
+import { PersonAvatar } from '@/components/unwrapt2/TheaAvatar';
+import { useThea } from '@/hooks/useThea';
 import { initialsOf, U } from '@/components/unwrapt2/theme';
 import { cleanName } from '@/lib/utils';
 import { formatOccasionDate } from '@/lib/dateUtils';
@@ -32,6 +33,7 @@ const RecipientDetailSheet: React.FC<RecipientDetailSheetProps> = ({
 }) => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { openThea } = useThea();
   const [interests, setInterests] = useState<string[]>([]);
   const [draftInterest, setDraftInterest] = useState('');
   const [saving, setSaving] = useState(false);
@@ -98,6 +100,7 @@ const RecipientDetailSheet: React.FC<RecipientDetailSheetProps> = ({
             <Sparkles className="h-4 w-4 text-[#B65B3C]" /> Browse ideas
           </button>
         </div>
+        <button onClick={() => openThea({ surface: 'recipient', recipientName: name })} className="u-touch-card mt-2.5 flex w-full items-center justify-center gap-2 rounded-[16px] bg-[#EEE5D5] px-3 py-3 text-[12.5px] font-semibold text-[#5A5147]"><Sparkles className="h-4 w-4 text-[#B65B3C]" /> Ask Thea about {name.split(' ')[0]}</button>
 
         <section className="mt-6">
           <div className="mb-2.5 flex items-center justify-between">
