@@ -19,6 +19,10 @@ import { ApprovalScreen } from '@/components/unwrapt2/ApprovalScreen';
 import { U, toneForIndex, initialsOf } from '@/components/unwrapt2/theme';
 import { cleanName } from '@/lib/utils';
 import { getNextOccurrence, formatOccasionDate, getDaysUntil, getDaysUntilExact } from '@/lib/dateUtils';
+import RecipientDetailSheet from '@/components/RecipientDetailSheet';
+import CatalogPreviewSheet from '@/components/CatalogPreviewSheet';
+import GiftStatusBadge from '@/components/GiftStatusBadge';
+import { getRecipientStatus, type RecipientRecord } from '@/lib/giftStatus';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -29,6 +33,9 @@ const Dashboard = () => {
   const [showAddRecipient, setShowAddRecipient] = useState(false);
   const [showScheduleGift, setShowScheduleGift] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState(null);
+  const [recipientDetail, setRecipientDetail] = useState<RecipientRecord | null>(null);
+  const [catalogRecipient, setCatalogRecipient] = useState<RecipientRecord | null>(null);
+  const [showCatalog, setShowCatalog] = useState(false);
   const [showAddFunds, setShowAddFunds] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showEnableAutomation, setShowEnableAutomation] = useState(false);
@@ -171,8 +178,22 @@ const Dashboard = () => {
   };
 
   const handleScheduleGift = (recipient: any) => {
+    setRecipientDetail(null);
     setSelectedRecipient(recipient);
     setShowScheduleGift(true);
+  };
+  const handleOpenRecipient = (recipient: RecipientRecord) => {
+    setRecipientDetail(recipient);
+  };
+  const handleBrowseCatalog = (recipient?: RecipientRecord) => {
+    setRecipientDetail(null);
+    setCatalogRecipient(recipient || null);
+    setShowCatalog(true);
+  };
+  const handleEditRecipient = (recipient: RecipientRecord) => {
+    setRecipientDetail(null);
+    setEditingRecipient(recipient);
+    setShowEditRecipient(true);
   };
   const handleEnableAutomation = (recipient: any) => {
     setAutomationRecipient(recipient);
@@ -253,20 +274,11 @@ const Dashboard = () => {
       <MobileShell
         contentClassName="px-5 pt-12 pb-3"
         footer={
-          <>
-            <div className="mb-2.5 flex gap-2 overflow-x-auto">
-              <div onClick={() => setShowAddRecipient(true)} className="flex-shrink-0 cursor-pointer whitespace-nowrap" style={{ padding: '9px 14px', borderRadius: 14, background: U.chip, border: '1px solid rgba(42,37,32,0.1)', fontSize: 13, fontWeight: 600, color: '#5A5147' }}>
-                ＋ Add someone
-              </div>
-              <div onClick={() => navigate('/gift-history')} className="flex-shrink-0 cursor-pointer whitespace-nowrap" style={{ padding: '9px 14px', borderRadius: 14, background: U.chip, border: '1px solid rgba(42,37,32,0.1)', fontSize: 13, fontWeight: 600, color: '#5A5147' }}>
-                ✦ Gift history
-              </div>
-            </div>
-            <div className="flex items-center gap-2.5" style={{ padding: '7px 7px 7px 18px', borderRadius: 24, background: U.surface, border: '1px solid rgba(42,37,32,0.1)' }}>
-              <input placeholder="Ask Margot anything…" className="flex-1" style={{ border: 'none', background: 'transparent', fontSize: 14.5, color: U.ink }} />
-              <div className="flex items-center justify-center" style={{ width: 38, height: 38, borderRadius: '50%', background: U.accent, color: U.buttonText, fontSize: 17, flexShrink: 0 }}>↑</div>
-            </div>
-          </>
+          <nav aria-label="Primary actions" className="grid grid-cols-3 gap-2 rounded-[22px] border border-[#D9CDBD] bg-[#FAF6EE]/95 p-2 shadow-[0_12px_30px_rgba(42,37,32,0.08)] backdrop-blur">
+            <button onClick={() => setShowAddRecipient(true)} className="u-touch-card rounded-[15px] px-2 py-3 text-[11.5px] font-semibold text-[#5A5147]">＋ Add person</button>
+            <button onClick={() => handleBrowseCatalog()} className="u-touch-card rounded-[15px] bg-[#EEE5D5] px-2 py-3 text-[11.5px] font-semibold text-[#5A5147]">✦ Catalog</button>
+            <button onClick={() => navigate('/gift-history')} className="u-touch-card rounded-[15px] px-2 py-3 text-[11.5px] font-semibold text-[#5A5147]">◎ Gift status</button>
+          </nav>
         }
       >
         {/* Header */}
@@ -308,15 +320,19 @@ const Dashboard = () => {
             <Eyebrow className="mb-2.5">Your people</Eyebrow>
             <div className="flex gap-3.5 overflow-x-auto pb-0.5">
               {sortedRecipients.map((p: any, i: number) => (
-                <div key={p.id} onClick={() => handleScheduleGift(p)} className="flex flex-shrink-0 cursor-pointer flex-col items-center gap-1.5" style={{ width: 56 }}>
-                  <PersonAvatar initials={initialsOf(cleanName(p.name))} tone={toneForIndex(i)} size={52} />
+                <button key={p.id} onClick={() => handleOpenRecipient(p as RecipientRecord)} className="u-tray-item flex flex-shrink-0 cursor-pointer flex-col items-center gap-1.5" style={{ width: 60 }} aria-label={`Open ${cleanName(p.name)}`}>
+                  <div className="relative">
+                    <PersonAvatar initials={initialsOf(cleanName(p.name))} tone={toneForIndex(i)} size={52} />
+                    <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[#EDE6D8]" style={{ background: getRecipientStatus(p as RecipientRecord).dot }} />
+                  </div>
                   <span style={{ fontSize: 11.5, color: '#5A5147', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 56 }}>{cleanName(p.name).split(' ')[0]}</span>
-                </div>
+                  <span className="max-w-[60px] truncate text-[8.5px] font-semibold uppercase tracking-wide" style={{ color: getRecipientStatus(p as RecipientRecord).dot }}>{getRecipientStatus(p as RecipientRecord).label}</span>
+                </button>
               ))}
-              <div onClick={() => setShowAddRecipient(true)} className="flex flex-shrink-0 cursor-pointer flex-col items-center gap-1.5" style={{ width: 56 }}>
+              <button onClick={() => setShowAddRecipient(true)} className="u-tray-item flex flex-shrink-0 cursor-pointer flex-col items-center gap-1.5" style={{ width: 60 }} aria-label="Add a recipient">
                 <div className="flex items-center justify-center" style={{ width: 52, height: 52, borderRadius: '50%', border: '1.5px dashed rgba(42,37,32,0.25)', color: U.accent, fontSize: 24 }}>+</div>
                 <span style={{ fontSize: 11.5, color: U.muted }}>Add</span>
-              </div>
+              </button>
             </div>
           </div>
         )}
@@ -384,6 +400,7 @@ const Dashboard = () => {
               const occasionType = recipient.birthday ? 'Birthday' : 'Anniversary';
               const isLocked = isFree && index >= 3;
               const daysUntil = nextOccasionDate ? getDaysUntil(nextOccasionDate) : null;
+              const recipientStatus = getRecipientStatus(recipient as RecipientRecord);
 
               const activeOrder = recipient.scheduled_gifts?.find((gift: any) =>
                 (gift.status === 'ordered' || gift.status === 'delivered') && gift.delivery_date);
@@ -410,8 +427,8 @@ const Dashboard = () => {
               }
 
               return (
-                <div key={recipient.id} style={{ borderRadius: 20, border: `1px solid ${U.border}`, background: U.surface, padding: '16px 18px' }}>
-                  <div className="flex cursor-pointer items-center justify-between" onClick={() => handleScheduleGift(recipient)}>
+                <div key={recipient.id} className="u-recipient-card" style={{ borderRadius: 20, border: `1px solid ${U.border}`, background: U.surface, padding: '16px 18px' }}>
+                  <button className="flex w-full cursor-pointer items-center justify-between text-left" onClick={() => handleOpenRecipient(recipient as RecipientRecord)}>
                     <div className="flex items-center gap-3">
                       <PersonAvatar initials={initialsOf(cleanName(recipient.name))} tone={toneForIndex(index)} size={38} />
                       <div>
@@ -426,8 +443,8 @@ const Dashboard = () => {
                         )}
                       </div>
                     </div>
-                    <span style={{ fontSize: 20, color: U.muted }}>›</span>
-                  </div>
+                    <div className="flex items-center gap-2"><GiftStatusBadge status={recipientStatus} compact /><span style={{ fontSize: 20, color: U.muted }}>›</span></div>
+                  </button>
 
                   {/* Active order status */}
                   {activeOrder && (
@@ -514,6 +531,20 @@ const Dashboard = () => {
       {showScheduleGift && selectedRecipient && (
         <ScheduleGiftModal isOpen={showScheduleGift} onClose={() => setShowScheduleGift(false)} recipient={selectedRecipient} />
       )}
+      <RecipientDetailSheet
+        recipient={recipientDetail}
+        open={Boolean(recipientDetail)}
+        onOpenChange={(open) => { if (!open) setRecipientDetail(null); }}
+        onSchedule={handleScheduleGift}
+        onEdit={handleEditRecipient}
+        onBrowseCatalog={handleBrowseCatalog}
+      />
+      <CatalogPreviewSheet
+        open={showCatalog}
+        onOpenChange={setShowCatalog}
+        recipientName={catalogRecipient?.name}
+        interests={catalogRecipient?.interests || []}
+      />
       {showAddFunds && userProfile && (
         <AddFundsModal isOpen={showAddFunds} onClose={() => setShowAddFunds(false)} currentBalance={userProfile.gift_wallet_balance || 0} />
       )}

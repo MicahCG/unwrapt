@@ -18,7 +18,7 @@ const stateCopy: Record<string, { label: string; detail: string; icon: typeof Pa
   awaiting_recipient: { label: 'Waiting for their choice', detail: 'Share or refresh the private choice link.', icon: Gift, tone: 'bg-violet-100 text-violet-800' },
   recipient_selected: { label: 'Choice received', detail: 'Their selection is ready for partner checkout.', icon: Check, tone: 'bg-emerald-100 text-emerald-800' },
   ready_for_partner: { label: 'Ready for partner', detail: 'Approved and queued for a verified fulfillment handoff.', icon: Sparkles, tone: 'bg-blue-100 text-blue-800' },
-  submitted_to_partner: { label: 'Partner processing', detail: 'The fulfillment partner has accepted the order.', icon: Package, tone: 'bg-blue-100 text-blue-800' },
+  submitted_to_partner: { label: 'Ordered', detail: 'The fulfillment partner has accepted the order.', icon: Package, tone: 'bg-blue-100 text-blue-800' },
   shipped: { label: 'Shipped', detail: 'The carrier is moving the gift.', icon: Truck, tone: 'bg-indigo-100 text-indigo-800' },
   delivered: { label: 'Delivered', detail: 'The gift has arrived.', icon: Check, tone: 'bg-emerald-100 text-emerald-800' },
   exception: { label: 'Concierge review', detail: 'A person will review the sourcing or fulfillment details.', icon: AlertTriangle, tone: 'bg-orange-100 text-orange-800' },

@@ -1,22 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { Heart, MapPin, Sparkles, Wallet as WalletIcon, Calendar, CreditCard, Package, Truck } from 'lucide-react';
+import { Heart, MapPin, CreditCard, Package, Truck } from 'lucide-react';
 import { format, subDays, parseISO } from 'date-fns';
 import { cleanName } from '@/lib/utils';
 import { GIFT_VIBE_OPTIONS, type GiftVibe, type Product, getAllProducts } from '@/lib/giftVibes';
+import type { RecipientRecord } from '@/lib/giftStatus';
+
+type ScheduleRecipient = RecipientRecord & {
+  preferred_gift_vibe?: GiftVibe | null;
+  _holidayPreset?: Partial<{ occasion_date: string; street: string; city: string; state: string; zip_code: string; country: string }>;
+};
 
 interface ScheduleGiftModalProps {
-  recipient: any;
+  recipient: ScheduleRecipient;
   isOpen: boolean;
   onClose: () => void;
   payingForGiftId?: string | null;
@@ -43,9 +48,21 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   const [isLoading, setIsLoading] = useState(false);
   const [showScrollHint, setShowScrollHint] = useState(true);
 
+  const isRecipientValid = !isOpen || Boolean(recipient?.id);
+
+  useEffect(() => {
+    if (isRecipientValid) return;
+    toast({
+      title: 'Recipient unavailable',
+      description: 'Close this screen and choose the recipient again.',
+      variant: 'destructive',
+    });
+    onClose();
+  }, [isRecipientValid, onClose, toast]);
+
   // Fetch user wallet balance
   const { data: userProfile } = useQuery({
-    queryKey: ['user-profile'],
+    queryKey: ['user-profile', user?.id],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
@@ -59,7 +76,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
       if (error) throw error;
       return data;
     },
-    enabled: isOpen,
+    enabled: isOpen && !!user?.id,
   });
 
   // Fetch all products from Supabase products table
@@ -85,9 +102,9 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         .gte('occasion_date', today)
         .order('occasion_date', { ascending: true })
         .limit(1)
-        .single();
+        .maybeSingle();
       
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         console.error('Error fetching existing gift:', error);
         return null;
       }
@@ -101,58 +118,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     ? allProducts.filter(p => p.gift_vibe === selectedVibe)
     : allProducts;
 
-  // Debug logging for products
-  useEffect(() => {
-    if (isOpen) {
-      console.log('🎁 Products loaded:', {
-        totalProducts: allProducts.length,
-        selectedVibe,
-        filteredCount: filteredProducts.length,
-        productsLoading,
-        allProductsPreview: allProducts.slice(0, 3).map(p => ({
-          title: p.title,
-          vibe: p.gift_vibe,
-          active: p.active,
-          available: p.available_for_sale
-        }))
-      });
-
-      if (allProducts.length === 0 && !productsLoading) {
-        console.error('⚠️ NO PRODUCTS FOUND - Check production database!');
-      }
-    }
-  }, [allProducts, selectedVibe, filteredProducts, isOpen, productsLoading]);
-
-  // Debug logging for recipient prop
-  useEffect(() => {
-    console.log('🔍 ScheduleGiftModal recipient prop changed:', {
-      recipient,
-      isOpen,
-      recipientId: recipient?.id,
-      recipientType: typeof recipient,
-      recipientKeys: recipient ? Object.keys(recipient) : 'N/A'
-    });
-  }, [recipient, isOpen]);
-
-  // Early return if recipient is invalid
-  if (isOpen && (!recipient || !recipient.id)) {
-    console.error('❌ ScheduleGiftModal: Invalid recipient data', { recipient, isOpen });
-
-    useEffect(() => {
-      if (isOpen && (!recipient || !recipient.id)) {
-        toast({
-          title: "Error",
-          description: "Recipient information is missing. Please try again.",
-          variant: "destructive"
-        });
-        onClose();
-      }
-    }, [isOpen, recipient, onClose, toast]);
-
-    return null;
-  }
-
-  const getDefaultOccasionDate = () => {
+  const getDefaultOccasionDate = useCallback(() => {
     const today = new Date();
     const currentYear = today.getFullYear();
 
@@ -169,8 +135,15 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
       };
     }
 
-    return { occasion: '', date: '' };
-  };
+    if (recipient?.anniversary) {
+      const anniversary = parseISO(recipient.anniversary);
+      const thisYearAnniversary = new Date(currentYear, anniversary.getMonth(), anniversary.getDate());
+      if (thisYearAnniversary < today) thisYearAnniversary.setFullYear(currentYear + 1);
+      return { occasion: 'Anniversary', date: thisYearAnniversary.toISOString().split('T')[0] };
+    }
+
+    return { occasion: 'Special occasion', date: '' };
+  }, [recipient?.anniversary, recipient?.birthday]);
 
   useEffect(() => {
     if (isOpen) {
@@ -209,13 +182,13 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
       }
       setEditingAddress(!hasExistingAddress);
     }
-  }, [isOpen, recipient]);
+  }, [getDefaultOccasionDate, isOpen, recipient]);
 
   const getSenderName = () => {
     return user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Someone special';
   };
 
-  const sendGiftNotificationEmail = async (giftDetails: any) => {
+  const sendGiftNotificationEmail = async (giftDetails: { occasion_date: string; gift_type: string; price: number }) => {
     try {
       await supabase.functions.invoke('send-notification-email', {
         body: {
@@ -224,7 +197,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           userName: user?.user_metadata?.full_name || user?.email?.split('@')[0],
           data: {
             recipientName: cleanName(recipient.name),
-            occasion: 'Birthday',
+            occasion: getDefaultOccasionDate().occasion,
             occasionDate: giftDetails.occasion_date,
             giftType: giftDetails.gift_type,
             priceRange: giftDetails.price
@@ -314,6 +287,10 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         return;
       }
 
+      const defaultOccasion = getDefaultOccasionDate();
+      const occasion = defaultOccasion.occasion;
+      const occasionType = occasion.toLowerCase().replace(/\s+/g, '_');
+
       // Create scheduled gift
       const deliveryDate = new Date(new Date(formData.occasion_date).getTime() - 3 * 24 * 60 * 60 * 1000)
         .toISOString().split('T')[0];
@@ -325,9 +302,9 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         .insert({
           user_id: currentUser.id,
           recipient_id: recipient.id,
-          occasion: 'Birthday',
+          occasion,
           occasion_date: formData.occasion_date,
-          occasion_type: 'birthday',
+          occasion_type: occasionType,
           gift_type: selectedProduct.title,
           gift_variant_id: selectedProduct.shopify_variant_id,
           gift_image_url: selectedProduct.featured_image_url,
@@ -441,7 +418,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             productImage: selectedProduct.featured_image_url,
             giftDetails: {
               recipientName: cleanName(recipient.name),
-              occasion: 'Birthday',
+              occasion,
               giftType: selectedProduct.title
             },
             shippingAddress: {
@@ -489,11 +466,11 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           setSelectedProduct(null);
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Error scheduling gift:', error);
       toast({
         title: "Error",
-        description: error?.message || "There was a problem scheduling your gift. Please try again.",
+        description: error instanceof Error ? error.message : "There was a problem scheduling your gift. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -529,21 +506,27 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     }
   ];
 
+  if (!isRecipientValid) return null;
+
+  const occasionLabel = getDefaultOccasionDate().occasion;
+
   return (
     <Sheet open={isOpen} onOpenChange={handleClose}>
       <SheetContent
-        side="right"
-        className="w-full sm:w-[840px] sm:max-w-[90vw] p-0 bg-[#FAF8F3] border-l-2 border-[#E4DCD2] overflow-hidden flex flex-col"
+        side="bottom"
+        className="mx-auto flex h-[94dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[28px] border-x border-t border-[#E4DCD2] bg-[#FAF8F3] p-0"
       >
         {/* Header - Compact */}
-        <SheetHeader className="px-6 pt-5 pb-3 border-b border-[#E4DCD2] bg-white/50 backdrop-blur-sm">
-          <SheetTitle className="font-display text-xl text-[#1A1A1A]">
-            Schedule Gift for {cleanName(recipient.name)}
+        <SheetHeader className="border-b border-[#E4DCD2] bg-white/70 px-5 pb-4 pt-5 text-left backdrop-blur-sm">
+          <SheetTitle className="pr-8 font-display text-xl text-[#1A1A1A]">
+            Plan a gift for {cleanName(recipient.name)}
           </SheetTitle>
+          <p className="text-sm text-[#1A1A1A]/60">Choose the timing, delivery details and gift. You will review payment before anything is ordered.</p>
         </SheetHeader>
 
+        <div className="min-h-0 flex-1 overflow-y-auto">
         {/* Compact Info Bar: Timeline + Cancel + Address */}
-        <div className="px-6 py-2 space-y-2 border-b border-[#E4DCD2] bg-white/40">
+        <div className="space-y-3 border-b border-[#E4DCD2] bg-white/40 px-5 py-3">
           {/* Timeline - Inline */}
           {formData.occasion_date && (() => {
             const occasionDate = parseISO(formData.occasion_date);
@@ -555,21 +538,10 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             const deliveryDate = subDays(occasionDate, 3);
             
             return (
-              <div className="flex items-center gap-3 text-xs">
-                <Calendar className="w-3.5 h-3.5 text-[#C4A36F] flex-shrink-0" />
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={fundsReserved ? 'text-emerald-700 font-medium' : 'text-[#1A1A1A]/70'}>
-                    {fundsReserved ? '✓ Funds' : `Funds ${format(fundsReserveDate, 'MMM d')}`}
-                  </span>
-                  <span className="text-[#C4A36F]/40">→</span>
-                  <span className={orderPlaced ? 'text-emerald-700 font-medium' : 'text-[#1A1A1A]/70'}>
-                    {orderPlaced ? '✓ Ordered' : `Order ${format(orderDate, 'MMM d')}`}
-                  </span>
-                  <span className="text-[#C4A36F]/40">→</span>
-                  <span className={delivered ? 'text-emerald-700 font-medium' : 'text-[#1A1A1A]/70'}>
-                    {delivered ? '✓ Delivered' : `Arrives ${format(deliveryDate, 'MMM d')}`}
-                  </span>
-                </div>
+              <div className="grid grid-cols-3 gap-2 text-[11px]">
+                <div className="rounded-xl bg-white px-2.5 py-2"><CreditCard className="mb-1 h-3.5 w-3.5 text-[#C4A36F]" /><span className={fundsReserved ? 'font-medium text-emerald-700' : 'text-[#1A1A1A]/65'}>{fundsReserved ? 'Funds ready' : `Review ${format(fundsReserveDate, 'MMM d')}`}</span></div>
+                <div className="rounded-xl bg-white px-2.5 py-2"><Package className="mb-1 h-3.5 w-3.5 text-[#C4A36F]" /><span className={orderPlaced ? 'font-medium text-emerald-700' : 'text-[#1A1A1A]/65'}>{orderPlaced ? 'Ordered' : `Order ${format(orderDate, 'MMM d')}`}</span></div>
+                <div className="rounded-xl bg-white px-2.5 py-2"><Truck className="mb-1 h-3.5 w-3.5 text-[#C4A36F]" /><span className={delivered ? 'font-medium text-emerald-700' : 'text-[#1A1A1A]/65'}>{delivered ? 'Delivered' : `Arrive ${format(deliveryDate, 'MMM d')}`}</span></div>
               </div>
             );
           })()}
@@ -586,15 +558,6 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
               Order placed. Contact <a href="mailto:team@unwrapt.io" className="underline font-medium">team@unwrapt.io</a> for changes.
             </p>
           )}
-
-          {/* Problem with order notice */}
-          <p className="text-xs text-[#1A1A1A]/50">
-            Having an issue with your order? Contact{' '}
-            <a href="mailto:team@unwrapt.io" className="underline font-medium text-[#C4A36F] hover:text-[#b8943f]">
-              team@unwrapt.io
-            </a>
-            {' '}and we'll respond within 24 hours.
-          </p>
 
           {/* Address - Compact inline */}
           {(() => {
@@ -638,7 +601,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
                       onChange={(e) => setFormData(prev => ({ ...prev, street: e.target.value }))}
                       className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm h-9"
                     />
-                    <div className="grid grid-cols-4 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       <Input
                         placeholder="City *"
                         value={formData.city}
@@ -680,11 +643,11 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         </div>
 
         {/* Controls Bar: Date + Vibe */}
-        <div className="px-8 py-3 border-b border-[#E4DCD2] bg-white/30 flex flex-wrap items-end gap-4">
+        <div className="space-y-3 border-b border-[#E4DCD2] bg-white/30 px-5 py-3">
           {/* Birthday Date */}
           <div className="space-y-1">
             <Label htmlFor="occasion_date" className="text-xs font-medium text-[#1A1A1A]">
-              Birthday Date *
+              {occasionLabel} date *
             </Label>
             <Input
               id="occasion_date"
@@ -692,12 +655,12 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
               value={formData.occasion_date}
               onChange={(e) => setFormData(prev => ({ ...prev, occasion_date: e.target.value }))}
               required
-              className="bg-white border-[#E4DCD2] text-[#1A1A1A] h-9 w-[160px] text-sm"
+              className="h-10 w-full border-[#E4DCD2] bg-white text-sm text-[#1A1A1A]"
             />
           </div>
 
           {/* Gift Vibe - Horizontal Pills */}
-          <div className="flex-1 space-y-1">
+          <div className="space-y-1">
             <Label className="text-xs font-medium text-[#1A1A1A]">Gift Vibe *</Label>
             <div className="flex gap-2 flex-wrap">
               {vibeButtons.map((vibe) => (
@@ -721,7 +684,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
         {/* Gift Gallery - Full Width */}
         <div
-          className="flex-1 overflow-y-auto px-6 py-4 bg-gradient-to-br from-[#FAF8F3] to-[#EFE7DD]/30 relative"
+          className="relative bg-gradient-to-br from-[#FAF8F3] to-[#EFE7DD]/30 px-5 py-4"
           onScroll={(e) => {
             const el = e.currentTarget;
             const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
@@ -732,7 +695,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           {showScrollHint && filteredProducts.length > 3 && (
             <div className="pointer-events-none sticky bottom-0 left-0 right-0 z-10 -mb-4">
               <div className="h-16 bg-gradient-to-t from-[#FAF8F3] to-transparent flex items-end justify-center pb-2">
-                <div className="pointer-events-auto animate-bounce flex items-center gap-1.5 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-md border border-[#E4DCD2] text-xs text-[#1A1A1A]/70">
+                <div className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-[#E4DCD2] bg-white/90 px-3 py-1.5 text-xs text-[#1A1A1A]/70 shadow-md backdrop-blur-sm">
                   <span>Scroll for more gifts</span>
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-[#C4A36F]">
                     <path d="M6 2v8m0 0l3-3m-3 3L3 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -847,12 +810,13 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
             </div>
             )}
           </div>
+        </div>
 
         {/* Sticky Bottom Summary Bar */}
-        <div className="border-t-2 border-[#E4DCD2] bg-white px-8 py-4 shadow-lg">
-          <div className="flex items-center justify-between gap-4">
+        <div className="border-t-2 border-[#E4DCD2] bg-white px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-lg">
+          <div className="space-y-3">
             {/* Left: Selected Gift Summary */}
-            <div className="flex items-center gap-4 flex-1">
+            <div className="flex min-h-10 items-center gap-3">
               {selectedProduct ? (
                 <>
                   <img
@@ -877,29 +841,21 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
               )}
             </div>
 
-            {/* Middle: Wallet Balance */}
-            <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-[#EFE7DD] rounded-lg">
-              <WalletIcon className="w-4 h-4 text-[#1A1A1A]/60" />
-              <span className="text-sm font-medium text-[#1A1A1A]">
-                ${walletBalance.toFixed(2)}
-              </span>
-            </div>
-
             {/* Right: Action Buttons */}
-            <div className="flex gap-3">
+            <div className="grid grid-cols-[auto_1fr] gap-2">
               <Button
                 type="button"
                 variant="outline"
                 onClick={handleClose}
                 disabled={isLoading}
-                className="border-[#E4DCD2] text-[#1A1A1A] hover:bg-[#EFE7DD]"
+                className="h-11 border-[#E4DCD2] px-4 text-[#1A1A1A] hover:bg-[#EFE7DD]"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleSubmit}
                 disabled={isLoading || !isFormValid()}
-                className="bg-[#D2B887] hover:bg-[#D2B887]/90 text-[#1A1A1A] font-medium"
+                className="h-11 bg-[#D2B887] font-medium text-[#1A1A1A] hover:bg-[#D2B887]/90"
               >
                 {isLoading ? (
                   'Processing...'

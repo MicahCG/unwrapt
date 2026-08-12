@@ -567,8 +567,33 @@
 @keyframes u-shimmer { 0% { background-position: -220px 0; } 100% { background-position: 220px 0; } }
 @keyframes u-blink { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
 
+.u-touch-card,
+.u-recipient-card,
+.u-catalog-card {
+  transform: translateZ(0);
+  transition: transform 160ms ease, box-shadow 180ms ease, border-color 180ms ease, opacity 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.u-touch-card:active,
+.u-recipient-card:active,
+.u-catalog-card:active { transform: scale(.985); }
+
+@media (hover: hover) {
+  .u-recipient-card:hover,
+  .u-catalog-card:hover { transform: translateY(-2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
 .animate-u-fadeUp { animation: u-fadeUp .5s ease both; }
 .animate-u-pop { animation: u-pop .3s ease both; }
 .animate-u-pulse-disc { animation: u-pulseDisc 1.7s ease-in-out infinite; }
 .animate-u-blink { animation: u-blink 1.2s infinite; }
-
