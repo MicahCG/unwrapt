@@ -88,7 +88,7 @@ const GiftChoice = () => {
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-brand-charcoal/70">
             {complete
               ? `${selectedTitle} is saved. The sender will take it from here.`
-              : `These were thoughtfully picked for your ${gift.occasion}. Choose one—your address and delivery details will be handled securely during partner checkout.`}
+              : `These were thoughtfully picked for your ${gift.occasion}. Choose one. Your address and delivery details will be handled securely during partner checkout.`}
           </p>
         </header>
 

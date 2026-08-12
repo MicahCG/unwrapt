@@ -14,7 +14,7 @@ const WELCOME_STEPS = [
   {
     icon: Gift,
     title: "Add someone special",
-    description: "Start by adding a recipient—a friend, family member, or anyone you want to remember.",
+    description: "Start by adding a recipient: a friend, family member, or anyone you want to remember.",
     action: "Add First Recipient",
   },
   {

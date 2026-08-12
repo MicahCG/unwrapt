@@ -66,3 +66,7 @@ verify_jwt = false
 # Supports authenticated sender actions and a separate hashed recipient-choice token.
 [functions.fulfillment-router]
 verify_jwt = false
+
+# Catalog credentials stay server-side. Authenticated clients receive only normalized products.
+[functions.gift-catalog]
+verify_jwt = false

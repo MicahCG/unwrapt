@@ -16,7 +16,7 @@ const ONBOARDING_SLIDES = [
     id: 2,
     icon: 'heart',
     headline: "But the people you love shouldn't fade into the background.",
-    body: "Birthdays, anniversaries, and quiet milestones deserve to be remembered, celebrated, and felt — not rushed or forgotten."
+    body: "Birthdays, anniversaries, and quiet milestones deserve to be remembered, celebrated, and felt, not rushed or forgotten."
   },
   {
     id: 3,

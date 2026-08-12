@@ -9,6 +9,7 @@ import { MargotAvatar, PersonAvatar } from '@/components/unwrapt2/MargotAvatar';
 import { U, toneForIndex, initialsOf } from '@/components/unwrapt2/theme';
 import { format } from 'date-fns';
 import { trackProductEvent } from '@/lib/productAnalytics';
+import GiftRecommendationPreview from '@/components/onboarding2/GiftRecommendationPreview';
 
 interface AgentOnboardingFlowProps {
   /** Called once recipients are created so the parent can show the dashboard. */
@@ -36,9 +37,10 @@ interface Person {
   fromCalendar: boolean;
 }
 
-type Screen = 'welcome' | 'import' | 'found' | 'addperson' | 'intel' | 'summary' | 'guardrails' | 'trial';
+type Screen = 'welcome' | 'import' | 'found' | 'addperson' | 'intel' | 'recommendations' | 'summary' | 'guardrails' | 'trial';
 
 const FREE_TIER_LIMIT = 3;
+const MAX_INTERESTS = 3;
 
 const INTEREST_TAXONOMY = [
   'Golf', 'Travel', 'Coffee', 'Fitness', 'Cooking', 'Wine', 'Reading', 'Music',
@@ -46,9 +48,9 @@ const INTEREST_TAXONOMY = [
 ];
 
 const INTEREST_REPLIES: Record<string, (n: string) => string> = {
-  Golf: (n) => `Golf — noted. I'll lean toward course-day gear and experiences ${n}'ll actually use.`,
+  Golf: (n) => `Golf noted. I'll lean toward course-day gear and experiences ${n} will actually use.`,
   Travel: (n) => `A traveller. I'll favour things that pack well and earn a spot in ${n}'s carry-on.`,
-  Whiskey: () => `Whiskey it is — I'll keep an eye out for tastings and a really good pour.`,
+  Whiskey: () => `Whiskey it is. I'll keep an eye out for tastings and a really good pour.`,
   'Premium experiences': () => `Premium experiences. I'll watch for moments worth giving, not just objects.`,
 };
 
@@ -113,13 +115,13 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   const [scanning, setScanning] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [sources, setSources] = useState({ google: false, apple: false, outlook: false, contacts: false });
   const [people, setPeople] = useState<Person[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
 
   // Intel chat state
   const [intelMessages, setIntelMessages] = useState<{ from: 'margot' | 'user'; text: string }[]>([]);
   const [intelFacts, setIntelFacts] = useState<string[]>([]);
+  const [intelInput, setIntelInput] = useState('');
 
   // Guardrails
   const [budget, setBudget] = useState({ lo: 50, hi: 150 });
@@ -149,7 +151,6 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           const integration = integrations[0];
           if (integration.is_connected && !integration.is_expired) {
             setIsConnected(true);
-            setSources((s) => ({ ...s, google: true }));
             // If we land back here connected (e.g. after OAuth), pull events.
             await fetchCalendarEvents(true);
           }
@@ -212,7 +213,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         } else {
           toast({
             title: 'No events found',
-            description: "I couldn't find birthdays or anniversaries — let's add someone together.",
+            description: "I couldn't find birthdays or anniversaries. Let's add someone together.",
           });
           startManualAdd();
         }
@@ -259,41 +260,49 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       fromCalendar: false,
     };
     setPeople((prev) => [...prev, person]);
-    enterIntel(person.id);
+    enterIntel(person.id, person);
   };
 
   // ── Intel chat ────────────────────────────────────────────────────────────────
-  const enterIntel = (id?: string) => {
+  const enterIntel = (id?: string, personOverride?: Person) => {
     const target = id || selectedPeople[0]?.id || people[0]?.id || null;
     if (!target) {
       startManualAdd();
       return;
     }
-    const person = people.find((p) => p.id === target);
+    const person = personOverride || people.find((p) => p.id === target);
     const first = firstNameOf(person?.name || '');
     setActiveId(target);
-    setIntelFacts([]);
+    setIntelFacts(person?.interests || []);
+    setIntelInput('');
     setIntelMessages([
       {
         from: 'margot',
-        text: `Tell me about ${first} — anything you know. The more specific you are, the better the gifts.`,
+        text: `Tell me about ${first}. Pick up to ${MAX_INTERESTS} things they genuinely enjoy, and I'll show you what I could choose.`,
       },
     ]);
     setScreen('intel');
   };
 
   const addInterest = (label: string) => {
-    if (!activePerson) return;
+    const interest = label.trim();
+    if (!activePerson || !interest || intelFacts.length >= MAX_INTERESTS) return;
+    if (intelFacts.some((fact) => fact.toLowerCase() === interest.toLowerCase())) return;
     const first = firstNameOf(activePerson.name);
-    setIntelMessages((m) => [...m, { from: 'user', text: label }]);
-    setIntelFacts((f) => [...f, label]);
+    setIntelMessages((m) => [...m, { from: 'user', text: interest }]);
+    setIntelFacts((f) => [...f, interest]);
     setPeople((prev) =>
-      prev.map((p) => (p.id === activeId ? { ...p, interests: [...p.interests, label] } : p)),
+      prev.map((p) => (p.id === activeId ? { ...p, interests: [...p.interests, interest].slice(0, MAX_INTERESTS) } : p)),
     );
-    const reply = INTEREST_REPLIES[label]?.(first) || `${label} — noted. I'll fold that into ${first}'s gifts.`;
+    const reply = INTEREST_REPLIES[interest]?.(first) || `${interest} noted. I'll fold that into ${first}'s gifts.`;
     setTimeout(() => {
       setIntelMessages((m) => [...m, { from: 'margot', text: reply }]);
     }, 550);
+  };
+
+  const submitInterest = () => {
+    addInterest(intelInput);
+    setIntelInput('');
   };
 
   // ── Completion: create recipients (preserves original Supabase logic) ─────────
@@ -355,7 +364,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       toast({
         title: "You're all set",
         description: toCreate.length
-          ? `${toCreate.length} ${toCreate.length === 1 ? 'person' : 'people'} added — I'll start watching for gift moments.`
+          ? `${toCreate.length} ${toCreate.length === 1 ? 'person' : 'people'} added. I'll start watching for gift moments.`
           : "Welcome to Unwrapt. I'll take it from here.",
       });
 
@@ -417,14 +426,14 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           <div className="mt-auto pt-16">
             <div className="mb-6 flex items-center gap-3">
               <MargotAvatar size={34} />
-              <span style={{ fontSize: 13.5, color: U.subtle }}>Hi, I'm Margot — your gifting concierge</span>
+              <span style={{ fontSize: 13.5, color: U.subtle }}>Hi, I'm Margot, your gifting concierge</span>
             </div>
             <Display style={{ fontSize: 47, lineHeight: 1.02, letterSpacing: '-0.03em' }}>
               Never forget<br />another<br />
               <em style={{ fontStyle: 'italic', fontWeight: 400, color: U.accent }}>moment.</em>
             </Display>
             <p className="mt-5" style={{ fontSize: 17, lineHeight: 1.55, color: U.textSecondary, maxWidth: 300 }}>
-              I remember the people who matter, learn what they love, and quietly handle the perfect gift — so you
+              I remember the people who matter, learn what they love, and quietly handle the perfect gift, so you
               never have to stress again.
             </p>
           </div>
@@ -479,39 +488,33 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           <p className="mb-6 mt-2.5" style={{ fontSize: 15, lineHeight: 1.5, color: U.textSecondary }}>
             I'll quietly find birthdays, anniversaries and the people behind them. Your data stays yours.
           </p>
-          <div className="flex flex-col gap-2.5">
-            {([
-              { key: 'google', icon: 'G', title: 'Google Calendar', sub: 'Birthdays & events', wired: true },
-              { key: 'apple', icon: '', title: 'Apple Calendar', sub: 'iCloud events', wired: false },
-              { key: 'outlook', icon: 'O', title: 'Outlook Calendar', sub: 'Work & personal', wired: false },
-              { key: 'contacts', icon: '@', title: 'Contacts', sub: 'Names & addresses', wired: false },
-            ] as const).map((src) => {
-              const connected = sources[src.key as keyof typeof sources];
-              return (
-                <div
-                  key={src.key}
-                  onClick={() => (src.wired ? connectGoogleCalendar() : setSources((s) => ({ ...s, [src.key]: !s[src.key as keyof typeof sources] })))}
-                  className="flex cursor-pointer items-center gap-3.5"
-                  style={{ padding: 15, borderRadius: 18, background: U.surface, border: `1px solid ${U.border}` }}
-                >
-                  <div
-                    className="flex items-center justify-center"
-                    style={{ width: 38, height: 38, borderRadius: 11, background: '#EAE0CC', flexShrink: 0, fontFamily: "'Newsreader', serif", fontSize: 19, color: U.slate }}
-                  >
-                    {src.icon}
-                  </div>
-                  <div className="flex-1">
-                    <div style={{ fontWeight: 600, fontSize: 15.5 }}>{src.title}</div>
-                    <div style={{ fontSize: 12.5, color: U.muted }}>{src.sub}</div>
-                  </div>
-                  {connected ? (
-                    <div className="flex items-center justify-center" style={{ width: 26, height: 26, borderRadius: '50%', background: U.sage, color: U.cream, fontSize: 14 }}>✓</div>
-                  ) : (
-                    <span className="font-mono uppercase" style={{ fontSize: 11, letterSpacing: '1px', color: U.accent }}>Connect</span>
-                  )}
-                </div>
-              );
-            })}
+          <button
+            type="button"
+            onClick={handleFindMyPeople}
+            disabled={connecting}
+            className="flex w-full items-center gap-3.5 text-left disabled:opacity-60"
+            style={{ padding: 15, borderRadius: 18, background: U.surface, border: `1px solid ${U.border}` }}
+          >
+            <div
+              className="flex items-center justify-center"
+              style={{ width: 38, height: 38, borderRadius: 11, background: '#EAE0CC', flexShrink: 0, fontFamily: "'Newsreader', serif", fontSize: 19, color: U.slate }}
+            >
+              G
+            </div>
+            <div className="flex-1">
+              <div style={{ fontWeight: 600, fontSize: 15.5 }}>Google Calendar</div>
+              <div style={{ fontSize: 12.5, color: U.muted }}>Birthdays and anniversaries</div>
+            </div>
+            {isConnected ? (
+              <div className="flex items-center justify-center" style={{ width: 26, height: 26, borderRadius: '50%', background: U.sage, color: U.cream, fontSize: 14 }}>✓</div>
+            ) : (
+              <span className="font-mono uppercase" style={{ fontSize: 11, letterSpacing: '1px', color: U.accent }}>Connect</span>
+            )}
+          </button>
+          <div className="mt-3" style={{ padding: '11px 13px', borderRadius: 14, background: U.chip }}>
+            <p className="text-[12.5px] leading-5" style={{ color: U.textSecondary }}>
+              Google Contacts is next. For now, add anyone missing from your calendar manually.
+            </p>
           </div>
           <div className="mt-5 flex items-center gap-2" style={{ color: U.muted, fontSize: 12.5 }}>
             <span style={{ fontSize: 14 }}>⏿</span>
@@ -667,6 +670,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       const first = firstNameOf(activePerson?.name || '');
       const available = INTEREST_TAXONOMY.filter((t) => !intelFacts.includes(t)).slice(0, 9);
       const canBuild = intelFacts.length >= 2;
+      const interestLimitReached = intelFacts.length >= MAX_INTERESTS;
       return (
         <MobileShell
           contentClassName="flex flex-col px-0 pt-0"
@@ -679,7 +683,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
               <MargotAvatar size={38} />
               <div className="flex-1">
                 <div style={{ fontWeight: 600, fontSize: 15.5 }}>Getting to know {first}</div>
-                <Eyebrow>Margot · learning</Eyebrow>
+                <Eyebrow>Margot · {intelFacts.length}/{MAX_INTERESTS} interests</Eyebrow>
               </div>
             </div>
             {/* messages */}
@@ -705,23 +709,25 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             <div style={{ padding: '8px 16px 0' }}>
               <div className="mb-3 flex flex-wrap gap-2">
                 {available.map((c) => (
-                  <div
+                  <button
+                    type="button"
                     key={c}
                     onClick={() => addInterest(c)}
-                    className="cursor-pointer"
+                    disabled={interestLimitReached}
+                    className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                     style={{ padding: '9px 14px', borderRadius: 14, background: U.chip, border: `1px solid rgba(42,37,32,0.1)`, fontSize: 13.5, fontWeight: 500, color: '#5A5147' }}
                   >
                     + {c}
-                  </div>
+                  </button>
                 ))}
               </div>
               {canBuild && (
                 <button
-                  onClick={() => setScreen('summary')}
+                  onClick={() => setScreen('recommendations')}
                   className="u-btn-primary animate-u-pop mb-3"
                   style={{ fontSize: 16, padding: 16 }}
                 >
-                  Build {first}'s profile
+                  Show me gift ideas
                 </button>
               )}
             </div>
@@ -729,23 +735,63 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             <div style={{ padding: '0 16px 34px' }}>
               <div className="flex items-center gap-2.5" style={{ padding: '7px 7px 7px 18px', borderRadius: 24, background: U.surface, border: `1px solid rgba(42,37,32,0.1)` }}>
                 <input
-                  placeholder={`Tell Margot something about ${first}…`}
+                  value={intelInput}
+                  disabled={interestLimitReached}
+                  placeholder={interestLimitReached ? 'Three interests selected' : `Add something about ${first}`}
                   className="flex-1"
                   style={{ border: 'none', background: 'transparent', fontSize: 14.5, color: U.ink }}
+                  onChange={(event) => setIntelInput(event.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
-                      const v = (e.target as HTMLInputElement).value.trim();
-                      if (v) {
-                        addInterest(v);
-                        (e.target as HTMLInputElement).value = '';
-                      }
+                      e.preventDefault();
+                      submitInterest();
                     }
                   }}
                 />
-                <div className="flex items-center justify-center" style={{ width: 38, height: 38, borderRadius: '50%', background: U.ink, color: U.buttonText, fontSize: 17, flexShrink: 0 }}>↑</div>
+                <button
+                  type="button"
+                  aria-label="Add interest"
+                  onClick={submitInterest}
+                  disabled={!intelInput.trim() || interestLimitReached}
+                  className="flex items-center justify-center disabled:opacity-40"
+                  style={{ width: 38, height: 38, borderRadius: '50%', background: U.ink, color: U.buttonText, fontSize: 17, flexShrink: 0 }}
+                >
+                  ↑
+                </button>
               </div>
             </div>
           </div>
+        </MobileShell>
+      );
+    }
+
+    // ════════ VALUE PREVIEW (catalog-backed recommendations) ════════
+    case 'recommendations': {
+      if (!activePerson) return null;
+      const first = firstNameOf(activePerson.name);
+      return (
+        <MobileShell
+          contentClassName="px-[22px] pt-14 pb-4"
+          footer={<PrimaryButton onClick={() => setScreen('summary')}>Save {first}'s taste profile</PrimaryButton>}
+        >
+          <button
+            type="button"
+            aria-label="Back to interests"
+            onClick={() => enterIntel(activePerson.id)}
+            className="mb-3.5"
+            style={{ fontSize: 22, color: U.subtle }}
+          >
+            ‹
+          </button>
+          <div className="mb-2 flex items-center gap-2.5">
+            <MargotAvatar size={28} />
+            <Eyebrow>Personalized for {first}</Eyebrow>
+          </div>
+          <Display style={{ fontSize: 31, lineHeight: 1.08 }}>This is where their interests can lead.</Display>
+          <p className="mb-5 mt-2.5" style={{ fontSize: 15, lineHeight: 1.5, color: U.textSecondary }}>
+            These are live catalog examples I would consider from what you shared. The final recommendation gets sharper as I learn more.
+          </p>
+          <GiftRecommendationPreview recipientFirstName={first} interests={activePerson.interests} />
         </MobileShell>
       );
     }
@@ -761,7 +807,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           contentClassName="px-[22px] pt-14 pb-4"
           footer={
             <>
-              <PrimaryButton onClick={() => setScreen('guardrails')}>Looks right — continue</PrimaryButton>
+              <PrimaryButton onClick={() => setScreen('guardrails')}>Looks right, continue</PrimaryButton>
               <p onClick={() => enterIntel(activePerson.id)} className="mt-3 cursor-pointer text-center" style={{ fontSize: 13.5, color: U.subtle }}>Edit details</p>
             </>
           }
@@ -893,7 +939,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           <div className="mt-4.5 flex gap-2.5" style={{ padding: 14, borderRadius: 16, background: U.chip, marginTop: 18 }}>
             <span style={{ fontSize: 16 }}>🕊</span>
             <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: '#5A5147' }}>
-              You'll always see what I'm doing before it happens. And you only ever pay the real gift price —{' '}
+              You'll always see what I'm doing before it happens. And you only ever pay the real gift price.{' '}
               <strong>no markups, no hidden fees.</strong>
             </p>
           </div>

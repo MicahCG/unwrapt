@@ -97,7 +97,7 @@ export const ApprovalScreen: React.FC<ApprovalScreenProps> = ({ gift, recipient,
         footer={
           <>
             <PrimaryButton onClick={approve} disabled={Boolean(activeAction)} className="mb-2.5">
-              {activeAction === 'exact_gift' ? 'Confirming…' : `Approve exact gift${priceLabel ? ` — ${priceLabel}` : ''}`}
+              {activeAction === 'exact_gift' ? 'Confirming…' : `Approve exact gift${priceLabel ? `: ${priceLabel}` : ''}`}
             </PrimaryButton>
             <button
               onClick={() => chooseAlternateRoute('recipient_choice')}
@@ -139,7 +139,7 @@ export const ApprovalScreen: React.FC<ApprovalScreenProps> = ({ gift, recipient,
         <div className="mb-4 mt-3" style={{ background: U.surface, border: `1px solid ${U.border}`, borderRadius: 20, padding: '15px 17px' }}>
           <p style={{ margin: 0, fontSize: 15, lineHeight: 1.5, color: U.inkSoft }}>
             {first}'s {gift?.occasion || 'occasion'} is {days != null ? (days <= 0 ? 'here' : `in ${days} days`) : 'coming up'}. I found
-            something I think they'll love — it fits what you've told me, and it's the kind of specific they like.
+            something I think they'll love. It fits what you've told me, and it's the kind of specific they like.
           </p>
         </div>
 
@@ -184,7 +184,7 @@ export const ApprovalScreen: React.FC<ApprovalScreenProps> = ({ gift, recipient,
         <div className="mb-4">
           <Eyebrow className="mb-2">Why this</Eyebrow>
           <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.6, color: '#5A5147' }}>
-            It matches what you've shared about {first} and the budget you set — premium without being flashy, and not
+            It matches what you've shared about {first} and the budget you set: premium without being flashy, and not
             something they'd buy themselves, which is exactly the kind of gift that lands.
           </p>
         </div>
