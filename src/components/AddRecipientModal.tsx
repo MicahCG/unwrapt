@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { sanitizeInput, sanitizeAddress } from '@/utils/inputSanitization';
 import { ErrorHandler } from '@/utils/errorHandler';
 import { rateLimiter, RATE_LIMITS } from '@/utils/rateLimiter';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface AddRecipientModalProps {
   onRecipientAdded?: () => void;
@@ -28,8 +29,10 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
 }) => {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showAddress, setShowAddress] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   // Use external state if provided, otherwise use internal state
   const modalIsOpen = isOpen !== undefined ? isOpen : internalIsOpen;
@@ -79,7 +82,7 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
   };
 
   const addInterest = () => {
-    if (newInterest.trim()) {
+    if (newInterest.trim() && formData.interests.length < 3) {
       const sanitizedInterest = sanitizeInput(newInterest.trim());
       if (sanitizedInterest && !formData.interests.includes(sanitizedInterest)) {
         setFormData(prev => ({
@@ -188,15 +191,12 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
       });
       
       handleOpenChange(false);
+      setShowAddress(false);
+      queryClient.invalidateQueries({ queryKey: ['recipients'] });
       if (onRecipientAdded) {
         onRecipientAdded();
       }
-      
-      // Refresh the page so user can select the new recipient
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error adding recipient:', error);
       const friendlyMessage = ErrorHandler.handleApiError(error, 'add-recipient', user.id);
       toast({
@@ -216,14 +216,14 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
           {children}
         </DialogTrigger>
       )}
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[92dvh] w-[calc(100%-1.5rem)] max-w-lg overflow-y-auto rounded-[24px] p-5 sm:p-6">
         <DialogHeader>
           <DialogTitle>Add New Recipient</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="name">Name *</Label>
               <Input
@@ -247,7 +247,7 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="birthday">Birthday</Label>
               <Input
@@ -268,8 +268,12 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
             </div>
           </div>
 
-          <div className="space-y-4">
-            <h3 className="font-medium">Address</h3>
+          <div className="space-y-4 rounded-2xl border border-[#E4DCD2] bg-[#FAF8F3] p-4">
+            <button type="button" onClick={() => setShowAddress((value) => !value)} className="flex w-full items-center justify-between text-left">
+              <span><span className="block font-medium">Delivery address</span><span className="text-xs text-muted-foreground">Optional now; required before an order is placed</span></span>
+              <span className="text-sm font-medium text-[#9A7848]">{showAddress ? 'Hide' : 'Add'}</span>
+            </button>
+            {showAddress && <>
             <div>
               <Label htmlFor="street">Street Address</Label>
               <Input
@@ -280,7 +284,7 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
                 maxLength={200}
               />
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
                 <Label htmlFor="city">City</Label>
                 <Input
@@ -322,19 +326,21 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
                 maxLength={100}
               />
             </div>
+            </>}
           </div>
 
           <div>
-            <Label htmlFor="interests">Interests</Label>
+            <div className="flex items-center justify-between"><Label htmlFor="interests">Interests</Label><span className="text-xs text-muted-foreground">{formData.interests.length}/3</span></div>
             <div className="flex gap-2 mb-2">
               <Input
                 value={newInterest}
                 onChange={(e) => setNewInterest(e.target.value)}
                 placeholder="Add an interest"
-                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addInterest())}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addInterest())}
                 maxLength={50}
+                disabled={formData.interests.length >= 3}
               />
-              <Button type="button" onClick={addInterest} size="sm">
+              <Button type="button" onClick={addInterest} size="sm" disabled={formData.interests.length >= 3 || !newInterest.trim()}>
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
@@ -352,11 +358,11 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
           </div>
 
 
-          <div className="flex justify-end gap-2 pt-4">
+          <div className="grid grid-cols-[auto_1fr] gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading || !formData.name.trim()} className="h-11 bg-[#2A2520] text-[#F4ECDD] hover:bg-[#2A2520]/90">
               {isLoading ? 'Adding...' : 'Add Recipient'}
             </Button>
           </div>
