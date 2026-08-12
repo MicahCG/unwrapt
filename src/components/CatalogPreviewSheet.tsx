@@ -4,6 +4,7 @@ import { Gift, Sparkles } from 'lucide-react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { getGiftRecommendations, type GiftCatalogItem } from '@/lib/giftCatalog';
 import { U } from '@/components/unwrapt2/theme';
+import { useThea } from '@/hooks/useThea';
 
 interface CatalogPreviewSheetProps {
   open: boolean;
@@ -24,6 +25,7 @@ const CatalogPreviewSheet: React.FC<CatalogPreviewSheetProps> = ({
   recipientName,
   interests = [],
 }) => {
+  const { openThea } = useThea();
   const { data, isLoading } = useQuery({
     queryKey: ['catalog-preview', [...interests].sort().join('|')],
     queryFn: () => getGiftRecommendations(interests, 6),
@@ -47,9 +49,10 @@ const CatalogPreviewSheet: React.FC<CatalogPreviewSheetProps> = ({
           <SheetDescription className="max-w-sm text-sm leading-6 text-[#6F6559]">
             {interests.length
               ? `Guided by ${interests.slice(0, 3).join(', ')}. Prices and availability are illustrative until the Goody catalog is activated.`
-              : 'A lightweight preview of the kinds of gifts Margot can curate. Live Goody inventory will replace placeholders after activation.'}
+              : 'A lightweight preview of the kinds of gifts Thea can curate. Live Goody inventory will replace placeholders after activation.'}
           </SheetDescription>
         </SheetHeader>
+        <button onClick={() => openThea({ surface: 'catalog', recipientName })} className="u-touch-card mt-4 flex w-full items-center justify-center gap-2 rounded-[16px] bg-[#2A2520] px-4 py-3 text-[13px] font-semibold text-[#F4ECDD]"><Sparkles className="h-4 w-4" /> Ask Thea to narrow it down</button>
 
         <div className="mt-6 grid grid-cols-2 gap-3">
           {isLoading

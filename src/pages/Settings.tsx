@@ -32,9 +32,9 @@ const RANGE_PRESETS = [
 ];
 
 const AUTOPILOT_OPTIONS = [
-  { id: 'always', label: 'Always ask first', desc: 'Margot recommends. You approve every gift before it ships.' },
-  { id: 'ask100', label: 'Auto-approve under $100', desc: 'Small gestures handled. Margot checks in above $100.' },
-  { id: 'ask250', label: 'Auto-approve under $250', desc: 'Most gifts handled for you. Margot checks in above $250.' },
+  { id: 'always', label: 'Always ask first', desc: 'Thea recommends. You approve every gift before it ships.' },
+  { id: 'ask100', label: 'Auto-approve under $100', desc: 'Small gestures handled. Thea checks in above $100.' },
+  { id: 'ask250', label: 'Auto-approve under $250', desc: 'Most gifts handled for you. Thea checks in above $250.' },
 ];
 
 const Settings = () => {
@@ -185,7 +185,7 @@ const Settings = () => {
       {/* Default gift budget */}
       <Eyebrow className="mb-1">Default gift budget</Eyebrow>
       <p className="mb-3.5" style={{ margin: '0 0 14px', fontSize: 13, color: U.muted }}>
-        Margot shops within this range for everyone. You can set a different range on any person.
+        Thea shops within this range for everyone. You can set a different range on any person.
       </p>
       <div className="mb-3 text-center" style={{ background: U.surface, border: `1px solid ${U.border}`, borderRadius: 20, padding: '18px' }}>
         <span className="font-display" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>{budgetLabel}</span>
@@ -209,7 +209,7 @@ const Settings = () => {
       </div>
 
       {/* Auto-approve */}
-      <Eyebrow className="mb-3">How much Margot can approve alone</Eyebrow>
+      <Eyebrow className="mb-3">How much Thea can approve alone</Eyebrow>
       <div className="mb-6 flex flex-col gap-2.5">
         {AUTOPILOT_OPTIONS.map((o) => {
           const sel = autopilot === o.id;
@@ -315,7 +315,7 @@ const Settings = () => {
 
       <div className="flex items-center gap-2 pt-5" style={{ color: U.muted, fontSize: 12.5 }}>
         <span style={{ fontSize: 14 }}>🕊</span>
-        <span>You only ever pay the real gift price. Margot never spends above your maximum.</span>
+        <span>You only ever pay the real gift price. Thea never spends above your maximum.</span>
       </div>
     </MobileShell>
   );

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,7 +14,7 @@ import { VIPUpgradeModal } from '@/components/subscription/VIPUpgradeModal';
 import { VIPWelcomeModal } from '@/components/onboarding/VIPWelcomeModal';
 import { AutomationToggle, EnableAutomationModal, AutomationDetailModal } from '@/components/automation';
 import { MobileShell, Eyebrow, PrimaryButton, Display } from '@/components/unwrapt2/MobileShell';
-import { MargotAvatar, PersonAvatar } from '@/components/unwrapt2/MargotAvatar';
+import { TheaAvatar, PersonAvatar } from '@/components/unwrapt2/TheaAvatar';
 import { ApprovalScreen } from '@/components/unwrapt2/ApprovalScreen';
 import { U, toneForIndex, initialsOf } from '@/components/unwrapt2/theme';
 import { cleanName } from '@/lib/utils';
@@ -23,10 +23,13 @@ import RecipientDetailSheet from '@/components/RecipientDetailSheet';
 import CatalogPreviewSheet from '@/components/CatalogPreviewSheet';
 import GiftStatusBadge from '@/components/GiftStatusBadge';
 import { getRecipientStatus, type RecipientRecord } from '@/lib/giftStatus';
+import { useThea } from '@/hooks/useThea';
 
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { openThea } = useThea();
   const [showMonthlyOpportunities, setShowMonthlyOpportunities] = useState(false);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [successRecipient, setSuccessRecipient] = useState(null);
@@ -164,6 +167,13 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'add-person') setShowAddRecipient(true);
+    if (action === 'catalog') setShowCatalog(true);
+    if (action) setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
     if (recentGift && !showMonthlyOpportunities) {
       setSuccessRecipient(recentGift);
       setShowSuccessAnimation(true);
@@ -274,10 +284,12 @@ const Dashboard = () => {
       <MobileShell
         contentClassName="px-5 pt-12 pb-3"
         footer={
-          <nav aria-label="Primary actions" className="grid grid-cols-3 gap-2 rounded-[22px] border border-[#D9CDBD] bg-[#FAF6EE]/95 p-2 shadow-[0_12px_30px_rgba(42,37,32,0.08)] backdrop-blur">
-            <button onClick={() => setShowAddRecipient(true)} className="u-touch-card rounded-[15px] px-2 py-3 text-[11.5px] font-semibold text-[#5A5147]">＋ Add person</button>
-            <button onClick={() => handleBrowseCatalog()} className="u-touch-card rounded-[15px] bg-[#EEE5D5] px-2 py-3 text-[11.5px] font-semibold text-[#5A5147]">✦ Catalog</button>
-            <button onClick={() => navigate('/gift-history')} className="u-touch-card rounded-[15px] px-2 py-3 text-[11.5px] font-semibold text-[#5A5147]">◎ Gift status</button>
+          <nav aria-label="Primary actions" className="grid grid-cols-[1fr_1fr_1.15fr_1fr_1fr] items-center gap-1 rounded-[22px] border border-[#D9CDBD] bg-[#FAF6EE]/95 p-2 shadow-[0_12px_30px_rgba(42,37,32,0.08)] backdrop-blur">
+            <button onClick={() => setShowAddRecipient(true)} className="u-touch-card rounded-[13px] px-1 py-2.5 text-[9.5px] font-semibold text-[#5A5147]"><span className="mb-0.5 block text-base">＋</span>People</button>
+            <button onClick={() => handleBrowseCatalog()} className="u-touch-card rounded-[13px] px-1 py-2.5 text-[9.5px] font-semibold text-[#5A5147]"><span className="mb-0.5 block text-base">✦</span>Catalog</button>
+            <button onClick={() => openThea({ surface: 'dashboard' })} className="u-touch-card -my-4 flex flex-col items-center rounded-[18px] bg-[#2A2520] px-1 py-2 text-[9.5px] font-semibold text-[#F4ECDD] shadow-[0_8px_20px_rgba(42,37,32,0.2)]" aria-label="Ask Thea"><TheaAvatar size={34} /><span className="mt-1">Ask Thea</span></button>
+            <button onClick={() => navigate('/gift-history')} className="u-touch-card rounded-[13px] px-1 py-2.5 text-[9.5px] font-semibold text-[#5A5147]"><span className="mb-0.5 block text-base">◎</span>Gifts</button>
+            <button onClick={() => navigate('/settings')} className="u-touch-card rounded-[13px] px-1 py-2.5 text-[9.5px] font-semibold text-[#5A5147]"><span className="mb-0.5 block text-base">○</span>Account</button>
           </nav>
         }
       >
@@ -295,13 +307,14 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Margot status */}
-        <div className="my-4 flex items-center gap-2.5" style={{ padding: '11px 14px', borderRadius: 14, background: U.chip }}>
-          <MargotAvatar size={26} />
+        {/* Thea status */}
+        <button type="button" onClick={() => openThea({ surface: 'dashboard' })} className="my-4 flex w-full items-center gap-2.5 text-left" style={{ padding: '11px 14px', borderRadius: 14, background: U.chip }} aria-label="Open Thea, your gifting agent">
+          <TheaAvatar size={26} />
           <span style={{ fontSize: 13.5, color: '#5A5147' }}>
-            <strong>Margot</strong> · {needsReview.length} {needsReview.length === 1 ? 'needs' : 'need'} you, {inMotionCount} in motion
+            <strong>Thea</strong> · {needsReview.length} {needsReview.length === 1 ? 'needs' : 'need'} you, {inMotionCount} in motion
           </span>
-        </div>
+          <span className="ml-auto text-[#9A8E7C]">›</span>
+        </button>
 
         {/* Trial / activate banner */}
         {isFree && (
@@ -383,7 +396,7 @@ const Dashboard = () => {
         {/* Upcoming people list */}
         {sortedRecipients.length === 0 ? (
           <div className="mt-2" style={{ borderRadius: 22, border: `1px dashed rgba(42,37,32,0.18)`, padding: '28px 20px', textAlign: 'center' }}>
-            <MargotAvatar size={40} className="mx-auto mb-3" />
+            <TheaAvatar size={40} className="mx-auto mb-3" />
             <Display style={{ fontSize: 21 }}>Let's find your people</Display>
             <p className="mx-auto mt-1.5" style={{ fontSize: 13.5, color: U.muted, maxWidth: 260, lineHeight: 1.5 }}>
               Add someone you care about and I'll watch for the moments that matter.

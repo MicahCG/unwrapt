@@ -59,11 +59,11 @@ export type ReadinessItem = {
 
 const statuses: Record<GiftStatusKey, GiftStatus> = {
   needs_details: {
-    key: 'needs_details', label: 'Needs details', detail: 'Add the missing information so Margot can prepare this gift.',
+    key: 'needs_details', label: 'Needs details', detail: 'Add the missing information so Thea can prepare this gift.',
     dot: '#B65B3C', className: 'bg-[#F7E4DA] text-[#87432E]',
   },
   scheduled: {
-    key: 'scheduled', label: 'Scheduled', detail: 'The occasion is saved. Margot will keep this gift on the radar.',
+    key: 'scheduled', label: 'Scheduled', detail: 'The occasion is saved. Thea will keep this gift on the radar.',
     dot: '#907A52', className: 'bg-[#EEE6D6] text-[#66583F]',
   },
   about_to_order: {
@@ -87,7 +87,7 @@ const statuses: Record<GiftStatusKey, GiftStatus> = {
     dot: '#6E7B5B', className: 'bg-[#E3E8DA] text-[#4F5C3F]',
   },
   attention: {
-    key: 'attention', label: 'Needs attention', detail: 'Margot found an issue that needs a quick review.',
+    key: 'attention', label: 'Needs attention', detail: 'Thea found an issue that needs a quick review.',
     dot: '#A24B3B', className: 'bg-[#F5DDDA] text-[#823B30]',
   },
 };
@@ -98,11 +98,11 @@ export const hasRecipientAddress = (recipient: RecipientRecord) =>
 export const getGiftReadiness = (gift: GiftRecord, recipient: RecipientRecord): ReadinessItem[] => [
   {
     key: 'occasion', label: 'Occasion date', complete: Boolean(gift.occasion_date || recipient.birthday || recipient.anniversary),
-    help: 'Add the date Margot should plan around.',
+    help: 'Add the date Thea should plan around.',
   },
   {
     key: 'gift', label: 'Gift selection', complete: Boolean(gift.gift_variant_id || gift.gift_description || gift.gift_type),
-    help: 'Choose a catalog item or let Margot curate one.',
+    help: 'Choose a catalog item or let Thea curate one.',
   },
   {
     key: 'delivery', label: 'Delivery details', complete: hasRecipientAddress(recipient),

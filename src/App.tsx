@@ -29,6 +29,7 @@ import ScrollToTop from "@/components/ScrollToTop";
 import ProductAnalytics from "@/components/ProductAnalytics";
 import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
+import { TheaProvider } from '@/components/TheaAgent';
 
 const queryClient = new QueryClient();
 
@@ -45,6 +46,7 @@ function App() {
           <VercelAnalytics />
           <SpeedInsights />
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <TheaProvider>
             <ScrollToTop />
             <ProductAnalytics />
             <Routes>
@@ -76,6 +78,7 @@ function App() {
               <Route path="/auth/calendar/callback" element={<CalendarOAuthCallback />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </TheaProvider>
           </BrowserRouter>
         </AuthProvider>
       </TooltipProvider>
