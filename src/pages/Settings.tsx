@@ -185,7 +185,7 @@ const Settings = () => {
       {/* Default gift budget */}
       <Eyebrow className="mb-1">Default gift budget</Eyebrow>
       <p className="mb-3.5" style={{ margin: '0 0 14px', fontSize: 13, color: U.muted }}>
-        Margot shops within this range for everyone — you can set a different range on any person.
+        Margot shops within this range for everyone. You can set a different range on any person.
       </p>
       <div className="mb-3 text-center" style={{ background: U.surface, border: `1px solid ${U.border}`, borderRadius: 20, padding: '18px' }}>
         <span className="font-display" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>{budgetLabel}</span>

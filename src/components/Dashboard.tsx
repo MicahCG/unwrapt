@@ -341,7 +341,7 @@ const Dashboard = () => {
               </div>
               <div style={{ padding: '14px 18px 4px' }}>
                 <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5, color: '#5A5147' }}>
-                  <em className="font-display" style={{ fontStyle: 'italic', color: U.ink }}>"I found something I think they'll love — it fits what you've told me."</em>
+                  <em className="font-display" style={{ fontStyle: 'italic', color: U.ink }}>"I found something I think they'll love. It fits what you've told me."</em>
                 </p>
               </div>
               <div className="flex items-center gap-3" style={{ padding: '14px 18px 18px' }}>
