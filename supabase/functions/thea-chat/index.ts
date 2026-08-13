@@ -1,6 +1,21 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import { corsHeaders, handleCors } from "../_shared/cors.ts";
+
+// Inlined rather than imported from ../_shared/cors.ts so this function is a
+// single self-contained file, pastable directly into the Supabase Dashboard
+// function editor (which only sees this one file, not sibling folders).
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE",
+  "Access-Control-Max-Age": "86400",
+};
+
+const handleCors = (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders, status: 200 });
+  }
+};
 
 type ChatRole = "user" | "assistant";
 
