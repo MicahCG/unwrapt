@@ -70,3 +70,7 @@ verify_jwt = false
 # Catalog credentials stay server-side. Authenticated clients receive only normalized products.
 [functions.gift-catalog]
 verify_jwt = false
+
+# OpenAI key stays server-side. Manually auth-checked inside; gated to an email allowlist for testing.
+[functions.thea-chat]
+verify_jwt = false

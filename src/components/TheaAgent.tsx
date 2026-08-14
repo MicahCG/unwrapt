@@ -6,6 +6,14 @@ import { TheaAvatar } from '@/components/unwrapt2/TheaAvatar';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { trackProductEvent } from '@/lib/productAnalytics';
 import { TheaContextValue, type TheaContext } from '@/hooks/useThea';
+import { supabase } from '@/integrations/supabase/client';
+
+// Testing-only allowlist for the LLM-backed conversation. Everyone else keeps
+// the lightweight keyword-routed version below untouched.
+const THEA_LLM_ALLOWED_EMAILS = ['kkinyua53@gmail.com', 'giraudelc@gmail.com'];
+
+type ChatMessage = { role: 'user' | 'assistant'; content: string };
+type ThreadProduct = { id: string; title: string; price: number; featured_image_url: string | null };
 
 const suggestions = [
   { label: 'Plan for someone', detail: 'Add or update a person', icon: Users, destination: '/?action=add-person', intent: 'person' },
@@ -30,11 +38,18 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [context, setContext] = useState<TheaContext>({});
   const [question, setQuestion] = useState('');
   const [matchedIntent, setMatchedIntent] = useState<(typeof suggestions)[number] | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatProducts, setChatProducts] = useState<ThreadProduct[]>([]);
+  const [sending, setSending] = useState(false);
+
+  const isTheaLlmTester = Boolean(user?.email && THEA_LLM_ALLOWED_EMAILS.includes(user.email.toLowerCase()));
 
   const openThea = useCallback((nextContext: TheaContext = {}) => {
     setContext(nextContext);
     setQuestion('');
     setMatchedIntent(null);
+    setChatMessages([]);
+    setChatProducts([]);
     setOpen(true);
     void trackProductEvent('thea_opened', { surface: nextContext.surface || 'global', has_recipient_context: Boolean(nextContext.recipientName) });
   }, []);
@@ -51,6 +66,33 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const match = inferSuggestion(question);
     setMatchedIntent(match);
     void trackProductEvent('thea_request_routed', { intent: match.intent, surface: context.surface || 'global' });
+  };
+
+  const sendToThea = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const text = question.trim();
+    if (!text || sending) return;
+
+    const nextMessages: ChatMessage[] = [...chatMessages, { role: 'user', content: text }];
+    setChatMessages(nextMessages);
+    setQuestion('');
+    setSending(true);
+    void trackProductEvent('thea_llm_message_sent', { surface: context.surface || 'global' });
+
+    try {
+      const { data, error } = await supabase.functions.invoke('thea-chat', { body: { messages: nextMessages } });
+      if (error || !data?.success) throw error || new Error(data?.error || 'Thea request failed');
+      setChatMessages([...nextMessages, { role: 'assistant', content: data.reply }]);
+      setChatProducts(data.products || []);
+    } catch (err) {
+      console.error('Thea chat failed', err);
+      setChatMessages([...nextMessages, {
+        role: 'assistant',
+        content: "I'm having trouble connecting right now. Give it another try in a moment.",
+      }]);
+    } finally {
+      setSending(false);
+    }
   };
 
   const value = useMemo(() => ({ openThea }), [openThea]);
@@ -84,15 +126,52 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
             <SheetDescription className="pt-1 text-[13.5px] leading-6 text-[#6F6559]">{contextualIntro}</SheetDescription>
           </SheetHeader>
 
-          <form onSubmit={submitQuestion} className="mt-5 rounded-[20px] border border-[#D9CDBD] bg-white p-2 shadow-[0_8px_24px_rgba(42,37,32,0.04)]">
+          {isTheaLlmTester && chatMessages.length > 0 && (
+            <div className="mt-5 max-h-[38dvh] space-y-3 overflow-y-auto pr-1">
+              {chatMessages.map((message, index) => (
+                message.role === 'user' ? (
+                  <div key={index} className="flex justify-end">
+                    <div className="max-w-[85%] rounded-[16px] rounded-tr-[4px] bg-[#2A2520] px-3.5 py-2.5 text-[13.5px] leading-5 text-[#F4ECDD]">{message.content}</div>
+                  </div>
+                ) : (
+                  <div key={index} className="flex items-start gap-2">
+                    <TheaAvatar size={24} />
+                    <div className="max-w-[85%] rounded-[16px] rounded-tl-[4px] border border-[#D9CDBD] bg-white px-3.5 py-2.5 text-[13.5px] leading-5 text-[#2A2520]">{message.content}</div>
+                  </div>
+                )
+              ))}
+              {sending && (
+                <div className="flex items-start gap-2">
+                  <TheaAvatar size={24} />
+                  <div className="rounded-[16px] rounded-tl-[4px] border border-[#D9CDBD] bg-white px-3.5 py-2.5 text-[13.5px] text-[#9A8E7C]">Thinking…</div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {isTheaLlmTester && chatProducts.length > 0 && (
+            <div className="mt-3 flex gap-2.5 overflow-x-auto pb-1">
+              {chatProducts.map((product) => (
+                <div key={product.id} className="w-32 shrink-0 rounded-[16px] border border-[#DED2C1] bg-white p-2.5">
+                  {product.featured_image_url && (
+                    <img src={product.featured_image_url} alt={product.title} className="mb-2 h-20 w-full rounded-[10px] object-cover" />
+                  )}
+                  <p className="line-clamp-2 text-[11.5px] font-semibold leading-4 text-[#2A2520]">{product.title}</p>
+                  <p className="mt-1 text-[11.5px] font-semibold text-[#B65B3C]">${product.price}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <form onSubmit={isTheaLlmTester ? sendToThea : submitQuestion} className="mt-5 rounded-[20px] border border-[#D9CDBD] bg-white p-2 shadow-[0_8px_24px_rgba(42,37,32,0.04)]">
             <label htmlFor="thea-question" className="sr-only">Tell Thea what you need</label>
             <div className="flex items-center gap-2">
-              <input id="thea-question" value={question} onChange={(event) => { setQuestion(event.target.value); setMatchedIntent(null); }} placeholder="Tell Thea what you need…" className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-[14px] text-[#2A2520] outline-none placeholder:text-[#9A8E7C]" />
-              <button type="submit" disabled={!question.trim()} className="flex h-10 w-10 items-center justify-center rounded-full bg-[#B65B3C] text-white disabled:opacity-35" aria-label="Send to Thea"><Send className="h-4 w-4" /></button>
+              <input id="thea-question" value={question} onChange={(event) => { setQuestion(event.target.value); setMatchedIntent(null); }} placeholder="Tell Thea what you need…" disabled={sending} className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-[14px] text-[#2A2520] outline-none placeholder:text-[#9A8E7C] disabled:opacity-60" />
+              <button type="submit" disabled={!question.trim() || sending} className="flex h-10 w-10 items-center justify-center rounded-full bg-[#B65B3C] text-white disabled:opacity-35" aria-label="Send to Thea"><Send className="h-4 w-4" /></button>
             </div>
           </form>
 
-          {matchedIntent && (
+          {!isTheaLlmTester && matchedIntent && (
             <div aria-live="polite" className="mt-3 rounded-[18px] border border-[#D9CDBD] bg-[#FFFDF8] p-4">
               <div className="flex items-start gap-3"><TheaAvatar size={28} /><div className="flex-1"><p className="text-[13px] leading-5 text-[#5A5147]">The best next step is <strong>{matchedIntent.label.toLowerCase()}</strong>. I’ll take you to the right place and keep your current work intact.</p><button onClick={() => go(matchedIntent.destination, matchedIntent.intent)} className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#2A2520] px-4 py-2 text-xs font-semibold text-[#F4ECDD]">Continue <Sparkles className="h-3.5 w-3.5" /></button></div></div>
             </div>
