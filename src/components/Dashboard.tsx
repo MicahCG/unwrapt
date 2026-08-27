@@ -17,6 +17,7 @@ import { MobileShell, Eyebrow, PrimaryButton, Display } from '@/components/unwra
 import { TheaAvatar, PersonAvatar } from '@/components/unwrapt2/TheaAvatar';
 import { ApprovalScreen } from '@/components/unwrapt2/ApprovalScreen';
 import { U, toneForIndex, initialsOf } from '@/components/unwrapt2/theme';
+import { VIP_MONTHLY_PRICE_ID } from '@/lib/stripe';
 import { cleanName } from '@/lib/utils';
 import { getNextOccurrence, formatOccasionDate, getDaysUntil, getDaysUntilExact } from '@/lib/dateUtils';
 import RecipientDetailSheet from '@/components/RecipientDetailSheet';
@@ -58,7 +59,7 @@ const Dashboard = () => {
     setIsUpgrading(true);
     try {
       const { data, error } = await supabase.functions.invoke('create-subscription-checkout', {
-        body: { priceId: 'vip_monthly' },
+        body: { priceId: VIP_MONTHLY_PRICE_ID, planType: 'vip_monthly' },
       });
       if (error) throw error;
       if (data?.url) window.location.href = data.url;
@@ -158,13 +159,14 @@ const Dashboard = () => {
   });
 
   useEffect(() => {
+    if (!recipients.length) return;
     const today = new Date().toDateString();
     const opportunitiesShownDate = localStorage.getItem('opportunitiesShownDate');
     if (opportunitiesShownDate !== today) {
       setShowMonthlyOpportunities(true);
       localStorage.setItem('opportunitiesShownDate', today);
     }
-  }, []);
+  }, [recipients.length]);
 
   useEffect(() => {
     const action = searchParams.get('action');

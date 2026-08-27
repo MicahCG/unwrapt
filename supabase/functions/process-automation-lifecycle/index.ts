@@ -426,8 +426,8 @@ async function handleAddressRequest(supabaseClient: any, gift: any, recipient: a
           giftDescription: gift.gift_description || "Curated selection",
           giftImage: productImage,
           deliveryDate: gift.delivery_date,
-          confirmationLink: `${Deno.env.get("SUPABASE_URL")}/confirm-address/${gift.id}`,
-          modifyLink: `${Deno.env.get("SUPABASE_URL")}/dashboard`
+          confirmationLink: `https://app.unwrapt.io/confirm-address/${gift.id}`,
+          modifyLink: `https://app.unwrapt.io/`
         }
       }
     });
@@ -457,7 +457,7 @@ async function handleAddressReminder(supabaseClient: any, gift: any, recipient: 
           recipientName: recipient.name,
           occasion: gift.occasion,
           deliveryDate: gift.delivery_date,
-          confirmationLink: `${Deno.env.get("SUPABASE_URL")}/confirm-address/${gift.id}`
+          confirmationLink: `https://app.unwrapt.io/confirm-address/${gift.id}`
         }
       }
     });

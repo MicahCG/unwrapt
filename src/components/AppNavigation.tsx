@@ -11,16 +11,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { 
   Home, 
-  Users, 
-  Gift, 
-  Calendar, 
-  Settings, 
-  CreditCard,
   Package,
-  BarChart3,
-  Heart,
-  Bell,
-  UserPlus
+  Settings, 
 } from 'lucide-react';
 
 const AppNavigation = () => {
@@ -41,57 +33,18 @@ const AppNavigation = () => {
       description: 'Past gifts and deliveries' 
     },
     { 
-      title: 'Analytics', 
-      path: '/analytics', 
-      icon: BarChart3, 
-      description: 'Spending and gifting insights' 
-    },
-    { 
-      title: 'Wishlist', 
-      path: '/wishlist', 
-      icon: Heart, 
-      description: 'Saved gift ideas' 
-    },
-    { 
-      title: 'Notifications', 
-      path: '/notifications', 
-      icon: Bell, 
-      description: 'Alerts and reminders' 
-    },
-    { 
       title: 'Settings', 
       path: '/settings', 
       icon: Settings, 
       description: 'Account and preferences' 
     },
-    { 
-      title: 'Testing', 
-      path: '/testing', 
-      icon: Settings, 
-      description: 'Diagnostic tools and tests' 
-    },
-    { 
-      title: 'Onboarding', 
-      path: '/onboarding', 
-      icon: UserPlus, 
-      description: 'Setup and onboarding flow' 
-    },
-    { 
-      title: 'Payment Success', 
-      path: '/payment/success', 
-      icon: CreditCard, 
-      description: 'Payment confirmation page' 
-    }
   ];
 
   const handleNavigate = (path: string) => {
-    console.log('🔧 AppNavigation: Navigating to:', path);
     navigate(path);
   };
 
-  const isActive = (path: string) => {
-    return location.pathname === path;
-  };
+  const isActive = (path: string) => location.pathname === path;
 
   return (
     <NavigationMenu>

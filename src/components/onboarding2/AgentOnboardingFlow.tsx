@@ -308,10 +308,18 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   // ── Completion: create recipients (preserves original Supabase logic) ─────────
   const completeOnboarding = async () => {
     if (!user?.id) return;
+    const chosen = people.filter((p) => p.selected);
+    if (chosen.length === 0) {
+      toast({
+        title: 'Add someone first',
+        description: 'Pick at least one person for Thea to look after.',
+        variant: 'destructive',
+      });
+      startManualAdd();
+      return;
+    }
     setCompleting(true);
     try {
-      const chosen = people.filter((p) => p.selected);
-
       // Dedup against existing recipients by normalized name.
       const { data: existing } = await supabase
         .from('recipients')
@@ -337,7 +345,9 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         if (error) console.error('Error creating recipient', person.name, error);
       }
 
-      // Persist gifting preferences best-effort (ignore if columns are absent).
+      // Persist prefs + free trial window (14 days). Preference columns are best-effort.
+      const trialEnds = new Date();
+      trialEnds.setDate(trialEnds.getDate() + 14);
       try {
         await supabase
           .from('profiles')
@@ -345,10 +355,19 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             default_gift_budget_min: budget.lo,
             default_gift_budget_max: budget.hi,
             autopilot_level: autopilot,
+            trial_ends_at: trialEnds.toISOString(),
           } as never)
           .eq('id', user.id);
       } catch (e) {
         /* preference columns may not exist yet — non-fatal */
+        try {
+          await supabase
+            .from('profiles')
+            .update({ trial_ends_at: trialEnds.toISOString() })
+            .eq('id', user.id);
+        } catch {
+          /* ignore */
+        }
       }
 
       try {

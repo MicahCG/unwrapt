@@ -1,5 +1,5 @@
-import React from 'react';
-import { Crown, Users, Sparkles, Wallet, Headphones, Check } from 'lucide-react';
+import React, { useState } from 'react';
+import { Crown, Users, Sparkles, Wallet, Headphones, Check, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -7,6 +7,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
+import { VIP_MONTHLY_AMOUNT_LABEL, VIP_MONTHLY_PRICE_ID } from '@/lib/stripe';
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -15,9 +18,36 @@ interface UpgradeModalProps {
 }
 
 const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, trigger }) => {
-  const handleStartTrial = () => {
-    // TODO: Implement Stripe checkout flow
-    console.log('Starting VIP trial...');
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleUpgrade = async () => {
+    setIsProcessing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await supabase.functions.invoke('create-subscription-checkout', {
+        body: {
+          priceId: VIP_MONTHLY_PRICE_ID,
+          planType: 'vip_monthly',
+        },
+      });
+
+      if (response.error) throw response.error;
+      if (response.data?.url) {
+        window.location.href = response.data.url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
+    } catch (error) {
+      console.error('Error creating checkout:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to start checkout. Please try again.',
+        variant: 'destructive',
+      });
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -37,16 +67,14 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, trigger })
             You've reached the 3 recipient limit on the Free plan. Upgrade to VIP for unlimited recipients and more.
           </p>
         )}
-        
+
         {trigger === 'automation_feature' && (
           <p className="text-center text-[hsl(var(--charcoal-text))]/70 mb-6">
             Automation features are only available on VIP. Upgrade to unlock full automation capabilities.
           </p>
         )}
 
-        {/* Comparison Grid */}
         <div className="grid grid-cols-2 gap-4 mb-8">
-          {/* Free Column */}
           <div className="bg-[hsl(var(--sand))] border border-[hsl(var(--cream-border))] rounded-2xl p-6">
             <h3 className="font-display text-xl text-[hsl(var(--charcoal-text))] mb-4">Free</h3>
             <div className="space-y-3">
@@ -65,7 +93,6 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, trigger })
             </div>
           </div>
 
-          {/* VIP Column */}
           <div className="bg-gradient-to-br from-[hsl(var(--champagne-gold))]/10 to-[hsl(var(--champagne-gold))]/5 border-2 border-[hsl(var(--champagne-gold))]/30 rounded-2xl p-6 relative">
             <div className="absolute -top-3 left-1/2 -translate-x-1/2">
               <span className="bg-[hsl(var(--champagne-gold))] text-[hsl(var(--charcoal-text))] text-xs font-medium px-3 py-1 rounded-full">
@@ -97,28 +124,36 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, trigger })
           </div>
         </div>
 
-        {/* Pricing */}
         <div className="text-center mb-6">
           <div className="font-display text-4xl text-[hsl(var(--charcoal-text))] mb-2">
-            $24.99<span className="text-2xl text-[hsl(var(--charcoal-text))]/60">/month</span>
+            {VIP_MONTHLY_AMOUNT_LABEL}
+            <span className="text-2xl text-[hsl(var(--charcoal-text))]/60">/month</span>
           </div>
           <p className="text-sm text-[hsl(var(--champagne-gold))] font-medium">
-            7-day free trial • No commitment
+            Cancel anytime · No commitment
           </p>
         </div>
 
-        {/* CTA Button */}
         <Button
-          onClick={handleStartTrial}
+          onClick={handleUpgrade}
+          disabled={isProcessing}
           className="w-full h-12 bg-[hsl(var(--champagne-gold))] hover:bg-[hsl(var(--champagne-gold))]/90 text-[hsl(var(--charcoal-text))] font-medium text-base rounded-xl"
         >
-          <Crown className="w-5 h-5 mr-2" />
-          Start Free Trial
+          {isProcessing ? (
+            <>
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              Redirecting…
+            </>
+          ) : (
+            <>
+              <Crown className="w-5 h-5 mr-2" />
+              Upgrade to VIP
+            </>
+          )}
         </Button>
 
-        {/* Fine Print */}
         <p className="text-center text-xs text-[hsl(var(--charcoal-text))]/50 mt-4">
-          Cancel anytime during trial. No charges until trial ends.
+          Secure checkout powered by Stripe.
         </p>
       </DialogContent>
     </Dialog>

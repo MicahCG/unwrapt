@@ -14,15 +14,12 @@ import AppStart from "./pages/AppStart";
 import Privacy from "./pages/Privacy";
 import TermsOfService from "./pages/TermsOfService";
 import Settings from "./pages/Settings";
-import Analytics from "./pages/Analytics";
-import Notifications from "./pages/Notifications";
 import GiftHistory from "./pages/GiftHistory";
-import Wishlist from "./pages/Wishlist";
 import PaymentSuccess from "./pages/PaymentSuccess";
-import ProductionTesting from "./pages/ProductionTesting";
 import NotFound from "./pages/NotFound";
 import Onboarding from "./pages/Onboarding";
 import GiftChoice from "./pages/GiftChoice";
+import ConfirmAddress from "./pages/ConfirmAddress";
 import OAuthCallback from "./components/auth/OAuthCallback";
 import CalendarOAuthCallback from "./components/auth/CalendarOAuthCallback";
 import ScrollToTop from "@/components/ScrollToTop";
@@ -32,6 +29,7 @@ import { SpeedInsights } from "@vercel/speed-insights/react";
 import { TheaProvider } from '@/components/TheaAgent';
 
 const queryClient = new QueryClient();
+const isProd = import.meta.env.PROD;
 
 function App() {
   const isMarketingHost = ['unwrapt.io', 'www.unwrapt.io'].includes(window.location.hostname);
@@ -50,30 +48,28 @@ function App() {
             <ScrollToTop />
             <ProductAnalytics />
             <Routes>
-              {/* Landing page route - marketing site only on unwrapt.io */}
               <Route path="/landing" element={<Landing />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<TermsOfService />} />
               <Route path="/gift-choice/:token" element={<GiftChoice />} />
-              
-              {/* Root path routing: unwrapt.io = marketing, app.unwrapt.io = app */}
+
               <Route path="/" element={isMarketingHost ? <Landing /> : <Index />} />
-              
-              {/* App flow routes - primarily on app subdomain */}
+
               <Route path="/app" element={<AppStart />} />
-              
-              {/* Main app routes */}
-              
+
               <Route path="/settings" element={<Settings />} />
-              <Route path="/analytics" element={<Analytics />} />
-              <Route path="/notifications" element={<Notifications />} />
+              {/* Stub destinations redirect so nav never dead-ends */}
+              <Route path="/analytics" element={<Navigate to="/" replace />} />
+              <Route path="/notifications" element={<Navigate to="/settings" replace />} />
+              <Route path="/wishlist" element={<Navigate to="/" replace />} />
               <Route path="/gift-history" element={<GiftHistory />} />
-          <Route path="/history" element={<Navigate to="/gift-history" replace />} />
-          <Route path="/wishlist" element={<Wishlist />} />
-          <Route path="/testing" element={<Testing />} />
-          <Route path="/payment/success" element={<PaymentSuccess />} />
-          <Route path="/payment-success" element={<Navigate to="/payment/success" replace />} />
-          <Route path="/onboarding" element={<Onboarding />} />
+              <Route path="/history" element={<Navigate to="/gift-history" replace />} />
+              {!isProd && <Route path="/testing" element={<Testing />} />}
+              <Route path="/payment/success" element={<PaymentSuccess />} />
+              <Route path="/payment-success" element={<Navigate to="/payment/success" replace />} />
+              <Route path="/onboarding" element={<Onboarding />} />
+              <Route path="/confirm-address/:giftId" element={<ConfirmAddress />} />
+              <Route path="/gifts/confirm-address/:giftId" element={<ConfirmAddress />} />
               <Route path="/auth/callback" element={<OAuthCallback />} />
               <Route path="/auth/calendar/callback" element={<CalendarOAuthCallback />} />
               <Route path="*" element={<NotFound />} />

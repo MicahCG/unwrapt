@@ -5,14 +5,12 @@ import { Card } from '@/components/ui/card';
 import { Crown, Loader2, Zap, Users, Calendar, Wallet } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { VIP_MONTHLY_PRICE_ID } from '@/lib/stripe';
 
 interface VIPUpgradeModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
-
-// Stripe Price ID for VIP Monthly subscription
-const VIP_MONTHLY_PRICE_ID = 'price_1SbpNlRvvOzjYUzy9iakOpwv';
 
 export const VIPUpgradeModal = ({ isOpen, onClose }: VIPUpgradeModalProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
