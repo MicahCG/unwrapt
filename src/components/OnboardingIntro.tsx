@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Heart, Gift, ArrowRight } from 'lucide-react';
+import { markSkipAgentWelcome } from '@/lib/funnel';
 
 interface OnboardingIntroProps {
   onComplete: () => void;
@@ -34,14 +35,12 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
   const slide = ONBOARDING_SLIDES[index];
   const isLastSlide = index === ONBOARDING_SLIDES.length - 1;
 
-  // Use localhost when in development, production URL otherwise
   const getAppUrl = () => {
     return window.location.hostname === 'localhost'
       ? 'http://localhost:8080'
       : 'https://app.unwrapt.io';
   };
 
-  // Typewriter effect
   useEffect(() => {
     setTypedText('');
     setIsTypingDone(false);
@@ -60,7 +59,6 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
     return () => clearInterval(interval);
   }, [index, slide.headline]);
 
-  // Auto-advance after typing is done (but NOT on last slide - user must click button)
   useEffect(() => {
     if (!isTypingDone || isLastSlide) return;
 
@@ -74,14 +72,18 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
   }, [isTypingDone, index, isLastSlide]);
 
   const handleSkip = () => {
-    // Mark as seen and redirect to app subdomain
     localStorage.setItem('hasSeenIntro', 'true');
-    window.location.href = getAppUrl();
+    markSkipAgentWelcome();
+    if (window.location.hostname === 'unwrapt.io') {
+      window.location.href = getAppUrl();
+      return;
+    }
+    onComplete();
   };
 
   const handleGetStarted = () => {
-    // Mark as seen and proceed to onboarding
     localStorage.setItem('hasSeenIntro', 'true');
+    markSkipAgentWelcome();
     onComplete();
   };
 
@@ -121,7 +123,6 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
           {slide.body}
         </p>
 
-        {/* Continue to sign-in. Calendar access is offered separately after authentication. */}
         {isLastSlide && isTypingDone && (
           <button
             onClick={handleGetStarted}
@@ -144,7 +145,6 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
             />
           ))}
         </div>
-
       </div>
     </div>
   );

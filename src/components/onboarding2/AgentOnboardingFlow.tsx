@@ -10,6 +10,7 @@ import { U, toneForIndex, initialsOf } from '@/components/unwrapt2/theme';
 import { format } from 'date-fns';
 import { trackProductEvent } from '@/lib/productAnalytics';
 import GiftRecommendationPreview from '@/components/onboarding2/GiftRecommendationPreview';
+import { clearSkipAgentWelcome, markTheaValueSeen, shouldSkipAgentWelcome } from '@/lib/funnel';
 
 interface AgentOnboardingFlowProps {
   /** Called once recipients are created so the parent can show the dashboard. */
@@ -37,7 +38,7 @@ interface Person {
   fromCalendar: boolean;
 }
 
-type Screen = 'welcome' | 'import' | 'found' | 'addperson' | 'intel' | 'recommendations' | 'summary' | 'guardrails' | 'trial';
+type Screen = 'welcome' | 'import' | 'found' | 'addperson' | 'intel' | 'recommendations';
 
 const FREE_TIER_LIMIT = 3;
 const MAX_INTERESTS = 3;
@@ -56,12 +57,9 @@ const INTEREST_REPLIES: Record<string, (n: string) => string> = {
 
 const REL_OPTIONS = ['Friend', 'Family', 'Partner', 'Colleague', 'Mentor'];
 
-const RANGE_PRESETS = [
-  { id: 'budget', label: 'Budget-friendly', range: '$15–50', lo: 15, hi: 50 },
-  { id: 'everyday', label: 'Everyday', range: '$50–150', lo: 50, hi: 150 },
-  { id: 'generous', label: 'Generous', range: '$150–350', lo: 150, hi: 350 },
-  { id: 'luxury', label: 'Luxury', range: '$350+', lo: 350, hi: 600 },
-];
+/** Silent defaults — budget/autopilot UI deferred until post-subscribe gift config. */
+const DEFAULT_BUDGET = { lo: 50, hi: 150 };
+const DEFAULT_AUTOPILOT = 'always';
 
 function firstNameOf(name: string) {
   return (name || '').trim().split(/\s+/)[0] || 'them';
@@ -111,7 +109,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [screen, setScreen] = useState<Screen>('welcome');
+  const [screen, setScreen] = useState<Screen>(() => (shouldSkipAgentWelcome() ? 'import' : 'welcome'));
   const [scanning, setScanning] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -122,10 +120,6 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   const [intelMessages, setIntelMessages] = useState<{ from: 'thea' | 'user'; text: string }[]>([]);
   const [intelFacts, setIntelFacts] = useState<string[]>([]);
   const [intelInput, setIntelInput] = useState('');
-
-  // Guardrails
-  const [budget, setBudget] = useState({ lo: 50, hi: 150 });
-  const [autopilot] = useState('always');
 
   // Manual add-person draft
   const [draft, setDraft] = useState({ name: '', relationship: 'Friend', date: '' });
@@ -138,6 +132,15 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   useEffect(() => {
     void trackProductEvent('onboarding_step_viewed', { step: screen });
   }, [screen]);
+
+  useEffect(() => {
+    if (screen !== 'recommendations' || !activePerson) return;
+    markTheaValueSeen();
+    void trackProductEvent('onboarding_gift_proof_shown', {
+      recipient: firstNameOf(activePerson.name),
+      interests: activePerson.interests.length,
+    });
+  }, [screen, activePerson]);
 
   // ── Calendar integration (faithful to the original CalendarStep logic) ──────
   useEffect(() => {
@@ -345,16 +348,16 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         if (error) console.error('Error creating recipient', person.name, error);
       }
 
-      // Persist prefs + free trial window (14 days). Preference columns are best-effort.
+      // Silent defaults + free trial window. Budget/autopilot UI comes later (gift config / VIP).
       const trialEnds = new Date();
       trialEnds.setDate(trialEnds.getDate() + 14);
       try {
         await supabase
           .from('profiles')
           .update({
-            default_gift_budget_min: budget.lo,
-            default_gift_budget_max: budget.hi,
-            autopilot_level: autopilot,
+            default_gift_budget_min: DEFAULT_BUDGET.lo,
+            default_gift_budget_max: DEFAULT_BUDGET.hi,
+            autopilot_level: DEFAULT_AUTOPILOT,
             trial_ends_at: trialEnds.toISOString(),
           } as never)
           .eq('id', user.id);
@@ -376,6 +379,9 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         /* metrics RPC is best-effort */
       }
 
+      clearSkipAgentWelcome();
+      markTheaValueSeen();
+
       await queryClient.invalidateQueries({ queryKey: ['onboarding-status', user.id] });
       await queryClient.invalidateQueries({ queryKey: ['recipients', user.id] });
       await queryClient.invalidateQueries({ queryKey: ['user-metrics', user.id] });
@@ -390,6 +396,10 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       void trackProductEvent('onboarding_completed', {
         people_count: selectedPeople.length,
         import_method: people.some((person) => person.fromCalendar) ? 'calendar' : 'manual',
+        skipped_guardrails: true,
+      });
+      void trackProductEvent('onboarding_completed_to_inbox', {
+        people_count: selectedPeople.length,
       });
 
       setTimeout(async () => {
@@ -784,14 +794,21 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       );
     }
 
-    // ════════ VALUE PREVIEW (catalog-backed recommendations) ════════
+    // ════════ VALUE PREVIEW (catalog-backed recommendations) — emotional peak → inbox ════════
     case 'recommendations': {
       if (!activePerson) return null;
       const first = firstNameOf(activePerson.name);
       return (
         <MobileShell
           contentClassName="px-[22px] pt-14 pb-4"
-          footer={<PrimaryButton onClick={() => setScreen('summary')}>Save {first}'s taste profile</PrimaryButton>}
+          footer={
+            <>
+              <PrimaryButton onClick={completeOnboarding}>Enter your inbox</PrimaryButton>
+              <p className="mt-3 text-center font-mono" style={{ fontSize: 12, color: U.muted, letterSpacing: '0.4px' }}>
+                Ask Thea anytime · approve before anything ships
+              </p>
+            </>
+          }
         >
           <button
             type="button"
@@ -808,212 +825,12 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           </div>
           <Display style={{ fontSize: 31, lineHeight: 1.08 }}>This is where their interests can lead.</Display>
           <p className="mb-5 mt-2.5" style={{ fontSize: 15, lineHeight: 1.5, color: U.textSecondary }}>
-            These are live catalog examples I would consider from what you shared. The final recommendation gets sharper as I learn more.
+            Live catalog ideas from what you shared. This is the magic — Thea gets sharper every time you talk.
           </p>
           <GiftRecommendationPreview recipientFirstName={first} interests={activePerson.interests} />
         </MobileShell>
       );
     }
-
-    // ════════ SUMMARY (living profile) ════════
-    case 'summary': {
-      if (!activePerson) return null;
-      const first = firstNameOf(activePerson.name);
-      const interests = activePerson.interests;
-      const strength = Math.min(4, 1 + interests.length);
-      return (
-        <MobileShell
-          contentClassName="px-[22px] pt-14 pb-4"
-          footer={
-            <>
-              <PrimaryButton onClick={() => setScreen('guardrails')}>Looks right, continue</PrimaryButton>
-              <p onClick={() => enterIntel(activePerson.id)} className="mt-3 cursor-pointer text-center" style={{ fontSize: 13.5, color: U.subtle }}>Edit details</p>
-            </>
-          }
-        >
-          <div onClick={() => enterIntel(activePerson.id)} className="mb-3.5 cursor-pointer" style={{ fontSize: 22, color: U.subtle }}>‹</div>
-          <div className="mb-2 flex items-center gap-2.5">
-            <TheaAvatar size={26} />
-            <span style={{ fontSize: 13.5, color: U.subtle }}>Here's how I understand {first}</span>
-          </div>
-          <Display style={{ fontSize: 30, lineHeight: 1.1 }}>A living profile<br />that gets sharper.</Display>
-
-          <div className="mb-3.5 mt-4" style={{ background: U.surface, border: `1px solid ${U.border}`, borderRadius: 22, padding: 18 }}>
-            <div className="mb-4 flex items-center gap-3.5">
-              <PersonAvatar initials={initialsOf(activePerson.name)} tone={activePerson.tone} size={52} />
-              <div className="flex-1">
-                <div className="font-display" style={{ fontSize: 21, letterSpacing: '-0.3px' }}>{activePerson.name}</div>
-                <div style={{ fontSize: 13, color: U.muted }}>{activePerson.relationship || 'Someone special'}</div>
-              </div>
-            </div>
-            {(activePerson.primaryDate) && (
-              <div className="flex items-center gap-2 font-mono uppercase" style={{ padding: '11px 13px', borderRadius: 13, background: U.chip, fontSize: 11, letterSpacing: '1px', color: U.accent }}>
-                🎂 {activePerson.primaryType || 'Date'} · {formatDateLabel(activePerson)}
-              </div>
-            )}
-          </div>
-
-          {interests.length > 0 && (
-            <div className="mb-4">
-              <Eyebrow className="mb-2.5">Interests</Eyebrow>
-              <div className="flex flex-wrap gap-1.5">
-                {interests.map((i) => (
-                  <span key={i} style={{ padding: '7px 13px', borderRadius: 13, background: U.chip, fontSize: 13.5, fontWeight: 500 }}>{i}</span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="mb-4">
-            <Eyebrow className="mb-2">Gift style</Eyebrow>
-            <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.55, color: '#5A5147' }}>
-              Specific over generic. Quality over quantity. {first} would rather have one thing they'll actually use
-              than a clever gimmick.
-            </p>
-          </div>
-
-          <div className="mb-1.5 flex items-center gap-2.5" style={{ padding: '13px 15px', borderRadius: 15, background: U.chip }}>
-            <Eyebrow color={U.subtle}>Profile strength</Eyebrow>
-            <div className="flex flex-1 items-center gap-1">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} style={{ width: 22, height: 6, borderRadius: 3, background: i < strength ? U.accent : 'rgba(42,37,32,0.13)' }} />
-              ))}
-            </div>
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: U.accent }}>{strength >= 3 ? 'Strong' : strength === 2 ? 'Good' : 'Growing'}</span>
-          </div>
-        </MobileShell>
-      );
-    }
-
-    // ════════ GUARDRAILS (budget + autopilot) ════════
-    case 'guardrails': {
-      const budgetLabel = `$${budget.lo} – $${budget.hi}`;
-      return (
-        <MobileShell
-          contentClassName="px-[22px] pt-14 pb-4"
-          footer={<PrimaryButton onClick={() => setScreen('trial')}>Turn on Unwrapt</PrimaryButton>}
-        >
-          <div onClick={() => setScreen('summary')} className="mb-3.5 cursor-pointer" style={{ fontSize: 22, color: U.subtle }}>‹</div>
-          <Eyebrow className="mb-3">Step 4 of 4 · Trust &amp; budget</Eyebrow>
-          <Display style={{ fontSize: 31, lineHeight: 1.08 }}>Set your guardrails</Display>
-          <p className="mb-5 mt-2.5" style={{ fontSize: 15, lineHeight: 1.5, color: U.textSecondary }}>
-            What you'd usually spend, and how much I can handle on my own. Fine-tune any of it later in Settings.
-          </p>
-
-          <Eyebrow className="mb-2.5">Typical gift range</Eyebrow>
-          <div className="mb-2.5 text-center" style={{ background: U.surface, border: `1px solid ${U.border}`, borderRadius: 20, padding: '15px 18px' }}>
-            <span className="font-display" style={{ fontSize: 30, letterSpacing: '-0.5px' }}>{budgetLabel}</span>
-            <div style={{ fontSize: 12, color: U.muted, marginTop: 1 }}>per gift, on average</div>
-          </div>
-          <div className="mb-5 flex flex-wrap gap-2">
-            {RANGE_PRESETS.map((r) => {
-              const sel = budget.lo === r.lo && budget.hi === r.hi;
-              return (
-                <div
-                  key={r.id}
-                  onClick={() => setBudget({ lo: r.lo, hi: r.hi })}
-                  className="flex cursor-pointer items-baseline"
-                  style={{ padding: '10px 13px', borderRadius: 14, background: sel ? '#F1E7D5' : U.surface, border: sel ? `1.5px solid ${U.ink}` : '1px solid rgba(42,37,32,0.12)' }}
-                >
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>{r.label}</span>
-                  <span className="font-mono" style={{ fontSize: 11, opacity: 0.65, marginLeft: 6 }}>{r.range}</span>
-                </div>
-              );
-            })}
-          </div>
-
-          <Eyebrow className="mb-3">Your approval preference</Eyebrow>
-          <div
-            className="flex items-start gap-3.5"
-            style={{
-              padding: 16,
-              borderRadius: 18,
-              background: '#F1E7D5',
-              border: `1.5px solid ${U.ink}`,
-            }}
-          >
-            <div
-              className="flex items-center justify-center"
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: '50%',
-                flexShrink: 0,
-                background: U.ink,
-                color: U.buttonText,
-                fontSize: 13,
-                fontWeight: 700,
-              }}
-            >
-              ✓
-            </div>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 15.5 }}>Always ask before purchase</div>
-              <div style={{ fontSize: 13, color: U.muted, marginTop: 2, lineHeight: 1.4 }}>
-                Thea recommends the gift and explains why it fits. Nothing is purchased
-                until you approve the item and total.
-              </div>
-            </div>
-          </div>
-          <div className="mt-4.5 flex gap-2.5" style={{ padding: 14, borderRadius: 16, background: U.chip, marginTop: 18 }}>
-            <span style={{ fontSize: 16 }}>🕊</span>
-            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: '#5A5147' }}>
-              You'll always see what I'm doing before it happens. And you only ever pay the real gift price.{' '}
-              <strong>no markups, no hidden fees.</strong>
-            </p>
-          </div>
-        </MobileShell>
-      );
-    }
-
-    // ════════ FREE PLAN CONFIRMATION ════════
-    case 'trial':
-      return (
-        <MobileShell
-          contentClassName="px-6 pt-14 pb-4"
-          footer={
-            <>
-              <PrimaryButton onClick={completeOnboarding}>Finish setup</PrimaryButton>
-              <p className="mt-3 text-center font-mono" style={{ fontSize: 12, color: U.muted, letterSpacing: '0.4px' }}>
-                No card required · approve every gift before purchase
-              </p>
-            </>
-          }
-        >
-          <div onClick={() => setScreen('guardrails')} className="mb-3.5 cursor-pointer" style={{ fontSize: 22, color: U.subtle }}>‹</div>
-          <Eyebrow className="mb-3">Ready when you are</Eyebrow>
-          <Display style={{ fontSize: 31, lineHeight: 1.08 }}>Your concierge is set up</Display>
-          <p className="mb-5 mt-2.5" style={{ fontSize: 15, lineHeight: 1.5, color: U.textSecondary }}>
-            Thea will watch the moments you added and bring you a recommendation when
-            there is something worth giving. <strong>You stay in control of every purchase.</strong>
-          </p>
-          <div className="mb-3.5" style={{ background: U.surface, border: `1px solid ${U.border}`, borderRadius: 20, padding: '4px 16px' }}>
-            <div className="flex items-center justify-between gap-3" style={{ padding: '15px 0', borderBottom: '1px solid rgba(42,37,32,0.07)' }}>
-              <Eyebrow>People</Eyebrow>
-              <span style={{ fontSize: 14.5, fontWeight: 600 }}>{selectedPeople.length} selected</span>
-            </div>
-            <div className="flex items-center justify-between gap-3" style={{ padding: '15px 0', borderBottom: '1px solid rgba(42,37,32,0.07)' }}>
-              <Eyebrow>Budget</Eyebrow>
-              <span style={{ fontSize: 14.5, fontWeight: 600 }}>${budget.lo}–${budget.hi} per gift</span>
-            </div>
-            <div className="flex items-center justify-between gap-3" style={{ padding: '15px 0' }}>
-              <Eyebrow>Approval</Eyebrow>
-              <span style={{ fontSize: 14.5, fontWeight: 600 }}>Always ask first</span>
-            </div>
-          </div>
-          <div className="mb-3.5" style={{ background: U.chip, borderRadius: 18, padding: '16px 18px' }}>
-            <Eyebrow className="mb-2.5" color={U.subtle}>Included in your free plan</Eyebrow>
-            <div className="flex flex-col gap-2.5" style={{ fontSize: 13.5, color: '#5A5147' }}>
-              <div className="flex gap-2.5"><span style={{ color: U.sage }}>✓</span><span>Up to {FREE_TIER_LIMIT} people, fully looked after</span></div>
-              <div className="flex gap-2.5"><span style={{ color: U.sage }}>✓</span><span>Thoughtful recommendations &amp; occasion reminders</span></div>
-              <div className="flex gap-2.5"><span style={{ color: U.muted }}>✦</span><span>Upgrade anytime for unlimited people and priority recommendations</span></div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2" style={{ color: U.muted, fontSize: 12 }}>
-            <span>⏿</span><span>Your preferences can be changed anytime in Settings.</span>
-          </div>
-        </MobileShell>
-      );
 
     default:
       return null;

@@ -6,6 +6,7 @@ import LoginPage from '@/components/auth/LoginPage';
 import OnboardingFlow from '@/components/OnboardingFlow';
 import OnboardingIntro from '@/components/OnboardingIntro';
 import Dashboard from '@/components/Dashboard';
+import { markSkipAgentWelcome } from '@/lib/funnel';
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -14,17 +15,18 @@ const Index = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    // Check if user just signed up and should see onboarding intro
+    // Landing signup already chose "Get started" — skip stacked intro + welcome.
     const shouldShowIntro = localStorage.getItem('shouldShowOnboardingIntro');
 
     if (shouldShowIntro === 'true' && user && !loading) {
-      // User just logged in from landing page - show intro
-      setShowIntro(true);
       localStorage.removeItem('shouldShowOnboardingIntro');
+      markSkipAgentWelcome();
+      localStorage.setItem('hasSeenIntro', 'true');
+      setShowIntro(false);
       return;
     }
 
-    // Only show intro for users without accounts on their first visit
+    // Unauthenticated first visit: short story, then login (not another Get started).
     if (!user && !loading) {
       const hasSeenIntro = localStorage.getItem('hasSeenIntro');
       if (!hasSeenIntro) {
@@ -96,22 +98,16 @@ const Index = () => {
   }
 
   const handleIntroComplete = () => {
-    // Mark intro as seen
     localStorage.setItem('hasSeenIntro', 'true');
+    markSkipAgentWelcome();
     setShowIntro(false);
 
-    // If user is authenticated (came from landing page login), they'll automatically
-    // go to onboarding flow in the next render since hasCompletedOnboarding will be false
-    // If user is not authenticated, show login page
     if (!user) {
-      // This should only happen on app.unwrapt.io
-      // If somehow triggered on unwrapt.io, redirect to app subdomain
       if (window.location.hostname === 'unwrapt.io') {
         window.location.href = 'https://app.unwrapt.io';
         return;
       }
 
-      // Add a small delay before showing login page to create smooth transition
       setTimeout(() => {
         setShowLoginPage(true);
       }, 100);

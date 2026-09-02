@@ -25,6 +25,8 @@ import CatalogPreviewSheet from '@/components/CatalogPreviewSheet';
 import GiftStatusBadge from '@/components/GiftStatusBadge';
 import { getRecipientStatus, type RecipientRecord } from '@/lib/giftStatus';
 import { useThea } from '@/hooks/useThea';
+import { hasTheaValueSeen } from '@/lib/funnel';
+import { VIP_MONTHLY_AMOUNT_LABEL } from '@/lib/stripe';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -266,6 +268,18 @@ const Dashboard = () => {
   const heroRecipient = sortedRecipients[0];
   const heroNextDate = heroRecipient ? (heroRecipient.birthday || heroRecipient.anniversary) : null;
   const heroDays = heroNextDate ? getDaysUntil(heroNextDate) : null;
+  const [theaValueSeen, setTheaValueSeen] = useState(() => hasTheaValueSeen());
+  const showActivateBanner = isFree && (theaValueSeen || sortedRecipients.length > 3);
+
+  useEffect(() => {
+    const sync = () => setTheaValueSeen(hasTheaValueSeen());
+    window.addEventListener('unwrapt:thea-value-seen', sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener('unwrapt:thea-value-seen', sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
 
   return (
     <>
@@ -318,12 +332,27 @@ const Dashboard = () => {
           <span className="ml-auto text-[#9A8E7C]">›</span>
         </button>
 
-        {/* Trial / activate banner */}
-        {isFree && (
+        {/* Value strip (pre-proof) or Activate (after value / limit) */}
+        {isFree && !showActivateBanner && (
+          <button
+            type="button"
+            onClick={() => openThea({ surface: 'dashboard' })}
+            className="mb-4 flex w-full cursor-pointer items-center gap-2.5 text-left"
+            style={{ padding: '12px 14px', borderRadius: 14, background: U.chip, border: '1px solid rgba(42,37,32,0.08)' }}
+          >
+            <span style={{ fontSize: 15 }}>✦</span>
+            <div className="flex-1" style={{ fontSize: 13, color: '#5A5147' }}>
+              <strong>See what Thea finds</strong> · thoughtful picks in minutes, you approve before anything ships
+            </div>
+            <span className="font-mono uppercase" style={{ fontSize: 10, letterSpacing: '1px', color: U.accent }}>Ask</span>
+          </button>
+        )}
+        {showActivateBanner && (
           <div onClick={() => setShowUpgradeModal(true)} className="mb-4 flex cursor-pointer items-center gap-2.5" style={{ padding: '12px 14px', borderRadius: 14, background: U.accentSoft, border: '1px solid rgba(182,91,60,0.25)' }}>
             <span style={{ fontSize: 15 }}>✦</span>
             <div className="flex-1" style={{ fontSize: 13, color: '#5A5147' }}>
-              <strong>{userProfile?.trial_ends_at ? 'Trial active' : 'Upgrade Unwrapt'}</strong> · unlock unlimited people and priority recommendations
+              <strong>{userProfile?.trial_ends_at ? 'Keep Thea watching' : 'Continue with Thea'}</strong>
+              {' '}· unlimited people & priority picks · {VIP_MONTHLY_AMOUNT_LABEL}/mo
             </div>
             <span className="font-mono uppercase" style={{ fontSize: 10, letterSpacing: '1px', color: U.accent }}>Activate</span>
           </div>
