@@ -130,13 +130,11 @@ const DashboardRecipients = () => {
       // Fetch products for these variant IDs
       let productMap: Record<string, { title: string; featured_image_url: string; price: number }> = {};
       if (variantIds.size > 0) {
-        const { data: products } = await supabase
-          .from('products')
-          .select('shopify_variant_id, title, featured_image_url, price')
-          .in('shopify_variant_id', Array.from(variantIds));
-        
-        products?.forEach(p => {
-          productMap[p.shopify_variant_id] = {
+        const { getProductsByIds } = await import('@/lib/giftVibes');
+        const products = await getProductsByIds(Array.from(variantIds));
+
+        Object.values(products).forEach(p => {
+          productMap[p.id] = {
             title: p.title,
             featured_image_url: p.featured_image_url,
             price: p.price

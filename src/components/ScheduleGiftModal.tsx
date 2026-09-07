@@ -306,7 +306,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
           occasion_date: formData.occasion_date,
           occasion_type: occasionType,
           gift_type: selectedProduct.title,
-          gift_variant_id: selectedProduct.shopify_variant_id,
+          gift_variant_id: selectedProduct.id,
           gift_image_url: selectedProduct.featured_image_url,
           estimated_cost: totalCost,
           price_range: `$${selectedProduct.price.toFixed(2)}`,
@@ -430,7 +430,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
               country: formData.country,
               zip: formData.zip_code
             },
-            variantId: selectedProduct.shopify_variant_id
+            variantId: selectedProduct.id
           }
         });
 

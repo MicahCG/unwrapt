@@ -140,7 +140,7 @@ export async function getDefaultGiftVariant(params: {
   }
 
   return {
-    variantId: selectedGift.shopify_variant_id,
+    variantId: selectedGift.id,
     productId: selectedGift.id,
     description: selectedGift.title,
     price: selectedGift.price
