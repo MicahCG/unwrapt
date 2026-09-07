@@ -30,6 +30,32 @@ const firstName = (name: string | null | undefined) =>
 
 const appOrigin = () => Deno.env.get("APP_URL") || "https://app.unwrapt.io";
 
+type GoodyProduct = {
+  id?: string;
+  name?: string;
+  subtitle?: string | null;
+  subtitle_short?: string | null;
+  price?: number | null;
+  images?: Array<{ image_large?: { url?: string | null } | null }>;
+};
+
+const fetchGoodyCatalog = async (): Promise<GoodyProduct[]> => {
+  const environment = Deno.env.get("GOODY_API_ENV") === "production" ? "production" : "sandbox";
+  const apiKey = environment === "production"
+    ? Deno.env.get("GOODY_PRODUCTION_COMMERCE_API_KEY")
+    : Deno.env.get("GOODY_SANDBOX_COMMERCE_API_KEY");
+  if (!apiKey) return [];
+
+  const baseUrl = environment === "production" ? "https://api.ongoody.com" : "https://api.sandbox.ongoody.com";
+  const response = await fetch(`${baseUrl}/v1/products?page=1&per_page=100`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!response.ok) throw new Error(`Goody catalog request failed with ${response.status}`);
+  const payload = await response.json() as { data?: GoodyProduct[] };
+  return (payload.data || []).filter((p) => p.id && p.name);
+};
+
 const routeForGift = (gift: Record<string, unknown>): { route: Route; confidence: "high" | "medium" | "low" } => {
   const amount = Number(gift.estimated_cost || gift.wallet_reservation_amount || 0);
   if (amount >= 300) return { route: "concierge", confidence: "medium" };
@@ -179,7 +205,7 @@ Deno.serve(async (req: Request) => {
     if (action !== "create_route") return fail("Unknown action", 400);
     const giftId = String(body?.giftId || "");
     const { data: gift, error: giftError } = await admin.from("scheduled_gifts")
-      .select("id, user_id, recipient_id, occasion, occasion_date, gift_type, gift_description, gift_image_url, gift_variant_id, gift_vibe, estimated_cost, wallet_reservation_amount, shopify_order_id, fulfilled_at")
+      .select("id, user_id, recipient_id, occasion, occasion_date, gift_type, gift_description, gift_image_url, gift_variant_id, gift_vibe, estimated_cost, wallet_reservation_amount, goody_order_id, fulfilled_at")
       .eq("id", giftId).eq("user_id", user.id).maybeSingle();
     if (giftError || !gift) return fail("Gift not found", 404);
 
@@ -190,12 +216,12 @@ Deno.serve(async (req: Request) => {
     const confidence = automatic.confidence;
     const existingStatus = route === "recipient_choice" ? "awaiting_recipient"
       : route === "concierge" ? "exception"
-      : route === "exact_gift" && gift.shopify_order_id ? "submitted_to_partner"
+      : route === "exact_gift" && gift.goody_order_id ? "submitted_to_partner"
       : route === "exact_gift" ? "ready_for_partner" : "awaiting_sender";
     const token = route === "recipient_choice" ? newToken() : null;
     const expiresAt = token ? new Date(Date.now() + 14 * 86400000).toISOString() : null;
     const provider = route === "concierge" ? "unwrapt_concierge"
-      : route === "retailer_handoff" || gift.shopify_order_id ? "shopify" : "unassigned";
+      : route === "retailer_handoff" || gift.goody_order_id ? "goody" : "unassigned";
 
     const { data: existingOrder } = await admin.from("fulfillment_orders")
       .select("id, status").eq("scheduled_gift_id", gift.id).maybeSingle();
@@ -211,32 +237,37 @@ Deno.serve(async (req: Request) => {
       confidence,
       status: existingStatus,
       provider,
-      external_order_id: gift.shopify_order_id || null,
+      external_order_id: gift.goody_order_id || null,
       choice_token_hash: token ? await hashToken(token) : null,
       choice_expires_at: expiresAt,
       exception_reason: route === "concierge" ? "Concierge review requested" : null,
       approved_at: route === "exact_gift" ? new Date().toISOString() : null,
-      submitted_at: gift.shopify_order_id ? (gift.fulfilled_at || new Date().toISOString()) : null,
+      submitted_at: gift.goody_order_id ? (gift.fulfilled_at || new Date().toISOString()) : null,
       metadata: { routing_version: "mvp_v1", auto_recommended_route: automatic.route },
     }, { onConflict: "scheduled_gift_id" }).select("*").single();
     if (upsertError) throw upsertError;
 
     await admin.from("fulfillment_options").delete().eq("fulfillment_order_id", order.id);
-    const { data: catalog } = await admin.from("products")
-      .select("id, title, description, price, currency, featured_image_url, handle, shopify_product_id, shopify_variant_id")
-      .eq("active", true).eq("available_for_sale", true).order("rank").limit(12);
-    const sorted = [...(catalog || [])].sort((a, b) => {
-      if (a.shopify_variant_id === gift.gift_variant_id) return -1;
-      if (b.shopify_variant_id === gift.gift_variant_id) return 1;
-      return Math.abs(Number(a.price) - Number(gift.estimated_cost || a.price)) - Math.abs(Number(b.price) - Number(gift.estimated_cost || b.price));
+    const goodyCatalog = await fetchGoodyCatalog();
+    const sorted = [...goodyCatalog].sort((a, b) => {
+      if (a.id === gift.gift_variant_id) return -1;
+      if (b.id === gift.gift_variant_id) return 1;
+      const priceA = typeof a.price === "number" ? a.price / 100 : 0;
+      const priceB = typeof b.price === "number" ? b.price / 100 : 0;
+      return Math.abs(priceA - Number(gift.estimated_cost || priceA)) - Math.abs(priceB - Number(gift.estimated_cost || priceB));
     }).slice(0, route === "recipient_choice" ? 3 : 1);
 
     const options = sorted.length ? sorted.map((product, rank) => ({
-      fulfillment_order_id: order.id, product_id: product.id, title: product.title,
-      description: product.description, image_url: product.featured_image_url, price: product.price,
-      currency: product.currency || "USD", product_url: product.handle ? `https://unwrapt.io/products/${product.handle}` : null,
-      provider: "shopify", provider_product_id: product.shopify_product_id,
-      provider_variant_id: product.shopify_variant_id, rank,
+      // product_id is a foreign key into the (Shopify-sourced) products
+      // table, which Goody items were never part of, so this stays null;
+      // provider_product_id carries the actual Goody id.
+      fulfillment_order_id: order.id, product_id: null, title: product.name,
+      description: product.subtitle_short || product.subtitle || null,
+      image_url: product.images?.[0]?.image_large?.url || null,
+      price: typeof product.price === "number" ? product.price / 100 : null,
+      currency: "USD", product_url: null,
+      provider: "goody", provider_product_id: product.id,
+      provider_variant_id: product.id, rank,
     })) : [{
       fulfillment_order_id: order.id, title: gift.gift_description || gift.gift_type || "A gift picked for you",
       image_url: gift.gift_image_url, price: gift.estimated_cost, currency: "USD", provider: "unassigned", rank: 0,
