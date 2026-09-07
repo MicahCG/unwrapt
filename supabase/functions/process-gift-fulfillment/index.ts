@@ -73,7 +73,7 @@ serve(async (req) => {
     // Verify the gift exists and get user_id + current status
     const { data: giftCheck, error: giftCheckError } = await supabaseService
       .from('scheduled_gifts')
-      .select('user_id, status, shopify_order_id')
+      .select('user_id, status, goody_order_id')
       .eq('id', scheduledGiftId)
       .single();
 
@@ -85,9 +85,9 @@ serve(async (req) => {
       );
     }
 
-    // IDEMPOTENCY CHECK: If the gift already has a Shopify order, skip fulfillment
-    if (giftCheck.status === 'ordered' || giftCheck.status === 'fulfilled' || giftCheck.shopify_order_id) {
-      console.log(`🎁 Process-gift-fulfillment: Gift ${scheduledGiftId} already fulfilled (status: ${giftCheck.status}, shopify_order_id: ${giftCheck.shopify_order_id}). Skipping duplicate.`);
+    // IDEMPOTENCY CHECK: If the gift already has a Goody order, skip fulfillment
+    if (giftCheck.status === 'ordered' || giftCheck.status === 'fulfilled' || giftCheck.status === 'delivered' || giftCheck.goody_order_id) {
+      console.log(`🎁 Process-gift-fulfillment: Gift ${scheduledGiftId} already fulfilled (status: ${giftCheck.status}, goody_order_id: ${giftCheck.goody_order_id}). Skipping duplicate.`);
       return new Response(JSON.stringify({
         success: true,
         message: "Gift already fulfilled - skipping duplicate order",
@@ -116,36 +116,23 @@ serve(async (req) => {
     
     if (isTestGift) {
       console.log('🧪 Process-gift-fulfillment: Test mode detected, using mock data');
-      
-      // For test mode, create mock gift data and call shopify-order in test mode
-      const testRecipientAddress = {
-        first_name: 'Test',
-        last_name: 'Recipient',
-        address1: '123 Test Street',
-        city: 'Test City',
-        province: 'CA',
-        country: 'US',
-        zip: '12345',
-        phone: '555-123-4567',
-      };
 
-      console.log('🎁 Process-gift-fulfillment: Calling shopify-order in test mode...');
-      
+      console.log('🎁 Process-gift-fulfillment: Calling goody-order in test mode...');
+
       // Use Supabase function invocation instead of direct HTTP call
-      const orderResult = await supabaseService.functions.invoke('shopify-order', {
+      const orderResult = await supabaseService.functions.invoke('goody-order', {
         body: {
           scheduledGiftId,
-          recipientAddress: testRecipientAddress,
           testMode: true
         }
       });
 
-      console.log('🎁 Process-gift-fulfillment: Shopify order test result:', orderResult);
+      console.log('🎁 Process-gift-fulfillment: Goody order test result:', orderResult);
 
     const typedTestOrderResult = orderResult as unknown as { error?: { message?: string }; data?: { success?: boolean; error?: string } };
 
     if (typedTestOrderResult.error) {
-      console.error('🎁 Process-gift-fulfillment: Shopify order test failed:', typedTestOrderResult.error);
+      console.error('🎁 Process-gift-fulfillment: Goody order test failed:', typedTestOrderResult.error);
       return new Response(JSON.stringify({
         success: false,
         error: `Test order creation failed: ${typedTestOrderResult.error}`,
@@ -361,44 +348,26 @@ serve(async (req) => {
       zip: recipient.zip_code
     });
 
-    // Create Shopify order using direct HTTP call
-    console.log('🎁 Process-gift-fulfillment: Preparing to call shopify-order function...');
+    // goody-order fetches the recipient's address itself; we only needed the
+    // check above to fail fast (before charging the wallet) if it's missing.
+    console.log(`🎁 Process-gift-fulfillment: Calling goody-order via Supabase client`);
 
-    const recipientAddress = {
-      first_name: recipient.name.split(' ')[0] || 'Gift',
-      last_name: recipient.name.split(' ').slice(1).join(' ') || 'Recipient',
-      address1: recipient.street || '',
-      city: recipient.city || '',
-      province: recipient.state || '',
-      country: recipient.country || 'US',
-      zip: recipient.zip_code || '',
-      phone: recipient.phone || '',
-    };
-
-    console.log('🎁 Process-gift-fulfillment: Recipient address prepared:', recipientAddress);
-
-    console.log(`🎁 Process-gift-fulfillment: Calling shopify-order via Supabase client`);
-
-    // Use Supabase function invocation instead of direct HTTP call  
     const orderResult = await Promise.race([
-      supabaseService.functions.invoke('shopify-order', {
-        body: {
-          scheduledGiftId,
-          recipientAddress
-        }
+      supabaseService.functions.invoke('goody-order', {
+        body: { scheduledGiftId }
       }),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Shopify order creation timeout after 25 seconds')), 25000)
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Goody order creation timeout after 25 seconds')), 25000)
       )
     ]);
 
-    console.log(`🎁 Process-gift-fulfillment: Shopify order result:`, orderResult);
+    console.log(`🎁 Process-gift-fulfillment: Goody order result:`, orderResult);
 
     const typedOrderResult = orderResult as { error?: { message?: string }; data?: { success?: boolean; error?: string } };
 
     if (typedOrderResult.error) {
-      console.error('🎁 Process-gift-fulfillment: Shopify order function error:', typedOrderResult.error);
-      return new Response(JSON.stringify({ 
+      console.error('🎁 Process-gift-fulfillment: Goody order function error:', typedOrderResult.error);
+      return new Response(JSON.stringify({
         error: `Order creation failed: ${typedOrderResult.error}`,
         success: false
       }), {
@@ -408,8 +377,8 @@ serve(async (req) => {
     }
 
     if (!typedOrderResult.data || !typedOrderResult.data.success) {
-      console.error('🎁 Process-gift-fulfillment: Shopify order creation failed:', typedOrderResult.data?.error);
-      return new Response(JSON.stringify({ 
+      console.error('🎁 Process-gift-fulfillment: Goody order creation failed:', typedOrderResult.data?.error);
+      return new Response(JSON.stringify({
         error: `Order creation failed: ${typedOrderResult.data?.error || 'Unknown error'}`,
         success: false
       }), {
@@ -418,28 +387,8 @@ serve(async (req) => {
       });
     }
 
-    console.log('🎁 Process-gift-fulfillment: Shopify order created successfully');
-
-    // Update the gift status and store the Shopify order ID for idempotency
-    console.log('🎁 Process-gift-fulfillment: Updating gift status...');
-    const orderData = typedOrderResult.data as Record<string, unknown>;
-    const shopifyOrderId = orderData?.shopifyOrderId;
-    
-    const { error: updateError } = await supabaseService
-      .from('scheduled_gifts')
-      .update({
-        status: 'ordered',
-        shopify_order_id: shopifyOrderId ? String(shopifyOrderId) : null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', scheduledGiftId);
-
-    if (updateError) {
-      console.error('🎁 Process-gift-fulfillment: Error updating gift status:', updateError);
-    } else {
-      console.log('🎁 Process-gift-fulfillment: Gift status updated to ordered');
-    }
-
+    // goody-order already writes status='ordered' and goody_order_id on
+    // success, so there's nothing left to update here.
     console.log(`🎁 Process-gift-fulfillment: Gift fulfillment processed successfully for ${scheduledGiftId}`);
 
     return new Response(JSON.stringify({

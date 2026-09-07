@@ -6,6 +6,31 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const getGoodyProductImage = async (productId: string): Promise<string | undefined> => {
+  const environment = Deno.env.get("GOODY_API_ENV") === "production" ? "production" : "sandbox";
+  const apiKey = environment === "production"
+    ? Deno.env.get("GOODY_PRODUCTION_COMMERCE_API_KEY")
+    : Deno.env.get("GOODY_SANDBOX_COMMERCE_API_KEY");
+  if (!apiKey) return undefined;
+
+  const baseUrl = environment === "production" ? "https://api.ongoody.com" : "https://api.sandbox.ongoody.com";
+  try {
+    const response = await fetch(`${baseUrl}/v1/products?page=1&per_page=100`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) return undefined;
+    const payload = await response.json() as {
+      data?: Array<{ id?: string; images?: Array<{ image_large?: { url?: string | null } | null }> }>;
+    };
+    const product = (payload.data || []).find((p) => p.id === productId);
+    return product?.images?.[0]?.image_large?.url || undefined;
+  } catch (error) {
+    console.error("Failed to fetch Goody product image", error);
+    return undefined;
+  }
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -159,13 +184,7 @@ serve(async (req) => {
     // Get product image for email
     let productImage: string | undefined;
     if (gift.gift_variant_id) {
-      const { data: product } = await supabaseClient
-        .from("products")
-        .select("featured_image_url")
-        .eq("shopify_variant_id", gift.gift_variant_id)
-        .single();
-
-      productImage = product?.featured_image_url;
+      productImage = await getGoodyProductImage(gift.gift_variant_id);
     }
 
     // Send confirmation email
