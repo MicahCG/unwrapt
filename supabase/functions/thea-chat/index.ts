@@ -33,7 +33,7 @@ type Product = {
   featured_image_url: string | null;
   product_type: string | null;
   gift_vibe: string | null;
-  provider: "unwrapt" | "goody";
+  provider: "goody";
 };
 
 type GoodyProduct = {
@@ -161,33 +161,29 @@ const sanitizeMessages = (input: unknown): ChatMessage[] | null => {
   return messages;
 };
 
-const searchUnwraptGifts = async (
-  admin: ReturnType<typeof createClient>,
-  args: { vibe?: string; max_price?: number; min_price?: number },
-): Promise<Product[]> => {
-  let query = admin
-    .from("products")
-    .select("id, title, description, price, currency, featured_image_url, product_type, gift_vibe")
-    .eq("active", true)
-    .eq("available_for_sale", true);
-
-  if (args.vibe) query = query.eq("gift_vibe", args.vibe);
-  if (typeof args.max_price === "number") query = query.lte("price", args.max_price);
-  if (typeof args.min_price === "number") query = query.gte("price", args.min_price);
-
-  const { data, error } = await query.order("rank", { ascending: true }).order("price", { ascending: true }).limit(8);
-  if (error) {
-    console.error("search_gifts query failed", error);
-    return [];
-  }
-  return (data || []).map((p) => ({ ...p, provider: "unwrapt" as const })) as Product[];
+const VIBE_KEYWORDS: Record<string, string[]> = {
+  CALM_COMFORT: [
+    "candle", "aroma", "cozy", "relax", "soothing", "spa", "bath", "tea", "blanket",
+    "comfort", "self-care", "self care", "calm", "sleep", "wellness", "massage",
+  ],
+  ARTFUL_UNIQUE: [
+    "handmade", "artisan", "heritage", "craft", "ceramic", "pottery", "incense",
+    "story", "hand-carved", "hand carved", "ritual", "culture", "traditional", "art",
+  ],
+  REFINED_STYLISH: [
+    "glass", "crystal", "barware", "decor", "elegant", "vase", "sculpt", "design",
+    "leather", "marble", "brass", "sophisticated", "modern", "statement",
+  ],
 };
+
+const scoreVibe = (text: string, vibe: string) =>
+  (VIBE_KEYWORDS[vibe] || []).reduce((score, keyword) => score + (text.includes(keyword) ? 1 : 0), 0);
 
 const goodyImage = (product: GoodyProduct) =>
   product.images?.[0]?.image_large?.url || product.variants?.[0]?.image_large?.url || null;
 
 const searchGoodyGifts = async (
-  args: { max_price?: number; min_price?: number },
+  args: { vibe?: string; max_price?: number; min_price?: number },
 ): Promise<Product[]> => {
   const environment = Deno.env.get("GOODY_API_ENV") === "production" ? "production" : "sandbox";
   const apiKey = environment === "production"
@@ -207,7 +203,7 @@ const searchGoodyGifts = async (
     if (!response.ok) throw new Error(`Goody catalog request failed with ${response.status}`);
     const payload = await response.json() as { data?: GoodyProduct[] };
 
-    return (payload.data || [])
+    const candidates = (payload.data || [])
       .filter((product): product is GoodyProduct & { id: string; name: string; price: number } =>
         Boolean(product.id && product.name && typeof product.price === "number"))
       .map((product) => ({ ...product, price: product.price / 100 }))
@@ -215,34 +211,39 @@ const searchGoodyGifts = async (
         if (typeof args.max_price === "number" && product.price > args.max_price) return false;
         if (typeof args.min_price === "number" && product.price < args.min_price) return false;
         return true;
-      })
-      .map((product) => ({
-        id: product.id,
-        title: product.name,
-        description: product.subtitle_short || product.subtitle || product.recipient_description || null,
-        price: product.price,
-        currency: "USD",
-        featured_image_url: goodyImage(product),
-        product_type: product.brand?.name || null,
-        gift_vibe: null,
-        provider: "goody" as const,
-      }));
+      });
+
+    const text = (product: (typeof candidates)[number]) =>
+      [product.name, product.brand?.name, product.subtitle, product.subtitle_short, product.recipient_description]
+        .filter(Boolean).join(" ").toLowerCase();
+
+    const scored = args.vibe
+      ? candidates
+        .map((product) => ({ product, score: scoreVibe(text(product), args.vibe!) }))
+        .sort((a, b) => b.score - a.score || a.product.price - b.product.price)
+        .map(({ product }) => product)
+      : candidates.sort((a, b) => a.price - b.price);
+
+    return scored.map((product) => ({
+      id: product.id,
+      title: product.name,
+      description: product.subtitle_short || product.subtitle || product.recipient_description || null,
+      price: product.price,
+      currency: "USD",
+      featured_image_url: goodyImage(product),
+      product_type: product.brand?.name || null,
+      gift_vibe: args.vibe && scoreVibe(text(product), args.vibe) > 0 ? args.vibe : null,
+      provider: "goody" as const,
+    }));
   } catch (error) {
-    console.error("Goody catalog unavailable for Thea; continuing with Unwrapt catalog only", error);
+    console.error("Goody catalog unavailable for Thea", error);
     return [];
   }
 };
 
 const searchGifts = async (
-  admin: ReturnType<typeof createClient>,
   args: { vibe?: string; max_price?: number; min_price?: number },
-): Promise<Product[]> => {
-  const [unwraptProducts, goodyProducts] = await Promise.all([
-    searchUnwraptGifts(admin, args),
-    searchGoodyGifts(args),
-  ]);
-  return [...unwraptProducts, ...goodyProducts].slice(0, 8);
-};
+): Promise<Product[]> => searchGoodyGifts(args);
 
 const callOpenAI = async (apiKey: string, messages: unknown[]) => {
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -277,10 +278,9 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
 
-    if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+    if (!supabaseUrl || !anonKey) {
       return json({ success: false, error: "Server configuration unavailable" }, 503);
     }
     if (!openaiApiKey) {
@@ -301,10 +301,6 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => null);
     const messages = sanitizeMessages(body?.messages);
     if (!messages) return json({ success: false, error: "Invalid messages payload" }, 400);
-
-    const admin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
 
     const conversation: unknown[] = [
       { role: "system", content: SYSTEM_PROMPT },
@@ -336,7 +332,7 @@ Deno.serve(async (req: Request) => {
           args = {};
         }
 
-        const results = toolCall.function?.name === "search_gifts" ? await searchGifts(admin, args) : [];
+        const results = toolCall.function?.name === "search_gifts" ? await searchGifts(args) : [];
         for (const product of results) seenProducts.set(product.id, product);
 
         conversation.push({

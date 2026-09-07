@@ -25,8 +25,44 @@ type CatalogItem = {
   imageUrl: string | null;
   price: number | null;
   currency: string;
-  provider: "goody" | "unwrapt";
+  provider: "goody";
   providerProductId: string | null;
+  vibe?: GiftVibe;
+};
+
+type GiftVibe = "CALM_COMFORT" | "ARTFUL_UNIQUE" | "REFINED_STYLISH";
+
+const VIBE_KEYWORDS: Record<GiftVibe, string[]> = {
+  CALM_COMFORT: [
+    "candle", "aroma", "cozy", "relax", "soothing", "spa", "bath", "tea", "blanket",
+    "comfort", "self-care", "self care", "calm", "sleep", "wellness", "massage",
+  ],
+  ARTFUL_UNIQUE: [
+    "handmade", "artisan", "heritage", "craft", "ceramic", "pottery", "incense",
+    "story", "hand-carved", "hand carved", "ritual", "culture", "traditional", "art",
+  ],
+  REFINED_STYLISH: [
+    "glass", "crystal", "barware", "decor", "elegant", "vase", "sculpt", "design",
+    "leather", "marble", "brass", "sophisticated", "modern", "statement",
+  ],
+};
+
+const scoreVibe = (text: string, vibe: GiftVibe) =>
+  VIBE_KEYWORDS[vibe].reduce((score, keyword) => score + (text.includes(keyword) ? 1 : 0), 0);
+
+const bestVibe = (text: string): GiftVibe => {
+  const vibes = Object.keys(VIBE_KEYWORDS) as GiftVibe[];
+  let best = vibes[0];
+  let bestScore = -1;
+  for (const vibe of vibes) {
+    const score = scoreVibe(text, vibe);
+    if (score > bestScore) {
+      best = vibe;
+      bestScore = score;
+    }
+  }
+  // No keyword matched anything: default to the safest, broadly-applicable vibe.
+  return bestScore > 0 ? best : "CALM_COMFORT";
 };
 
 type GoodyProduct = {
@@ -62,7 +98,7 @@ const scoreText = (text: string, interests: string[]) =>
 const goodyImage = (product: GoodyProduct) =>
   product.images?.[0]?.image_large?.url || product.variants?.[0]?.image_large?.url || null;
 
-const getGoodyCatalog = async (interests: string[], limit: number): Promise<CatalogItem[]> => {
+const fetchGoodyProducts = async (): Promise<GoodyProduct[]> => {
   const environment = Deno.env.get("GOODY_API_ENV") === "production" ? "production" : "sandbox";
   const apiKey = environment === "production"
     ? Deno.env.get("GOODY_PRODUCTION_COMMERCE_API_KEY")
@@ -79,62 +115,42 @@ const getGoodyCatalog = async (interests: string[], limit: number): Promise<Cata
 
   if (!response.ok) throw new Error(`Goody catalog request failed with ${response.status}`);
   const payload = await response.json() as { data?: GoodyProduct[] };
-
-  return (payload.data || [])
-    .filter((product) => product.id && product.name)
-    .map((product) => ({
-      product,
-      score: scoreText([
-        product.name,
-        product.brand?.name,
-        product.subtitle,
-        product.subtitle_short,
-        product.recipient_description,
-      ].filter(Boolean).join(" ").toLowerCase(), interests),
-    }))
-    .sort((a, b) => b.score - a.score || Number(a.product.price || 0) - Number(b.product.price || 0))
-    .slice(0, limit)
-    .map(({ product }) => ({
-      id: product.id!,
-      name: product.name!,
-      brand: product.brand?.name || null,
-      description: product.subtitle_short || product.subtitle || product.recipient_description || null,
-      imageUrl: goodyImage(product),
-      price: typeof product.price === "number" ? product.price / 100 : null,
-      currency: "USD",
-      provider: "goody" as const,
-      providerProductId: product.id!,
-    }));
+  return (payload.data || []).filter((product) => product.id && product.name);
 };
 
-const getUnwraptCatalog = async (limit: number): Promise<CatalogItem[]> => {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!supabaseUrl || !serviceRoleKey) return [];
+const productText = (product: GoodyProduct) =>
+  [product.name, product.brand?.name, product.subtitle, product.subtitle_short, product.recipient_description]
+    .filter(Boolean).join(" ").toLowerCase();
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { data, error } = await admin
-    .from("products")
-    .select("id, title, description, price, currency, featured_image_url")
-    .eq("active", true)
-    .eq("available_for_sale", true)
-    .order("rank", { ascending: true })
-    .limit(limit);
+const toCatalogItem = (product: GoodyProduct): CatalogItem => ({
+  id: product.id!,
+  name: product.name!,
+  brand: product.brand?.name || null,
+  description: product.subtitle_short || product.subtitle || product.recipient_description || null,
+  imageUrl: goodyImage(product),
+  price: typeof product.price === "number" ? product.price / 100 : null,
+  currency: "USD",
+  provider: "goody" as const,
+  providerProductId: product.id!,
+});
 
-  if (error) throw error;
-  return (data || []).map((product) => ({
-    id: String(product.id),
-    name: String(product.title),
-    brand: "Unwrapt collection",
-    description: product.description ? String(product.description) : null,
-    imageUrl: product.featured_image_url ? String(product.featured_image_url) : null,
-    price: product.price === null ? null : Number(product.price),
-    currency: String(product.currency || "USD"),
-    provider: "unwrapt" as const,
-    providerProductId: null,
-  }));
+const getGoodyCatalog = async (interests: string[], limit: number): Promise<CatalogItem[]> => {
+  const products = await fetchGoodyProducts();
+  return products
+    .map((product) => ({ product, score: scoreText(productText(product), interests) }))
+    .sort((a, b) => b.score - a.score || Number(a.product.price || 0) - Number(b.product.price || 0))
+    .slice(0, limit)
+    .map(({ product }) => toCatalogItem(product));
+};
+
+// Tags every product with its best-guess vibe so callers (the gift-vibe
+// selection system in src/lib/giftVibes.ts) can filter/sort client-side, the
+// same way they used to filter the old products table by its gift_vibe column.
+const getGoodyCatalogByVibe = async (): Promise<Array<CatalogItem & { vibe: GiftVibe }>> => {
+  const products = await fetchGoodyProducts();
+  return products
+    .map((product) => ({ ...toCatalogItem(product), vibe: bestVibe(productText(product)) }))
+    .sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity));
 };
 
 Deno.serve(async (req: Request) => {
@@ -156,6 +172,12 @@ Deno.serve(async (req: Request) => {
     if (userError || !user) return json({ success: false, error: "Unauthorized" }, 401);
 
     const body = await req.json();
+
+    if (body?.action === "browse_by_vibe") {
+      const products = await getGoodyCatalogByVibe();
+      return json({ success: true, source: "goody", products });
+    }
+
     if (body?.action !== "recommend") {
       return json({ success: false, error: "Unknown action" }, 400);
     }
@@ -163,15 +185,8 @@ Deno.serve(async (req: Request) => {
     const interests = cleanInterests(body.interests);
     const limit = Math.min(Math.max(Number(body.limit) || 3, 1), 6);
 
-    try {
-      const products = await getGoodyCatalog(interests, limit);
-      if (products.length > 0) return json({ success: true, source: "goody", products });
-    } catch (error) {
-      console.error("Goody catalog unavailable; using Unwrapt fallback", error);
-    }
-
-    const products = await getUnwraptCatalog(limit);
-    return json({ success: true, source: "unwrapt", products });
+    const products = await getGoodyCatalog(interests, limit);
+    return json({ success: true, source: "goody", products });
   } catch (error) {
     console.error("gift-catalog failed", error);
     return json({
