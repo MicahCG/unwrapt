@@ -32,7 +32,20 @@ type Product = {
   currency: string;
   featured_image_url: string | null;
   product_type: string | null;
-  gift_vibe: string;
+  gift_vibe: string | null;
+  provider: "unwrapt" | "goody";
+};
+
+type GoodyProduct = {
+  id?: string;
+  name?: string;
+  subtitle?: string | null;
+  subtitle_short?: string | null;
+  recipient_description?: string | null;
+  price?: number | null;
+  brand?: { name?: string | null } | null;
+  images?: Array<{ image_large?: { url?: string | null } | null }>;
+  variants?: Array<{ image_large?: { url?: string | null } | null }>;
 };
 
 const json = (body: unknown, status = 200) =>
@@ -108,7 +121,7 @@ const SEARCH_GIFTS_TOOL = {
   type: "function",
   function: {
     name: "search_gifts",
-    description: "Search Unwrapt's live gift catalog. Always call this before recommending, never recommend from memory.",
+    description: "Search Unwrapt's live gift catalog, which combines the curated Unwrapt shop and live Goody inventory. Always call this before recommending, never recommend from memory.",
     parameters: {
       type: "object",
       properties: {
@@ -148,7 +161,7 @@ const sanitizeMessages = (input: unknown): ChatMessage[] | null => {
   return messages;
 };
 
-const searchGifts = async (
+const searchUnwraptGifts = async (
   admin: ReturnType<typeof createClient>,
   args: { vibe?: string; max_price?: number; min_price?: number },
 ): Promise<Product[]> => {
@@ -167,7 +180,68 @@ const searchGifts = async (
     console.error("search_gifts query failed", error);
     return [];
   }
-  return (data || []) as Product[];
+  return (data || []).map((p) => ({ ...p, provider: "unwrapt" as const })) as Product[];
+};
+
+const goodyImage = (product: GoodyProduct) =>
+  product.images?.[0]?.image_large?.url || product.variants?.[0]?.image_large?.url || null;
+
+const searchGoodyGifts = async (
+  args: { max_price?: number; min_price?: number },
+): Promise<Product[]> => {
+  const environment = Deno.env.get("GOODY_API_ENV") === "production" ? "production" : "sandbox";
+  const apiKey = environment === "production"
+    ? Deno.env.get("GOODY_PRODUCTION_COMMERCE_API_KEY")
+    : Deno.env.get("GOODY_SANDBOX_COMMERCE_API_KEY");
+  if (!apiKey) return [];
+
+  const baseUrl = environment === "production"
+    ? "https://api.ongoody.com"
+    : "https://api.sandbox.ongoody.com";
+
+  try {
+    const response = await fetch(`${baseUrl}/v1/products?page=1&per_page=100`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) throw new Error(`Goody catalog request failed with ${response.status}`);
+    const payload = await response.json() as { data?: GoodyProduct[] };
+
+    return (payload.data || [])
+      .filter((product): product is GoodyProduct & { id: string; name: string; price: number } =>
+        Boolean(product.id && product.name && typeof product.price === "number"))
+      .map((product) => ({ ...product, price: product.price / 100 }))
+      .filter((product) => {
+        if (typeof args.max_price === "number" && product.price > args.max_price) return false;
+        if (typeof args.min_price === "number" && product.price < args.min_price) return false;
+        return true;
+      })
+      .map((product) => ({
+        id: product.id,
+        title: product.name,
+        description: product.subtitle_short || product.subtitle || product.recipient_description || null,
+        price: product.price,
+        currency: "USD",
+        featured_image_url: goodyImage(product),
+        product_type: product.brand?.name || null,
+        gift_vibe: null,
+        provider: "goody" as const,
+      }));
+  } catch (error) {
+    console.error("Goody catalog unavailable for Thea; continuing with Unwrapt catalog only", error);
+    return [];
+  }
+};
+
+const searchGifts = async (
+  admin: ReturnType<typeof createClient>,
+  args: { vibe?: string; max_price?: number; min_price?: number },
+): Promise<Product[]> => {
+  const [unwraptProducts, goodyProducts] = await Promise.all([
+    searchUnwraptGifts(admin, args),
+    searchGoodyGifts(args),
+  ]);
+  return [...unwraptProducts, ...goodyProducts].slice(0, 8);
 };
 
 const callOpenAI = async (apiKey: string, messages: unknown[]) => {
@@ -274,6 +348,7 @@ Deno.serve(async (req: Request) => {
             price: p.price,
             product_type: p.product_type,
             vibe: p.gift_vibe,
+            source: p.provider,
           }))),
         });
       }
