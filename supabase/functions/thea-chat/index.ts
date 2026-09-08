@@ -57,7 +57,7 @@ const json = (body: unknown, status = 200) =>
 const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") || "gpt-4o-mini";
 const MAX_MESSAGES = 40;
 const MAX_MESSAGE_LENGTH = 2000;
-const MAX_TOOL_ITERATIONS = 3;
+const MAX_TOOL_ITERATIONS = 4;
 
 const SYSTEM_PROMPT = `You are Thea, Unwrapt's Gift Concierge. You have genuinely excellent taste, a quiet delight in matching the right object to the right person, and a dry, warm sense of humor you use sparingly. You notice small details in what people tell you about their recipient and reflect them back. That is your signature move, not generic enthusiasm.
 
@@ -131,8 +131,9 @@ Gather these across separate turns, one question per message (see the hard rule 
 - Give one short, specific reason per pick, tied to the relationship or occasion. Never generic marketing language ("perfect for any occasion" is banned).
 - On lock in, confirm the exact product and price back clearly, in one line, and say it's ready to send. You do not process payment or place the order yourself.
 
-When you present specific recommendations to the user, end your reply on its own new line with:
-RECOMMENDED_IDS: [comma-separated product ids you just recommended, or empty brackets if none]`;
+This is a hard rule with no exceptions: any reply that names a specific product must end on its own new line with:
+RECOMMENDED_IDS: [comma-separated product ids you just recommended, or empty brackets if none]
+Every single time, including when you're refining, narrowing down, or repeating a recommendation from earlier in the conversation. A reply that names products without this line is incomplete, never send one.`;
 
 const SEARCH_GIFTS_TOOL = {
   type: "function",
@@ -262,7 +263,7 @@ const searchGifts = async (
   args: { vibe?: string; max_price?: number; min_price?: number },
 ): Promise<Product[]> => searchGoodyGifts(args);
 
-const callOpenAI = async (apiKey: string, messages: unknown[]) => {
+const callOpenAI = async (apiKey: string, messages: unknown[], forceSearch = false) => {
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -274,7 +275,9 @@ const callOpenAI = async (apiKey: string, messages: unknown[]) => {
       temperature: 0.7,
       messages,
       tools: [SEARCH_GIFTS_TOOL],
-      tool_choice: "auto",
+      tool_choice: forceSearch
+        ? { type: "function", function: { name: "search_gifts" } }
+        : "auto",
     }),
     signal: AbortSignal.timeout(30000),
   });
@@ -326,16 +329,47 @@ Deno.serve(async (req: Request) => {
 
     const seenProducts = new Map<string, Product>();
     let finalContent = "";
+    let forceSearchNextCall = false;
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
-      const completion = await callOpenAI(openaiApiKey, conversation);
+      const completion = await callOpenAI(openaiApiKey, conversation, forceSearchNextCall);
+      forceSearchNextCall = false;
       const choice = completion.choices?.[0];
       const message = choice?.message;
       if (!message) throw new Error("OpenAI returned no message");
 
       const toolCalls = message.tool_calls || [];
       if (toolCalls.length === 0) {
-        finalContent = message.content || "";
+        const content = message.content || "";
+
+        // Two distinct failure modes seen in practice, both of which leave
+        // the product cards empty despite the text naming real items:
+        // (a) the model forgets the RECOMMENDED_IDS line entirely even
+        //     though it clearly named specific bolded products with prices;
+        // (b) it references ids that were never returned by a search_gifts
+        //     call this turn (e.g. recalling names from earlier in the
+        //     conversation instead of the current results).
+        const idsMatch = content.match(/RECOMMENDED_IDS:\s*(.*)$/is);
+        const mentionedIds: string[] = idsMatch
+          ? idsMatch[1].replace(/[[\]]/g, "").split(",").map((id: string) => id.trim().replace(/^["']|["']$/g, "")).filter(Boolean)
+          : [];
+        const looksLikeRecommendation = /\*\*[^*]+\*\*[^\n]*\$\d/.test(content);
+        const missingMarker = looksLikeRecommendation && mentionedIds.length === 0;
+        const hasUnresolvedIds = mentionedIds.some((id: string) => !seenProducts.has(id));
+
+        if ((hasUnresolvedIds || missingMarker) && iteration < MAX_TOOL_ITERATIONS - 1) {
+          conversation.push({ role: "assistant", content });
+          conversation.push({
+            role: "system",
+            content: missingMarker
+              ? "You named specific products but left out the required RECOMMENDED_IDS line. Resend the same recommendations, ending on a new line with RECOMMENDED_IDS: followed by the exact ids of those products from your search_gifts results."
+              : "You referenced specific products without calling search_gifts this turn, so they can't actually be shown. search_gifts is being invoked now; once you see the results, recommend only from those.",
+          });
+          if (!missingMarker) forceSearchNextCall = true;
+          continue;
+        }
+
+        finalContent = content;
         break;
       }
 
@@ -383,7 +417,11 @@ Deno.serve(async (req: Request) => {
         .map((id) => id.trim().replace(/^["']|["']$/g, ""))
         .filter(Boolean)
       : [];
-    const reply = (markerMatch ? finalContent.slice(0, markerMatch.index) : finalContent).trim();
+    // The prompt already says never use an em dash, but that rule isn't
+    // always followed, so enforce it here rather than relying on the model.
+    const reply = (markerMatch ? finalContent.slice(0, markerMatch.index) : finalContent)
+      .replace(/\s*—\s*/g, ", ")
+      .trim();
 
     const products = recommendedIds.length > 0
       ? recommendedIds.map((id) => seenProducts.get(id)).filter((p): p is Product => Boolean(p))

@@ -131,6 +131,32 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isVip, setIsVip] = useState(false);
   const productCarouselRef = useRef<HTMLDivElement>(null);
   const [canScrollProducts, setCanScrollProducts] = useState(false);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const chatContentRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
+
+  // Keeps the newest message in view as it arrives and as it types out,
+  // unless the user has deliberately scrolled up to read earlier messages.
+  useEffect(() => {
+    const scrollEl = chatScrollRef.current;
+    const contentEl = chatContentRef.current;
+    if (!scrollEl || !contentEl) return;
+
+    const handleScroll = () => {
+      stickToBottomRef.current = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < 40;
+    };
+    scrollEl.addEventListener('scroll', handleScroll, { passive: true });
+
+    const observer = new ResizeObserver(() => {
+      if (stickToBottomRef.current) scrollEl.scrollTop = scrollEl.scrollHeight;
+    });
+    observer.observe(contentEl);
+
+    return () => {
+      scrollEl.removeEventListener('scroll', handleScroll);
+      observer.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     const el = productCarouselRef.current;
@@ -233,6 +259,7 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    stickToBottomRef.current = true;
     const nextMessages: ChatMessage[] = [...chatMessages, { role: 'user', content: text }];
     setChatMessages(nextMessages);
     setQuestion('');
@@ -346,31 +373,33 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
           )}
 
           {isTheaLlmTester && chatMessages.length > 0 && (
-            <div className="mt-5 max-h-[38dvh] space-y-3 overflow-y-auto pr-1">
-              {chatMessages.map((message, index) =>
-                message.role === 'user' ? (
-                  <div key={index} className="flex justify-end">
-                    <div className="max-w-[85%] rounded-[16px] rounded-tr-[4px] bg-[#2A2520] px-3.5 py-2.5 text-[13.5px] leading-5 text-[#F4ECDD]">
-                      {message.content}
+            <div ref={chatScrollRef} className="mt-5 max-h-[38dvh] space-y-3 overflow-y-auto pr-1">
+              <div ref={chatContentRef} className="space-y-3">
+                {chatMessages.map((message, index) =>
+                  message.role === 'user' ? (
+                    <div key={index} className="flex justify-end">
+                      <div className="max-w-[85%] rounded-[16px] rounded-tr-[4px] bg-[#2A2520] px-3.5 py-2.5 text-[13.5px] leading-5 text-[#F4ECDD]">
+                        {message.content}
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div key={index} className="flex items-start gap-2">
+                  ) : (
+                    <div key={index} className="flex items-start gap-2">
+                      <TheaAvatar size={24} />
+                      <div className="max-w-[85%] whitespace-pre-wrap rounded-[16px] rounded-tl-[4px] border border-[#D9CDBD] bg-white px-3.5 py-2.5 text-[13.5px] leading-5 text-[#2A2520]">
+                        <TypewriterText text={message.content} />
+                      </div>
+                    </div>
+                  ),
+                )}
+                {sending && (
+                  <div className="flex items-start gap-2">
                     <TheaAvatar size={24} />
-                    <div className="max-w-[85%] whitespace-pre-wrap rounded-[16px] rounded-tl-[4px] border border-[#D9CDBD] bg-white px-3.5 py-2.5 text-[13.5px] leading-5 text-[#2A2520]">
-                      <TypewriterText text={message.content} />
+                    <div className="rounded-[16px] rounded-tl-[4px] border border-[#D9CDBD] bg-white px-3.5 py-2.5 text-[13.5px] text-[#9A8E7C]">
+                      Thinking…
                     </div>
                   </div>
-                ),
-              )}
-              {sending && (
-                <div className="flex items-start gap-2">
-                  <TheaAvatar size={24} />
-                  <div className="rounded-[16px] rounded-tl-[4px] border border-[#D9CDBD] bg-white px-3.5 py-2.5 text-[13.5px] text-[#9A8E7C]">
-                    Thinking…
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
 
