@@ -514,7 +514,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     <Sheet open={isOpen} onOpenChange={handleClose}>
       <SheetContent
         side="bottom"
-        className="mx-auto flex h-[94dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[28px] border-x border-t border-[#E4DCD2] bg-[#FAF8F3] p-0"
+        className="mx-auto flex h-[94dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[28px] border-x border-t border-[#E4DCD2] bg-[#FAF8F3] p-0 lg:max-w-[600px]"
       >
         {/* Header - Compact */}
         <SheetHeader className="border-b border-[#E4DCD2] bg-white/70 px-5 pb-4 pt-5 text-left backdrop-blur-sm">

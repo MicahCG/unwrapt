@@ -76,7 +76,7 @@ const RecipientDetailSheet: React.FC<RecipientDetailSheetProps> = ({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[92dvh] overflow-y-auto rounded-t-[28px] border-0 bg-[#F7F1E6] px-5 pb-10 pt-5 sm:mx-auto sm:max-w-[440px]">
+      <SheetContent side="bottom" className="h-[92dvh] overflow-y-auto rounded-t-[28px] border-0 bg-[#F7F1E6] px-5 pb-10 pt-5 sm:mx-auto sm:max-w-[440px] lg:max-w-[600px]">
         <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-[#2A2520]/15" />
         <SheetHeader className="text-left">
           <div className="flex items-center gap-3.5">

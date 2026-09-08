@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Gift, Heart, Send, Settings, Sparkles, Users } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CalendarDays, ChevronRight, Gift, Heart, Send, Settings, Sparkles, Users } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { TheaAvatar } from '@/components/unwrapt2/TheaAvatar';
@@ -25,8 +25,33 @@ type ThreadProduct = { id: string; title: string; price: number; featured_image_
 // once per message (keyed by index in the list below), so it types out once
 // when a reply first arrives and stays static on re-render — it never
 // replays for messages already on screen.
-const TYPEWRITER_TARGET_TICKS = 40;
-const TYPEWRITER_TICK_MS = 16;
+const TYPEWRITER_BASE_MS = 32; // per-character pace, human typing speed
+const TYPEWRITER_JITTER_MS = 20; // +/- randomness so it doesn't feel robotic
+const TYPEWRITER_MAX_DURATION_MS = 4500; // cap so a long reply doesn't drag
+
+// Minimal, dependency-free rendering for the small set of markdown Thea's
+// replies actually use: **bold** spans and newlines as line breaks. Applied
+// to whatever's currently revealed (not the full text), so it stays in sync
+// with the typewriter effect as it types.
+const renderInlineMarkdown = (line: string, keyPrefix: string) =>
+  line
+    .split(/(\*\*[^*]+\*\*)/g)
+    .filter(Boolean)
+    .map((part, i) =>
+      part.startsWith('**') && part.endsWith('**') ? (
+        <strong key={`${keyPrefix}-${i}`}>{part.slice(2, -2)}</strong>
+      ) : (
+        <React.Fragment key={`${keyPrefix}-${i}`}>{part}</React.Fragment>
+      ),
+    );
+
+const renderTheaText = (text: string) =>
+  text.split('\n').map((line, i, arr) => (
+    <React.Fragment key={i}>
+      {renderInlineMarkdown(line, String(i))}
+      {i < arr.length - 1 && <br />}
+    </React.Fragment>
+  ));
 
 const TypewriterText: React.FC<{ text: string }> = ({ text }) => {
   const [shown, setShown] = useState(0);
@@ -37,23 +62,32 @@ const TypewriterText: React.FC<{ text: string }> = ({ text }) => {
       return;
     }
     setShown(0);
-    const charsPerTick = Math.max(1, Math.ceil(text.length / TYPEWRITER_TARGET_TICKS));
-    const id = setInterval(() => {
-      setShown((prev) => {
-        const next = prev + charsPerTick;
-        if (next >= text.length) {
-          clearInterval(id);
-          return text.length;
-        }
-        return next;
-      });
-    }, TYPEWRITER_TICK_MS);
-    return () => clearInterval(id);
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout>;
+    // For long replies, reveal a few characters per step so the total
+    // duration stays under the cap instead of typing one at a time forever.
+    const stepChars = Math.max(1, Math.ceil((text.length * TYPEWRITER_BASE_MS) / TYPEWRITER_MAX_DURATION_MS));
+    let index = 0;
+
+    const tick = () => {
+      if (cancelled) return;
+      index = Math.min(text.length, index + stepChars);
+      setShown(index);
+      if (index >= text.length) return;
+      const jitter = (Math.random() - 0.5) * 2 * TYPEWRITER_JITTER_MS;
+      timeoutId = setTimeout(tick, Math.max(8, TYPEWRITER_BASE_MS + jitter));
+    };
+    timeoutId = setTimeout(tick, TYPEWRITER_BASE_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
   }, [text]);
 
   return (
     <>
-      {text.slice(0, shown)}
+      {renderTheaText(text.slice(0, shown))}
       {shown < text.length && <span className="u-thea-caret" aria-hidden="true" />}
     </>
   );
@@ -95,6 +129,50 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeDismissed, setUpgradeDismissed] = useState(() => isTheaUpgradeDismissed());
   const [isVip, setIsVip] = useState(false);
+  const productCarouselRef = useRef<HTMLDivElement>(null);
+  const [canScrollProducts, setCanScrollProducts] = useState(false);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const chatContentRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
+
+  // Keeps the newest message in view as it arrives and as it types out,
+  // unless the user has deliberately scrolled up to read earlier messages.
+  useEffect(() => {
+    const scrollEl = chatScrollRef.current;
+    const contentEl = chatContentRef.current;
+    if (!scrollEl || !contentEl) return;
+
+    const handleScroll = () => {
+      stickToBottomRef.current = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < 40;
+    };
+    scrollEl.addEventListener('scroll', handleScroll, { passive: true });
+
+    const observer = new ResizeObserver(() => {
+      if (stickToBottomRef.current) scrollEl.scrollTop = scrollEl.scrollHeight;
+    });
+    observer.observe(contentEl);
+
+    return () => {
+      scrollEl.removeEventListener('scroll', handleScroll);
+      observer.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    const el = productCarouselRef.current;
+    if (!el || chatProducts.length === 0) {
+      setCanScrollProducts(false);
+      return;
+    }
+    const update = () => setCanScrollProducts(el.scrollWidth - el.clientWidth - el.scrollLeft > 8);
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      el.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [chatProducts]);
 
   const isTheaLlmTester = isTheaLlmEmailAllowed(user?.email);
   const userMessageCount = chatMessages.filter((m) => m.role === 'user').length;
@@ -181,6 +259,7 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    stickToBottomRef.current = true;
     const nextMessages: ChatMessage[] = [...chatMessages, { role: 'user', content: text }];
     setChatMessages(nextMessages);
     setQuestion('');
@@ -268,7 +347,7 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent
           side="bottom"
-          className="mx-auto max-h-[88dvh] w-full max-w-[440px] overflow-y-auto rounded-t-[28px] border-x border-t border-[#DED2C1] bg-[#F7F1E6] px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-5"
+          className="mx-auto max-h-[88dvh] w-full max-w-[440px] overflow-y-auto rounded-t-[28px] border-x border-t border-[#DED2C1] bg-[#F7F1E6] px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-5 lg:max-w-[600px]"
         >
           <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-[#2A2520]/15" />
           <SheetHeader className="text-left">
@@ -294,45 +373,59 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
           )}
 
           {isTheaLlmTester && chatMessages.length > 0 && (
-            <div className="mt-5 max-h-[38dvh] space-y-3 overflow-y-auto pr-1">
-              {chatMessages.map((message, index) =>
-                message.role === 'user' ? (
-                  <div key={index} className="flex justify-end">
-                    <div className="max-w-[85%] rounded-[16px] rounded-tr-[4px] bg-[#2A2520] px-3.5 py-2.5 text-[13.5px] leading-5 text-[#F4ECDD]">
-                      {message.content}
+            <div ref={chatScrollRef} className="mt-5 max-h-[38dvh] space-y-3 overflow-y-auto pr-1">
+              <div ref={chatContentRef} className="space-y-3">
+                {chatMessages.map((message, index) =>
+                  message.role === 'user' ? (
+                    <div key={index} className="flex justify-end">
+                      <div className="max-w-[85%] rounded-[16px] rounded-tr-[4px] bg-[#2A2520] px-3.5 py-2.5 text-[13.5px] leading-5 text-[#F4ECDD]">
+                        {message.content}
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div key={index} className="flex items-start gap-2">
+                  ) : (
+                    <div key={index} className="flex items-start gap-2">
+                      <TheaAvatar size={24} />
+                      <div className="max-w-[85%] whitespace-pre-wrap rounded-[16px] rounded-tl-[4px] border border-[#D9CDBD] bg-white px-3.5 py-2.5 text-[13.5px] leading-5 text-[#2A2520]">
+                        <TypewriterText text={message.content} />
+                      </div>
+                    </div>
+                  ),
+                )}
+                {sending && (
+                  <div className="flex items-start gap-2">
                     <TheaAvatar size={24} />
-                    <div className="max-w-[85%] whitespace-pre-wrap rounded-[16px] rounded-tl-[4px] border border-[#D9CDBD] bg-white px-3.5 py-2.5 text-[13.5px] leading-5 text-[#2A2520]">
-                      <TypewriterText text={message.content} />
+                    <div className="rounded-[16px] rounded-tl-[4px] border border-[#D9CDBD] bg-white px-3.5 py-2.5 text-[13.5px] text-[#9A8E7C]">
+                      Thinking…
                     </div>
                   </div>
-                ),
-              )}
-              {sending && (
-                <div className="flex items-start gap-2">
-                  <TheaAvatar size={24} />
-                  <div className="rounded-[16px] rounded-tl-[4px] border border-[#D9CDBD] bg-white px-3.5 py-2.5 text-[13.5px] text-[#9A8E7C]">
-                    Thinking…
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
 
           {isTheaLlmTester && chatProducts.length > 0 && (
-            <div className="mt-3 flex gap-2.5 overflow-x-auto pb-1">
-              {chatProducts.map((product) => (
-                <div key={product.id} className="w-32 shrink-0 rounded-[16px] border border-[#DED2C1] bg-white p-2.5">
-                  {product.featured_image_url && (
-                    <img src={product.featured_image_url} alt={product.title} className="mb-2 h-20 w-full rounded-[10px] object-cover" />
-                  )}
-                  <p className="line-clamp-2 text-[11.5px] font-semibold leading-4 text-[#2A2520]">{product.title}</p>
-                  <p className="mt-1 text-[11.5px] font-semibold text-[#B65B3C]">${product.price}</p>
+            <div className="relative mt-3">
+              <div ref={productCarouselRef} className="flex gap-2.5 overflow-x-auto pb-1">
+                {chatProducts.map((product) => (
+                  <div key={product.id} className="w-32 shrink-0 rounded-[16px] border border-[#DED2C1] bg-white p-2.5">
+                    {product.featured_image_url && (
+                      <img src={product.featured_image_url} alt={product.title} className="mb-2 h-20 w-full rounded-[10px] object-cover" />
+                    )}
+                    <p className="line-clamp-2 text-[11.5px] font-semibold leading-4 text-[#2A2520]">{product.title}</p>
+                    <p className="mt-1 text-[11.5px] font-semibold text-[#B65B3C]">${product.price}</p>
+                  </div>
+                ))}
+              </div>
+              {canScrollProducts && (
+                <div
+                  className="pointer-events-none absolute inset-y-0 right-0 flex w-12 items-center justify-end bg-gradient-to-l from-[#F7F1E6] via-[#F7F1E6]/80 to-transparent pb-1"
+                  aria-hidden="true"
+                >
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-[0_2px_8px_rgba(42,37,32,0.15)]">
+                    <ChevronRight className="h-3.5 w-3.5 text-[#B65B3C]" />
+                  </div>
                 </div>
-              ))}
+              )}
             </div>
           )}
 
@@ -436,8 +529,9 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   <button
                     key={item.intent}
                     onClick={() => go(item.destination, item.intent)}
-                    className="u-touch-card rounded-[18px] border border-[#DED2C1] bg-white p-3.5 text-left"
+                    className="u-touch-card relative cursor-pointer rounded-[18px] border border-[#DED2C1] bg-white p-3.5 text-left transition-colors hover:border-[#B65B3C]/40 hover:bg-[#FFFDF8]"
                   >
+                    <ChevronRight className="absolute right-3 top-3 h-3.5 w-3.5 text-[#C7BBA8]" />
                     <Icon className="mb-3 h-4 w-4 text-[#B65B3C]" />
                     <span className="block text-[13px] font-semibold text-[#2A2520]">{item.label}</span>
                     <span className="mt-1 block text-[11px] leading-4 text-[#8A7E6E]">{item.detail}</span>
