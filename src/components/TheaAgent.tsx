@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, ChevronRight, Gift, Heart, Send, Settings, Sparkles, Users } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -28,6 +28,30 @@ type ThreadProduct = { id: string; title: string; price: number; featured_image_
 const TYPEWRITER_BASE_MS = 32; // per-character pace, human typing speed
 const TYPEWRITER_JITTER_MS = 20; // +/- randomness so it doesn't feel robotic
 const TYPEWRITER_MAX_DURATION_MS = 4500; // cap so a long reply doesn't drag
+
+// Minimal, dependency-free rendering for the small set of markdown Thea's
+// replies actually use: **bold** spans and newlines as line breaks. Applied
+// to whatever's currently revealed (not the full text), so it stays in sync
+// with the typewriter effect as it types.
+const renderInlineMarkdown = (line: string, keyPrefix: string) =>
+  line
+    .split(/(\*\*[^*]+\*\*)/g)
+    .filter(Boolean)
+    .map((part, i) =>
+      part.startsWith('**') && part.endsWith('**') ? (
+        <strong key={`${keyPrefix}-${i}`}>{part.slice(2, -2)}</strong>
+      ) : (
+        <React.Fragment key={`${keyPrefix}-${i}`}>{part}</React.Fragment>
+      ),
+    );
+
+const renderTheaText = (text: string) =>
+  text.split('\n').map((line, i, arr) => (
+    <React.Fragment key={i}>
+      {renderInlineMarkdown(line, String(i))}
+      {i < arr.length - 1 && <br />}
+    </React.Fragment>
+  ));
 
 const TypewriterText: React.FC<{ text: string }> = ({ text }) => {
   const [shown, setShown] = useState(0);
@@ -63,7 +87,7 @@ const TypewriterText: React.FC<{ text: string }> = ({ text }) => {
 
   return (
     <>
-      {text.slice(0, shown)}
+      {renderTheaText(text.slice(0, shown))}
       {shown < text.length && <span className="u-thea-caret" aria-hidden="true" />}
     </>
   );
@@ -105,6 +129,24 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeDismissed, setUpgradeDismissed] = useState(() => isTheaUpgradeDismissed());
   const [isVip, setIsVip] = useState(false);
+  const productCarouselRef = useRef<HTMLDivElement>(null);
+  const [canScrollProducts, setCanScrollProducts] = useState(false);
+
+  useEffect(() => {
+    const el = productCarouselRef.current;
+    if (!el || chatProducts.length === 0) {
+      setCanScrollProducts(false);
+      return;
+    }
+    const update = () => setCanScrollProducts(el.scrollWidth - el.clientWidth - el.scrollLeft > 8);
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      el.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [chatProducts]);
 
   const isTheaLlmTester = isTheaLlmEmailAllowed(user?.email);
   const userMessageCount = chatMessages.filter((m) => m.role === 'user').length;
@@ -333,16 +375,28 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
           )}
 
           {isTheaLlmTester && chatProducts.length > 0 && (
-            <div className="mt-3 flex gap-2.5 overflow-x-auto pb-1">
-              {chatProducts.map((product) => (
-                <div key={product.id} className="w-32 shrink-0 rounded-[16px] border border-[#DED2C1] bg-white p-2.5">
-                  {product.featured_image_url && (
-                    <img src={product.featured_image_url} alt={product.title} className="mb-2 h-20 w-full rounded-[10px] object-cover" />
-                  )}
-                  <p className="line-clamp-2 text-[11.5px] font-semibold leading-4 text-[#2A2520]">{product.title}</p>
-                  <p className="mt-1 text-[11.5px] font-semibold text-[#B65B3C]">${product.price}</p>
+            <div className="relative mt-3">
+              <div ref={productCarouselRef} className="flex gap-2.5 overflow-x-auto pb-1">
+                {chatProducts.map((product) => (
+                  <div key={product.id} className="w-32 shrink-0 rounded-[16px] border border-[#DED2C1] bg-white p-2.5">
+                    {product.featured_image_url && (
+                      <img src={product.featured_image_url} alt={product.title} className="mb-2 h-20 w-full rounded-[10px] object-cover" />
+                    )}
+                    <p className="line-clamp-2 text-[11.5px] font-semibold leading-4 text-[#2A2520]">{product.title}</p>
+                    <p className="mt-1 text-[11.5px] font-semibold text-[#B65B3C]">${product.price}</p>
+                  </div>
+                ))}
+              </div>
+              {canScrollProducts && (
+                <div
+                  className="pointer-events-none absolute inset-y-0 right-0 flex w-12 items-center justify-end bg-gradient-to-l from-[#F7F1E6] via-[#F7F1E6]/80 to-transparent pb-1"
+                  aria-hidden="true"
+                >
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-[0_2px_8px_rgba(42,37,32,0.15)]">
+                    <ChevronRight className="h-3.5 w-3.5 text-[#B65B3C]" />
+                  </div>
                 </div>
-              ))}
+              )}
             </div>
           )}
 
