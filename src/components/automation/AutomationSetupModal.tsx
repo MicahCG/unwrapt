@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useShopifyCollection } from "@/hooks/useShopifyCollection";
+import { getAllProducts } from "@/lib/giftVibes";
 import { Loader2, Check, AlertCircle, Wallet as WalletIcon } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -24,7 +24,11 @@ export const AutomationSetupModal = ({ isOpen, onClose, recipient, onSuccess }: 
   const queryClient = useQueryClient();
 
   // Fetch all products
-  const { data: products = [], isLoading: productsLoading } = useShopifyCollection("", 50);
+  const { data: products = [], isLoading: productsLoading } = useQuery({
+    queryKey: ["goody-catalog", "automation-setup"],
+    queryFn: () => getAllProducts(),
+    enabled: isOpen,
+  });
 
   // Fetch user profile (wallet balance and tier)
   const { data: userProfile } = useQuery({
@@ -119,7 +123,7 @@ export const AutomationSetupModal = ({ isOpen, onClose, recipient, onSuccess }: 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const variantId = selectedGift.variantId;
+      const variantId = selectedGift.id;
 
       // Update recipient with default gift and enable automation
       const { error: recipientError } = await supabase
@@ -194,12 +198,12 @@ export const AutomationSetupModal = ({ isOpen, onClose, recipient, onSuccess }: 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-h-[400px] overflow-y-auto">
                 {products.map((product) => (
                   <button
-                    key={product.variantId}
+                    key={product.id}
                     onClick={() => handleGiftSelect(product)}
                     className="group relative bg-white border-2 border-[#E4DCD2] rounded-lg p-3 hover:border-[#D2B887] transition-all"
                   >
                     <img
-                      src={product.featuredImage || ""}
+                      src={product.featured_image_url || ""}
                       alt={product.title}
                       className="w-full h-32 object-cover rounded-md mb-2"
                     />
@@ -224,9 +228,9 @@ export const AutomationSetupModal = ({ isOpen, onClose, recipient, onSuccess }: 
                 Selected Gift
               </h3>
               <div className="flex items-center gap-4">
-                {selectedGift.featuredImage && (
+                {selectedGift.featured_image_url && (
                   <img
-                    src={selectedGift.featuredImage}
+                    src={selectedGift.featured_image_url}
                     alt={selectedGift.title}
                     className="w-24 h-24 object-cover rounded-lg"
                   />

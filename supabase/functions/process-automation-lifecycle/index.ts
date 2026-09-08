@@ -3,6 +3,25 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
 
 const SERVICE_FEE = 0; // No service fee
 
+type GoodyProductLookup = { price?: number | null; images?: Array<{ image_large?: { url?: string | null } | null }> };
+
+const fetchGoodyProduct = async (productId: string): Promise<GoodyProductLookup | null> => {
+  const environment = Deno.env.get("GOODY_API_ENV") === "production" ? "production" : "sandbox";
+  const apiKey = environment === "production"
+    ? Deno.env.get("GOODY_PRODUCTION_COMMERCE_API_KEY")
+    : Deno.env.get("GOODY_SANDBOX_COMMERCE_API_KEY");
+  if (!apiKey) return null;
+
+  const baseUrl = environment === "production" ? "https://api.ongoody.com" : "https://api.sandbox.ongoody.com";
+  const response = await fetch(`${baseUrl}/v1/products?page=1&per_page=100`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!response.ok) throw new Error(`Goody product lookup failed with ${response.status}`);
+  const payload = await response.json() as { data?: Array<{ id?: string } & GoodyProductLookup> };
+  return (payload.data || []).find((p) => p.id === productId) || null;
+};
+
 serve(async (req) => {
   try {
     console.log("🤖 Starting automation lifecycle processing");
@@ -207,7 +226,7 @@ async function handleFundReservation(supabaseClient: any, gift: any, recipient: 
   console.log("    💰 STAGE 1: Fund Reservation");
 
   try {
-    // Get default gift price from Shopify
+    // Get default gift price from Goody
     const variantId = recipient.default_gift_variant_id;
     if (!variantId) {
       await logAutomation(supabaseClient, gift.user_id, recipient.id, gift.id, "fund_reservation", "failed", {
@@ -216,16 +235,12 @@ async function handleFundReservation(supabaseClient: any, gift: any, recipient: 
       return;
     }
 
-    // Fetch product details from Shopify
-    const shopifyResponse = await supabaseClient.functions.invoke("shopify-product", {
-      body: { variantId }
-    });
-
-    if (shopifyResponse.error) {
-      throw new Error(`Failed to fetch Shopify product: ${shopifyResponse.error.message}`);
+    const goodyProduct = await fetchGoodyProduct(variantId);
+    if (!goodyProduct || typeof goodyProduct.price !== "number") {
+      throw new Error("Failed to fetch Goody product price");
     }
 
-    const productPrice = parseFloat(shopifyResponse.data.price);
+    const productPrice = goodyProduct.price / 100;
     const totalCost = productPrice + SERVICE_FEE;
 
     // Check available balance
@@ -496,7 +511,7 @@ async function handleOrderFulfillment(supabaseClient: any, gift: any, recipient:
 
     console.log("    💳 Wallet charged successfully");
 
-    // Step 2: Process gift fulfillment (create Shopify order)
+    // Step 2: Process gift fulfillment (place the order via process-gift-fulfillment)
     const fulfillmentResponse = await supabaseClient.functions.invoke("process-gift-fulfillment", {
       body: { scheduledGiftId: gift.id },
       headers: {
@@ -781,17 +796,12 @@ async function logAutomation(
     });
 }
 
-async function getProductImage(supabaseClient: any, variantId: string | null): Promise<string | undefined> {
+async function getProductImage(_supabaseClient: any, variantId: string | null): Promise<string | undefined> {
   if (!variantId) return undefined;
 
   try {
-    const { data: product } = await supabaseClient
-      .from("products")
-      .select("featured_image_url")
-      .eq("shopify_variant_id", variantId)
-      .single();
-
-    return product?.featured_image_url;
+    const product = await fetchGoodyProduct(variantId);
+    return product?.images?.[0]?.image_large?.url || undefined;
   } catch (error) {
     console.error("Error fetching product image:", error);
     return undefined;

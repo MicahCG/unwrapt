@@ -5,6 +5,11 @@
  * - CALM_COMFORT: Cozy, soothing, relaxing, ambience
  * - ARTFUL_UNIQUE: Handmade, ritual, heritage, craft, story-driven
  * - REFINED_STYLISH: Elegant design, glassware, striking decor, barware
+ *
+ * Sourced from Goody's live catalog via the gift-catalog edge function's
+ * `browse_by_vibe` action, which tags each product with a best-guess vibe
+ * (Goody has no vibe taxonomy of its own, so this is a keyword-based
+ * approximation — see VIBE_KEYWORDS in supabase/functions/gift-catalog).
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -20,20 +25,13 @@ export interface GiftVibeOption {
 
 export interface Product {
   id: string;
-  shopify_product_id: string;
-  shopify_variant_id: string;
   title: string;
-  handle: string;
   description: string | null;
   price: number;
   currency: string;
   featured_image_url: string | null;
   product_type: string | null;
   gift_vibe: GiftVibe;
-  inventory: number;
-  available_for_sale: boolean;
-  rank: number;
-  active: boolean;
 }
 
 /**
@@ -60,29 +58,45 @@ export const GIFT_VIBE_OPTIONS: GiftVibeOption[] = [
   }
 ];
 
-/**
- * House Essentials (Universal Defaults)
- * These are our go-to gifts when no preference is set or budget is tight.
- * All are CALM_COMFORT vibe.
- */
-export const HOUSE_ESSENTIALS = {
-  premium: 'serene-mist-aromatherapy', // $78
-  standard: 'ashen-mountain-candle',   // $89
-  budget: 'eclipse-pine-candle'         // $45
-} as const;
+let cachedCatalog: { products: Product[]; fetchedAt: number } | null = null;
+const CATALOG_CACHE_MS = 5 * 60 * 1000;
 
 /**
- * Select a house essential gift based on available budget
+ * Fetch the full Goody catalog, each item tagged with a best-guess vibe.
+ * Cached in-memory for a few minutes since this is called from several
+ * helpers below and the underlying catalog doesn't change second to second.
  */
-export function selectHouseEssential(availableBalance: number): string {
-  if (availableBalance >= 78) {
-    return HOUSE_ESSENTIALS.premium;
-  } else if (availableBalance >= 45) {
-    return HOUSE_ESSENTIALS.budget;
-  } else {
-    // Even if they can't afford it, return the cheapest option
-    // so they know what to save for
-    return HOUSE_ESSENTIALS.budget;
+async function fetchGoodyCatalog(): Promise<Product[]> {
+  if (cachedCatalog && Date.now() - cachedCatalog.fetchedAt < CATALOG_CACHE_MS) {
+    return cachedCatalog.products;
+  }
+
+  try {
+    const { data, error } = await supabase.functions.invoke('gift-catalog', {
+      body: { action: 'browse_by_vibe' },
+    });
+
+    if (error || !data?.success) {
+      console.error('Error fetching Goody catalog:', error || data?.error);
+      return cachedCatalog?.products || [];
+    }
+
+    const products: Product[] = (data.products || []).map((p: any) => ({
+      id: p.id,
+      title: p.name,
+      description: p.description,
+      price: p.price ?? 0,
+      currency: p.currency || 'USD',
+      featured_image_url: p.imageUrl,
+      product_type: p.brand,
+      gift_vibe: p.vibe,
+    }));
+
+    cachedCatalog = { products, fetchedAt: Date.now() };
+    return products;
+  } catch (error) {
+    console.error('Error in fetchGoodyCatalog:', error);
+    return cachedCatalog?.products || [];
   }
 }
 
@@ -93,78 +107,40 @@ export async function getProductsByVibe(
   vibe: GiftVibe,
   maxPrice: number
 ): Promise<Product[]> {
-  try {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('gift_vibe', vibe)
-      .eq('active', true)
-      .eq('available_for_sale', true)
-      .lte('price', maxPrice)
-      .order('rank', { ascending: true })
-      .order('price', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching products by vibe:', error);
-      return [];
-    }
-
-    return (data || []) as Product[];
-  } catch (error) {
-    console.error('Error in getProductsByVibe:', error);
-    return [];
-  }
+  const catalog = await fetchGoodyCatalog();
+  return catalog
+    .filter((p) => p.gift_vibe === vibe && p.price <= maxPrice)
+    .sort((a, b) => a.price - b.price);
 }
 
 /**
  * Get house essential products
  */
 export async function getHouseEssentials(maxPrice: number = 100): Promise<Product[]> {
-  try {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('gift_vibe', 'CALM_COMFORT')
-      .eq('active', true)
-      .eq('available_for_sale', true)
-      .lte('price', maxPrice)
-      .order('rank', { ascending: true })
-      .order('price', { ascending: true })
-      .limit(3);
-
-    if (error) {
-      console.error('Error fetching house essentials:', error);
-      return [];
-    }
-
-    return (data || []) as Product[];
-  } catch (error) {
-    console.error('Error in getHouseEssentials:', error);
-    return [];
-  }
+  return (await getProductsByVibe('CALM_COMFORT', maxPrice)).slice(0, 3);
 }
 
 /**
  * Get a single product by ID
  */
 export async function getProductById(productId: string): Promise<Product | null> {
-  try {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('id', productId)
-      .single();
+  const catalog = await fetchGoodyCatalog();
+  return catalog.find((p) => p.id === productId) || null;
+}
 
-    if (error) {
-      console.error('Error fetching product:', error);
-      return null;
-    }
-
-    return data as Product;
-  } catch (error) {
-    console.error('Error in getProductById:', error);
-    return null;
+/**
+ * Get multiple products by ID in one lookup (avoids N calls for previews
+ * like the dashboard's upcoming-gift/default-gift cards).
+ */
+export async function getProductsByIds(productIds: string[]): Promise<Record<string, Product>> {
+  if (productIds.length === 0) return {};
+  const catalog = await fetchGoodyCatalog();
+  const idSet = new Set(productIds);
+  const map: Record<string, Product> = {};
+  for (const product of catalog) {
+    if (idSet.has(product.id)) map[product.id] = product;
   }
+  return map;
 }
 
 /**
@@ -179,7 +155,7 @@ export async function getProductById(productId: string): Promise<Product | null>
  * 1. If recipient has a preferred_gift_vibe → filter by that vibe
  * 2. If no vibe set → use CALM_COMFORT (house essentials)
  * 3. Filter by budget (available balance / number of gifts to schedule)
- * 4. Pick the highest-ranked gift within budget
+ * 4. Pick the cheapest-fit gift within budget
  * 5. If no gifts fit → fall back to house essentials
  */
 export async function selectGiftForRecipient(params: {
@@ -190,40 +166,27 @@ export async function selectGiftForRecipient(params: {
   const { recipientVibe, availableBalance } = params;
 
   try {
-    // Determine target vibe
     const targetVibe = recipientVibe || 'CALM_COMFORT';
-
-    // Get candidate gifts for that vibe
     const candidates = await getProductsByVibe(targetVibe, availableBalance);
 
     if (candidates.length > 0) {
-      // Pick the highest-ranked (first) gift within budget
       return candidates[0];
     }
 
-    // Fallback: Try house essentials if vibe-specific search failed
     console.log(`No gifts found for vibe ${targetVibe} within budget $${availableBalance}, falling back to house essentials`);
 
     const essentials = await getHouseEssentials(availableBalance);
-
     if (essentials.length > 0) {
       return essentials[0];
     }
 
-    // Last resort: Return the cheapest house essential even if over budget
-    // This helps the user know what they need to save for
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('id', HOUSE_ESSENTIALS.budget)
-      .single();
-
-    if (error) {
-      console.error('Error fetching fallback product:', error);
-      return null;
-    }
-
-    return data as Product;
+    // Last resort: cheapest CALM_COMFORT item regardless of budget, so the
+    // user knows what they'd need to save for.
+    const catalog = await fetchGoodyCatalog();
+    const cheapest = catalog
+      .filter((p) => p.gift_vibe === 'CALM_COMFORT')
+      .sort((a, b) => a.price - b.price)[0];
+    return cheapest || null;
 
   } catch (error) {
     console.error('Error in selectGiftForRecipient:', error);
@@ -242,27 +205,15 @@ export async function estimateGiftCost(params: {
 
   try {
     const targetVibe = recipientVibe || 'CALM_COMFORT';
+    const catalog = await fetchGoodyCatalog();
+    const cheapest = catalog
+      .filter((p) => p.gift_vibe === targetVibe)
+      .sort((a, b) => a.price - b.price)[0];
 
-    // Get the cheapest gift in this vibe
-    const { data, error } = await supabase
-      .from('products')
-      .select('price')
-      .eq('gift_vibe', targetVibe)
-      .eq('active', true)
-      .eq('available_for_sale', true)
-      .order('price', { ascending: true })
-      .limit(1)
-      .single();
-
-    if (error || !data) {
-      // Return average house essential price as fallback
-      return 70;
-    }
-
-    return data.price;
+    return cheapest ? cheapest.price : 70; // fallback estimate
   } catch (error) {
     console.error('Error estimating gift cost:', error);
-    return 70; // Default estimate
+    return 70;
   }
 }
 
@@ -281,34 +232,21 @@ export async function checkVibeBudgetMatch(params: {
   const { recipientVibe, availableBalance } = params;
 
   try {
-    // Try to find a gift within budget
     const candidates = await getProductsByVibe(recipientVibe, availableBalance);
-
     if (candidates.length > 0) {
-      return {
-        canAfford: true,
-        matchedGift: candidates[0]
-      };
+      return { canAfford: true, matchedGift: candidates[0] };
     }
 
-    // Get the cheapest option in this vibe (even if over budget)
-    const { data: cheapest, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('gift_vibe', recipientVibe)
-      .eq('active', true)
-      .eq('available_for_sale', true)
-      .order('price', { ascending: true })
-      .limit(1)
-      .maybeSingle();
+    const catalog = await fetchGoodyCatalog();
+    const cheapest = catalog
+      .filter((p) => p.gift_vibe === recipientVibe)
+      .sort((a, b) => a.price - b.price)[0];
 
-    if (error || !cheapest) {
-      return { canAfford: false };
-    }
+    if (!cheapest) return { canAfford: false };
 
     return {
       canAfford: false,
-      cheapestOption: cheapest as Product,
+      cheapestOption: cheapest,
       shortfall: cheapest.price - availableBalance
     };
 
@@ -326,43 +264,10 @@ export async function getAllProducts(params?: {
   maxPrice?: number;
   minPrice?: number;
 }): Promise<Product[]> {
-  try {
-    let query = supabase
-      .from('products')
-      .select('*')
-      .eq('active', true)
-      .eq('available_for_sale', true);
-
-    if (params?.vibe) {
-      query = query.eq('gift_vibe', params.vibe);
-    }
-
-    if (params?.maxPrice) {
-      query = query.lte('price', params.maxPrice);
-    }
-
-    if (params?.minPrice) {
-      query = query.gte('price', params.minPrice);
-    }
-
-    query = query.order('gift_vibe', { ascending: true })
-                 .order('rank', { ascending: true });
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('❌ Error fetching all products:', error);
-      return [];
-    }
-
-    console.log(`✅ getAllProducts: Fetched ${data?.length || 0} products`, {
-      filters: params,
-      sampleProducts: data?.slice(0, 2).map(p => ({ title: p.title, vibe: p.gift_vibe }))
-    });
-
-    return (data || []) as Product[];
-  } catch (error) {
-    console.error('Error in getAllProducts:', error);
-    return [];
-  }
+  const catalog = await fetchGoodyCatalog();
+  return catalog
+    .filter((p) => !params?.vibe || p.gift_vibe === params.vibe)
+    .filter((p) => params?.maxPrice === undefined || p.price <= params.maxPrice)
+    .filter((p) => params?.minPrice === undefined || p.price >= params.minPrice)
+    .sort((a, b) => a.gift_vibe.localeCompare(b.gift_vibe) || a.price - b.price);
 }
