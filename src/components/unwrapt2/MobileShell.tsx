@@ -15,8 +15,10 @@ interface MobileShellProps {
 
 /**
  * The phone-width column every agent-first screen lives in. On desktop it
- * centers a ~440px mobile canvas against the warm background; on phones it
- * fills the viewport. Content scrolls; the footer stays pinned with a fade.
+ * centers a ~440-600px mobile canvas against the warm background, with soft
+ * ambient decoration filling the margins and a full-width nav bar so it
+ * reads as anchored to the screen rather than floating; on phones it fills
+ * the viewport. Content scrolls; the footer stays pinned with a fade.
  */
 export const MobileShell: React.FC<MobileShellProps> = ({
   children,
@@ -27,10 +29,23 @@ export const MobileShell: React.FC<MobileShellProps> = ({
 }) => (
   <div
     style={{ background: U.bg }}
-    className="min-h-screen w-full flex justify-center"
+    className="relative flex min-h-screen w-full justify-center overflow-hidden"
   >
+    {/* Ambient desktop-only decoration: sits behind the card, only visible
+        in the margins once the viewport is wider than the canvas. */}
+    <div className="pointer-events-none absolute inset-0 hidden lg:block" aria-hidden="true">
+      <div
+        className="absolute -left-40 top-[-10%] h-[560px] w-[560px] rounded-full opacity-[0.14] blur-3xl"
+        style={{ background: U.accent }}
+      />
+      <div
+        className="absolute -right-48 bottom-[-15%] h-[620px] w-[620px] rounded-full opacity-[0.12] blur-3xl"
+        style={{ background: U.sage }}
+      />
+    </div>
+
     <div
-      className={`relative flex h-[100dvh] min-h-screen w-full max-w-[440px] flex-col overflow-hidden ${
+      className={`relative z-10 flex h-[100dvh] min-h-screen w-full max-w-[440px] flex-col overflow-hidden lg:max-w-[600px] ${
         animate ? 'animate-u-fadeUp' : ''
       }`}
       style={{
@@ -42,13 +57,17 @@ export const MobileShell: React.FC<MobileShellProps> = ({
         {children}
       </div>
       {footer && (
-        <div
-          className="px-6 pb-9 pt-3"
-          style={{
-            background: `linear-gradient(0deg, ${U.bg} 72%, rgba(237,230,216,0))`,
-          }}
-        >
-          {footer}
+        <div className="relative px-6 pb-9 pt-3">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-1/2 hidden w-screen -translate-x-1/2 lg:block"
+            style={{ background: `linear-gradient(0deg, ${U.bg} 72%, rgba(237,230,216,0))` }}
+          />
+          <div
+            className="absolute inset-y-0 left-0 right-0 lg:hidden"
+            style={{ background: `linear-gradient(0deg, ${U.bg} 72%, rgba(237,230,216,0))` }}
+          />
+          <div className="relative">{footer}</div>
         </div>
       )}
     </div>

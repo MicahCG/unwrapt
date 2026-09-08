@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Gift, Heart, Send, Settings, Sparkles, Users } from 'lucide-react';
+import { CalendarDays, ChevronRight, Gift, Heart, Send, Settings, Sparkles, Users } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { TheaAvatar } from '@/components/unwrapt2/TheaAvatar';
@@ -25,8 +25,9 @@ type ThreadProduct = { id: string; title: string; price: number; featured_image_
 // once per message (keyed by index in the list below), so it types out once
 // when a reply first arrives and stays static on re-render — it never
 // replays for messages already on screen.
-const TYPEWRITER_TARGET_TICKS = 40;
-const TYPEWRITER_TICK_MS = 16;
+const TYPEWRITER_BASE_MS = 32; // per-character pace, human typing speed
+const TYPEWRITER_JITTER_MS = 20; // +/- randomness so it doesn't feel robotic
+const TYPEWRITER_MAX_DURATION_MS = 4500; // cap so a long reply doesn't drag
 
 const TypewriterText: React.FC<{ text: string }> = ({ text }) => {
   const [shown, setShown] = useState(0);
@@ -37,18 +38,27 @@ const TypewriterText: React.FC<{ text: string }> = ({ text }) => {
       return;
     }
     setShown(0);
-    const charsPerTick = Math.max(1, Math.ceil(text.length / TYPEWRITER_TARGET_TICKS));
-    const id = setInterval(() => {
-      setShown((prev) => {
-        const next = prev + charsPerTick;
-        if (next >= text.length) {
-          clearInterval(id);
-          return text.length;
-        }
-        return next;
-      });
-    }, TYPEWRITER_TICK_MS);
-    return () => clearInterval(id);
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout>;
+    // For long replies, reveal a few characters per step so the total
+    // duration stays under the cap instead of typing one at a time forever.
+    const stepChars = Math.max(1, Math.ceil((text.length * TYPEWRITER_BASE_MS) / TYPEWRITER_MAX_DURATION_MS));
+    let index = 0;
+
+    const tick = () => {
+      if (cancelled) return;
+      index = Math.min(text.length, index + stepChars);
+      setShown(index);
+      if (index >= text.length) return;
+      const jitter = (Math.random() - 0.5) * 2 * TYPEWRITER_JITTER_MS;
+      timeoutId = setTimeout(tick, Math.max(8, TYPEWRITER_BASE_MS + jitter));
+    };
+    timeoutId = setTimeout(tick, TYPEWRITER_BASE_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
   }, [text]);
 
   return (
@@ -268,7 +278,7 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent
           side="bottom"
-          className="mx-auto max-h-[88dvh] w-full max-w-[440px] overflow-y-auto rounded-t-[28px] border-x border-t border-[#DED2C1] bg-[#F7F1E6] px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-5"
+          className="mx-auto max-h-[88dvh] w-full max-w-[440px] overflow-y-auto rounded-t-[28px] border-x border-t border-[#DED2C1] bg-[#F7F1E6] px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-5 lg:max-w-[600px]"
         >
           <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-[#2A2520]/15" />
           <SheetHeader className="text-left">
@@ -436,8 +446,9 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   <button
                     key={item.intent}
                     onClick={() => go(item.destination, item.intent)}
-                    className="u-touch-card rounded-[18px] border border-[#DED2C1] bg-white p-3.5 text-left"
+                    className="u-touch-card relative cursor-pointer rounded-[18px] border border-[#DED2C1] bg-white p-3.5 text-left transition-colors hover:border-[#B65B3C]/40 hover:bg-[#FFFDF8]"
                   >
+                    <ChevronRight className="absolute right-3 top-3 h-3.5 w-3.5 text-[#C7BBA8]" />
                     <Icon className="mb-3 h-4 w-4 text-[#B65B3C]" />
                     <span className="block text-[13px] font-semibold text-[#2A2520]">{item.label}</span>
                     <span className="mt-1 block text-[11px] leading-4 text-[#8A7E6E]">{item.detail}</span>
