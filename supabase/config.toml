@@ -12,13 +12,10 @@ verify_jwt = false
 [functions.trigger-auto-reload]
 verify_jwt = false
 
-[functions.shopify-order]
+[functions.goody-order]
 verify_jwt = false
 
-[functions.shopify-collections]
-verify_jwt = false
-
-[functions.shopify-webhook]
+[functions.goody-webhook]
 verify_jwt = false
 
 [functions.test-stripe-secret]

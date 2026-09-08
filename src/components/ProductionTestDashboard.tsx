@@ -104,59 +104,48 @@ const ProductionTestDashboard = () => {
     }
   };
 
-  // Test shopify-order function directly  
-  const testShopifyOrderDirect = async () => {
+  // Test goody-order function directly
+  const testGoodyOrderDirect = async () => {
     setIsRunningTests(true);
-    
-    try {
-      console.log('🧪 Testing shopify-order function directly...');
-      
-      const testGiftId = generateTestUUID();
-      const testAddress = {
-        first_name: 'Test',
-        last_name: 'User',
-        address1: '123 Test Street',
-        city: 'Test City',
-        province: 'CA',
-        country: 'US',
-        zip: '12345',
-        phone: '555-123-4567'
-      };
 
-      const response = await supabase.functions.invoke('shopify-order', {
+    try {
+      console.log('🧪 Testing goody-order function directly...');
+
+      const testGiftId = generateTestUUID();
+
+      const response = await supabase.functions.invoke('goody-order', {
         body: {
           scheduledGiftId: testGiftId,
-          recipientAddress: testAddress,
           testMode: true
         }
       });
 
-      const data = await handleEdgeFunctionResponse(response, 'shopify-order');
+      const data = await handleEdgeFunctionResponse(response, 'goody-order');
 
       setTestResults(prev => [...prev, {
-        test: 'Shopify Order Direct',
+        test: 'Goody Order Direct',
         status: 'success',
         result: data,
         timestamp: new Date().toISOString()
       }]);
 
       toast({
-        title: "✅ Shopify Test Successful",
-        description: "Direct shopify-order function test completed",
+        title: "✅ Goody Test Successful",
+        description: "Direct goody-order function test completed",
       });
 
     } catch (error) {
-      console.error('❌ Shopify order direct test failed:', error);
-      
+      console.error('❌ Goody order direct test failed:', error);
+
       setTestResults(prev => [...prev, {
-        test: 'Shopify Order Direct',
+        test: 'Goody Order Direct',
         status: 'error',
         result: error.message,
         timestamp: new Date().toISOString()
       }]);
 
       toast({
-        title: "❌ Shopify Test Failed",
+        title: "❌ Goody Test Failed",
         description: error.message,
         variant: "destructive"
       });
@@ -385,7 +374,7 @@ const ProductionTestDashboard = () => {
     
     const tests = [
       { name: 'Payment Verification', func: testVerifyPaymentFlow, delay: 1000 },
-      { name: 'Shopify Order Direct', func: testShopifyOrderDirect, delay: 2000 },
+      { name: 'Goody Order Direct', func: testGoodyOrderDirect, delay: 2000 },
       { name: 'Process Fulfillment Direct', func: testProcessGiftFulfillmentDirect, delay: 2000 },
       { name: 'Create Gift Payment (Dummy)', func: testCreateGiftPayment, delay: 2000 },
       { name: 'Payment Fulfillment Flow (Simplified)', func: testPaymentFulfillmentFlow, delay: 3000 }
@@ -477,15 +466,15 @@ const ProductionTestDashboard = () => {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <p className="text-xs text-muted-foreground">
-                      Tests shopify-order function directly in test mode
+                      Tests goody-order function directly in test mode
                     </p>
-                    <Button 
-                      size="sm" 
-                      onClick={testShopifyOrderDirect}
+                    <Button
+                      size="sm"
+                      onClick={testGoodyOrderDirect}
                       disabled={isRunningTests}
                       className="w-full"
                     >
-                      {isRunningTests ? 'Testing...' : 'Test Shopify'}
+                      {isRunningTests ? 'Testing...' : 'Test Goody'}
                       <Play className="h-3 w-3 ml-1" />
                     </Button>
                   </CardContent>
