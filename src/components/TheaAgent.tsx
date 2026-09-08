@@ -21,6 +21,44 @@ import {
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
 type ThreadProduct = { id: string; title: string; price: number; featured_image_url: string | null };
 
+// Reveals text progressively for a lightweight typewriter effect. Mounted
+// once per message (keyed by index in the list below), so it types out once
+// when a reply first arrives and stays static on re-render — it never
+// replays for messages already on screen.
+const TYPEWRITER_TARGET_TICKS = 40;
+const TYPEWRITER_TICK_MS = 16;
+
+const TypewriterText: React.FC<{ text: string }> = ({ text }) => {
+  const [shown, setShown] = useState(0);
+
+  useEffect(() => {
+    if (!text) {
+      setShown(0);
+      return;
+    }
+    setShown(0);
+    const charsPerTick = Math.max(1, Math.ceil(text.length / TYPEWRITER_TARGET_TICKS));
+    const id = setInterval(() => {
+      setShown((prev) => {
+        const next = prev + charsPerTick;
+        if (next >= text.length) {
+          clearInterval(id);
+          return text.length;
+        }
+        return next;
+      });
+    }, TYPEWRITER_TICK_MS);
+    return () => clearInterval(id);
+  }, [text]);
+
+  return (
+    <>
+      {text.slice(0, shown)}
+      {shown < text.length && <span className="u-thea-caret" aria-hidden="true" />}
+    </>
+  );
+};
+
 const suggestions = [
   { label: 'Plan for someone', detail: 'Add or update a person', icon: Users, destination: '/?action=add-person', intent: 'person' },
   { label: 'Find a gift', detail: 'Browse ideas and interests', icon: Gift, destination: '/?action=catalog', intent: 'catalog' },
@@ -267,8 +305,8 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 ) : (
                   <div key={index} className="flex items-start gap-2">
                     <TheaAvatar size={24} />
-                    <div className="max-w-[85%] rounded-[16px] rounded-tl-[4px] border border-[#D9CDBD] bg-white px-3.5 py-2.5 text-[13.5px] leading-5 text-[#2A2520]">
-                      {message.content}
+                    <div className="max-w-[85%] whitespace-pre-wrap rounded-[16px] rounded-tl-[4px] border border-[#D9CDBD] bg-white px-3.5 py-2.5 text-[13.5px] leading-5 text-[#2A2520]">
+                      <TypewriterText text={message.content} />
                     </div>
                   </div>
                 ),

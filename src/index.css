@@ -567,6 +567,16 @@
 @keyframes u-shimmer { 0% { background-position: -220px 0; } 100% { background-position: 220px 0; } }
 @keyframes u-blink { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
 
+.u-thea-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: currentColor;
+  animation: u-blink 0.9s step-start infinite;
+}
+
 .u-touch-card,
 .u-recipient-card,
 .u-catalog-card {
