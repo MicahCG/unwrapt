@@ -6,7 +6,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { normalizeRecipientName } from '@/lib/dateUtils';
 import { MobileShell, Eyebrow, PrimaryButton, Display } from '@/components/unwrapt2/MobileShell';
-import { TheaAvatar, PersonAvatar } from '@/components/unwrapt2/TheaAvatar';
+import { PersonAvatar } from '@/components/unwrapt2/TheaAvatar';
+import { TheaCharacter } from '@/components/unwrapt2/TheaCharacter';
 import { U, toneForIndex, initialsOf } from '@/components/unwrapt2/theme';
 import { format } from 'date-fns';
 import { trackProductEvent } from '@/lib/productAnalytics';
@@ -40,7 +41,7 @@ interface Person {
   fromCalendar: boolean;
 }
 
-type Screen = 'welcome' | 'import' | 'found' | 'focus' | 'addperson' | 'intel' | 'recommendations' | 'subscription';
+type Screen = 'welcome' | 'import' | 'found' | 'addperson' | 'intel' | 'recommendations' | 'subscription';
 
 const FREE_TIER_LIMIT = 3;
 const MAX_INTERESTS = 3;
@@ -143,6 +144,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   const [connecting, setConnecting] = useState(false);
   const [people, setPeople] = useState<Person[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [focusingId, setFocusingId] = useState<string | null>(null);
 
   // Intel chat state
   const [intelMessages, setIntelMessages] = useState<{ from: 'thea' | 'user'; text: string }[]>([]);
@@ -163,12 +165,15 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   }, [screen]);
 
   useEffect(() => {
-    if (screen !== 'focus' || !activePerson) return;
-    const timer = window.setTimeout(() => enterIntel(activePerson.id), 1250);
+    if (screen !== 'found' || !focusingId) return;
+    const timer = window.setTimeout(() => {
+      enterIntel(focusingId);
+      setFocusingId(null);
+    }, 1250);
     return () => window.clearTimeout(timer);
-    // The transition intentionally runs once for the selected person.
+    // Runs once after the chosen person expands in the list.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [screen, activePerson?.id]);
+  }, [screen, focusingId]);
 
   useEffect(() => {
     if (screen !== 'recommendations' || !activePerson) return;
@@ -284,7 +289,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     )[0];
     if (!nearest) return;
     setActiveId(nearest.id);
-    setScreen('focus');
+    setFocusingId(nearest.id);
   };
 
   // ── Manual add person ─────────────────────────────────────────────────────────
@@ -483,7 +488,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     return (
       <MobileShell glow animate={false}>
         <div className="flex h-full flex-col items-center justify-center text-center">
-          <TheaAvatar size={66} pulse />
+          <TheaCharacter size="large" speaking={false} />
           <Display className="mt-7 text-[27px]">
             {startingCheckout ? 'Opening secure checkout…' : 'Setting up your concierge…'}
           </Display>
@@ -515,18 +520,17 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             <span className="font-display" style={{ fontSize: 23, letterSpacing: '-0.3px' }}>Unwrapt</span>
             <Eyebrow>Concierge</Eyebrow>
           </div>
-          <div className="mt-auto pt-16">
-            <div className="mb-6 flex items-center gap-3">
-              <TheaAvatar size={34} />
-              <span style={{ fontSize: 13.5, color: U.subtle }}>Hi, I'm Thea, your personal gifting agent</span>
-            </div>
-            <Display style={{ fontSize: 47, lineHeight: 1.02, letterSpacing: '-0.03em' }}>
-              Never forget<br />another<br />
+          <div className="flex flex-1 flex-col justify-center pt-4 text-center">
+            <TheaCharacter size="large" />
+            <p className="mt-2 text-[12px] font-semibold uppercase tracking-[0.16em]" style={{ color: U.accent }}>
+              Hi, I’m Thea, your gifting agent
+            </p>
+            <Display className="mt-3" style={{ fontSize: 40, lineHeight: 1.02, letterSpacing: '-0.03em' }}>
+              Never forget another<br />
               <em style={{ fontStyle: 'italic', fontWeight: 400, color: U.accent }}>moment.</em>
             </Display>
-            <p className="mt-5" style={{ fontSize: 17, lineHeight: 1.55, color: U.textSecondary, maxWidth: 300 }}>
-              I remember the people who matter, learn what they love, and quietly handle the perfect gift, so you
-              never have to stress again.
+            <p className="mx-auto mt-4" style={{ fontSize: 15, lineHeight: 1.5, color: U.textSecondary, maxWidth: 320 }}>
+              I remember who matters, learn what they love and help you handle every gift.
             </p>
           </div>
         </MobileShell>
@@ -538,7 +542,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         return (
           <MobileShell animate={false}>
             <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-              <TheaAvatar size={66} pulse />
+              <TheaCharacter size="large" />
               <Display className="mt-7 text-[27px]">Reading your calendar…</Display>
               <p className="mt-2" style={{ fontSize: 15, color: U.subtle, maxWidth: 260, lineHeight: 1.5 }}>
                 Finding the people who matter and the dates that count.
@@ -564,46 +568,32 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       }
       return (
         <MobileShell
+          contentClassName="px-5 pt-5 pb-4"
           footer={
-            <button
-              type="button"
-              onClick={startManualAdd}
-              className="min-h-11 w-full rounded-[16px] border px-4 py-3 text-[14px] font-semibold"
-              style={{ borderColor: U.border, background: U.surface, color: U.ink }}
-            >
-              Add someone manually
-            </button>
+            <>
+              <PrimaryButton onClick={handleFindMyPeople} disabled={connecting}>
+                {connecting ? 'Connecting…' : 'Connect Google Calendar'}
+              </PrimaryButton>
+              <button
+                type="button"
+                onClick={startManualAdd}
+                className="mt-2 min-h-11 w-full text-[13.5px] font-semibold"
+                style={{ color: U.textSecondary }}
+              >
+                Add someone manually
+              </button>
+            </>
           }
         >
-          <Eyebrow className="mb-3.5">Step 1 of 4</Eyebrow>
-          <Display style={{ fontSize: 32, lineHeight: 1.08 }}>Who should Thea remember?</Display>
-          <p className="mb-6 mt-2.5" style={{ fontSize: 15, lineHeight: 1.5, color: U.textSecondary }}>
-            Bring in upcoming birthdays and anniversaries in one tap, or start with one person yourself.
-          </p>
-          <button
-            type="button"
-            onClick={handleFindMyPeople}
-            disabled={connecting}
-            className="flex min-h-[76px] w-full items-center gap-3.5 text-left shadow-[0_12px_30px_rgba(42,37,32,0.12)] disabled:opacity-60"
-            style={{ padding: 15, borderRadius: 18, background: U.ink, border: `1px solid ${U.ink}`, color: U.buttonText }}
-          >
-            <div
-              className="flex items-center justify-center"
-              style={{ width: 38, height: 38, borderRadius: 11, background: U.cream, flexShrink: 0, fontFamily: "'Newsreader', serif", fontSize: 19, color: U.slate }}
-            >
-              G
-            </div>
-            <div className="flex-1">
-              <div style={{ fontWeight: 600, fontSize: 15.5 }}>Connect Google Calendar</div>
-              <div style={{ fontSize: 12.5, color: '#D6CCBD' }}>Find important dates automatically</div>
-            </div>
-            {isConnected ? (
-              <div className="flex items-center justify-center" style={{ width: 26, height: 26, borderRadius: '50%', background: U.sage, color: U.cream, fontSize: 14 }}>✓</div>
-            ) : (
-              <span aria-hidden="true" style={{ fontSize: 20 }}>→</span>
-            )}
-          </button>
-          <div className="mt-5 flex items-center gap-2" style={{ color: U.muted, fontSize: 12.5 }}>
+          <Eyebrow className="mb-1 text-center">Step 1 of 4</Eyebrow>
+          <TheaCharacter size="large" />
+          <div className="-mt-2 rounded-[22px] border bg-white/80 px-5 py-4 text-center" style={{ borderColor: U.border }}>
+            <Display style={{ fontSize: 28, lineHeight: 1.08 }}>Who should I remember?</Display>
+            <p className="mt-2 text-[14px] leading-5" style={{ color: U.textSecondary }}>
+              I can find upcoming birthdays and anniversaries from your calendar, or we can start with one person.
+            </p>
+          </div>
+          <div className="mt-4 flex items-center justify-center gap-2" style={{ color: U.muted, fontSize: 12 }}>
             <ShieldCheck size={16} aria-hidden="true" />
             <span>Read-only access. Disconnect whenever.</span>
           </div>
@@ -614,24 +604,33 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     case 'found': {
       const selectedCount = selectedPeople.length;
       const overLimit = selectedCount > FREE_TIER_LIMIT;
+      const nearest = [...selectedPeople].sort(
+        (a, b) => nextOccasionTime(a.primaryDate) - nextOccasionTime(b.primaryDate),
+      )[0];
+      const nearestFirst = firstNameOf(nearest?.name || 'them');
       return (
         <MobileShell
+          contentClassName="px-5 pt-5 pb-4"
           footer={
-            <PrimaryButton onClick={focusNearestPerson} disabled={selectedCount === 0}>
-              Look after {selectedCount} {selectedCount === 1 ? 'person' : 'people'}
+            <PrimaryButton onClick={focusNearestPerson} disabled={selectedCount === 0 || !!focusingId}>
+              {focusingId ? `Starting with ${nearestFirst}…` : `Continue with ${nearestFirst} first`}
             </PrimaryButton>
           }
         >
-          <div className="mb-4 flex items-center gap-2.5">
-            <TheaAvatar size={30} />
-            <Eyebrow>Step 2 of 4</Eyebrow>
+          <Eyebrow className="text-center">Step 2 of 4</Eyebrow>
+          <TheaCharacter size="medium" />
+          <div className="-mt-2 mb-4 rounded-[22px] border bg-white/80 px-5 py-4 text-center" style={{ borderColor: U.border }} aria-live="polite">
+            <Display style={{ fontSize: 27, lineHeight: 1.1 }}>
+              {focusingId
+                ? `Let’s start with ${nearestFirst}.`
+                : <>I found <span style={{ color: U.accent }}>{people.length} {people.length === 1 ? 'person' : 'people'}</span> in your calendar.</>}
+            </Display>
+            <p className="mt-2 text-[13.5px] leading-5" style={{ color: U.textSecondary }}>
+              {focusingId
+                ? `${nearest ? formatDateLabel(nearest) : 'Their occasion'} is coming up first. Tell me what they love and I’ll take it from there.`
+                : `I’ll begin with ${nearestFirst}, whose occasion is soonest. Keep the people you want me to look after.`}
+            </p>
           </div>
-          <Display style={{ fontSize: 31, lineHeight: 1.1 }}>
-            I found <span style={{ color: U.accent }}>{people.length} {people.length === 1 ? 'person' : 'people'}</span> who seem to matter to you.
-          </Display>
-          <p className="mb-4 mt-2.5" style={{ fontSize: 15, lineHeight: 1.5, color: U.textSecondary }}>
-            Keep the ones I should look after. You can always add or remove people later.
-          </p>
           <Eyebrow className="mb-3" color={U.subtle}>{selectedCount} selected</Eyebrow>
           {overLimit && (
             <div className="mb-3 flex items-center gap-2.5" style={{ padding: '11px 13px', borderRadius: 13, background: U.accentSoft, border: '1px solid rgba(182,91,60,0.25)' }}>
@@ -643,11 +642,19 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           )}
           <div className="flex flex-col gap-2.5">
             {people.map((p) => (
-              <div
+              <button
+                type="button"
                 key={p.id}
                 onClick={() => togglePerson(p.id)}
-                className="flex cursor-pointer items-center gap-3.5"
-                style={{ padding: '13px 14px', borderRadius: 18, background: U.surface, border: `1px solid ${U.border}` }}
+                disabled={!!focusingId}
+                aria-pressed={p.selected}
+                className="flex w-full cursor-pointer items-center gap-3.5 text-left"
+                style={{
+                  padding: '13px 14px', borderRadius: 18, background: U.surface, border: `1px solid ${U.border}`,
+                  transform: focusingId ? (p.id === focusingId ? 'scale(1.045)' : 'scale(.91)') : 'scale(1)',
+                  opacity: focusingId && p.id !== focusingId ? 0.35 : 1,
+                  transition: 'transform 700ms cubic-bezier(.22,1,.36,1), opacity 500ms ease',
+                }}
               >
                 <PersonAvatar initials={initialsOf(p.name)} tone={p.tone} dim={!p.selected} />
                 <div className="min-w-0 flex-1" style={{ opacity: p.selected ? 1 : 0.5 }}>
@@ -667,35 +674,18 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
                 >
                   ✓
                 </div>
-              </div>
+              </button>
             ))}
-            <div
+            <button
+              type="button"
               onClick={startManualAdd}
-              className="flex cursor-pointer items-center gap-3.5"
-              style={{ padding: '13px 14px', borderRadius: 18, border: '1px dashed rgba(42,37,32,0.18)', color: U.muted }}
+              disabled={!!focusingId}
+              className="flex w-full cursor-pointer items-center gap-3.5 text-left"
+              style={{ padding: '13px 14px', borderRadius: 18, border: '1px dashed rgba(42,37,32,0.18)', color: U.muted, opacity: focusingId ? 0.3 : 1, transition: 'opacity 500ms ease' }}
             >
               <div className="flex items-center justify-center" style={{ width: 44, height: 44, borderRadius: '50%', border: '1px dashed rgba(42,37,32,0.2)', fontSize: 22, color: U.accent }}>+</div>
               <div className="flex-1" style={{ fontSize: 14 }}>Add someone manually</div>
-            </div>
-          </div>
-        </MobileShell>
-      );
-    }
-
-    // ════════ PERSON FOCUS TRANSITION ════════
-    case 'focus': {
-      const first = firstNameOf(activePerson?.name || '');
-      return (
-        <MobileShell glow animate={false}>
-          <div className="flex h-full flex-col items-center justify-center px-6 text-center" aria-live="polite">
-            <PersonAvatar initials={initialsOf(activePerson?.name || '')} tone={activePerson?.tone || U.accent} size={68} />
-            <Eyebrow className="mb-4 mt-7">First up</Eyebrow>
-            <Display className="animate-u-fadeUp text-[34px]">Let’s start with {first}.</Display>
-            <p className="mt-3 max-w-[280px] text-[15px] leading-6" style={{ color: U.textSecondary }}>
-              {activePerson?.primaryDate
-                ? `${formatDateLabel(activePerson)} is the closest occasion, so a little context now will help Thea find a stronger gift.`
-                : 'A little context now will help Thea find a stronger first gift.'}
-            </p>
+            </button>
           </div>
         </MobileShell>
       );
@@ -715,13 +705,13 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           }
         >
           <div className="mb-1 flex items-center gap-3">
-            <div onClick={() => setScreen(people.length ? 'found' : 'import')} className="cursor-pointer" style={{ fontSize: 22, color: U.subtle, width: 24 }}>‹</div>
-            <TheaAvatar size={34} />
+            <button type="button" aria-label="Back" onClick={() => setScreen(people.length ? 'found' : 'import')} className="min-h-11 min-w-11 cursor-pointer text-left" style={{ fontSize: 22, color: U.subtle }}>‹</button>
             <div className="flex-1">
               <div style={{ fontWeight: 600, fontSize: 15.5 }}>Add someone</div>
               <Eyebrow>Thea</Eyebrow>
             </div>
           </div>
+          <TheaCharacter size="compact" />
           <p className="font-display mb-4 mt-4" style={{ fontSize: 20, lineHeight: 1.3 }}>Who would you like me to look after?</p>
           <div className="mb-5 flex items-center gap-3.5" style={{ padding: 14, borderRadius: 18, background: U.chip }}>
             <PersonAvatar initials={npInitials} tone={U.accent} size={48} />
@@ -784,10 +774,10 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         >
           <div className="flex h-full flex-col">
             {/* header */}
-            <div className="flex items-center gap-3" style={{ padding: '56px 20px 14px', borderBottom: `1px solid rgba(42,37,32,0.07)` }}>
-              <div onClick={() => setScreen(people.length > 1 || activePerson?.fromCalendar ? 'found' : 'import')} className="cursor-pointer" style={{ fontSize: 22, color: U.subtle, width: 26 }}>‹</div>
-              <TheaAvatar size={38} />
-              <div className="flex-1">
+            <div className="relative text-center" style={{ padding: '16px 20px 14px', borderBottom: `1px solid rgba(42,37,32,0.07)` }}>
+              <button type="button" aria-label="Back to people" onClick={() => setScreen(people.length > 1 || activePerson?.fromCalendar ? 'found' : 'import')} className="absolute left-4 top-5 flex min-h-11 min-w-11 items-center text-[22px]" style={{ color: U.subtle }}>‹</button>
+              <TheaCharacter size="compact" className="mx-auto" />
+              <div className="-mt-1">
                 <div style={{ fontWeight: 600, fontSize: 15.5 }}>Getting to know {first}</div>
                 <Eyebrow>Thea · {intelFacts.length}/{MAX_INTERESTS} interests</Eyebrow>
               </div>
@@ -900,9 +890,9 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             ‹
           </button>
           <div className="mb-2 flex items-center gap-2.5">
-            <TheaAvatar size={28} />
             <Eyebrow>Personalized for {first}</Eyebrow>
           </div>
+          <TheaCharacter size="medium" />
           <Display style={{ fontSize: 31, lineHeight: 1.08 }}>This is where their interests can lead.</Display>
           <p className="mb-5 mt-2.5" style={{ fontSize: 15, lineHeight: 1.5, color: U.textSecondary }}>
             Live catalog ideas from what you shared. This is the magic — Thea gets sharper every time you talk.
@@ -960,10 +950,10 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             ‹
           </button>
 
-          <div className="flex items-center gap-2.5">
-            <TheaAvatar size={34} />
+          <div className="flex items-center justify-center gap-2.5">
             <Eyebrow color={U.accent}>Thea membership</Eyebrow>
           </div>
+          <TheaCharacter size="compact" />
           <Display className="mt-4 text-[32px]">Put gifting for {peopleCount} {peopleCount === 1 ? 'person' : 'people'} on autopilot.</Display>
           <p className="mt-3 text-[15px] leading-6" style={{ color: U.textSecondary }}>
             Thea turns the dates and interests you shared into thoughtful options, timely approvals and fewer last-minute scrambles.
