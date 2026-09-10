@@ -99,11 +99,10 @@ function groupEventsIntoPeople(events: CalendarEvent[]): Person[] {
       if (event.type === 'anniversary' && !p.anniversary) p.anniversary = event.date;
     }
   });
-  // Pre-select only the first FREE_TIER_LIMIT people; the rest stay off by
-  // default so users opt in rather than having to deselect everyone.
+  // Choose the first person by default so this step always has one clear focus.
   return Array.from(map.values())
     .sort((a, b) => nextOccasionTime(a.primaryDate) - nextOccasionTime(b.primaryDate))
-    .map((p, i) => ({ ...p, selected: i < FREE_TIER_LIMIT }));
+    .map((p, i) => ({ ...p, selected: i === 0 }));
 }
 
 function nextOccasionTime(value: string | null): number {
@@ -279,17 +278,15 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   };
 
   // ── People selection ────────────────────────────────────────────────────────
-  const togglePerson = (id: string) => {
-    setPeople((prev) => prev.map((p) => (p.id === id ? { ...p, selected: !p.selected } : p)));
+  const selectPerson = (id: string) => {
+    setPeople((prev) => prev.map((p) => ({ ...p, selected: p.id === id })));
   };
 
-  const focusNearestPerson = () => {
-    const nearest = [...selectedPeople].sort(
-      (a, b) => nextOccasionTime(a.primaryDate) - nextOccasionTime(b.primaryDate),
-    )[0];
-    if (!nearest) return;
-    setActiveId(nearest.id);
-    setFocusingId(nearest.id);
+  const focusSelectedPerson = () => {
+    const selectedPerson = selectedPeople[0];
+    if (!selectedPerson) return;
+    setActiveId(selectedPerson.id);
+    setFocusingId(selectedPerson.id);
   };
 
   // ── Manual add person ─────────────────────────────────────────────────────────
@@ -313,7 +310,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       tone: toneForIndex(people.length),
       fromCalendar: false,
     };
-    setPeople((prev) => [...prev, person]);
+    setPeople((prev) => [...prev.map((p) => ({ ...p, selected: false })), person]);
     enterIntel(person.id, person);
   };
 
@@ -603,17 +600,14 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     // ════════ FOUND PEOPLE ════════
     case 'found': {
       const selectedCount = selectedPeople.length;
-      const overLimit = selectedCount > FREE_TIER_LIMIT;
-      const nearest = [...selectedPeople].sort(
-        (a, b) => nextOccasionTime(a.primaryDate) - nextOccasionTime(b.primaryDate),
-      )[0];
-      const nearestFirst = firstNameOf(nearest?.name || 'them');
+      const selectedPerson = selectedPeople[0];
+      const selectedFirst = firstNameOf(selectedPerson?.name || 'them');
       return (
         <MobileShell
           contentClassName="px-5 pt-5 pb-4"
           footer={
-            <PrimaryButton onClick={focusNearestPerson} disabled={selectedCount === 0 || !!focusingId}>
-              {focusingId ? `Starting with ${nearestFirst}…` : `Continue with ${nearestFirst} first`}
+            <PrimaryButton onClick={focusSelectedPerson} disabled={selectedCount === 0 || !!focusingId}>
+              {focusingId ? `Starting with ${selectedFirst}…` : `Continue with ${selectedFirst}`}
             </PrimaryButton>
           }
         >
@@ -622,32 +616,25 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           <div className="-mt-2 mb-4 rounded-[22px] border bg-white/80 px-5 py-4 text-center" style={{ borderColor: U.border }} aria-live="polite">
             <Display style={{ fontSize: 27, lineHeight: 1.1 }}>
               {focusingId
-                ? `Let’s start with ${nearestFirst}.`
+                ? `Let’s start with ${selectedFirst}.`
                 : <>I found <span style={{ color: U.accent }}>{people.length} {people.length === 1 ? 'person' : 'people'}</span> in your calendar.</>}
             </Display>
             <p className="mt-2 text-[13.5px] leading-5" style={{ color: U.textSecondary }}>
               {focusingId
-                ? `${nearest ? formatDateLabel(nearest) : 'Their occasion'} is coming up first. Tell me what they love and I’ll take it from there.`
-                : `I’ll begin with ${nearestFirst}, whose occasion is soonest. Keep the people you want me to look after.`}
+                ? `${selectedPerson ? formatDateLabel(selectedPerson) : 'Their occasion'} is coming up. Tell me what they love and I’ll take it from there.`
+                : `${selectedFirst} has the soonest occasion. Choose one person to start with. Selecting someone else will replace your choice.`}
             </p>
           </div>
-          <Eyebrow className="mb-3" color={U.subtle}>{selectedCount} selected</Eyebrow>
-          {overLimit && (
-            <div className="mb-3 flex items-center gap-2.5" style={{ padding: '11px 13px', borderRadius: 13, background: U.accentSoft, border: '1px solid rgba(182,91,60,0.25)' }}>
-              <span style={{ fontSize: 14 }}>✦</span>
-              <div className="flex-1" style={{ fontSize: 12.5, color: '#5A5147' }}>
-                Your free plan covers <strong>{FREE_TIER_LIMIT} people</strong>. Upgrade to look after everyone.
-              </div>
-            </div>
-          )}
-          <div className="flex flex-col gap-2.5">
+          <Eyebrow className="mb-3" color={U.subtle}>Choose one person</Eyebrow>
+          <div className="flex flex-col gap-2.5" role="radiogroup" aria-label="Choose one person to start with">
             {people.map((p) => (
               <button
                 type="button"
                 key={p.id}
-                onClick={() => togglePerson(p.id)}
+                onClick={() => selectPerson(p.id)}
                 disabled={!!focusingId}
-                aria-pressed={p.selected}
+                role="radio"
+                aria-checked={p.selected}
                 className="flex w-full cursor-pointer items-center gap-3.5 text-left"
                 style={{
                   padding: '13px 14px', borderRadius: 18, background: U.surface, border: `1px solid ${U.border}`,
