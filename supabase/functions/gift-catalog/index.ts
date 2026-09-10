@@ -92,8 +92,32 @@ const cleanInterests = (value: unknown) => {
     .slice(0, 3);
 };
 
+const INTEREST_KEYWORDS: Record<string, string[]> = {
+  golf: ["golf", "golfer", "course", "putting"],
+  travel: ["travel", "luggage", "passport", "carry-on", "weekender", "trip"],
+  coffee: ["coffee", "espresso", "latte", "roast", "mug", "brew"],
+  fitness: ["fitness", "workout", "gym", "yoga", "recovery", "active"],
+  cooking: ["cook", "kitchen", "chef", "recipe", "culinary", "pantry", "sauce", "spice", "olive oil", "cookware", "bake"],
+  wine: ["wine", "sommelier", "vineyard", "bottle", "barware", "tumbler"],
+  reading: ["book", "reading", "literary", "journal", "bookstore"],
+  music: ["music", "audio", "speaker", "vinyl", "concert", "headphone"],
+  fashion: ["fashion", "style", "jewelry", "scarf", "bag", "leather", "accessory"],
+  gaming: ["game", "gaming", "puzzle", "cards", "board game"],
+  art: ["art", "artist", "paint", "design", "museum", "craft"],
+  pets: ["pet", "dog", "cat", "leash"],
+  tech: ["tech", "charger", "wireless", "bluetooth", "gadget"],
+  outdoors: ["outdoor", "camping", "hiking", "picnic", "adventure"],
+  whiskey: ["whiskey", "whisky", "bourbon", "scotch", "barware"],
+  "premium experiences": ["experience", "tasting", "class", "tour", "membership"],
+};
+
 const scoreText = (text: string, interests: string[]) =>
-  interests.reduce((score, interest) => score + (text.includes(interest) ? 1 : 0), 0);
+  interests.reduce((score, interest) => {
+    const keywords = INTEREST_KEYWORDS[interest] || [interest];
+    return score + keywords.reduce((interestScore, keyword) => (
+      interestScore + (text.includes(keyword) ? (keyword === interest ? 4 : 1) : 0)
+    ), 0);
+  }, 0);
 
 const goodyImage = (product: GoodyProduct) =>
   product.images?.[0]?.image_large?.url || product.variants?.[0]?.image_large?.url || null;
