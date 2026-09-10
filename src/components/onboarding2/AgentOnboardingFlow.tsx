@@ -12,6 +12,7 @@ import { U, toneForIndex, initialsOf } from '@/components/unwrapt2/theme';
 import { format } from 'date-fns';
 import { trackProductEvent } from '@/lib/productAnalytics';
 import GiftRecommendationPreview from '@/components/onboarding2/GiftRecommendationPreview';
+import InlineGiftPreview from '@/components/onboarding2/InlineGiftPreview';
 import { clearSkipAgentWelcome, markTheaValueSeen, shouldSkipAgentWelcome } from '@/lib/funnel';
 import { VIP_MONTHLY_AMOUNT_LABEL, VIP_MONTHLY_PRICE_ID } from '@/lib/stripe';
 
@@ -787,6 +788,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
                   </div>
                 </div>
               ))}
+              <InlineGiftPreview recipientFirstName={first} interests={intelFacts} />
             </div>
             {/* chips + build */}
             <div style={{ padding: '8px 16px 0' }}>
