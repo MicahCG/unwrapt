@@ -146,6 +146,10 @@ const productText = (product: GoodyProduct) =>
   [product.name, product.brand?.name, product.subtitle, product.subtitle_short, product.recipient_description]
     .filter(Boolean).join(" ").toLowerCase();
 
+const productLabelText = (product: GoodyProduct) =>
+  [product.name, product.brand?.name]
+    .filter(Boolean).join(" ").toLowerCase();
+
 const toCatalogItem = (product: GoodyProduct): CatalogItem => ({
   id: product.id!,
   name: product.name!,
@@ -161,9 +165,13 @@ const toCatalogItem = (product: GoodyProduct): CatalogItem => ({
 const getGoodyCatalog = async (interests: string[], limit: number): Promise<CatalogItem[]> => {
   const products = await fetchGoodyProducts();
   const scoredProducts = products
-    .map((product) => ({ product, score: scoreText(productText(product), interests) }));
+    .map((product) => ({
+      product,
+      score: scoreText(productText(product), interests),
+      labelScore: scoreText(productLabelText(product), interests),
+    }));
   const relevantProducts = interests.length
-    ? scoredProducts.filter(({ score }) => score > 0)
+    ? scoredProducts.filter(({ labelScore }) => labelScore > 0)
     : scoredProducts;
   return relevantProducts
     .sort((a, b) => b.score - a.score || Number(a.product.price || 0) - Number(b.product.price || 0))
