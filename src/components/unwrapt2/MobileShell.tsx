@@ -57,7 +57,7 @@ export const MobileShell: React.FC<MobileShellProps> = ({
         {children}
       </div>
       {footer && (
-        <div className="relative px-6 pb-9 pt-3">
+        <div className="relative px-6 pb-[max(2.25rem,env(safe-area-inset-bottom))] pt-3">
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-y-0 left-1/2 hidden w-screen -translate-x-1/2 lg:block"
