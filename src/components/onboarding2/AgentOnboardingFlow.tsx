@@ -899,7 +899,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       const annualHours = Math.max(6, peopleCount * 3);
       const benefits = [
         { icon: Clock3, title: `Estimated ${annualHours}+ hours back`, body: 'Thea remembers dates, searches the catalog and keeps gifting moving.' },
-        { icon: Gift, title: 'Curated gift options', body: `Recommendations shaped by what ${first} and the people you love actually enjoy.` },
+        { icon: Gift, title: 'Curated gift options', body: `Recommendations shaped by what ${first} actually enjoys.` },
         { icon: CalendarDays, title: 'Occasions watched for you', body: 'Birthdays and anniversaries stay visible before they become last-minute emergencies.' },
         { icon: ShieldCheck, title: 'You stay in control', body: 'Review the recommendation and approve before any gift is purchased.' },
       ];
@@ -943,10 +943,18 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             <Eyebrow color={U.accent}>Thea membership</Eyebrow>
           </div>
           <TheaCharacter size="compact" />
-          <Display className="mt-4 text-[32px]">Put gifting for {peopleCount} {peopleCount === 1 ? 'person' : 'people'} on autopilot.</Display>
+          <Display className="mt-4 text-[32px]">Put gifting for {first} on autopilot.</Display>
           <p className="mt-3 text-[15px] leading-6" style={{ color: U.textSecondary }}>
             Thea turns the dates and interests you shared into thoughtful options, timely approvals and fewer last-minute scrambles.
           </p>
+
+          <section className="mt-5">
+            <Eyebrow className="mb-2" color={U.accent}>Possible gifts for {first}</Eyebrow>
+            <p className="mb-3 text-[12.5px] leading-5" style={{ color: U.textSecondary }}>
+              Based on {activePerson.interests.slice(0, 3).join(', ').toLowerCase()}. Thea keeps refining these as she learns more.
+            </p>
+            <GiftRecommendationPreview recipientFirstName={first} interests={activePerson.interests} />
+          </section>
 
           <div className="mt-5 grid grid-cols-2 gap-2.5">
             {benefits.map(({ icon: Icon, title, body }) => (
