@@ -97,7 +97,7 @@ const INTEREST_KEYWORDS: Record<string, string[]> = {
   travel: ["travel", "luggage", "passport", "carry-on", "weekender", "trip"],
   coffee: ["coffee", "espresso", "latte", "roast", "mug", "brew"],
   fitness: ["fitness", "workout", "gym", "yoga", "recovery", "active"],
-  cooking: ["cook", "kitchen", "chef", "recipe", "culinary", "pantry", "sauce", "spice", "olive oil", "cookware", "bake"],
+  cooking: ["cooking", "cookware", "cookbook", "kitchen", "chef", "recipe", "culinary", "pantry", "sauce", "spice", "olive oil", "baking", "bake"],
   wine: ["wine", "sommelier", "vineyard", "bottle", "barware", "tumbler"],
   reading: ["book", "reading", "literary", "journal", "bookstore"],
   music: ["music", "audio", "speaker", "vinyl", "concert", "headphone"],
