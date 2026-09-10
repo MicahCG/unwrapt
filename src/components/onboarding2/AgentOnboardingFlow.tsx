@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { CalendarDays, Check, Clock3, Gift, ShieldCheck, Sparkles, Users } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,6 +12,7 @@ import { format } from 'date-fns';
 import { trackProductEvent } from '@/lib/productAnalytics';
 import GiftRecommendationPreview from '@/components/onboarding2/GiftRecommendationPreview';
 import { clearSkipAgentWelcome, markTheaValueSeen, shouldSkipAgentWelcome } from '@/lib/funnel';
+import { VIP_MONTHLY_AMOUNT_LABEL, VIP_MONTHLY_PRICE_ID } from '@/lib/stripe';
 
 interface AgentOnboardingFlowProps {
   /** Called once recipients are created so the parent can show the dashboard. */
@@ -38,7 +40,7 @@ interface Person {
   fromCalendar: boolean;
 }
 
-type Screen = 'welcome' | 'import' | 'found' | 'addperson' | 'intel' | 'recommendations';
+type Screen = 'welcome' | 'import' | 'found' | 'focus' | 'addperson' | 'intel' | 'recommendations' | 'subscription';
 
 const FREE_TIER_LIMIT = 3;
 const MAX_INTERESTS = 3;
@@ -49,10 +51,16 @@ const INTEREST_TAXONOMY = [
 ];
 
 const INTEREST_REPLIES: Record<string, (n: string) => string> = {
-  Golf: (n) => `Golf noted. I'll lean toward course-day gear and experiences ${n} will actually use.`,
-  Travel: (n) => `A traveller. I'll favour things that pack well and earn a spot in ${n}'s carry-on.`,
-  Whiskey: () => `Whiskey it is. I'll keep an eye out for tastings and a really good pour.`,
-  'Premium experiences': () => `Premium experiences. I'll watch for moments worth giving, not just objects.`,
+  Golf: (n) => `Great choice. We have plenty of golf gifts, from course-day essentials to experiences ${n} will actually use.`,
+  Travel: (n) => `Love that. Travel opens up useful gifts that pack well and earn a spot in ${n}'s carry-on.`,
+  Coffee: () => `Luckily, we have a large selection of coffee gifts, from daily ritual upgrades to special roasts.`,
+  Cooking: () => `Great! We have tons of cooking gifts. It's an especially good interest for the fall season.`,
+  Fitness: (n) => `Perfect. Fitness gives me lots of practical options I can tailor to ${n}'s routine.`,
+  Wine: () => `Great choice. We can explore bottles, glassware, and tasting experiences without making the gift feel generic.`,
+  Reading: (n) => `That helps a lot. I can look beyond bestsellers and find something that feels personal to ${n}.`,
+  Music: () => `Nice. Music gives us a broad range, from listening upgrades to memorable live experiences.`,
+  Whiskey: () => `Whiskey gives us strong options, including tastings, glassware, and a really good pour.`,
+  'Premium experiences': () => `Excellent. I'll watch for moments worth giving, not just objects.`,
 };
 
 const REL_OPTIONS = ['Friend', 'Family', 'Partner', 'Colleague', 'Mentor'];
@@ -92,13 +100,33 @@ function groupEventsIntoPeople(events: CalendarEvent[]): Person[] {
   });
   // Pre-select only the first FREE_TIER_LIMIT people; the rest stay off by
   // default so users opt in rather than having to deselect everyone.
-  return Array.from(map.values()).map((p, i) => ({ ...p, selected: i < FREE_TIER_LIMIT }));
+  return Array.from(map.values())
+    .sort((a, b) => nextOccasionTime(a.primaryDate) - nextOccasionTime(b.primaryDate))
+    .map((p, i) => ({ ...p, selected: i < FREE_TIER_LIMIT }));
+}
+
+function nextOccasionTime(value: string | null): number {
+  if (!value) return Number.POSITIVE_INFINITY;
+  const parsed = parsePersonDate(value);
+  if (Number.isNaN(parsed.getTime())) return Number.POSITIVE_INFINITY;
+  const now = new Date();
+  const next = new Date(now.getFullYear(), parsed.getMonth(), parsed.getDate());
+  if (next.getTime() < new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) {
+    next.setFullYear(next.getFullYear() + 1);
+  }
+  return next.getTime();
+}
+
+function parsePersonDate(value: string): Date {
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (dateOnly) return new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
+  return new Date(value);
 }
 
 function formatDateLabel(p: Person): string {
   if (!p.primaryDate) return p.relationship || 'No date yet';
   try {
-    return format(new Date(p.primaryDate), 'MMM d');
+    return format(parsePersonDate(p.primaryDate), 'MMM d');
   } catch {
     return p.primaryDate;
   }
@@ -125,6 +153,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   const [draft, setDraft] = useState({ name: '', relationship: 'Friend', date: '' });
 
   const [completing, setCompleting] = useState(false);
+  const [startingCheckout, setStartingCheckout] = useState(false);
 
   const selectedPeople = useMemo(() => people.filter((p) => p.selected), [people]);
   const activePerson = useMemo(() => people.find((p) => p.id === activeId) || null, [people, activeId]);
@@ -132,6 +161,14 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   useEffect(() => {
     void trackProductEvent('onboarding_step_viewed', { step: screen });
   }, [screen]);
+
+  useEffect(() => {
+    if (screen !== 'focus' || !activePerson) return;
+    const timer = window.setTimeout(() => enterIntel(activePerson.id), 1250);
+    return () => window.clearTimeout(timer);
+    // The transition intentionally runs once for the selected person.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, activePerson?.id]);
 
   useEffect(() => {
     if (screen !== 'recommendations' || !activePerson) return;
@@ -241,6 +278,15 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     setPeople((prev) => prev.map((p) => (p.id === id ? { ...p, selected: !p.selected } : p)));
   };
 
+  const focusNearestPerson = () => {
+    const nearest = [...selectedPeople].sort(
+      (a, b) => nextOccasionTime(a.primaryDate) - nextOccasionTime(b.primaryDate),
+    )[0];
+    if (!nearest) return;
+    setActiveId(nearest.id);
+    setScreen('focus');
+  };
+
   // ── Manual add person ─────────────────────────────────────────────────────────
   const startManualAdd = () => {
     setDraft({ name: '', relationship: 'Friend', date: '' });
@@ -297,7 +343,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     setPeople((prev) =>
       prev.map((p) => (p.id === activeId ? { ...p, interests: [...p.interests, interest].slice(0, MAX_INTERESTS) } : p)),
     );
-    const reply = INTEREST_REPLIES[interest]?.(first) || `${interest} noted. I'll fold that into ${first}'s gifts.`;
+    const reply = INTEREST_REPLIES[interest]?.(first) || `Great, that helps. I can use ${interest.toLowerCase()} to make ${first}'s gift options feel much more personal.`;
     setTimeout(() => {
       setIntelMessages((m) => [...m, { from: 'thea', text: reply }]);
     }, 550);
@@ -309,7 +355,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   };
 
   // ── Completion: create recipients (preserves original Supabase logic) ─────────
-  const completeOnboarding = async () => {
+  const completeOnboarding = async (destination: 'dashboard' | 'checkout' = 'dashboard') => {
     if (!user?.id) return;
     const chosen = people.filter((p) => p.selected);
     if (chosen.length === 0) {
@@ -321,6 +367,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       startManualAdd();
       return;
     }
+    setStartingCheckout(destination === 'checkout');
     setCompleting(true);
     try {
       // Dedup against existing recipients by normalized name.
@@ -402,6 +449,19 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         people_count: selectedPeople.length,
       });
 
+      if (destination === 'checkout') {
+        void trackProductEvent('onboarding_subscription_checkout_started', {
+          people_count: selectedPeople.length,
+        });
+        const response = await supabase.functions.invoke('create-subscription-checkout', {
+          body: { priceId: VIP_MONTHLY_PRICE_ID, planType: 'vip_monthly' },
+        });
+        if (response.error) throw response.error;
+        if (!response.data?.url) throw new Error('No checkout URL returned');
+        window.location.href = response.data.url;
+        return;
+      }
+
       setTimeout(async () => {
         await onComplete();
         setCompleting(false);
@@ -414,6 +474,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         variant: 'destructive',
       });
       setCompleting(false);
+      setStartingCheckout(false);
     }
   };
 
@@ -423,7 +484,9 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       <MobileShell glow animate={false}>
         <div className="flex h-full flex-col items-center justify-center text-center">
           <TheaAvatar size={66} pulse />
-          <Display className="mt-7 text-[27px]">Setting up your concierge…</Display>
+          <Display className="mt-7 text-[27px]">
+            {startingCheckout ? 'Opening secure checkout…' : 'Setting up your concierge…'}
+          </Display>
           <p className="mt-2 text-[15px]" style={{ color: U.subtle }}>
             Saving your people and getting Thea ready.
           </p>
@@ -502,52 +565,47 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       return (
         <MobileShell
           footer={
-            <>
-              <PrimaryButton onClick={handleFindMyPeople} disabled={connecting}>
-                {connecting ? 'Connecting…' : 'Find my people'}
-              </PrimaryButton>
-              <p onClick={startManualAdd} className="mt-3.5 cursor-pointer text-center" style={{ fontSize: 13.5, color: U.subtle }}>
-                or add someone manually
-              </p>
-            </>
+            <button
+              type="button"
+              onClick={startManualAdd}
+              className="min-h-11 w-full rounded-[16px] border px-4 py-3 text-[14px] font-semibold"
+              style={{ borderColor: U.border, background: U.surface, color: U.ink }}
+            >
+              Add someone manually
+            </button>
           }
         >
           <Eyebrow className="mb-3.5">Step 1 of 4</Eyebrow>
-          <Display style={{ fontSize: 32, lineHeight: 1.08 }}>Connect your world</Display>
+          <Display style={{ fontSize: 32, lineHeight: 1.08 }}>Who should Thea remember?</Display>
           <p className="mb-6 mt-2.5" style={{ fontSize: 15, lineHeight: 1.5, color: U.textSecondary }}>
-            I'll quietly find birthdays, anniversaries and the people behind them. Your data stays yours.
+            Bring in upcoming birthdays and anniversaries in one tap, or start with one person yourself.
           </p>
           <button
             type="button"
             onClick={handleFindMyPeople}
             disabled={connecting}
-            className="flex w-full items-center gap-3.5 text-left disabled:opacity-60"
-            style={{ padding: 15, borderRadius: 18, background: U.surface, border: `1px solid ${U.border}` }}
+            className="flex min-h-[76px] w-full items-center gap-3.5 text-left shadow-[0_12px_30px_rgba(42,37,32,0.12)] disabled:opacity-60"
+            style={{ padding: 15, borderRadius: 18, background: U.ink, border: `1px solid ${U.ink}`, color: U.buttonText }}
           >
             <div
               className="flex items-center justify-center"
-              style={{ width: 38, height: 38, borderRadius: 11, background: '#EAE0CC', flexShrink: 0, fontFamily: "'Newsreader', serif", fontSize: 19, color: U.slate }}
+              style={{ width: 38, height: 38, borderRadius: 11, background: U.cream, flexShrink: 0, fontFamily: "'Newsreader', serif", fontSize: 19, color: U.slate }}
             >
               G
             </div>
             <div className="flex-1">
-              <div style={{ fontWeight: 600, fontSize: 15.5 }}>Google Calendar</div>
-              <div style={{ fontSize: 12.5, color: U.muted }}>Birthdays and anniversaries</div>
+              <div style={{ fontWeight: 600, fontSize: 15.5 }}>Connect Google Calendar</div>
+              <div style={{ fontSize: 12.5, color: '#D6CCBD' }}>Find important dates automatically</div>
             </div>
             {isConnected ? (
               <div className="flex items-center justify-center" style={{ width: 26, height: 26, borderRadius: '50%', background: U.sage, color: U.cream, fontSize: 14 }}>✓</div>
             ) : (
-              <span className="font-mono uppercase" style={{ fontSize: 11, letterSpacing: '1px', color: U.accent }}>Connect</span>
+              <span aria-hidden="true" style={{ fontSize: 20 }}>→</span>
             )}
           </button>
-          <div className="mt-3" style={{ padding: '11px 13px', borderRadius: 14, background: U.chip }}>
-            <p className="text-[12.5px] leading-5" style={{ color: U.textSecondary }}>
-              Google Contacts is next. For now, add anyone missing from your calendar manually.
-            </p>
-          </div>
           <div className="mt-5 flex items-center gap-2" style={{ color: U.muted, fontSize: 12.5 }}>
-            <span style={{ fontSize: 14 }}>⏿</span>
-            <span>Encrypted. Never sold or shared. Disconnect whenever.</span>
+            <ShieldCheck size={16} aria-hidden="true" />
+            <span>Read-only access. Disconnect whenever.</span>
           </div>
         </MobileShell>
       );
@@ -559,8 +617,8 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       return (
         <MobileShell
           footer={
-            <PrimaryButton onClick={() => enterIntel()} disabled={selectedCount === 0}>
-              Continue with {selectedCount} {selectedCount === 1 ? 'person' : 'people'}
+            <PrimaryButton onClick={focusNearestPerson} disabled={selectedCount === 0}>
+              Look after {selectedCount} {selectedCount === 1 ? 'person' : 'people'}
             </PrimaryButton>
           }
         >
@@ -619,6 +677,25 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
               <div className="flex items-center justify-center" style={{ width: 44, height: 44, borderRadius: '50%', border: '1px dashed rgba(42,37,32,0.2)', fontSize: 22, color: U.accent }}>+</div>
               <div className="flex-1" style={{ fontSize: 14 }}>Add someone manually</div>
             </div>
+          </div>
+        </MobileShell>
+      );
+    }
+
+    // ════════ PERSON FOCUS TRANSITION ════════
+    case 'focus': {
+      const first = firstNameOf(activePerson?.name || '');
+      return (
+        <MobileShell glow animate={false}>
+          <div className="flex h-full flex-col items-center justify-center px-6 text-center" aria-live="polite">
+            <PersonAvatar initials={initialsOf(activePerson?.name || '')} tone={activePerson?.tone || U.accent} size={68} />
+            <Eyebrow className="mb-4 mt-7">First up</Eyebrow>
+            <Display className="animate-u-fadeUp text-[34px]">Let’s start with {first}.</Display>
+            <p className="mt-3 max-w-[280px] text-[15px] leading-6" style={{ color: U.textSecondary }}>
+              {activePerson?.primaryDate
+                ? `${formatDateLabel(activePerson)} is the closest occasion, so a little context now will help Thea find a stronger gift.`
+                : 'A little context now will help Thea find a stronger first gift.'}
+            </p>
           </div>
         </MobileShell>
       );
@@ -798,14 +875,17 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     case 'recommendations': {
       if (!activePerson) return null;
       const first = firstNameOf(activePerson.name);
+      const otherCount = Math.max(0, selectedPeople.length - 1);
       return (
         <MobileShell
           contentClassName="px-[22px] pt-14 pb-4"
           footer={
             <>
-              <PrimaryButton onClick={completeOnboarding}>Enter your inbox</PrimaryButton>
+              <PrimaryButton onClick={() => setScreen('subscription')}>
+                Automate gifting for {first}{otherCount ? ` + ${otherCount} ${otherCount === 1 ? 'other' : 'others'}` : ''}
+              </PrimaryButton>
               <p className="mt-3 text-center font-mono" style={{ fontSize: 12, color: U.muted, letterSpacing: '0.4px' }}>
-                Ask Thea anytime · approve before anything ships
+                See what Thea can take off your plate
               </p>
             </>
           }
@@ -828,6 +908,109 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             Live catalog ideas from what you shared. This is the magic — Thea gets sharper every time you talk.
           </p>
           <GiftRecommendationPreview recipientFirstName={first} interests={activePerson.interests} />
+        </MobileShell>
+      );
+    }
+
+    // ════════ SUBSCRIPTION VALUE ════════
+    case 'subscription': {
+      if (!activePerson) return null;
+      const first = firstNameOf(activePerson.name);
+      const peopleCount = selectedPeople.length;
+      const annualHours = Math.max(6, peopleCount * 3);
+      const benefits = [
+        { icon: Clock3, title: `Estimated ${annualHours}+ hours back`, body: 'Thea remembers dates, searches the catalog and keeps gifting moving.' },
+        { icon: Gift, title: 'Curated gift options', body: `Recommendations shaped by what ${first} and the people you love actually enjoy.` },
+        { icon: CalendarDays, title: 'Occasions watched for you', body: 'Birthdays and anniversaries stay visible before they become last-minute emergencies.' },
+        { icon: ShieldCheck, title: 'You stay in control', body: 'Review the recommendation and approve before any gift is purchased.' },
+      ];
+      const personas = [
+        { label: 'Busy professional', text: 'Keeps meaningful relationships covered between packed workweeks.' },
+        { label: 'Busy parent', text: 'Moves birthdays and family occasions out of the mental-load pile.' },
+        { label: 'Proud grandparent', text: 'Keeps every grandchild’s interests and important dates in one place.' },
+      ];
+
+      return (
+        <MobileShell
+          contentClassName="px-5 pt-8 pb-6"
+          footer={
+            <>
+              <PrimaryButton onClick={() => completeOnboarding('checkout')} disabled={completing}>
+                Start automating · {VIP_MONTHLY_AMOUNT_LABEL}/month
+              </PrimaryButton>
+              <button
+                type="button"
+                onClick={() => completeOnboarding('dashboard')}
+                disabled={completing}
+                className="mt-2 min-h-11 w-full text-[13px] font-semibold"
+                style={{ color: U.textSecondary }}
+              >
+                Not now, go to my gift inbox
+              </button>
+            </>
+          }
+        >
+          <button
+            type="button"
+            aria-label="Back to gift ideas"
+            onClick={() => setScreen('recommendations')}
+            className="mb-3 min-h-11 min-w-11 text-left text-[24px]"
+            style={{ color: U.subtle }}
+          >
+            ‹
+          </button>
+
+          <div className="flex items-center gap-2.5">
+            <TheaAvatar size={34} />
+            <Eyebrow color={U.accent}>Thea membership</Eyebrow>
+          </div>
+          <Display className="mt-4 text-[32px]">Put gifting for {peopleCount} {peopleCount === 1 ? 'person' : 'people'} on autopilot.</Display>
+          <p className="mt-3 text-[15px] leading-6" style={{ color: U.textSecondary }}>
+            Thea turns the dates and interests you shared into thoughtful options, timely approvals and fewer last-minute scrambles.
+          </p>
+
+          <div className="mt-5 grid grid-cols-2 gap-2.5">
+            {benefits.map(({ icon: Icon, title, body }) => (
+              <article key={title} className="rounded-[18px] border bg-white p-3.5" style={{ borderColor: U.border }}>
+                <Icon size={18} color={U.accent} aria-hidden="true" />
+                <h3 className="mt-3 text-[13px] font-semibold leading-4">{title}</h3>
+                <p className="mt-1.5 text-[11.5px] leading-[17px]" style={{ color: U.textSecondary }}>{body}</p>
+              </article>
+            ))}
+          </div>
+
+          <section className="mt-5 rounded-[20px] p-4" style={{ background: U.ink, color: U.buttonText }}>
+            <div className="flex items-center gap-2">
+              <Sparkles size={17} color={U.accent} aria-hidden="true" />
+              <h3 className="text-[14px] font-semibold">Meet Thea, your gifting agent</h3>
+            </div>
+            <p className="mt-2 text-[12.5px] leading-5" style={{ color: '#D8CFC1' }}>
+              Ask for ideas anytime. Thea learns from your feedback, watches upcoming occasions and brings you a recommendation when it is time to act.
+            </p>
+          </section>
+
+          <section className="mt-6">
+            <Eyebrow className="mb-3">Made for real life</Eyebrow>
+            <div className="flex snap-x gap-2.5 overflow-x-auto pb-2">
+              {personas.map((persona) => (
+                <article key={persona.label} className="w-[78%] shrink-0 snap-start rounded-[18px] border bg-white p-4" style={{ borderColor: U.border }}>
+                  <div className="flex items-center gap-2">
+                    <Check size={15} color={U.sage} aria-hidden="true" />
+                    <h3 className="text-[12.5px] font-semibold">{persona.label}</h3>
+                  </div>
+                  <p className="mt-2 text-[12.5px] leading-5" style={{ color: U.textSecondary }}>{persona.text}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <div className="mt-4 flex items-center justify-center gap-2 text-[11.5px]" style={{ color: U.muted }}>
+            <Users size={14} aria-hidden="true" />
+            Cancel anytime · secure checkout
+          </div>
+          <p className="mt-2 text-center text-[10.5px] leading-4" style={{ color: U.muted }}>
+            Time estimate assumes about 3 hours of planning and shopping per person each year.
+          </p>
         </MobileShell>
       );
     }
