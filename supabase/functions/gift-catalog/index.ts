@@ -160,8 +160,12 @@ const toCatalogItem = (product: GoodyProduct): CatalogItem => ({
 
 const getGoodyCatalog = async (interests: string[], limit: number): Promise<CatalogItem[]> => {
   const products = await fetchGoodyProducts();
-  return products
-    .map((product) => ({ product, score: scoreText(productText(product), interests) }))
+  const scoredProducts = products
+    .map((product) => ({ product, score: scoreText(productText(product), interests) }));
+  const relevantProducts = interests.length
+    ? scoredProducts.filter(({ score }) => score > 0)
+    : scoredProducts;
+  return relevantProducts
     .sort((a, b) => b.score - a.score || Number(a.product.price || 0) - Number(b.product.price || 0))
     .slice(0, limit)
     .map(({ product }) => toCatalogItem(product));
