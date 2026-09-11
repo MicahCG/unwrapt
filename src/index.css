@@ -687,3 +687,24 @@
 .animate-u-pop { animation: u-pop .3s ease both; }
 .animate-u-pulse-disc { animation: u-pulseDisc 1.7s ease-in-out infinite; }
 .animate-u-blink { animation: u-blink 1.2s infinite; }
+
+.u-thea-character__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transition: opacity 180ms ease;
+}
+.u-thea-character__image { transition: opacity 180ms ease; }
+@media (prefers-reduced-motion: reduce) {
+  .u-thea-character__image, .u-thea-character__voice span { animation: none !important; transition: none; }
+  .u-thea-character__canvas { transition: none; }
+}
+
+.u-thea-character--greeting { height: clamp(220px, 40dvh, 360px); }
+@media (orientation: landscape) and (max-height: 500px) {
+  .u-thea-character--greeting { height: 150px; }
+}
+@media (max-height: 650px) and (orientation: portrait) {
+  .u-thea-character--greeting { height: clamp(150px, 30dvh, 195px); }
+}
