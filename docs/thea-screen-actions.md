@@ -1,14 +1,9 @@
-# Thea onboarding actions
+# Thea character and screen actions
 
-`TheaCharacter.activity` selects the scene behavior without downloading another model or remounting the renderer:
+The production renderer uses `thea-upper-body-v4.glb`, the approved character with the original textured sweater, necklaces and two folded arms. Its Sass clip provides head and shoulder motion. The calendar screen also gets a floating calendar decoration.
 
-- `idle`: the approved folded-arm pose and Sass animation.
-- `calendar`: hand at chin, head tilt, floating calendar.
-- `clipboard`: supported clipboard, moving pen and progressively revealed notes.
-- `chat`: a 16-second coffee/wine cycle, reaching from behind her side, lifting the drink to her lips, then returning it.
+The procedural body, extra sleeves/hands, clipboard and drinks from PR #27 have been removed. They did not preserve the approved character quality. `thea-actions-v5.glb` remains available only for older cached clients; current code must not load it.
 
-The model remains the approved upper-body Thea. `thea-actions-v5.glb` splits the original folded body from the head/collar into `FoldedBody` and `TheaHead`; both retain the original skeleton and Sass clip. The source has fused folded sleeves, so action scenes hide `FoldedBody` and use articulated procedural knit sleeves, hands, torso and props. Keeping the folded sleeves visible during arm movement produces stretched geometry. Do not merge these meshes during future asset optimization. The split was made at Blender Z 0.85 in the normalized, two-unit-high source asset.
+The original supplied GLB has one mesh, no skin and no animation clips. Genuine arm gestures require preparing that mesh (separating and repairing the folded arms, preserving texture detail, then rigging and weight painting) or obtaining an editable rigged source. Do not simulate this by overlaying arms, swapping in a primitive torso, or showing hand-held props detached from her actual hands.
 
-`theaActions.ts` owns all added geometry and materials. Sleeve vertex buffers update in place; resources are disposed with the renderer. The existing 30 fps cap, offscreen/background pause, shared model download and reduced-motion/data-saver poster fallback remain in place. These are real-time Three.js actions, not Spline exports or facial lip-sync. Jacket changes are not included.
-
-Verification: inspect the full 16-second chat cycle, clipboard pen contact and calendar bounds at phone sizes. Check manual onboarding at 390×844 and 320×568, reduced motion, and navigation cleanup. Production verification must use the served renderer chunk and compare the deployed GLB hash with the checked-in asset.
+`TheaCharacter.activity` retains the screen context for a future corrected rig. Only `calendar` currently adds a prop; `clipboard` and `chat` retain the original character and Sass clip until an approved rig is available. The renderer retains the 30 fps cap, visibility pause, shared model bytes, cleanup and reduced-motion/data-saver poster fallback.

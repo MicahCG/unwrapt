@@ -10,7 +10,7 @@ export type TheaGesture = 'Greeting' | 'Present' | 'Listen';
 let modelBytes: Promise<ArrayBuffer> | undefined;
 function loadModel() {
   if (!modelBytes) {
-    modelBytes = fetch('/models/thea-actions-v5.glb').then(response => {
+    modelBytes = fetch('/models/thea-upper-body-v4.glb').then(response => {
       if (!response.ok) throw new Error('Thea model unavailable');
       return response.arrayBuffer();
     }).catch(error => { modelBytes = undefined; throw error; });
