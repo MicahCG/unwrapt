@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createTheaActions, type TheaActivity } from './theaActions';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 
@@ -9,7 +10,7 @@ export type TheaGesture = 'Greeting' | 'Present' | 'Listen';
 let modelBytes: Promise<ArrayBuffer> | undefined;
 function loadModel() {
   if (!modelBytes) {
-    modelBytes = fetch('/models/thea-upper-body-v4.glb').then(response => {
+    modelBytes = fetch('/models/thea-actions-v5.glb').then(response => {
       if (!response.ok) throw new Error('Thea model unavailable');
       return response.arrayBuffer();
     }).catch(error => { modelBytes = undefined; throw error; });
@@ -41,6 +42,9 @@ export function mountThea(canvas: HTMLCanvasElement, ready: () => void, failed: 
   let action: THREE.AnimationAction | undefined;
   let clips: THREE.AnimationClip[] = [];
   let gesture: TheaGesture = 'Greeting';
+  let activity: TheaActivity = 'idle';
+  let actions: ReturnType<typeof createTheaActions> | undefined;
+  const setActivity = (next: TheaActivity) => { activity = next; actions?.setActivity(next); };
   const setGesture = (next: TheaGesture) => {
     gesture = next;
     if (!mixer) return;
@@ -82,6 +86,7 @@ export function mountThea(canvas: HTMLCanvasElement, ready: () => void, failed: 
     const delta = Math.min((now - last) / 1000, 0.05);
     last = now;
     mixer?.update(delta);
+    actions?.update(delta);
     renderer.render(scene, camera);
   };
   const observer = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; });
@@ -118,19 +123,23 @@ export function mountThea(canvas: HTMLCanvasElement, ready: () => void, failed: 
       failed(); return;
     }
     setGesture(gesture);
+    actions = createTheaActions(model, scene);
+    actions.setActivity(activity);
+    actions.update(0);
     resize();
     renderer.render(scene, camera);
     ready();
     last = performance.now();
     frame = requestAnimationFrame(tick);
   }).catch(() => { if (!disposed) failed(); });
-  return { setGesture, dispose: () => {
+  return { setGesture, setActivity, dispose: () => {
     disposed = true;
     window.clearTimeout(timeout);
     cancelAnimationFrame(frame);
     observer.disconnect();
     resizer.disconnect();
     canvas.removeEventListener('webglcontextlost', lost);
+    actions?.dispose();
     mixer?.stopAllAction();
     if (model) { mixer?.uncacheRoot(model); disposeModel(model); }
     renderer.dispose();
