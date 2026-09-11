@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, Check, Clock3, Gift, ShieldCheck, Sparkles, Users } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient } from '@tanstack/react-query';
@@ -51,19 +51,6 @@ const INTEREST_TAXONOMY = [
   'Golf', 'Travel', 'Coffee', 'Fitness', 'Cooking', 'Wine', 'Reading', 'Music',
   'Fashion', 'Gaming', 'Art', 'Pets', 'Tech', 'Outdoors', 'Whiskey', 'Premium experiences',
 ];
-
-const INTEREST_REPLIES: Record<string, (n: string) => string> = {
-  Golf: (n) => `Great choice. We have plenty of golf gifts, from course-day essentials to experiences ${n} will actually use.`,
-  Travel: (n) => `Love that. Travel opens up useful gifts that pack well and earn a spot in ${n}'s carry-on.`,
-  Coffee: () => `Luckily, we have a large selection of coffee gifts, from daily ritual upgrades to special roasts.`,
-  Cooking: () => `Great! We have tons of cooking gifts. It's an especially good interest for the fall season.`,
-  Fitness: (n) => `Perfect. Fitness gives me lots of practical options I can tailor to ${n}'s routine.`,
-  Wine: () => `Great choice. We can explore bottles, glassware, and tasting experiences without making the gift feel generic.`,
-  Reading: (n) => `That helps a lot. I can look beyond bestsellers and find something that feels personal to ${n}.`,
-  Music: () => `Nice. Music gives us a broad range, from listening upgrades to memorable live experiences.`,
-  Whiskey: () => `Whiskey gives us strong options, including tastings, glassware, and a really good pour.`,
-  'Premium experiences': () => `Excellent. I'll watch for moments worth giving, not just objects.`,
-};
 
 const REL_OPTIONS = ['Friend', 'Family', 'Partner', 'Colleague', 'Mentor'];
 
@@ -150,6 +137,13 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   const [intelMessages, setIntelMessages] = useState<{ from: 'thea' | 'user'; text: string }[]>([]);
   const [intelFacts, setIntelFacts] = useState<string[]>([]);
   const [intelInput, setIntelInput] = useState('');
+  const [intelSending, setIntelSending] = useState(false);
+  const intelRequest = useRef(0);
+  useEffect(() => {
+    intelRequest.current += 1;
+    setIntelSending(false);
+    return () => { intelRequest.current += 1; };
+  }, [screen, activeId]);
 
   // Manual add-person draft
   const [draft, setDraft] = useState({ name: '', relationship: 'Friend', date: '' });
@@ -330,32 +324,56 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     setIntelMessages([
       {
         from: 'thea',
-        text: `Tell me about ${first}. Pick up to ${MAX_INTERESTS} things they genuinely enjoy, and I'll show you what I could choose.`,
+        text: `Let's find something that feels like ${first}. What are they into? Tell me in your own words, or pick a few interests below.`,
       },
     ]);
     setScreen('intel');
   };
 
-  const addInterest = (label: string) => {
-    const interest = label.trim();
-    if (!activePerson || !interest || intelFacts.length >= MAX_INTERESTS) return;
-    if (intelFacts.some((fact) => fact.toLowerCase() === interest.toLowerCase())) return;
-    const first = firstNameOf(activePerson.name);
-    setIntelMessages((m) => [...m, { from: 'user', text: interest }]);
-    setIntelFacts((f) => [...f, interest]);
-    setPeople((prev) =>
-      prev.map((p) => (p.id === activeId ? { ...p, interests: [...p.interests, interest].slice(0, MAX_INTERESTS) } : p)),
-    );
-    const reply = INTEREST_REPLIES[interest]?.(first) || `Great, that helps. I can use ${interest.toLowerCase()} to make ${first}'s gift options feel much more personal.`;
-    setTimeout(() => {
-      setIntelMessages((m) => [...m, { from: 'thea', text: reply }]);
-    }, 550);
+  const sendIntelMessage = async (text: string, selectedInterest?: string) => {
+    const message = text.trim().slice(0, 2000);
+    if (!activePerson || !message || intelSending) return;
+    const personId = activePerson.id;
+    const request = ++intelRequest.current;
+    const facts = selectedInterest ? [...intelFacts, selectedInterest].slice(0, MAX_INTERESTS) : intelFacts;
+    const nextMessages = [...intelMessages, { from: 'user' as const, text: message }];
+    setIntelMessages(nextMessages);
+    setIntelInput('');
+    setIntelSending(true);
+    if (selectedInterest) {
+      setIntelFacts(facts);
+      setPeople(prev => prev.map(p => p.id === personId ? { ...p, interests: facts } : p));
+    }
+    try {
+      const { data, error } = await supabase.functions.invoke('thea-chat', {
+        body: {
+          mode: 'onboarding', recipientName: firstNameOf(activePerson.name), interests: facts,
+          messages: nextMessages.slice(-30).map(m => ({ role: m.from === 'thea' ? 'assistant' : 'user', content: m.text })),
+        },
+      });
+      if (request !== intelRequest.current) return;
+      if (error || !data?.success || typeof data.reply !== 'string') throw new Error('Thea unavailable');
+      const learned: string[] = Array.isArray(data.interests)
+        ? data.interests.filter((v: unknown): v is string => typeof v === 'string' && v.trim().length > 0 && v.length <= 80).slice(0, MAX_INTERESTS)
+        : facts;
+      setIntelFacts(learned);
+      setPeople(prev => prev.map(p => p.id === personId ? { ...p, interests: learned } : p));
+      setIntelMessages(m => [...m, { from: 'thea', text: data.reply }]);
+    } catch {
+      if (request !== intelRequest.current) return;
+      setIntelMessages(m => [...m, { from: 'thea', text: selectedInterest
+        ? `I'll use ${selectedInterest.toLowerCase()} for the gift ideas below. You can add another interest while chat is unavailable.`
+        : "Chat isn't available right now. You can still pick interests below and see gift ideas." }]);
+    } finally {
+      if (request === intelRequest.current) setIntelSending(false);
+    }
   };
 
-  const submitInterest = () => {
-    addInterest(intelInput);
-    setIntelInput('');
+  const addInterest = (label: string) => {
+    if (intelFacts.length >= MAX_INTERESTS || intelFacts.some(f => f.toLowerCase() === label.toLowerCase())) return;
+    void sendIntelMessage(label, label);
   };
+  const submitInterest = () => { void sendIntelMessage(intelInput); };
 
   // ── Completion: create recipients (preserves original Supabase logic) ─────────
   const completeOnboarding = async (destination: 'dashboard' | 'checkout' = 'dashboard') => {
@@ -788,6 +806,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
                   </div>
                 </div>
               ))}
+              {intelSending && <p role="status" className="text-sm" style={{ color: U.subtle }}>Thea is thinking…</p>}
               <InlineGiftPreview recipientFirstName={first} interests={intelFacts} />
             </div>
             {/* chips + build */}
@@ -798,7 +817,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
                     type="button"
                     key={c}
                     onClick={() => addInterest(c)}
-                    disabled={interestLimitReached}
+                    disabled={interestLimitReached || intelSending}
                     className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                     style={{ padding: '9px 14px', borderRadius: 14, background: U.chip, border: `1px solid rgba(42,37,32,0.1)`, fontSize: 13.5, fontWeight: 500, color: '#5A5147' }}
                   >
@@ -821,8 +840,9 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
               <div className="flex items-center gap-2.5" style={{ padding: '7px 7px 7px 18px', borderRadius: 24, background: U.surface, border: `1px solid rgba(42,37,32,0.1)` }}>
                 <input
                   value={intelInput}
-                  disabled={interestLimitReached}
-                  placeholder={interestLimitReached ? 'Three interests selected' : `Add something about ${first}`}
+                  disabled={intelSending}
+                  maxLength={2000}
+                  placeholder={`Tell me more about ${first}, or ask a question`}
                   className="flex-1"
                   style={{ border: 'none', background: 'transparent', fontSize: 14.5, color: U.ink }}
                   onChange={(event) => setIntelInput(event.target.value)}
@@ -835,9 +855,9 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
                 />
                 <button
                   type="button"
-                  aria-label="Add interest"
+                  aria-label="Send message"
                   onClick={submitInterest}
-                  disabled={!intelInput.trim() || interestLimitReached}
+                  disabled={!intelInput.trim() || intelSending}
                   className="flex items-center justify-center disabled:opacity-40"
                   style={{ width: 38, height: 38, borderRadius: '50%', background: U.ink, color: U.buttonText, fontSize: 17, flexShrink: 0 }}
                 >
