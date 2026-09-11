@@ -52,7 +52,7 @@ export const TheaCharacter: React.FC<TheaCharacterProps> = ({
       <div className="u-thea-character__glow" aria-hidden="true" />
       <img src={size === 'compact' ? theaCompact : theaCharacter} alt="Thea, your gifting concierge" className="u-thea-character__image" style={{ opacity: ready ? 0 : 1 }} draggable={false} width={size === 'compact' ? 320 : 480} height={size === 'compact' ? 236 : 640} />
       {animated && !failed && <canvas ref={canvas} className="u-thea-character__canvas" style={{ opacity: ready ? 1 : 0 }} aria-hidden="true" />}
-      {speaking && activity === 'idle' && <div className="u-thea-character__voice" aria-hidden="true"><span /><span /><span /></div>}
+      {speaking && activity !== 'calendar' && <div className="u-thea-character__voice" aria-hidden="true"><span /><span /><span /></div>}
     </div>
   );
 };
