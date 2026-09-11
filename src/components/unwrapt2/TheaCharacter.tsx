@@ -13,7 +13,7 @@ interface TheaCharacterProps {
 
 /** The same expressive character accompanies every onboarding step. */
 export const TheaCharacter: React.FC<TheaCharacterProps> = ({
-  size = 'medium', speaking = true, animated = true, className = '', gesture = 'Wave',
+  size = 'medium', speaking = true, animated = true, className = '', gesture = 'Greeting',
 }) => {
   const controller = useRef<ReturnType<typeof import('./theaScene').mountThea>>();
   const currentGesture = useRef(gesture);

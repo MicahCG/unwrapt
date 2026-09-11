@@ -2,14 +2,14 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 
-export type TheaGesture = 'Wave' | 'Present' | 'Listen';
+export type TheaGesture = 'Greeting' | 'Present' | 'Listen';
 
 // Share the downloaded bytes across onboarding steps, but give every mounted
 // character its own skeleton, textures and renderer lifecycle.
 let modelBytes: Promise<ArrayBuffer> | undefined;
 function loadModel() {
   if (!modelBytes) {
-    modelBytes = fetch('/models/thea-expressive-v3.glb').then(response => {
+    modelBytes = fetch('/models/thea-upper-body-v4.glb').then(response => {
       if (!response.ok) throw new Error('Thea model unavailable');
       return response.arrayBuffer();
     }).catch(error => { modelBytes = undefined; throw error; });
@@ -24,11 +24,11 @@ export function mountThea(canvas: HTMLCanvasElement, ready: () => void, failed: 
   renderer.setClearColor(0x000000, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15;
+  renderer.toneMappingExposure = 1.07;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(30, 1, 0.01, 30);
   scene.add(new THREE.HemisphereLight(0xfff8ef, 0xa8a0a0, 2.3));
-  const key = new THREE.DirectionalLight(0xfff3e6, 2.7);
+  const key = new THREE.DirectionalLight(0xfff3e6, 2.4);
   key.position.set(-3, 4, 5);
   scene.add(key);
   const fill = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -40,13 +40,14 @@ export function mountThea(canvas: HTMLCanvasElement, ready: () => void, failed: 
   let mixer: THREE.AnimationMixer | undefined;
   let action: THREE.AnimationAction | undefined;
   let clips: THREE.AnimationClip[] = [];
-  let gesture: TheaGesture = 'Wave';
+  let gesture: TheaGesture = 'Greeting';
   const setGesture = (next: TheaGesture) => {
     gesture = next;
     if (!mixer) return;
-    const clip = THREE.AnimationClip.findByName(clips, next);
+    const clip = THREE.AnimationClip.findByName(clips, 'Sass');
     if (!clip) { failed(); return; }
     const nextAction = mixer.clipAction(clip);
+    nextAction.setEffectiveTimeScale(next === 'Listen' ? 0.55 : next === 'Present' ? 0.8 : 1);
     if (nextAction === action) return;
     nextAction.reset().setEffectiveWeight(1).play();
     if (action) action.crossFadeTo(nextAction, 0.35, false);
@@ -69,10 +70,8 @@ export function mountThea(canvas: HTMLCanvasElement, ready: () => void, failed: 
     if (!width || !height) return;
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
-    const compact = height <= 140;
-    const focus = compact ? 1.52 : 1.34;
-    camera.position.set(0, focus, Math.max(compact ? 2.2 : 2.9, 1.25 / camera.aspect));
-    camera.lookAt(0, focus, 0);
+    camera.position.set(0, 1, Math.max(4.25, 2.9 / camera.aspect));
+    camera.lookAt(0, 1, 0);
     camera.updateProjectionMatrix();
   };
   const tick = (now: number) => {
@@ -115,7 +114,7 @@ export function mountThea(canvas: HTMLCanvasElement, ready: () => void, failed: 
     greeting.add(model);
     clips = gltf.animations;
     mixer = new THREE.AnimationMixer(model);
-    if (!['Wave', 'Present', 'Listen'].every(name => THREE.AnimationClip.findByName(clips, name))) {
+    if (!THREE.AnimationClip.findByName(clips, 'Sass')) {
       failed(); return;
     }
     setGesture(gesture);
