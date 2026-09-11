@@ -1,32 +1,24 @@
-# Expressive Thea onboarding character
+# Upper-body Thea onboarding character
 
-Version 3 replaces the old whole-body floating model throughout onboarding. Spline converted the approved big-eyed, loose-curled character reference into a textured mesh. The mesh was welded before reduction to preserve surface continuity, then rigged and animated in Blender.
+Version 4 uses the user-selected upper-body character: oversized tortoiseshell glasses, swept hair, ivory knitwear and folded arms. It replaces version 3 throughout onboarding.
 
-`public/models/thea-expressive-v3.glb` contains a five-bone skeleton and three 12-second performances:
+`public/models/thea-upper-body-v4.glb` contains the `Sass` skeletal animation: a chin lift, head tilt and subtle shoulder shrug. The base remains fixed. The greeting uses the original performance speed; presenting and listening contexts slow the same performance to 80% and 55%. This model has no wave or lip-sync animation.
 
-- `Wave`: independent upper-arm, forearm and wrist movement for the welcome and calendar-connect screens.
-- `Present`: open-hand gesture with a small head movement for people found, gift ideas and interest acknowledgement.
-- `Listen`: a restrained head nod for manual entry, chat before interests, membership and completion.
+## Runtime and assets
 
-The body root remains fixed. There is no lip-sync or facial blendshape animation in this version. Reduced-motion and data-saver users receive matching stills instead.
-
-## Runtime and asset budget
-
-- Original Spline generation: 461,240 faces, approximately 49 MB.
-- Production: 83,022 triangles, approximately 1.7 MiB GLB, Meshopt compression and 2048px WebP textures.
-- Matching transparent WebP posters, with a separate compact framing for the chat header.
-- Three.js is dynamically imported. Model bytes are shared across onboarding steps; skeletons and GPU resources belong to the mounted component and are disposed on navigation.
-- Gesture changes crossfade without reloading the model.
-- Rendering is capped at 30fps and 1.5 device pixel ratio. Hidden and offscreen scenes pause; no shadow maps or postprocessing.
-- Reduced motion and data-saver skip the model download. Network, texture and context failures retain the poster. Loading has a 15-second timeout.
-- Existing blob image/connect CSP allowances support GLB embedded textures.
+- Approximately 858 KiB GLB, Meshopt compression and WebP textures.
+- Matching transparent posters for standard and compact placements.
+- Camera and lighting match the approved comparison preview and keep the whole bust in frame.
+- Three.js loads dynamically. Model bytes are shared across onboarding steps; GPU resources and skeletons belong to each mounted component and are disposed on navigation.
+- Rendering is capped at 30fps and 1.5 device pixel ratio. Hidden and offscreen scenes pause.
+- Reduced-motion and data-saver users receive the matching poster without a model download. Network, texture or context failures also retain the poster. Loading has a 15-second timeout.
 
 ## Verification
 
-- Production build and changed-file ESLint pass.
+- Production build and changed-file ESLint.
 - Browser checks at 320x568, 390x844 and 1440x900: calendar CTA visible, no horizontal overflow or JS exceptions.
-- Manual entry through chat, gift recommendations and membership retains one live canvas and makes one model download.
-- Reduced motion makes no model request; failed model requests retain the poster.
-- Sampled skinned vertices across the wave: approximately 8 cm hand travel and zero foot travel. Close-up rendering checked for mesh seams and deformation.
+- Manual entry through chat, gift recommendations and membership: one model request and one live canvas.
+- Reduced motion: no model request. Failed model download: matching poster.
+- Visual review of the first screen, compact chat header and matching posters.
 
-Full-project `tsc` remains blocked by pre-existing Supabase CLI update text appended to `src/integrations/supabase/types.ts` on main (lines 1177-1178).
+Full-project typecheck remains blocked by pre-existing CLI text in generated Supabase types.
