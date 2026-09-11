@@ -2,7 +2,22 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 
-/** The Spline greeting's motion, using a compressed GLB and the existing Three runtime. */
+export type TheaGesture = 'Wave' | 'Present' | 'Listen';
+
+// Share the downloaded bytes across onboarding steps, but give every mounted
+// character its own skeleton, textures and renderer lifecycle.
+let modelBytes: Promise<ArrayBuffer> | undefined;
+function loadModel() {
+  if (!modelBytes) {
+    modelBytes = fetch('/models/thea-expressive-v3.glb').then(response => {
+      if (!response.ok) throw new Error('Thea model unavailable');
+      return response.arrayBuffer();
+    }).catch(error => { modelBytes = undefined; throw error; });
+  }
+  return modelBytes;
+}
+
+/** Plays independent skeletal gestures authored for the approved Thea model. */
 export function mountThea(canvas: HTMLCanvasElement, ready: () => void, failed: () => void) {
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
@@ -21,7 +36,22 @@ export function mountThea(canvas: HTMLCanvasElement, ready: () => void, failed: 
   scene.add(fill);
   const greeting = new THREE.Group();
   scene.add(greeting);
-  let disposed = false, visible = true, frame = 0, elapsed = 0, last = 0;
+  let disposed = false, visible = true, frame = 0, last = 0;
+  let mixer: THREE.AnimationMixer | undefined;
+  let action: THREE.AnimationAction | undefined;
+  let clips: THREE.AnimationClip[] = [];
+  let gesture: TheaGesture = 'Wave';
+  const setGesture = (next: TheaGesture) => {
+    gesture = next;
+    if (!mixer) return;
+    const clip = THREE.AnimationClip.findByName(clips, next);
+    if (!clip) { failed(); return; }
+    const nextAction = mixer.clipAction(clip);
+    if (nextAction === action) return;
+    nextAction.reset().setEffectiveWeight(1).play();
+    if (action) action.crossFadeTo(nextAction, 0.35, false);
+    action = nextAction;
+  };
   let model: THREE.Object3D | undefined;
   const disposeModel = (root: THREE.Object3D) => {
     root.traverse(object => {
@@ -39,8 +69,10 @@ export function mountThea(canvas: HTMLCanvasElement, ready: () => void, failed: 
     if (!width || !height) return;
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
-    camera.position.set(0, 1, Math.max(4.2, 2.1 / camera.aspect));
-    camera.lookAt(0, 1, 0);
+    const compact = height <= 140;
+    const focus = compact ? 1.52 : 1.34;
+    camera.position.set(0, focus, Math.max(compact ? 2.2 : 2.9, 1.25 / camera.aspect));
+    camera.lookAt(0, focus, 0);
     camera.updateProjectionMatrix();
   };
   const tick = (now: number) => {
@@ -48,17 +80,9 @@ export function mountThea(canvas: HTMLCanvasElement, ready: () => void, failed: 
     frame = requestAnimationFrame(tick);
     if (document.hidden || !visible) { last = now; return; }
     if (now - last < 1000 / 30) return;
-    elapsed += Math.min((now - last) / 1000, 0.05);
+    const delta = Math.min((now - last) / 1000, 0.05);
     last = now;
-    const t = elapsed;
-    const idle = Math.max(0, Math.min(1, (t - 1.1) / 1.1));
-    greeting.position.y = Math.exp(-2.5 * t) * Math.sin(7 * t) * 0.09;
-    greeting.rotation.set(
-      -Math.sin(Math.min(t, 2.4) / 2.4 * Math.PI) * 0.025,
-      Math.sin(t * 0.65) * 0.022 * idle,
-      Math.sin(t * 0.8) * 0.004 * idle,
-    );
-    greeting.scale.y = 1 + Math.sin(t * 1.5) * 0.002 * idle;
+    mixer?.update(delta);
     renderer.render(scene, camera);
   };
   const observer = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; });
@@ -68,7 +92,12 @@ export function mountThea(canvas: HTMLCanvasElement, ready: () => void, failed: 
   const lost = (event: Event) => { event.preventDefault(); failed(); };
   canvas.addEventListener('webglcontextlost', lost);
   const timeout = window.setTimeout(failed, 15000);
-  new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load('/models/thea-greeting-v2.glb', gltf => {
+  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+  loadModel().then(bytes => {
+    if (disposed) return undefined;
+    return loader.parseAsync(bytes, '/models/');
+  }).then(gltf => {
+    if (!gltf) return;
     if (disposed) { disposeModel(gltf.scene); return; }
     window.clearTimeout(timeout);
     model = gltf.scene;
@@ -84,21 +113,28 @@ export function mountThea(canvas: HTMLCanvasElement, ready: () => void, failed: 
     model.scale.multiplyScalar(scale);
     model.position.set(-center.x * scale, -bounds.min.y * scale, -center.z * scale);
     greeting.add(model);
+    clips = gltf.animations;
+    mixer = new THREE.AnimationMixer(model);
+    if (!['Wave', 'Present', 'Listen'].every(name => THREE.AnimationClip.findByName(clips, name))) {
+      failed(); return;
+    }
+    setGesture(gesture);
     resize();
     renderer.render(scene, camera);
     ready();
     last = performance.now();
     frame = requestAnimationFrame(tick);
-  }, undefined, failed);
-  return () => {
+  }).catch(() => { if (!disposed) failed(); });
+  return { setGesture, dispose: () => {
     disposed = true;
     window.clearTimeout(timeout);
     cancelAnimationFrame(frame);
     observer.disconnect();
     resizer.disconnect();
     canvas.removeEventListener('webglcontextlost', lost);
-    if (model) disposeModel(model);
+    mixer?.stopAllAction();
+    if (model) { mixer?.uncacheRoot(model); disposeModel(model); }
     renderer.dispose();
     renderer.forceContextLoss();
-  };
+  } };
 }
