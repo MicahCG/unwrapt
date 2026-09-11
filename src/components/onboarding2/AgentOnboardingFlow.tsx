@@ -486,7 +486,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     return (
       <MobileShell glow animate={false}>
         <div className="flex h-full flex-col items-center justify-center text-center">
-          <TheaCharacter size="large" speaking={false} />
+          <TheaCharacter size="large" speaking={false} gesture="Listen" />
           <Display className="mt-7 text-[27px]">
             {startingCheckout ? 'Opening secure checkout…' : 'Setting up your concierge…'}
           </Display>
@@ -540,7 +540,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         return (
           <MobileShell animate={false}>
             <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-              <TheaCharacter size="large" />
+              <TheaCharacter size="large" gesture="Listen" />
               <Display className="mt-7 text-[27px]">Reading your calendar…</Display>
               <p className="mt-2" style={{ fontSize: 15, color: U.subtle, maxWidth: 260, lineHeight: 1.5 }}>
                 Finding the people who matter and the dates that count.
@@ -613,7 +613,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           }
         >
           <Eyebrow className="text-center">Step 2 of 4</Eyebrow>
-          <TheaCharacter size="medium" />
+          <TheaCharacter size="medium" gesture="Present" />
           <div className="-mt-2 mb-4 rounded-[22px] border bg-white/80 px-5 py-4 text-center" style={{ borderColor: U.border }} aria-live="polite">
             <Display style={{ fontSize: 27, lineHeight: 1.1 }}>
               {focusingId
@@ -699,7 +699,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
               <Eyebrow>Thea</Eyebrow>
             </div>
           </div>
-          <TheaCharacter size="compact" />
+          <TheaCharacter size="compact" gesture="Listen" />
           <p className="font-display mb-4 mt-4" style={{ fontSize: 20, lineHeight: 1.3 }}>Who would you like me to look after?</p>
           <div className="mb-5 flex items-center gap-3.5" style={{ padding: 14, borderRadius: 18, background: U.chip }}>
             <PersonAvatar initials={npInitials} tone={U.accent} size={48} />
@@ -764,7 +764,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             {/* header */}
             <div className="relative text-center" style={{ padding: '16px 20px 14px', borderBottom: `1px solid rgba(42,37,32,0.07)` }}>
               <button type="button" aria-label="Back to people" onClick={() => setScreen(people.length > 1 || activePerson?.fromCalendar ? 'found' : 'import')} className="absolute left-4 top-5 flex min-h-11 min-w-11 items-center text-[22px]" style={{ color: U.subtle }}>‹</button>
-              <TheaCharacter size="compact" className="mx-auto" />
+              <TheaCharacter size="compact" className="mx-auto" gesture={intelFacts.length ? "Present" : "Listen"} />
               <div className="-mt-1">
                 <div style={{ fontWeight: 600, fontSize: 15.5 }}>Getting to know {first}</div>
                 <Eyebrow>Thea · {intelFacts.length}/{MAX_INTERESTS} interests</Eyebrow>
@@ -881,7 +881,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           <div className="mb-2 flex items-center gap-2.5">
             <Eyebrow>Personalized for {first}</Eyebrow>
           </div>
-          <TheaCharacter size="medium" />
+          <TheaCharacter size="medium" gesture="Present" />
           <Display style={{ fontSize: 31, lineHeight: 1.08 }}>This is where their interests can lead.</Display>
           <p className="mb-5 mt-2.5" style={{ fontSize: 15, lineHeight: 1.5, color: U.textSecondary }}>
             Live catalog ideas from what you shared. This is the magic — Thea gets sharper every time you talk.
@@ -942,7 +942,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           <div className="flex items-center justify-center gap-2.5">
             <Eyebrow color={U.accent}>Thea membership</Eyebrow>
           </div>
-          <TheaCharacter size="compact" />
+          <TheaCharacter size="compact" gesture="Listen" />
           <Display className="mt-4 text-[32px]">Put gifting for {first} on autopilot.</Display>
           <p className="mt-3 text-[15px] leading-6" style={{ color: U.textSecondary }}>
             Thea turns the dates and interests you shared into thoughtful options, timely approvals and fewer last-minute scrambles.

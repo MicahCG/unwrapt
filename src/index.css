@@ -566,10 +566,6 @@
 }
 @keyframes u-shimmer { 0% { background-position: -220px 0; } 100% { background-position: 220px 0; } }
 @keyframes u-blink { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
-@keyframes u-thea-float {
-  0%, 100% { transform: translateY(0) rotate(-0.4deg); }
-  50% { transform: translateY(-7px) rotate(0.5deg); }
-}
 @keyframes u-thea-voice {
   0%, 100% { transform: scale(.72); opacity: .45; }
   50% { transform: scale(1); opacity: 1; }
@@ -612,9 +608,6 @@
   user-select: none;
 }
 
-.u-thea-character--speaking .u-thea-character__image {
-  animation: u-thea-float 3.8s ease-in-out infinite;
-}
 
 .u-thea-character__voice {
   position: absolute;
