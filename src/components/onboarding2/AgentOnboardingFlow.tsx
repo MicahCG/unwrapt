@@ -584,7 +584,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           }
         >
           <Eyebrow className="mb-1 text-center">Step 1 of 4</Eyebrow>
-          <TheaCharacter size="large" />
+          <TheaCharacter size="large" animated className="u-thea-character--greeting" />
           <div className="-mt-2 rounded-[22px] border bg-white/80 px-5 py-4 text-center" style={{ borderColor: U.border }}>
             <Display style={{ fontSize: 28, lineHeight: 1.08 }}>Who should I remember?</Display>
             <p className="mt-2 text-[14px] leading-5" style={{ color: U.textSecondary }}>
