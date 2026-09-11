@@ -558,7 +558,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         return (
           <MobileShell animate={false}>
             <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-              <TheaCharacter size="large" gesture="Listen" />
+              <TheaCharacter size="large" gesture="Listen" activity="calendar" />
               <Display className="mt-7 text-[27px]">Reading your calendar…</Display>
               <p className="mt-2" style={{ fontSize: 15, color: U.subtle, maxWidth: 260, lineHeight: 1.5 }}>
                 Finding the people who matter and the dates that count.
@@ -631,18 +631,13 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           }
         >
           <Eyebrow className="text-center">Step 2 of 4</Eyebrow>
-          <TheaCharacter size="medium" gesture="Present" />
+          <TheaCharacter size="medium" gesture="Present" activity="clipboard" />
           <div className="-mt-2 mb-4 rounded-[22px] border bg-white/80 px-5 py-4 text-center" style={{ borderColor: U.border }} aria-live="polite">
             <Display style={{ fontSize: 27, lineHeight: 1.1 }}>
               {focusingId
                 ? `Let’s start with ${selectedFirst}.`
                 : <>I found <span style={{ color: U.accent }}>{people.length} {people.length === 1 ? 'person' : 'people'}</span> in your calendar.</>}
             </Display>
-            <p className="mt-2 text-[13.5px] leading-5" style={{ color: U.textSecondary }}>
-              {focusingId
-                ? `${selectedPerson ? formatDateLabel(selectedPerson) : 'Their occasion'} is coming up. Tell me what they love and I’ll take it from there.`
-                : `${selectedFirst} has the soonest occasion. Choose one person to start with. Selecting someone else will replace your choice.`}
-            </p>
           </div>
           <Eyebrow className="mb-3" color={U.subtle}>Choose one person</Eyebrow>
           <div className="flex flex-col gap-2.5" role="radiogroup" aria-label="Choose one person to start with">
@@ -782,7 +777,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             {/* header */}
             <div className="relative text-center" style={{ padding: '16px 20px 14px', borderBottom: `1px solid rgba(42,37,32,0.07)` }}>
               <button type="button" aria-label="Back to people" onClick={() => setScreen(people.length > 1 || activePerson?.fromCalendar ? 'found' : 'import')} className="absolute left-4 top-5 flex min-h-11 min-w-11 items-center text-[22px]" style={{ color: U.subtle }}>‹</button>
-              <TheaCharacter size="compact" className="mx-auto" gesture={intelFacts.length ? "Present" : "Listen"} />
+              <TheaCharacter size="compact" className="mx-auto u-thea-character--chat" activity="chat" gesture={intelFacts.length ? "Present" : "Listen"} />
               <div className="-mt-1">
                 <div style={{ fontWeight: 600, fontSize: 15.5 }}>Getting to know {first}</div>
                 <Eyebrow>Thea · {intelFacts.length}/{MAX_INTERESTS} interests</Eyebrow>
