@@ -133,8 +133,12 @@ async function searchLocalProducts(
 
 function pathOf(req: Request) {
   const url = new URL(req.url);
-  // Support both /muse-api/... and /functions/v1/muse-api/...
-  return url.pathname.replace(/^\/functions\/v1\/muse-api/, "").replace(/\/$/, "") || "/";
+  // Supabase may pass /functions/v1/muse-api/... or /muse-api/...
+  let path = url.pathname
+    .replace(/^\/functions\/v1\/muse-api/, "")
+    .replace(/^\/muse-api/, "");
+  path = path.replace(/\/$/, "") || "/";
+  return path;
 }
 
 function checkConnectorKey(req: Request): boolean {
@@ -178,7 +182,7 @@ Deno.serve(async (req) => {
   const path = pathOf(req);
 
   // Public health + openapi (no connector key required for discovery)
-  if (req.method === "GET" && (path === "/" || path === "/health")) {
+  if (req.method === "GET" && (path === "/" || path === "/health" || path === "/v1/health")) {
     return json({
       ok: true,
       service: "unwrapt-muse-api",
