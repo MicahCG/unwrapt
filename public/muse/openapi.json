@@ -1,0 +1,134 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Unwrapt Muse Connector API",
+    "version": "0.1.0",
+    "description": "Personal gifting concierge API for Meta Muse. Recommends gifts, tracks people and occasions, and never purchases without explicit user approval."
+  },
+  "servers": [
+    {
+      "url": "https://zxsswxzpzjimrrpcrrto.supabase.co/functions/v1/muse-api",
+      "description": "Production Muse API"
+    }
+  ],
+  "security": [{ "ConnectorApiKey": [] }],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health check",
+        "security": [],
+        "responses": {
+          "200": { "description": "Service is healthy" }
+        }
+      }
+    },
+    "/v1/recommendations": {
+      "post": {
+        "summary": "Recommend 2–3 gifts with prices",
+        "description": "Returns shoppable gift ideas for a recipient and budget. Does not purchase.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "recipient_name": { "type": "string" },
+                  "budget_max": { "type": "number", "example": 75 },
+                  "interests": { "type": "array", "items": { "type": "string" } },
+                  "occasion": { "type": "string" }
+                },
+                "required": ["recipient_name"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Gift recommendations with prices" }
+        }
+      }
+    },
+    "/v1/me": {
+      "get": {
+        "summary": "Current linked user",
+        "responses": { "200": { "description": "User profile" } }
+      }
+    },
+    "/v1/recipients": {
+      "get": {
+        "summary": "List people the user cares about",
+        "responses": { "200": { "description": "Recipients" } }
+      },
+      "post": {
+        "summary": "Add a person",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "relationship": { "type": "string" },
+                  "birthday": { "type": "string", "format": "date" },
+                  "anniversary": { "type": "string", "format": "date" },
+                  "interests": { "type": "array", "items": { "type": "string" } }
+                },
+                "required": ["name"]
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Recipient created" } }
+      }
+    },
+    "/v1/occasions/upcoming": {
+      "get": {
+        "summary": "Upcoming birthdays and anniversaries",
+        "responses": { "200": { "description": "Upcoming occasions" } }
+      }
+    },
+    "/v1/gifts/proposals": {
+      "post": {
+        "summary": "Create a gift proposal requiring approval",
+        "description": "Saves a proposed gift. Never charges or places an order until the user approves in Unwrapt or Muse.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "recipient_id": { "type": "string", "format": "uuid" },
+                  "product_id": { "type": "string" },
+                  "product_title": { "type": "string" },
+                  "estimated_cost": { "type": "number" },
+                  "occasion": { "type": "string" },
+                  "occasion_date": { "type": "string", "format": "date" }
+                },
+                "required": ["recipient_id"]
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Proposal created; approval required" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ConnectorApiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Unwrapt-Api-Key",
+        "description": "Muse connector API key issued by Unwrapt for Meta review and production."
+      },
+      "UserBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Supabase user access token for user-scoped data. For Meta sandbox, send X-Unwrapt-Review-User: 1 instead."
+      }
+    }
+  }
+}

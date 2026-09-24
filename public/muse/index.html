@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Unwrapt × Muse Connector Docs</title>
+  <style>
+    :root { color-scheme: light; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; background: #FAF6EE; color: #2A2520; line-height: 1.55; }
+    main { max-width: 720px; margin: 0 auto; padding: 48px 24px 80px; }
+    h1 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; font-size: 2.25rem; margin: 0 0 8px; }
+    h2 { font-size: 1.15rem; margin-top: 2rem; }
+    .eyebrow { text-transform: uppercase; letter-spacing: 0.16em; font-size: 11px; color: #B65B3C; font-weight: 600; }
+    code, pre { background: #fff; border: 1px solid #DED2C1; border-radius: 10px; }
+    code { padding: 2px 6px; font-size: 0.92em; }
+    pre { padding: 14px 16px; overflow-x: auto; font-size: 0.88rem; }
+    a { color: #B65B3C; }
+    .card { background: #fff; border: 1px solid #DED2C1; border-radius: 16px; padding: 16px 18px; margin: 12px 0; }
+    ul { padding-left: 1.2rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">Meta Muse · Connector docs</p>
+    <h1>Unwrapt for Muse</h1>
+    <p>Unwrapt is a personal gifting concierge. Muse can use this connector to remember people and occasions, recommend priced gifts, and create proposals that <strong>never purchase until the user approves</strong>.</p>
+
+    <div class="card">
+      <strong>Base URL</strong><br />
+      <code>https://zxsswxzpzjimrrpcrrto.supabase.co/functions/v1/muse-api</code>
+      <p style="margin: 10px 0 0; font-size: 0.95rem;">OpenAPI: <a href="./openapi.json">/muse/openapi.json</a></p>
+    </div>
+
+    <h2>Authentication</h2>
+    <ul>
+      <li><strong>Connector key (required):</strong> header <code>X-Unwrapt-Api-Key: &lt;key&gt;</code></li>
+      <li><strong>User scope (production):</strong> <code>Authorization: Bearer &lt;supabase_user_jwt&gt;</code> (OAuth / Google via Unwrapt)</li>
+      <li><strong>Meta review sandbox:</strong> send <code>X-Unwrapt-Review-User: 1</code> with the connector key to use the review account</li>
+    </ul>
+
+    <h2>Core endpoints</h2>
+    <ul>
+      <li><code>GET /health</code> — public health</li>
+      <li><code>POST /v1/recommendations</code> — 2–3 gift ideas with prices (no purchase)</li>
+      <li><code>GET /v1/recipients</code> · <code>POST /v1/recipients</code> — people</li>
+      <li><code>GET /v1/occasions/upcoming</code> — birthdays / anniversaries</li>
+      <li><code>POST /v1/gifts/proposals</code> — save a proposal; approval required before charge</li>
+    </ul>
+
+    <h2>Example: recommend gifts</h2>
+    <pre>curl -X POST "$BASE/v1/recommendations" \
+  -H "Content-Type: application/json" \
+  -H "X-Unwrapt-Api-Key: $MUSE_CONNECTOR_KEY" \
+  -d '{
+    "recipient_name": "Mom",
+    "budget_max": 75,
+    "interests": ["gardening", "tea"],
+    "occasion": "Birthday"
+  }'</pre>
+
+    <h2>Access requirements</h2>
+    <ul>
+      <li>Users: Unwrapt account (Google sign-in) or Meta review sandbox account</li>
+      <li>Region: US-first for Muse review; product available on web at app.unwrapt.io</li>
+      <li>Payments: Stripe (Link / Checkout). Connector never auto-charges.</li>
+      <li>Rate limits: fair-use; recommend ≤ 60 requests/minute per connector key during review</li>
+    </ul>
+
+    <h2>Privacy &amp; terms</h2>
+    <p>
+      <a href="https://unwrapt.io/privacy">Privacy Policy</a> ·
+      <a href="https://unwrapt.io/terms">Terms of Service</a> ·
+      <a href="https://unwrapt.io">unwrapt.io</a>
+    </p>
+    <p style="color:#6F6559; font-size: 0.95rem;">Contact: support@unwrapt.io · team@unwrapt.io</p>
+  </main>
+</body>
+</html>
