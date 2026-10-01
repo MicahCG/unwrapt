@@ -741,8 +741,8 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     return null;
   };
 
-  // ── Completion: create recipients (preserves original Supabase logic) ─────────
-  const completeOnboarding = async (destination: 'dashboard' | 'checkout' = 'dashboard') => {
+  // ── Completion: save people, then Stripe checkout only (no free dashboard bypass) ─
+  const completeOnboarding = async () => {
     if (!user?.id) return;
     const chosen = people.filter((p) => p.selected);
     if (chosen.length === 0) {
@@ -754,7 +754,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       startManualAdd();
       return;
     }
-    setStartingCheckout(destination === 'checkout');
+    setStartingCheckout(true);
     setCompleting(true);
     try {
       // Dedup against existing recipients by normalized name.
@@ -782,9 +782,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         if (error) console.error('Error creating recipient', person.name, error);
       }
 
-      // Silent defaults + free trial window. Budget/autopilot UI comes later (gift config / VIP).
-      const trialEnds = new Date();
-      trialEnds.setDate(trialEnds.getDate() + 14);
+      // Silent defaults. Budget/autopilot UI comes later (gift config / VIP).
       try {
         await supabase
           .from('profiles')
@@ -792,76 +790,51 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             default_gift_budget_min: DEFAULT_BUDGET.lo,
             default_gift_budget_max: DEFAULT_BUDGET.hi,
             autopilot_level: DEFAULT_AUTOPILOT,
-            trial_ends_at: trialEnds.toISOString(),
           } as never)
           .eq('id', user.id);
-      } catch (e) {
+      } catch {
         /* preference columns may not exist yet — non-fatal */
-        try {
-          await supabase
-            .from('profiles')
-            .update({ trial_ends_at: trialEnds.toISOString() })
-            .eq('id', user.id);
-        } catch {
-          /* ignore */
-        }
       }
 
       try {
         await supabase.rpc('calculate_user_metrics', { user_uuid: user.id });
-      } catch (e) {
+      } catch {
         /* metrics RPC is best-effort */
       }
 
       clearSkipAgentWelcome();
       markTheaValueSeen();
 
-      await queryClient.invalidateQueries({ queryKey: ['onboarding-status', user.id] });
+      await queryClient.invalidateQueries({ queryKey: ['app-access', user.id] });
       await queryClient.invalidateQueries({ queryKey: ['recipients', user.id] });
       await queryClient.invalidateQueries({ queryKey: ['user-metrics', user.id] });
-
-      toast({
-        title: "You're all set",
-        description: toCreate.length
-          ? `${toCreate.length} ${toCreate.length === 1 ? 'person' : 'people'} added. I'll start watching for gift moments.`
-          : "Welcome to Unwrapt. I'll take it from here.",
-      });
 
       void trackProductEvent('onboarding_completed', {
         people_count: selectedPeople.length,
         import_method: people.some((person) => person.fromCalendar) ? 'calendar' : 'manual',
         skipped_guardrails: true,
       });
-      void trackProductEvent('onboarding_completed_to_inbox', {
+      void trackProductEvent('onboarding_subscription_checkout_started', {
         people_count: selectedPeople.length,
       });
 
-      if (destination === 'checkout') {
-        void trackProductEvent('onboarding_subscription_checkout_started', {
-          people_count: selectedPeople.length,
-        });
-        const response = await supabase.functions.invoke('create-subscription-checkout', {
-          body: { priceId: VIP_MONTHLY_PRICE_ID, planType: 'vip_monthly' },
-        });
-        if (response.error) throw response.error;
-        if (!response.data?.url) throw new Error('No checkout URL returned');
-        window.location.href = response.data.url;
-        return;
-      }
-
-      setTimeout(async () => {
-        await onComplete();
-        setCompleting(false);
-      }, 900);
+      const response = await supabase.functions.invoke('create-subscription-checkout', {
+        body: { priceId: VIP_MONTHLY_PRICE_ID, planType: 'vip_monthly' },
+      });
+      if (response.error) throw response.error;
+      if (!response.data?.url) throw new Error('No checkout URL returned');
+      window.location.href = response.data.url;
     } catch (error) {
       console.error('Error completing onboarding:', error);
       toast({
         title: 'Something went wrong',
-        description: 'There was a problem finishing setup. Please try again.',
+        description: 'There was a problem opening checkout. Please try again.',
         variant: 'destructive',
       });
       setCompleting(false);
       setStartingCheckout(false);
+      // Recipients may already be saved — parent will show SubscribeGate on refresh.
+      await onComplete();
     }
   };
 
@@ -1234,20 +1207,9 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         <MobileShell
           contentClassName="px-5 pt-8 pb-6"
           footer={
-            <>
-              <PrimaryButton onClick={() => completeOnboarding('checkout')} disabled={completing}>
-                Start automating · {VIP_MONTHLY_AMOUNT_LABEL}/month
-              </PrimaryButton>
-              <button
-                type="button"
-                onClick={() => completeOnboarding('dashboard')}
-                disabled={completing}
-                className="mt-2 min-h-11 w-full text-[13px] font-semibold"
-                style={{ color: U.textSecondary }}
-              >
-                Not now, go to my gift inbox
-              </button>
-            </>
+            <PrimaryButton onClick={() => completeOnboarding()} disabled={completing}>
+              Start automating · {VIP_MONTHLY_AMOUNT_LABEL}/month
+            </PrimaryButton>
           }
         >
           <button

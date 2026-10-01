@@ -27,6 +27,7 @@ import ProductAnalytics from "@/components/ProductAnalytics";
 import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { TheaProvider } from '@/components/TheaAgent';
+import RequirePaid from '@/components/auth/RequirePaid';
 
 const queryClient = new QueryClient();
 const isProd = import.meta.env.PROD;
@@ -62,7 +63,14 @@ function App() {
               <Route path="/analytics" element={<Navigate to="/" replace />} />
               <Route path="/notifications" element={<Navigate to="/settings" replace />} />
               <Route path="/wishlist" element={<Navigate to="/" replace />} />
-              <Route path="/gift-history" element={<GiftHistory />} />
+              <Route
+                path="/gift-history"
+                element={
+                  <RequirePaid>
+                    <GiftHistory />
+                  </RequirePaid>
+                }
+              />
               <Route path="/history" element={<Navigate to="/gift-history" replace />} />
               {!isProd && <Route path="/testing" element={<Testing />} />}
               <Route path="/payment/success" element={<PaymentSuccess />} />

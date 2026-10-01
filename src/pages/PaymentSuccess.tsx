@@ -216,6 +216,7 @@ const PaymentSuccess = () => {
       await queryClient.invalidateQueries({ queryKey: ['unpaid-gifts', user.id] });
       
       if (isFromOnboarding) {
+        await queryClient.invalidateQueries({ queryKey: ['app-access', user.id] });
         await queryClient.invalidateQueries({ queryKey: ['onboarding-status', user.id] });
         await queryClient.invalidateQueries({ queryKey: ['recipients', user.id] });
       }

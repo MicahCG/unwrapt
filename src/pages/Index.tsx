@@ -6,7 +6,9 @@ import LoginPage from '@/components/auth/LoginPage';
 import OnboardingFlow from '@/components/OnboardingFlow';
 import OnboardingIntro from '@/components/OnboardingIntro';
 import Dashboard from '@/components/Dashboard';
+import SubscribeGate from '@/components/subscription/SubscribeGate';
 import { markSkipAgentWelcome } from '@/lib/funnel';
+import { isPaidVip } from '@/lib/stripe';
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -37,59 +39,43 @@ const Index = () => {
     }
   }, [user, loading]);
 
-  // Check if user has completed onboarding by looking for existing recipients
-  const { data: hasCompletedOnboarding, isLoading: checkingOnboarding } = useQuery({
-    queryKey: ['onboarding-status', user?.id],
+  // Recipients = onboarding progress; VIP = paid access to the product.
+  const { data: access, isLoading: checkingAccess } = useQuery({
+    queryKey: ['app-access', user?.id],
     queryFn: async () => {
-      if (!user?.id) return false;
-      
-      console.log('🔧 Index: Checking onboarding status for user:', user.id);
-      
-      // For fake dev user, always return true to skip onboarding
+      if (!user?.id) {
+        return { hasRecipients: false, isPaid: false };
+      }
+
+      // Dev fake user keeps full access for local testing.
       if (process.env.NODE_ENV === 'development' && user.id === '00000000-0000-0000-0000-000000000001') {
-        console.log('🔧 Index: Fake dev user detected, skipping onboarding');
-        return true;
+        return { hasRecipients: true, isPaid: true };
       }
-      
-      // Check for recipients first (primary indicator of completed onboarding)
-      const { data: recipients, error: recipientsError } = await supabase
-        .from('recipients')
-        .select('id')
-        .eq('user_id', user.id)
-        .limit(1);
-      
-      if (recipientsError) {
-        console.error('Error checking recipients:', recipientsError);
-      }
-      
-      console.log('🔧 Index: Recipients found:', recipients?.length || 0);
-      
-      // If user has recipients, they've definitely completed onboarding
-      if (recipients && recipients.length > 0) {
-        console.log('🔧 Index: User has recipients, onboarding complete');
-        return true;
-      }
-      
-      // For new users with no recipients, they need onboarding
-      console.log('🔧 Index: New user detected, needs onboarding');
-      return false;
+
+      const [{ data: recipients, error: recipientsError }, { data: profile, error: profileError }] =
+        await Promise.all([
+          supabase.from('recipients').select('id').eq('user_id', user.id).limit(1),
+          supabase
+            .from('profiles')
+            .select('subscription_tier, subscription_status')
+            .eq('id', user.id)
+            .maybeSingle(),
+        ]);
+
+      if (recipientsError) console.error('Error checking recipients:', recipientsError);
+      if (profileError) console.error('Error checking profile:', profileError);
+
+      return {
+        hasRecipients: (recipients?.length || 0) > 0,
+        isPaid: isPaidVip(profile),
+      };
     },
     enabled: !!user?.id,
-    staleTime: 0, // Always refetch to ensure fresh data
-    refetchOnWindowFocus: true
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
-  console.log('🔧 Index: Render state:', { 
-    hasUser: !!user, 
-    loading, 
-    checkingOnboarding, 
-    hasCompletedOnboarding,
-    userId: user?.id,
-    showIntro,
-    showLoginPage
-  });
-
-  if (loading || checkingOnboarding) {
+  if (loading || checkingAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#FAF6EE' }}>
         <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: '#B65B3C' }} />
@@ -114,45 +100,35 @@ const Index = () => {
     }
   };
 
-  // If user is authenticated, go directly to their appropriate flow
   if (user) {
-    console.log('🔧 Index: User authenticated, checking onboarding status');
-
-    // If user should see intro (from landing page signup), show it first
     if (showIntro) {
-      console.log('🔧 Index: Showing intro for new authenticated user');
       return <OnboardingIntro onComplete={handleIntroComplete} />;
     }
 
-    // If user has completed onboarding, show dashboard directly
-    if (hasCompletedOnboarding) {
-      console.log('🔧 Index: User completed onboarding, showing dashboard');
+    // Paid members only — dashboard is gated.
+    if (access?.isPaid) {
       return <Dashboard />;
     }
 
-    // Otherwise, show onboarding flow
-    console.log('🔧 Index: User needs onboarding, showing onboarding flow');
+    // Finished setup but unpaid: hard paywall (no inbox bypass).
+    if (access?.hasRecipients) {
+      return <SubscribeGate />;
+    }
+
     return (
       <OnboardingFlow
         onBack={async () => {
-          // Force refetch of onboarding status to show dashboard
-          console.log('Back from onboarding, refetching status');
-          await queryClient.invalidateQueries({ queryKey: ['onboarding-status', user?.id] });
-          await queryClient.refetchQueries({ queryKey: ['onboarding-status', user?.id] });
+          await queryClient.invalidateQueries({ queryKey: ['app-access', user?.id] });
+          await queryClient.refetchQueries({ queryKey: ['app-access', user?.id] });
         }}
       />
     );
   }
 
-  // For non-authenticated users
-  console.log('🔧 Index: No user, determining what to show');
-  
-  // Show intro for first-time visitors
   if (showIntro) {
     return <OnboardingIntro onComplete={handleIntroComplete} />;
   }
-  
-  // Show login page for returning visitors or after intro
+
   return (
     <div className={`transition-opacity duration-500 ${showLoginPage ? 'opacity-100' : 'opacity-0'}`}>
       <LoginPage />
