@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, Check, Clock3, Gift, ShieldCheck, Sparkles, Users } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ShieldCheck, Sparkles } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,10 +11,12 @@ import { TheaCharacter } from '@/components/unwrapt2/TheaCharacter';
 import { U, toneForIndex, initialsOf } from '@/components/unwrapt2/theme';
 import { format } from 'date-fns';
 import { trackProductEvent } from '@/lib/productAnalytics';
-import GiftRecommendationPreview from '@/components/onboarding2/GiftRecommendationPreview';
 import InlineGiftPreview from '@/components/onboarding2/InlineGiftPreview';
+import GachaReveal from '@/components/onboarding2/GachaReveal';
+import StrongGiftPicks from '@/components/onboarding2/StrongGiftPicks';
 import { clearSkipAgentWelcome, markTheaValueSeen, shouldSkipAgentWelcome } from '@/lib/funnel';
 import { VIP_MONTHLY_AMOUNT_LABEL, VIP_MONTHLY_PRICE_ID } from '@/lib/stripe';
+import type { GiftCatalogItem } from '@/lib/giftCatalog';
 
 interface AgentOnboardingFlowProps {
   /** Called once recipients are created so the parent can show the dashboard. */
@@ -42,9 +44,11 @@ interface Person {
   fromCalendar: boolean;
 }
 
-type Screen = 'welcome' | 'import' | 'found' | 'addperson' | 'intel' | 'recommendations' | 'subscription';
+type Screen = 'welcome' | 'import' | 'found' | 'addperson' | 'intel' | 'reveal' | 'subscription';
 
 const FREE_TIER_LIMIT = 3;
+/** After this many signals, chat locks and reveal becomes the only path. */
+const READY_INTERESTS = 2;
 const MAX_INTERESTS = 3;
 
 const INTEREST_TAXONOMY = [
@@ -421,6 +425,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   const [intelFacts, setIntelFacts] = useState<string[]>([]);
   const [intelInput, setIntelInput] = useState('');
   const [intelSending, setIntelSending] = useState(false);
+  const [revealPicks, setRevealPicks] = useState<GiftCatalogItem[]>([]);
   const intelRequest = useRef(0);
   useEffect(() => {
     intelRequest.current += 1;
@@ -453,7 +458,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   }, [screen, focusingId]);
 
   useEffect(() => {
-    if (screen !== 'recommendations' || !activePerson) return;
+    if (screen !== 'subscription' || !activePerson) return;
     markTheaValueSeen();
     void trackProductEvent('onboarding_gift_proof_shown', {
       recipient: firstNameOf(activePerson.name),
@@ -603,59 +608,138 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     setActiveId(target);
     setIntelFacts(person?.interests || []);
     setIntelInput('');
+    setRevealPicks([]);
     setIntelMessages([
       {
         from: 'thea',
-        text: `What is ${first} into? Tap a few interests — or tell me in your words.`,
+        text: `What’s ${first} into? Tap one thing to start — I’ll take it from there.`,
       },
     ]);
     setScreen('intel');
   };
 
+  const readyReply = (first: string, facts: string[]) => {
+    const list = facts.map((f) => f.toLowerCase()).join(', ');
+    if (facts.length >= READY_INTERESTS) {
+      return `Ooh — ${list}. I have a few options that tie that together. Ready to see what I recommend for ${first}?`;
+    }
+    return `Love that — ${list}. Anything else that feels like ${first}, or should I pull ideas now?`;
+  };
+
   const sendIntelMessage = async (text: string, selectedInterest?: string) => {
     const message = text.trim().slice(0, 2000);
     if (!activePerson || !message || intelSending) return;
+    if (intelFacts.length >= READY_INTERESTS) return;
     const personId = activePerson.id;
+    const first = firstNameOf(activePerson.name);
     const request = ++intelRequest.current;
-    const facts = selectedInterest ? [...intelFacts, selectedInterest].slice(0, MAX_INTERESTS) : intelFacts;
+    let facts = selectedInterest
+      ? [...intelFacts, selectedInterest]
+          .filter((v, i, arr) => arr.findIndex((x) => x.toLowerCase() === v.toLowerCase()) === i)
+          .slice(0, MAX_INTERESTS)
+      : intelFacts;
+
+    // Short free-text replies (e.g. "accessories") refine the interest set.
+    if (!selectedInterest && message.length <= 40 && intelFacts.length < READY_INTERESTS) {
+      const token = message.replace(/^[+]/, '').trim();
+      if (token && !intelFacts.some((f) => f.toLowerCase() === token.toLowerCase())) {
+        facts = [...intelFacts, token].slice(0, MAX_INTERESTS);
+        setIntelFacts(facts);
+        setPeople((prev) => prev.map((p) => (p.id === personId ? { ...p, interests: facts } : p)));
+      }
+    }
+
     const nextMessages = [...intelMessages, { from: 'user' as const, text: message }];
     setIntelMessages(nextMessages);
     setIntelInput('');
     setIntelSending(true);
     if (selectedInterest) {
       setIntelFacts(facts);
-      setPeople(prev => prev.map(p => p.id === personId ? { ...p, interests: facts } : p));
+      setPeople((prev) => prev.map((p) => (p.id === personId ? { ...p, interests: facts } : p)));
     }
+
+    // Chip picks stay snappy + on-script; free text can use Thea LLM when available.
+    if (selectedInterest) {
+      window.setTimeout(() => {
+        if (request !== intelRequest.current) return;
+        setIntelMessages((m) => [...m, { from: 'thea', text: readyReply(first, facts) }]);
+        setIntelSending(false);
+      }, 420);
+      return;
+    }
+
     try {
       const { data, error } = await supabase.functions.invoke('thea-chat', {
         body: {
-          mode: 'onboarding', recipientName: firstNameOf(activePerson.name), interests: facts,
-          messages: nextMessages.slice(-30).map(m => ({ role: m.from === 'thea' ? 'assistant' : 'user', content: m.text })),
+          mode: 'onboarding',
+          recipientName: first,
+          interests: facts,
+          messages: nextMessages.slice(-30).map((m) => ({
+            role: m.from === 'thea' ? 'assistant' : 'user',
+            content: m.text,
+          })),
         },
       });
       if (request !== intelRequest.current) return;
       if (error || !data?.success || typeof data.reply !== 'string') throw new Error('Thea unavailable');
       const learned: string[] = Array.isArray(data.interests)
-        ? data.interests.filter((v: unknown): v is string => typeof v === 'string' && v.trim().length > 0 && v.length <= 80).slice(0, MAX_INTERESTS)
+        ? data.interests
+            .filter((v: unknown): v is string => typeof v === 'string' && v.trim().length > 0 && v.length <= 80)
+            .slice(0, MAX_INTERESTS)
         : facts;
-      setIntelFacts(learned);
-      setPeople(prev => prev.map(p => p.id === personId ? { ...p, interests: learned } : p));
-      setIntelMessages(m => [...m, { from: 'thea', text: data.reply }]);
+      const merged = learned.length ? learned : facts;
+      setIntelFacts(merged);
+      setPeople((prev) => prev.map((p) => (p.id === personId ? { ...p, interests: merged } : p)));
+      const reply = merged.length >= READY_INTERESTS ? readyReply(first, merged) : data.reply;
+      setIntelMessages((m) => [...m, { from: 'thea', text: reply }]);
     } catch {
       if (request !== intelRequest.current) return;
-      setIntelMessages(m => [...m, { from: 'thea', text: selectedInterest
-        ? `I'll use ${selectedInterest.toLowerCase()} for the gift ideas below. You can add another interest while chat is unavailable.`
-        : "Chat isn't available right now. You can still pick interests below and see gift ideas." }]);
+      const fallbackFacts =
+        message.length <= 48 && !facts.length
+          ? [message]
+          : facts.length
+            ? facts
+            : intelFacts;
+      if (fallbackFacts !== intelFacts && fallbackFacts.length) {
+        setIntelFacts(fallbackFacts);
+        setPeople((prev) => prev.map((p) => (p.id === personId ? { ...p, interests: fallbackFacts } : p)));
+      }
+      setIntelMessages((m) => [
+        ...m,
+        { from: 'thea', text: readyReply(first, fallbackFacts.length ? fallbackFacts : [message]) },
+      ]);
     } finally {
       if (request === intelRequest.current) setIntelSending(false);
     }
   };
 
   const addInterest = (label: string) => {
-    if (intelFacts.length >= MAX_INTERESTS || intelFacts.some(f => f.toLowerCase() === label.toLowerCase())) return;
+    if (intelFacts.length >= READY_INTERESTS || intelFacts.some((f) => f.toLowerCase() === label.toLowerCase())) return;
     void sendIntelMessage(label, label);
   };
-  const submitInterest = () => { void sendIntelMessage(intelInput); };
+  const submitInterest = () => {
+    void sendIntelMessage(intelInput);
+  };
+
+  const startReveal = () => {
+    if (!intelFacts.length || !activePerson) return;
+    setPeople((prev) =>
+      prev.map((p) => (p.id === activePerson.id ? { ...p, interests: intelFacts } : p)),
+    );
+    setScreen('reveal');
+  };
+
+  const finishReveal = useCallback((picks: GiftCatalogItem[]) => {
+    setRevealPicks(picks);
+    setScreen('subscription');
+  }, []);
+
+  const occasionPhrase = (person: Person | null) => {
+    if (!person?.primaryType) return null;
+    if (person.primaryType === 'birthday') return 'birthday';
+    if (person.primaryType === 'anniversary') return 'anniversary';
+    return null;
+  };
 
   // ── Completion: create recipients (preserves original Supabase logic) ─────────
   const completeOnboarding = async (destination: 'dashboard' | 'checkout' = 'dashboard') => {
@@ -961,171 +1045,190 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     // ════════ INTEL (Thea chat) ════════
     case 'intel': {
       const first = firstNameOf(activePerson?.name || '');
-      const available = INTEREST_TAXONOMY.filter((t) => !intelFacts.includes(t)).slice(0, 9);
-      const canBuild = intelFacts.length >= 2;
-      const interestLimitReached = intelFacts.length >= MAX_INTERESTS;
+      const available = INTEREST_TAXONOMY.filter(
+        (t) => !intelFacts.some((f) => f.toLowerCase() === t.toLowerCase()),
+      ).slice(0, 9);
+      const showChips = intelFacts.length === 0;
+      const chatLocked = intelFacts.length >= READY_INTERESTS;
+      const canReveal = intelFacts.length >= 1 && !intelSending;
       return (
-        <MobileShell
-          contentClassName="flex flex-col px-0 pt-0"
-          animate
-        >
+        <MobileShell contentClassName="flex flex-col px-0 pt-0" animate>
           <div className="flex h-full flex-col">
-            {/* header */}
-            <div className="relative text-center" style={{ padding: '16px 20px 14px', borderBottom: `1px solid rgba(42,37,32,0.07)` }}>
-              <button type="button" aria-label="Back to people" onClick={() => setScreen(people.length > 1 || activePerson?.fromCalendar ? 'found' : 'import')} className="absolute left-4 top-5 flex min-h-11 min-w-11 items-center text-[22px]" style={{ color: U.subtle }}>‹</button>
+            <div
+              className="relative shrink-0 text-center"
+              style={{ padding: '12px 20px 10px', borderBottom: `1px solid rgba(42,37,32,0.07)` }}
+            >
+              <button
+                type="button"
+                aria-label="Back to people"
+                onClick={() => setScreen(people.length > 1 || activePerson?.fromCalendar ? 'found' : 'import')}
+                className="absolute left-4 top-4 flex min-h-11 min-w-11 items-center text-[22px]"
+                style={{ color: U.subtle }}
+              >
+                ‹
+              </button>
               <StepPips step={3} />
-              <TheaCharacter size="compact" className="mx-auto u-thea-character--chat" activity="chat" gesture={intelFacts.length ? "Present" : "Listen"} />
+              <TheaCharacter
+                size="compact"
+                className="mx-auto u-thea-character--chat"
+                activity="chat"
+                gesture={intelFacts.length ? 'Present' : 'Listen'}
+              />
               <div className="-mt-1">
                 <div style={{ fontWeight: 600, fontSize: 15.5 }}>Getting to know {first}</div>
-                <Eyebrow>{intelFacts.length}/{MAX_INTERESTS} interests unlocked</Eyebrow>
+                <Eyebrow>
+                  {chatLocked ? 'Ready for recommendations' : intelFacts.length ? 'Narrowing it down' : 'Pick a starting point'}
+                </Eyebrow>
               </div>
             </div>
-            {/* messages */}
-            <div className="flex flex-1 flex-col gap-3 overflow-y-auto" style={{ padding: '20px 20px 8px' }}>
+
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto" style={{ padding: '16px 20px 12px' }}>
               {intelMessages.map((m, i) => {
                 const isLatestThea = m.from === 'thea' && i === intelMessages.length - 1 && !intelSending;
                 return (
-                <div key={i} className="flex" style={{ justifyContent: m.from === 'thea' ? 'flex-start' : 'flex-end' }}>
-                  <div
-                    style={{
-                      maxWidth: '80%', padding: '13px 16px', borderRadius: 20, fontSize: 15, lineHeight: 1.45,
-                      background: m.from === 'thea' ? U.surface : U.ink,
-                      color: m.from === 'thea' ? U.ink : U.buttonText,
-                      border: m.from === 'thea' ? `1px solid ${U.border}` : `1px solid ${U.ink}`,
-                      borderBottomLeftRadius: m.from === 'thea' ? 6 : 20,
-                      borderBottomRightRadius: m.from === 'thea' ? 20 : 6,
-                    }}
-                  >
-                    {isLatestThea ? <TypewriterLine text={m.text} speedMs={18} /> : m.text}
+                  <div key={i} className="flex" style={{ justifyContent: m.from === 'thea' ? 'flex-start' : 'flex-end' }}>
+                    <div
+                      style={{
+                        maxWidth: '84%',
+                        padding: '13px 16px',
+                        borderRadius: 20,
+                        fontSize: 15,
+                        lineHeight: 1.45,
+                        background: m.from === 'thea' ? U.surface : U.ink,
+                        color: m.from === 'thea' ? U.ink : U.buttonText,
+                        border: m.from === 'thea' ? `1px solid ${U.border}` : `1px solid ${U.ink}`,
+                        borderBottomLeftRadius: m.from === 'thea' ? 6 : 20,
+                        borderBottomRightRadius: m.from === 'thea' ? 20 : 6,
+                      }}
+                    >
+                      {isLatestThea ? <TypewriterLine text={m.text} speedMs={18} /> : m.text}
+                    </div>
                   </div>
-                </div>
                 );
               })}
-              {intelSending && <p role="status" className="text-sm" style={{ color: U.subtle }}>Thea is thinking…</p>}
+              {intelSending && (
+                <p role="status" className="text-sm" style={{ color: U.subtle }}>
+                  Thea is thinking…
+                </p>
+              )}
               <InlineGiftPreview recipientFirstName={first} interests={intelFacts} />
             </div>
-            {/* chips + build */}
-            <div style={{ padding: '8px 16px 0' }}>
-              <div className="mb-3 flex flex-wrap gap-2">
-                {available.map((c) => (
-                  <button
-                    type="button"
-                    key={c}
-                    onClick={() => addInterest(c)}
-                    disabled={interestLimitReached || intelSending}
-                    className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
-                    style={{ padding: '9px 14px', borderRadius: 14, background: U.chip, border: `1px solid rgba(42,37,32,0.1)`, fontSize: 13.5, fontWeight: 500, color: '#5A5147' }}
-                  >
-                    + {c}
-                  </button>
-                ))}
-              </div>
-              {canBuild && (
+
+            <div className="shrink-0" style={{ padding: '8px 16px 28px' }}>
+              {showChips && (
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {available.map((c) => (
+                    <button
+                      type="button"
+                      key={c}
+                      onClick={() => addInterest(c)}
+                      disabled={intelSending}
+                      className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                      style={{
+                        padding: '9px 14px',
+                        borderRadius: 14,
+                        background: U.chip,
+                        border: `1px solid rgba(42,37,32,0.1)`,
+                        fontSize: 13.5,
+                        fontWeight: 500,
+                        color: '#5A5147',
+                      }}
+                    >
+                      + {c}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {canReveal && (
                 <button
-                  onClick={() => setScreen('recommendations')}
+                  type="button"
+                  onClick={startReveal}
                   className="u-btn-primary animate-u-pop mb-3"
                   style={{ fontSize: 16, padding: 16 }}
                 >
                   Show me gift ideas
                 </button>
               )}
-            </div>
-            {/* input (visual) */}
-            <div style={{ padding: '0 16px 34px' }}>
-              <div className="flex items-center gap-2.5" style={{ padding: '7px 7px 7px 18px', borderRadius: 24, background: U.surface, border: `1px solid rgba(42,37,32,0.1)` }}>
-                <input
-                  value={intelInput}
-                  disabled={intelSending}
-                  maxLength={2000}
-                  placeholder={`Tell me more about ${first}, or ask a question`}
-                  className="flex-1"
-                  style={{ border: 'none', background: 'transparent', fontSize: 14.5, color: U.ink }}
-                  onChange={(event) => setIntelInput(event.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      submitInterest();
-                    }
+
+              {!chatLocked && (
+                <div
+                  className="flex items-center gap-2.5"
+                  style={{
+                    padding: '7px 7px 7px 18px',
+                    borderRadius: 24,
+                    background: U.surface,
+                    border: `1px solid rgba(42,37,32,0.1)`,
                   }}
-                />
-                <button
-                  type="button"
-                  aria-label="Send message"
-                  onClick={submitInterest}
-                  disabled={!intelInput.trim() || intelSending}
-                  className="flex items-center justify-center disabled:opacity-40"
-                  style={{ width: 38, height: 38, borderRadius: '50%', background: U.ink, color: U.buttonText, fontSize: 17, flexShrink: 0 }}
                 >
-                  ↑
-                </button>
-              </div>
+                  <input
+                    value={intelInput}
+                    disabled={intelSending}
+                    maxLength={2000}
+                    placeholder={
+                      intelFacts.length
+                        ? `Add one more detail about ${first}…`
+                        : `Or tell me about ${first}…`
+                    }
+                    className="flex-1"
+                    style={{ border: 'none', background: 'transparent', fontSize: 14.5, color: U.ink }}
+                    onChange={(event) => setIntelInput(event.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        submitInterest();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    aria-label="Send message"
+                    onClick={submitInterest}
+                    disabled={!intelInput.trim() || intelSending}
+                    className="flex items-center justify-center disabled:opacity-40"
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: '50%',
+                      background: U.ink,
+                      color: U.buttonText,
+                      fontSize: 17,
+                      flexShrink: 0,
+                    }}
+                  >
+                    ↑
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </MobileShell>
       );
     }
 
-    // ════════ VALUE PREVIEW (catalog-backed recommendations) — emotional peak → inbox ════════
-    case 'recommendations': {
+    // ════════ GACHA REVEAL ════════
+    case 'reveal': {
       if (!activePerson) return null;
       const first = firstNameOf(activePerson.name);
-      const otherCount = Math.max(0, selectedPeople.length - 1);
       return (
-        <MobileShell
-          contentClassName="px-[22px] pt-14 pb-4"
-          footer={
-            <>
-              <PrimaryButton onClick={() => setScreen('subscription')}>
-                Automate gifting for {first}{otherCount ? ` + ${otherCount} ${otherCount === 1 ? 'other' : 'others'}` : ''}
-              </PrimaryButton>
-              <p className="mt-3 text-center font-mono" style={{ fontSize: 12, color: U.muted, letterSpacing: '0.4px' }}>
-                See what Thea can take off your plate
-              </p>
-            </>
-          }
-        >
-          <button
-            type="button"
-            aria-label="Back to interests"
-            onClick={() => enterIntel(activePerson.id)}
-            className="mb-3.5"
-            style={{ fontSize: 22, color: U.subtle }}
-          >
-            ‹
-          </button>
-          <StepPips step={4} />
-          <div className="mb-2 flex items-center gap-2.5">
-            <Eyebrow>For {first}</Eyebrow>
-          </div>
-          <TheaCharacter size="medium" gesture="Present" />
-          <Display style={{ fontSize: 31, lineHeight: 1.08 }}>
-            <TypewriterLine text={`Gift ideas for ${first}.`} speedMs={24} />
-          </Display>
-          <p className="mb-5 mt-2.5" style={{ fontSize: 15, lineHeight: 1.5, color: U.textSecondary }}>
-            From what you just shared.
-          </p>
-          <GiftRecommendationPreview recipientFirstName={first} interests={activePerson.interests} />
-        </MobileShell>
+        <GachaReveal
+          recipientFirstName={first}
+          interests={activePerson.interests.length ? activePerson.interests : intelFacts}
+          occasionLabel={occasionPhrase(activePerson)}
+          onDone={finishReveal}
+        />
       );
     }
 
-    // ════════ SUBSCRIPTION VALUE ════════
+    // ════════ REVEAL + SUBSCRIPTION (combined) ════════
     case 'subscription': {
       if (!activePerson) return null;
       const first = firstNameOf(activePerson.name);
-      const peopleCount = selectedPeople.length;
-      const annualHours = Math.max(6, peopleCount * 3);
-      const benefits = [
-        { icon: Clock3, title: `Estimated ${annualHours}+ hours back`, body: 'Thea remembers dates, searches the catalog and keeps gifting moving.' },
-        { icon: Gift, title: 'Curated gift options', body: `Recommendations shaped by what ${first} actually enjoys.` },
-        { icon: CalendarDays, title: 'Occasions watched for you', body: 'Birthdays and anniversaries stay visible before they become last-minute emergencies.' },
-        { icon: ShieldCheck, title: 'You stay in control', body: 'Review the recommendation and approve before any gift is purchased.' },
-      ];
-      const personas = [
-        { label: 'Busy professional', text: 'Keeps meaningful relationships covered between packed workweeks.' },
-        { label: 'Busy parent', text: 'Moves birthdays and family occasions out of the mental-load pile.' },
-        { label: 'Proud grandparent', text: 'Keeps every grandchild’s interests and important dates in one place.' },
-      ];
+      const occasion = occasionPhrase(activePerson);
+      const interests = activePerson.interests.length ? activePerson.interests : intelFacts;
+      const headline = occasion
+        ? `Here are options I’d recommend for ${first}’s ${occasion}.`
+        : `Here are options I’d recommend for ${first}.`;
 
       return (
         <MobileShell
@@ -1149,73 +1252,43 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         >
           <button
             type="button"
-            aria-label="Back to gift ideas"
-            onClick={() => setScreen('recommendations')}
-            className="mb-3 min-h-11 min-w-11 text-left text-[24px]"
+            aria-label="Back to chat"
+            onClick={() => setScreen('intel')}
+            className="mb-2 min-h-11 min-w-11 text-left text-[24px]"
             style={{ color: U.subtle }}
           >
             ‹
           </button>
 
-          <div className="flex items-center justify-center gap-2.5">
-            <Eyebrow color={U.accent}>Thea membership</Eyebrow>
-          </div>
-          <TheaCharacter size="compact" gesture="Listen" />
-          <Display className="mt-4 text-[32px]">Put gifting for {first} on autopilot.</Display>
-          <p className="mt-3 text-[15px] leading-6" style={{ color: U.textSecondary }}>
-            Thea turns the dates and interests you shared into thoughtful options, timely approvals and fewer last-minute scrambles.
+          <StepPips step={4} />
+          <TheaCharacter size="compact" gesture="Present" />
+          <Display className="mt-3 text-[28px] leading-tight">{headline}</Display>
+          <p className="mt-2 text-[14px] leading-5" style={{ color: U.textSecondary }}>
+            Based on {interests.map((i) => i.toLowerCase()).join(', ') || 'what you shared'}. Thea watches the date and asks before anything is bought.
           </p>
 
           <section className="mt-5">
-            <Eyebrow className="mb-2" color={U.accent}>Possible gifts for {first}</Eyebrow>
-            <p className="mb-3 text-[12.5px] leading-5" style={{ color: U.textSecondary }}>
-              Based on {activePerson.interests.slice(0, 3).join(', ').toLowerCase()}. Thea keeps refining these as she learns more.
-            </p>
-            <GiftRecommendationPreview recipientFirstName={first} interests={activePerson.interests} />
+            <StrongGiftPicks
+              recipientFirstName={first}
+              interests={interests}
+              products={revealPicks}
+            />
           </section>
-
-          <div className="mt-5 grid grid-cols-2 gap-2.5">
-            {benefits.map(({ icon: Icon, title, body }) => (
-              <article key={title} className="rounded-[18px] border bg-white p-3.5" style={{ borderColor: U.border }}>
-                <Icon size={18} color={U.accent} aria-hidden="true" />
-                <h3 className="mt-3 text-[13px] font-semibold leading-4">{title}</h3>
-                <p className="mt-1.5 text-[11.5px] leading-[17px]" style={{ color: U.textSecondary }}>{body}</p>
-              </article>
-            ))}
-          </div>
 
           <section className="mt-5 rounded-[20px] p-4" style={{ background: U.ink, color: U.buttonText }}>
             <div className="flex items-center gap-2">
               <Sparkles size={17} color={U.accent} aria-hidden="true" />
-              <h3 className="text-[14px] font-semibold">Meet Thea, your gifting agent</h3>
+              <h3 className="text-[14px] font-semibold">Put gifting on autopilot</h3>
             </div>
             <p className="mt-2 text-[12.5px] leading-5" style={{ color: '#D8CFC1' }}>
-              Ask for ideas anytime. Thea learns from your feedback, watches upcoming occasions and brings you a recommendation when it is time to act.
+              Thea keeps refining picks like these, remembers the occasion, and brings you a recommendation when it’s time — you approve before any purchase.
             </p>
           </section>
 
-          <section className="mt-6">
-            <Eyebrow className="mb-3">Made for real life</Eyebrow>
-            <div className="flex snap-x gap-2.5 overflow-x-auto pb-2">
-              {personas.map((persona) => (
-                <article key={persona.label} className="w-[78%] shrink-0 snap-start rounded-[18px] border bg-white p-4" style={{ borderColor: U.border }}>
-                  <div className="flex items-center gap-2">
-                    <Check size={15} color={U.sage} aria-hidden="true" />
-                    <h3 className="text-[12.5px] font-semibold">{persona.label}</h3>
-                  </div>
-                  <p className="mt-2 text-[12.5px] leading-5" style={{ color: U.textSecondary }}>{persona.text}</p>
-                </article>
-              ))}
-            </div>
-          </section>
-
           <div className="mt-4 flex items-center justify-center gap-2 text-[11.5px]" style={{ color: U.muted }}>
-            <Users size={14} aria-hidden="true" />
-            Cancel anytime · secure checkout
+            <ShieldCheck size={14} aria-hidden="true" />
+            Cancel anytime · you stay in control
           </div>
-          <p className="mt-2 text-center text-[10.5px] leading-4" style={{ color: U.muted }}>
-            Time estimate assumes about 3 hours of planning and shopping per person each year.
-          </p>
         </MobileShell>
       );
     }
@@ -1224,5 +1297,6 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       return null;
   }
 };
+
 
 export default AgentOnboardingFlow;
