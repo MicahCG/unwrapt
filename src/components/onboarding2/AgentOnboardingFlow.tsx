@@ -493,19 +493,60 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   }, [user]);
 
   const connectGoogleCalendar = async () => {
-    if (!user) return;
+    if (!user) {
+      toast({
+        title: 'Sign in required',
+        description: 'Please sign in again to connect Google Calendar.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setConnecting(true);
+    const redirectUri = `${window.location.origin}/auth/calendar/callback`;
+
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('No active session found. Please log in again.');
-      const { data: authData, error: authError } = await supabase.functions.invoke('google-calendar', {
-        body: { action: 'get_auth_url' },
+      try {
+        sessionStorage.setItem('unwrapt_calendar_redirect_uri', redirectUri);
+      } catch {
+        /* ignore */
+      }
+
+      let {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        const refreshed = await supabase.auth.refreshSession();
+        session = refreshed.data.session;
+      }
+      if (!session?.access_token) {
+        throw new Error('No active session found. Please log in again.');
+      }
+
+      const invokePromise = supabase.functions.invoke('google-calendar', {
+        body: { action: 'get_auth_url', redirectUri },
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
-      if (authError) throw new Error(authError.message || 'Failed to get authorization URL');
-      if (authData?.authUrl) {
-        window.location.href = authData.authUrl;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        window.setTimeout(() => reject(new Error('Calendar connection timed out. Please try again.')), 20000);
+      });
+
+      const { data: authData, error: authError } = await Promise.race([invokePromise, timeoutPromise]);
+
+      if (authError) {
+        throw new Error(authError.message || 'Failed to get authorization URL');
       }
+      if (authData && typeof authData === 'object' && 'error' in authData && (authData as { error?: unknown }).error) {
+        throw new Error(String((authData as { error: unknown }).error));
+      }
+
+      const authUrl = authData && typeof authData === 'object' ? (authData as { authUrl?: unknown }).authUrl : null;
+      if (!authUrl || typeof authUrl !== 'string') {
+        throw new Error('No authorization URL returned. Please try again.');
+      }
+
+      // Full navigation — keep connecting=true until the page unloads.
+      window.location.assign(authUrl);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to connect calendar';
       toast({ title: 'Connection failed', description: message, variant: 'destructive' });

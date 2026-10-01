@@ -106,8 +106,15 @@ const CalendarOAuthCallback: React.FC = () => {
         }
 
         console.log('📅 CalendarOAuthCallback: Exchanging authorization code...');
+        let redirectUri = `${window.location.origin}/auth/calendar/callback`;
+        try {
+          redirectUri = sessionStorage.getItem('unwrapt_calendar_redirect_uri') || redirectUri;
+        } catch {
+          /* ignore */
+        }
+
         const { data: tokenData, error: tokenError } = await supabase.functions.invoke('google-calendar', {
-          body: { action: 'exchange_code', code },
+          body: { action: 'exchange_code', code, redirectUri },
           headers: {
             Authorization: `Bearer ${session.access_token}`,
           }

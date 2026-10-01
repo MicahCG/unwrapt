@@ -195,15 +195,23 @@ Deno.serve(async (req) => {
 
     console.log('✅ User authenticated:', user.id)
 
-    const { action, code } = await req.json()
+    const { action, code, redirectUri: clientRedirectUri } = await req.json()
     console.log('📝 Action received:', action)
 
     if (action === 'get_auth_url') {
       const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
+      if (!clientId) {
+        console.error('❌ GOOGLE_CLIENT_ID is not configured')
+        return new Response(JSON.stringify({ error: 'Google Calendar is not configured' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
       const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/').slice(0, 3).join('/')
-      
-      // Use the calendar OAuth callback for onboarding flow
-      const redirectUri = `${origin}/auth/calendar/callback`
+      const redirectUri = (typeof clientRedirectUri === 'string' && clientRedirectUri.startsWith('http'))
+        ? clientRedirectUri
+        : `${origin}/auth/calendar/callback`
       
       console.log('🔗 Generated redirect URI:', redirectUri)
       
@@ -225,7 +233,9 @@ Deno.serve(async (req) => {
 
     if (action === 'exchange_code') {
       const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/').slice(0, 3).join('/')
-      const redirectUri = `${origin}/auth/calendar/callback`
+      const redirectUri = (typeof clientRedirectUri === 'string' && clientRedirectUri.startsWith('http'))
+        ? clientRedirectUri
+        : `${origin}/auth/calendar/callback`
 
       console.log('🔄 Exchange code - redirect URI:', redirectUri)
       console.log('🔄 Exchange code - user ID:', user.id)
