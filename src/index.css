@@ -624,6 +624,22 @@
   box-shadow: 0 8px 22px rgba(42,37,32,.09);
 }
 
+.u-thea-character__voice--text {
+  right: 2%;
+  top: 18%;
+  max-width: min(58%, 168px);
+  padding: 9px 12px;
+  border-radius: 16px 16px 16px 6px;
+  gap: 0;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #B65B3C;
+  text-align: left;
+}
+
 .u-thea-character__voice span {
   width: 4px;
   height: 4px;
@@ -639,6 +655,7 @@
   .u-thea-character--medium { height: 105px; }
   .u-thea-character--large { height: 125px; }
   .u-thea-character__voice { top: 12%; padding: 6px 8px; }
+  .u-thea-character__voice--text { max-width: 140px; font-size: 10px; }
 }
 
 .u-thea-caret {

@@ -11,11 +11,13 @@ interface TheaCharacterProps {
   className?: string;
   gesture?: TheaGesture;
   activity?: TheaActivity;
+  /** Replaces the ellipsis bubble with a short spoken line. */
+  bubble?: string;
 }
 
 /** The same expressive character accompanies every onboarding step. */
 export const TheaCharacter: React.FC<TheaCharacterProps> = ({
-  size = 'medium', speaking = true, animated = true, className = '', gesture = 'Greeting', activity = 'idle',
+  size = 'medium', speaking = true, animated = true, className = '', gesture = 'Greeting', activity = 'idle', bubble,
 }) => {
   const controller = useRef<ReturnType<typeof import('./theaScene').mountThea>>();
   const currentGesture = useRef(gesture);
@@ -47,12 +49,21 @@ export const TheaCharacter: React.FC<TheaCharacterProps> = ({
     }).catch(() => { if (!cancelled) setFailed(true); });
     return () => { stop(); motion.removeEventListener('change', change); };
   }, [animated, failed]);
+  const showBubble = speaking && activity !== 'calendar';
   return (
     <div className={`u-thea-character u-thea-character--${size} ${speaking ? 'u-thea-character--speaking' : ''} ${className}`} data-thea-renderer={ready ? 'webgl' : 'poster'}>
       <div className="u-thea-character__glow" aria-hidden="true" />
       <img src={size === 'compact' ? theaCompact : theaCharacter} alt="Thea, your gifting concierge" className="u-thea-character__image" style={{ opacity: ready ? 0 : 1 }} draggable={false} width={size === 'compact' ? 320 : 480} height={size === 'compact' ? 236 : 640} />
       {animated && !failed && <canvas ref={canvas} className="u-thea-character__canvas" style={{ opacity: ready ? 1 : 0 }} aria-hidden="true" />}
-      {speaking && activity !== 'calendar' && <div className="u-thea-character__voice" aria-hidden="true"><span /><span /><span /></div>}
+      {showBubble && (
+        bubble ? (
+          <div className="u-thea-character__voice u-thea-character__voice--text" role="status">
+            {bubble}
+          </div>
+        ) : (
+          <div className="u-thea-character__voice" aria-hidden="true"><span /><span /><span /></div>
+        )
+      )}
     </div>
   );
 };

@@ -863,12 +863,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           glow
           contentClassName="px-7 pt-16 pb-4 flex flex-col justify-between"
           footer={
-            <>
-              <PrimaryButton onClick={() => setScreen('import')}>Get started</PrimaryButton>
-              <p className="mt-3.5 text-center font-mono" style={{ fontSize: 12.5, color: U.muted, letterSpacing: '0.5px' }}>
-                about 2 minutes
-              </p>
-            </>
+            <PrimaryButton onClick={() => setScreen('import')}>Get started</PrimaryButton>
           }
         >
           <div className="flex items-center justify-between">
@@ -876,11 +871,8 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             <Eyebrow>Concierge</Eyebrow>
           </div>
           <div className="flex flex-1 flex-col justify-center pt-4 text-center">
-            <TheaCharacter size="large" />
-            <p className="mt-2 text-[12px] font-semibold uppercase tracking-[0.16em]" style={{ color: U.accent }}>
-              Hi, I’m Thea, your gifting agent
-            </p>
-            <Display className="mt-3" style={{ fontSize: 40, lineHeight: 1.02, letterSpacing: '-0.03em' }}>
+            <TheaCharacter size="large" bubble="Hi, I’m Thea, your gifting agent" />
+            <Display className="mt-5" style={{ fontSize: 40, lineHeight: 1.02, letterSpacing: '-0.03em' }}>
               Never forget another<br />
               <em style={{ fontStyle: 'italic', fontWeight: 400, color: U.accent }}>moment.</em>
             </Display>
