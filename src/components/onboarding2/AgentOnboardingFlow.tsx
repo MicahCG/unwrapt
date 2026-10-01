@@ -623,7 +623,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     if (facts.length >= READY_INTERESTS) {
       return `Ooh — ${list}. I have a few options that tie that together. Ready to see what I recommend for ${first}?`;
     }
-    return `Love that — ${list}. Anything else that feels like ${first}, or should I pull ideas now?`;
+    return `Love that — ${list}. Tell me a bit more about what ${first} is into.`;
   };
 
   const sendIntelMessage = async (text: string, selectedInterest?: string) => {
@@ -1050,7 +1050,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       ).slice(0, 9);
       const showChips = intelFacts.length === 0;
       const chatLocked = intelFacts.length >= READY_INTERESTS;
-      const canReveal = intelFacts.length >= 1 && !intelSending;
+      const canReveal = chatLocked && !intelSending;
       return (
         <MobileShell contentClassName="flex flex-col px-0 pt-0" animate>
           <div className="flex h-full flex-col">
