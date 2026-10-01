@@ -74,7 +74,7 @@ serve(async (req) => {
           }
         }
       } catch (e) {
-        // If external API fails, don't block the user — just skip verification
+        // If external API fails, don't block the user  -  just skip verification
         console.warn('ZIP verification API unavailable:', e);
       }
     }

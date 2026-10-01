@@ -17,7 +17,7 @@ const Index = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    // Landing signup already chose "Get started" — skip stacked intro + welcome.
+    // Landing signup already chose "Get started"  -  skip stacked intro + welcome.
     const shouldShowIntro = localStorage.getItem('shouldShowOnboardingIntro');
 
     if (shouldShowIntro === 'true' && user && !loading) {
@@ -105,7 +105,7 @@ const Index = () => {
       return <OnboardingIntro onComplete={handleIntroComplete} />;
     }
 
-    // Paid members only — dashboard is gated.
+    // Paid members only  -  dashboard is gated.
     if (access?.isPaid) {
       return <Dashboard />;
     }

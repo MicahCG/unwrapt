@@ -26,7 +26,7 @@ interface ApprovalScreenProps {
 
 /**
  * Agent-first gift approval. Mirrors the prototype's flagship "Approve & send"
- * screen and is wired to the existing `confirm-gift` edge function — the same
+ * screen and is wired to the existing `confirm-gift` edge function  -  the same
  * status transition the old GiftsAwaitingConfirmation card performed.
  */
 export const ApprovalScreen: React.FC<ApprovalScreenProps> = ({ gift, recipient, onClose, onApproved }) => {

@@ -128,7 +128,7 @@ const GiftHistory = () => {
           <CardTitle className="flex items-center font-display text-2xl text-brand-charcoal sm:text-3xl">
             <Package className="mr-3 h-6 w-6" />Gift fulfillment
           </CardTitle>
-          <p className="max-w-2xl text-sm leading-relaxed text-brand-charcoal/65">See every handoff clearly—from approval and recipient choice through partner processing and delivery.</p>
+          <p className="max-w-2xl text-sm leading-relaxed text-brand-charcoal/65">See every handoff clearly, from approval and recipient choice through partner processing and delivery.</p>
         </CardHeader>
         <CardContent className="px-0">
           {(authLoading || isLoading) && <div className="grid min-h-56 place-items-center"><Loader2 className="h-7 w-7 animate-spin text-brand-charcoal" /></div>}

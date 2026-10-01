@@ -122,7 +122,7 @@ const PaymentSuccess = () => {
     }
   };
 
-  // Check gift payment was processed — also triggers verify-payment to fulfill the order
+  // Check gift payment was processed  -  also triggers verify-payment to fulfill the order
   const checkGiftPayment = async () => {
     if (!user?.id) {
       setIsVerifying(false);

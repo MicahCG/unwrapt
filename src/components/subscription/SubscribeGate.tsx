@@ -81,7 +81,7 @@ const SubscribeGate: React.FC = () => {
           <h3 className="text-[14px] font-semibold">What you get</h3>
         </div>
         <p className="mt-2 text-[12.5px] leading-5" style={{ color: '#D8CFC1' }}>
-          Occasion watching, curated gift ideas, and approvals before any purchase — no dashboard access until you’re a member.
+          Occasion watching, curated gift ideas, and approvals before any purchase. No dashboard access until you’re a member.
         </p>
       </div>
     </MobileShell>

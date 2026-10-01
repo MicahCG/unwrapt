@@ -24,7 +24,7 @@
     },
     "/v1/recommendations": {
       "post": {
-        "summary": "Recommend 2–3 gifts with prices",
+        "summary": "Recommend 2-3 gifts with prices",
         "description": "Returns shoppable gift ideas for a recipient and budget. Does not purchase.",
         "requestBody": {
           "required": true,

@@ -23,7 +23,7 @@ type ThreadProduct = { id: string; title: string; price: number; featured_image_
 
 // Reveals text progressively for a lightweight typewriter effect. Mounted
 // once per message (keyed by index in the list below), so it types out once
-// when a reply first arrives and stays static on re-render — it never
+// when a reply first arrives and stays static on re-render  -  it never
 // replays for messages already on screen.
 const TYPEWRITER_BASE_MS = 32; // per-character pace, human typing speed
 const TYPEWRITER_JITTER_MS = 20; // +/- randomness so it doesn't feel robotic
@@ -317,7 +317,7 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
     ? `I can help you plan for ${recipientFirst}, refine their interests, or find the next gift.`
     : context.surface === 'catalog'
       ? 'Tell me who you are shopping for or what should feel different about the gift.'
-      : 'I remember the people who matter and find gifts worth giving — try me before you commit.';
+      : 'I remember the people who matter and find gifts worth giving. Try me before you commit.';
 
   return (
     <TheaContextValue.Provider value={value}>
@@ -434,8 +434,8 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#B65B3C]">Continue with Thea</p>
               <p className="mt-2 text-[13.5px] leading-5 text-[#5A5147]">
                 {recipientFirst
-                  ? `You've seen picks for ${recipientFirst}. Subscribe to keep chatting, get priority recommendations, and let me watch every occasion — ${VIP_MONTHLY_AMOUNT_LABEL}/mo.`
-                  : `You've seen what I can find. Subscribe to keep chatting and let me watch every occasion — ${VIP_MONTHLY_AMOUNT_LABEL}/mo.`}{' '}
+                  ? `You've seen picks for ${recipientFirst}. Subscribe to keep chatting, get priority recommendations, and let me watch every occasion (${VIP_MONTHLY_AMOUNT_LABEL}/mo).`
+                  : `You've seen what I can find. Subscribe to keep chatting and let me watch every occasion (${VIP_MONTHLY_AMOUNT_LABEL}/mo).`}{' '}
                 You still approve before anything ships.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -459,7 +459,7 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           {llmLocked && upgradeDismissed && !isVip && (
             <div className="mt-4 rounded-[16px] border border-dashed border-[#D9CDBD] bg-white/70 px-3.5 py-3 text-[12.5px] leading-5 text-[#6F6559]">
-              Preview complete. Subscribe to keep talking with Thea — your people and inbox stay free.
+              Preview complete. Subscribe to keep talking with Thea. Your people and inbox stay free.
               <button type="button" onClick={handleSubscribe} className="ml-1 font-semibold text-[#B65B3C] underline">
                 Subscribe
               </button>

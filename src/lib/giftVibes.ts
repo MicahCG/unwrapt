@@ -9,7 +9,7 @@
  * Sourced from Goody's live catalog via the gift-catalog edge function's
  * `browse_by_vibe` action, which tags each product with a best-guess vibe
  * (Goody has no vibe taxonomy of its own, so this is a keyword-based
- * approximation — see VIBE_KEYWORDS in supabase/functions/gift-catalog).
+ * approximation  -  see VIBE_KEYWORDS in supabase/functions/gift-catalog).
  */
 
 import { supabase } from '@/integrations/supabase/client';

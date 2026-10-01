@@ -1,4 +1,4 @@
-// Agent-first (Unwrapt 2.0) palette — single source of truth for the
+// Agent-first (Unwrapt 2.0) palette  -  single source of truth for the
 // concierge-style screens. Mirrors the "Unwrapt 2.0 agent-first design" prototype.
 export const U = {
   bg: '#EDE6D8',          // app background

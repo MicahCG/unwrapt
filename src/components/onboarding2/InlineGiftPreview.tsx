@@ -10,7 +10,7 @@ interface InlineGiftPreviewProps {
   interests: string[];
 }
 
-/** Soft, non-committal inspiration strip — not a picker. */
+/** Soft, non-committal inspiration strip  -  not a picker. */
 const InlineGiftPreview: React.FC<InlineGiftPreviewProps> = ({ recipientFirstName, interests }) => {
   const previewRef = useRef<HTMLDivElement>(null);
   const { data, isLoading } = useQuery({
@@ -94,7 +94,7 @@ const InlineGiftPreview: React.FC<InlineGiftPreviewProps> = ({ recipientFirstNam
         ))}
       </div>
       <p className="mt-2 text-[10px] leading-4" style={{ color: U.muted }}>
-        Just inspiration — Thea will pick the strong ones next.
+        Just inspiration. Thea will pick the strong ones next.
       </p>
     </div>
   );

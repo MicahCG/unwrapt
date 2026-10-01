@@ -332,7 +332,7 @@ You are in a short onboarding conversation learning about one gift recipient. Re
       const learned = Array.isArray(content.interests)
         ? [...new Set(content.interests.filter((v: unknown): v is string => typeof v === "string" && v.trim().length > 0 && v.length <= 80).map((v: string) => v.trim()))].slice(0, 3)
         : interests;
-      return json({ success: true, reply: content.reply.replace(/\s*—\s*/g, ", ").trim().slice(0, 1200), interests: learned });
+      return json({ success: true, reply: content.reply.replace(/\s*[\u2014\u2013]\s*/g, ", ").trim().slice(0, 1200), interests: learned });
     }
 
     const conversation: unknown[] = [
@@ -433,7 +433,7 @@ You are in a short onboarding conversation learning about one gift recipient. Re
     // The prompt already says never use an em dash, but that rule isn't
     // always followed, so enforce it here rather than relying on the model.
     const reply = (markerMatch ? finalContent.slice(0, markerMatch.index) : finalContent)
-      .replace(/\s*—\s*/g, ", ")
+      .replace(/\s*[\u2014\u2013]\s*/g, ", ")
       .trim();
 
     const products = recommendedIds.length > 0

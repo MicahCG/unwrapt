@@ -2,13 +2,13 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 
 /**
- * Muse Connector API — public surface for Meta Muse review + directory listing.
+ * Muse Connector API  -  public surface for Meta Muse review + directory listing.
  * Auth:
  *   - Required: X-Unwrapt-Api-Key (or Authorization: Bearer <MUSE_CONNECTOR_KEY>)
  *   - Optional user scope: Authorization: Bearer <supabase_user_jwt>
  *     OR X-Unwrapt-Review-User: 1 (uses MUSE_REVIEW_USER_ID for Meta sandbox)
  *
- * All purchases require explicit user approval — this API never auto-charges.
+ * All purchases require explicit user approval  -  this API never auto-charges.
  */
 
 const corsHeaders = {
@@ -194,7 +194,7 @@ Deno.serve(async (req) => {
   }
 
   if (req.method === "GET" && path === "/v1/openapi.json") {
-    // Redirect hint — canonical OpenAPI is hosted on the app
+    // Redirect hint  -  canonical OpenAPI is hosted on the app
     return json({
       openapi: "https://app.unwrapt.io/muse/openapi.json",
     });
@@ -370,7 +370,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (!recipient) return json({ error: "recipient_not_found" }, 404);
 
-      // Create a scheduled gift in a non-purchased state — requires approval before charge.
+      // Create a scheduled gift in a non-purchased state  -  requires approval before charge.
       const { data: gift, error } = await admin
         .from("scheduled_gifts")
         .insert({

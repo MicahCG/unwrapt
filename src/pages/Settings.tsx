@@ -25,9 +25,9 @@ import { MobileShell, Eyebrow, PrimaryButton, Display } from '@/components/unwra
 import { U, initialsOf } from '@/components/unwrapt2/theme';
 
 const RANGE_PRESETS = [
-  { id: 'budget', label: 'Budget-friendly', range: '$15–50', lo: 15, hi: 50 },
-  { id: 'everyday', label: 'Everyday', range: '$50–150', lo: 50, hi: 150 },
-  { id: 'generous', label: 'Generous', range: '$150–350', lo: 150, hi: 350 },
+  { id: 'budget', label: 'Budget-friendly', range: '$15-50', lo: 15, hi: 50 },
+  { id: 'everyday', label: 'Everyday', range: '$50-150', lo: 50, hi: 150 },
+  { id: 'generous', label: 'Generous', range: '$150-350', lo: 150, hi: 350 },
   { id: 'luxury', label: 'Luxury', range: '$350+', lo: 350, hi: 600 },
 ];
 
@@ -129,7 +129,7 @@ const Settings = () => {
     try {
       await supabase.from('profiles').update(payload as any).eq('id', user.id);
     } catch (e) {
-      /* preference columns may not exist yet — non-fatal */
+      /* preference columns may not exist yet  -  non-fatal */
     }
   };
 
@@ -149,7 +149,7 @@ const Settings = () => {
     toast({ title: "We've received your request", description: "Your account will be deleted within 24 hours. We're sorry to see you go." });
   };
 
-  const budgetLabel = `$${budget.lo} – $${budget.hi}`;
+  const budgetLabel = `$${budget.lo} - $${budget.hi}`;
   const tier = ((profile as Record<string, any>)?.subscription_tier as string) || 'free';
 
   return (

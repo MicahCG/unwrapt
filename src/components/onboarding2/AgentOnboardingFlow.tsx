@@ -58,7 +58,7 @@ const INTEREST_TAXONOMY = [
 
 const REL_OPTIONS = ['Friend', 'Family', 'Partner', 'Colleague', 'Mentor'];
 
-/** Silent defaults — budget/autopilot UI deferred until post-subscribe gift config. */
+/** Silent defaults  -  budget/autopilot UI deferred until post-subscribe gift config. */
 const DEFAULT_BUDGET = { lo: 50, hi: 150 };
 const DEFAULT_AUTOPILOT = 'always';
 
@@ -221,7 +221,7 @@ function HoldThenType({
   return <TypewriterLine text={next} onComplete={onComplete} />;
 }
 
-/** Duolingo-style step pips — cleaner than "STEP X OF 4". */
+/** Duolingo-style step pips  -  cleaner than "STEP X OF 4". */
 function StepPips({ step, total = 4 }: { step: number; total?: number }) {
   return (
     <div className="mb-2 flex items-center justify-center gap-1.5" role="progressbar" aria-valuenow={step} aria-valuemin={1} aria-valuemax={total} aria-label={`Step ${step} of ${total}`}>
@@ -612,7 +612,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     setIntelMessages([
       {
         from: 'thea',
-        text: `What’s ${first} into? Tap one thing to start — I’ll take it from there.`,
+        text: `What’s ${first} into? Tap one thing to start, and I’ll take it from there.`,
       },
     ]);
     setScreen('intel');
@@ -621,9 +621,9 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   const readyReply = (first: string, facts: string[]) => {
     const list = facts.map((f) => f.toLowerCase()).join(', ');
     if (facts.length >= READY_INTERESTS) {
-      return `Ooh — ${list}. I have a few options that tie that together. Ready to see what I recommend for ${first}?`;
+      return `Ooh, ${list}. I have a few options that tie that together. Ready to see what I recommend for ${first}?`;
     }
-    return `Love that — ${list}. Tell me a bit more about what ${first} is into.`;
+    return `Love that: ${list}. Tell me a bit more about what ${first} is into.`;
   };
 
   const sendIntelMessage = async (text: string, selectedInterest?: string) => {
@@ -793,7 +793,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           } as never)
           .eq('id', user.id);
       } catch {
-        /* preference columns may not exist yet — non-fatal */
+        /* preference columns may not exist yet  -  non-fatal */
       }
 
       try {
@@ -833,7 +833,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       });
       setCompleting(false);
       setStartingCheckout(false);
-      // Recipients may already be saved — parent will show SubscribeGate on refresh.
+      // Recipients may already be saved  -  parent will show SubscribeGate on refresh.
       await onComplete();
     }
   };
@@ -885,7 +885,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
               <em style={{ fontStyle: 'italic', fontWeight: 400, color: U.accent }}>moment.</em>
             </Display>
             <p className="mx-auto mt-4 min-h-[48px]" style={{ fontSize: 15, lineHeight: 1.5, color: U.textSecondary, maxWidth: 300 }}>
-              <TypewriterLine text="I remember who matters — and help you handle every gift." speedMs={22} />
+              <TypewriterLine text="I remember who matters, and help you handle every gift." speedMs={22} />
             </p>
           </div>
         </MobileShell>
@@ -1243,7 +1243,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
               <h3 className="text-[14px] font-semibold">Put gifting on autopilot</h3>
             </div>
             <p className="mt-2 text-[12.5px] leading-5" style={{ color: '#D8CFC1' }}>
-              Thea keeps refining picks like these, remembers the occasion, and brings you a recommendation when it’s time — you approve before any purchase.
+              Thea keeps refining picks like these, remembers the occasion, and brings you a recommendation when it’s time. You approve before any purchase.
             </p>
           </section>
 

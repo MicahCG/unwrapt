@@ -7,7 +7,7 @@ interface OnboardingFlowProps {
 }
 
 /**
- * Unwrapt 2.0 — agent-first onboarding. Flow: welcome (optional) → connect →
+ * Unwrapt 2.0  -  agent-first onboarding. Flow: welcome (optional) → connect →
  * people → Thea intel → gift proof → inbox. Budget/autopilot deferred until
  * post-subscribe gift configuration.
  */

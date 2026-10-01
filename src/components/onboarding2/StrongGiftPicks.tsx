@@ -11,7 +11,7 @@ interface StrongGiftPicksProps {
   products: GiftCatalogItem[];
 }
 
-/** 5–7 word why line from interests + product cues. */
+/** 5-7 word why line from interests + product cues. */
 export function whyForGift(product: GiftCatalogItem, interests: string[]): string {
   const tags = interests.map((i) => i.toLowerCase()).filter(Boolean);
   const name = `${product.name} ${product.brand || ''} ${product.description || ''}`.toLowerCase();

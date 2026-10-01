@@ -512,7 +512,7 @@ const Dashboard = () => {
                     </div>
                   )}
 
-                  {/* Automation toggle (VIP) — preserves existing logic */}
+                  {/* Automation toggle (VIP)  -  preserves existing logic */}
                   {nextOccasionDate && tier === 'vip' && (() => {
                     const activeOrderDate = activeOrder?.occasion_date;
                     const automatedGiftDate = relevantAutomatedGift?.occasion_date;
@@ -568,7 +568,7 @@ const Dashboard = () => {
         )}
       </MobileShell>
 
-      {/* Modals — unchanged logic */}
+      {/* Modals  -  unchanged logic */}
       {showAddRecipient && (
         <AddRecipientModal isOpen={showAddRecipient} onClose={() => setShowAddRecipient(false)} onRecipientAdded={() => setShowAddRecipient(false)} />
       )}
