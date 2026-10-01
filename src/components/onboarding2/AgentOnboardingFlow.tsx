@@ -120,6 +120,289 @@ function formatDateLabel(p: Person): string {
   }
 }
 
+const TYPE_MS = 26;
+
+/** Lightweight typewriter for onboarding speech bubbles. */
+function TypewriterLine({
+  text,
+  speedMs = TYPE_MS,
+  enabled = true,
+  className,
+  style,
+  caret = true,
+  onComplete,
+}: {
+  text: string;
+  speedMs?: number;
+  enabled?: boolean;
+  className?: string;
+  style?: React.CSSProperties;
+  caret?: boolean;
+  onComplete?: () => void;
+}) {
+  const [shown, setShown] = useState(enabled ? '' : text);
+  const doneRef = useRef(false);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
+  useEffect(() => {
+    doneRef.current = false;
+    if (!enabled) {
+      setShown(text);
+      if (!doneRef.current) {
+        doneRef.current = true;
+        onCompleteRef.current?.();
+      }
+      return;
+    }
+    setShown('');
+    let i = 0;
+    const id = window.setInterval(() => {
+      i += 1;
+      setShown(text.slice(0, i));
+      if (i >= text.length) {
+        window.clearInterval(id);
+        if (!doneRef.current) {
+          doneRef.current = true;
+          onCompleteRef.current?.();
+        }
+      }
+    }, speedMs);
+    return () => window.clearInterval(id);
+  }, [text, speedMs, enabled]);
+
+  const done = shown.length >= text.length;
+  return (
+    <span className={className} style={style}>
+      {shown}
+      {caret && !done && (
+        <span
+          aria-hidden="true"
+          style={{
+            display: 'inline-block',
+            width: 2,
+            height: '0.85em',
+            marginLeft: 2,
+            background: U.accent,
+            verticalAlign: '-0.1em',
+            animation: 'u-blink 1s step-end infinite',
+          }}
+        />
+      )}
+    </span>
+  );
+}
+
+/** Hold a title briefly, then typewriter into a follow-up prompt. */
+function HoldThenType({
+  hold,
+  next,
+  holdMs = 1500,
+  onComplete,
+}: {
+  hold: React.ReactNode;
+  next: string;
+  holdMs?: number;
+  onComplete?: () => void;
+}) {
+  const [phase, setPhase] = useState<'hold' | 'type'>('hold');
+
+  useEffect(() => {
+    setPhase('hold');
+    const t = window.setTimeout(() => setPhase('type'), holdMs);
+    return () => window.clearTimeout(t);
+  }, [holdMs, next]);
+
+  if (phase === 'hold') return <>{hold}</>;
+  return <TypewriterLine text={next} onComplete={onComplete} />;
+}
+
+/** Duolingo-style step pips — cleaner than "STEP X OF 4". */
+function StepPips({ step, total = 4 }: { step: number; total?: number }) {
+  return (
+    <div className="mb-2 flex items-center justify-center gap-1.5" role="progressbar" aria-valuenow={step} aria-valuemin={1} aria-valuemax={total} aria-label={`Step ${step} of ${total}`}>
+      {Array.from({ length: total }, (_, i) => {
+        const n = i + 1;
+        const done = n < step;
+        const current = n === step;
+        return (
+          <div
+            key={n}
+            style={{
+              height: 6,
+              width: current ? 22 : 6,
+              borderRadius: 99,
+              background: done || current ? U.accent : 'rgba(42,37,32,0.14)',
+              transition: 'width 280ms ease, background 280ms ease',
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function ImportPromptScreen({
+  connecting,
+  onConnect,
+}: {
+  connecting: boolean;
+  onConnect: () => void;
+}) {
+  const [ctaReady, setCtaReady] = useState(false);
+
+  return (
+    <MobileShell
+      contentClassName="px-5 pt-5 pb-4"
+      footer={
+        <div
+          style={{
+            opacity: ctaReady ? 1 : 0,
+            transform: ctaReady ? 'translateY(0)' : 'translateY(8px)',
+            transition: 'opacity 320ms ease, transform 320ms ease',
+            pointerEvents: ctaReady ? 'auto' : 'none',
+          }}
+        >
+          <PrimaryButton onClick={onConnect} disabled={connecting || !ctaReady}>
+            {connecting ? 'Connecting…' : 'Connect Google Calendar'}
+          </PrimaryButton>
+          <p
+            className="mt-3 flex items-center justify-center gap-1.5 text-center"
+            style={{ color: U.muted, fontSize: 10.5, opacity: 0.55, letterSpacing: '0.02em' }}
+          >
+            <ShieldCheck size={12} aria-hidden="true" />
+            <span>Read-only · disconnect anytime</span>
+          </p>
+        </div>
+      }
+    >
+      <StepPips step={1} />
+      <TheaCharacter size="large" animated className="u-thea-character--greeting" />
+      <div
+        className="-mt-2 rounded-[22px] border bg-white/80 px-5 py-5 text-center"
+        style={{ borderColor: U.border }}
+        aria-live="polite"
+      >
+        <Display style={{ fontSize: 24, lineHeight: 1.25, fontWeight: 500 }}>
+          <TypewriterLine
+            text="Connect your calendar and I’ll find important dates for us to prioritize."
+            onComplete={() => setCtaReady(true)}
+          />
+        </Display>
+      </div>
+    </MobileShell>
+  );
+}
+
+function FoundPeopleScreen({
+  people,
+  focusingId,
+  selectedFirst,
+  onSelect,
+  onContinue,
+}: {
+  people: Person[];
+  focusingId: string | null;
+  selectedFirst: string;
+  onSelect: (id: string) => void;
+  onContinue: () => void;
+}) {
+  const [listReady, setListReady] = useState(false);
+  const selectedCount = people.filter((p) => p.selected).length;
+
+  return (
+    <MobileShell
+      contentClassName="px-5 pt-5 pb-4"
+      footer={
+        <div
+          style={{
+            opacity: listReady ? 1 : 0,
+            transform: listReady ? 'translateY(0)' : 'translateY(8px)',
+            transition: 'opacity 320ms ease, transform 320ms ease',
+            pointerEvents: listReady ? 'auto' : 'none',
+          }}
+        >
+          <PrimaryButton onClick={onContinue} disabled={!listReady || selectedCount === 0 || !!focusingId}>
+            {focusingId ? `Starting with ${selectedFirst}…` : `Continue with ${selectedFirst}`}
+          </PrimaryButton>
+        </div>
+      }
+    >
+      <StepPips step={2} />
+      <TheaCharacter size="medium" gesture="Present" activity="clipboard" />
+      <div className="-mt-2 mb-4 rounded-[22px] border bg-white/80 px-5 py-4 text-center" style={{ borderColor: U.border }} aria-live="polite">
+        <Display style={{ fontSize: 27, lineHeight: 1.15 }}>
+          {focusingId ? (
+            `Let’s start with ${selectedFirst}.`
+          ) : (
+            <HoldThenType
+              hold={
+                <>
+                  I found{' '}
+                  <span style={{ color: U.accent }}>
+                    {people.length} {people.length === 1 ? 'person' : 'people'}
+                  </span>{' '}
+                  in your calendar.
+                </>
+              }
+              next="choose one person to get started"
+              onComplete={() => setListReady(true)}
+            />
+          )}
+        </Display>
+      </div>
+      <div
+        className="flex flex-col gap-2.5"
+        role="radiogroup"
+        aria-label="Choose one person to start with"
+        style={{
+          opacity: listReady || focusingId ? 1 : 0,
+          transform: listReady || focusingId ? 'translateY(0)' : 'translateY(10px)',
+          transition: 'opacity 380ms ease, transform 380ms ease',
+          pointerEvents: listReady || focusingId ? 'auto' : 'none',
+        }}
+      >
+        {people.map((p) => (
+          <button
+            type="button"
+            key={p.id}
+            onClick={() => onSelect(p.id)}
+            disabled={!!focusingId}
+            role="radio"
+            aria-checked={p.selected}
+            className="flex w-full cursor-pointer items-center gap-3.5 text-left"
+            style={{
+              padding: '13px 14px', borderRadius: 18, background: U.surface, border: `1px solid ${U.border}`,
+              transform: focusingId ? (p.id === focusingId ? 'scale(1.045)' : 'scale(.91)') : 'scale(1)',
+              opacity: focusingId && p.id !== focusingId ? 0.35 : 1,
+              transition: 'transform 700ms cubic-bezier(.22,1,.36,1), opacity 500ms ease',
+            }}
+          >
+            <PersonAvatar initials={initialsOf(p.name)} tone={p.tone} dim={!p.selected} />
+            <div className="min-w-0 flex-1" style={{ opacity: p.selected ? 1 : 0.5 }}>
+              <div style={{ fontWeight: 600, fontSize: 15.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+              <div style={{ fontSize: 12.5, color: U.muted }}>
+                {p.relationship ? `${p.relationship} · ` : ''}{formatDateLabel(p)}
+              </div>
+            </div>
+            <div
+              className="flex items-center justify-center"
+              style={{
+                width: 26, height: 26, borderRadius: '50%', flexShrink: 0, fontSize: 14,
+                background: p.selected ? U.accent : 'transparent',
+                border: p.selected ? `1.5px solid ${U.accent}` : '1.5px solid rgba(42,37,32,0.22)',
+                color: p.selected ? U.cream : 'transparent',
+              }}
+            >
+              ✓
+            </div>
+          </button>
+        ))}
+      </div>
+    </MobileShell>
+  );
+}
+
 const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete }) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -252,9 +535,8 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         } else {
           toast({
             title: 'No events found',
-            description: "I couldn't find birthdays or anniversaries. Let's add someone together.",
+            description: "I couldn't find birthdays or anniversaries yet. Make sure they’re on your Google Calendar, then try again.",
           });
-          startManualAdd();
         }
       }, 1400);
     } catch (error) {
@@ -324,7 +606,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     setIntelMessages([
       {
         from: 'thea',
-        text: `Let's find something that feels like ${first}. What are they into? Tell me in your own words, or pick a few interests below.`,
+        text: `What is ${first} into? Tap a few interests — or tell me in your words.`,
       },
     ]);
     setScreen('intel');
@@ -527,7 +809,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             <>
               <PrimaryButton onClick={() => setScreen('import')}>Get started</PrimaryButton>
               <p className="mt-3.5 text-center font-mono" style={{ fontSize: 12.5, color: U.muted, letterSpacing: '0.5px' }}>
-                about 2 minutes · cancel anytime
+                about 2 minutes
               </p>
             </>
           }
@@ -545,8 +827,8 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
               Never forget another<br />
               <em style={{ fontStyle: 'italic', fontWeight: 400, color: U.accent }}>moment.</em>
             </Display>
-            <p className="mx-auto mt-4" style={{ fontSize: 15, lineHeight: 1.5, color: U.textSecondary, maxWidth: 320 }}>
-              I remember who matters, learn what they love and help you handle every gift.
+            <p className="mx-auto mt-4 min-h-[48px]" style={{ fontSize: 15, lineHeight: 1.5, color: U.textSecondary, maxWidth: 300 }}>
+              <TypewriterLine text="I remember who matters — and help you handle every gift." speedMs={22} />
             </p>
           </div>
         </MobileShell>
@@ -559,9 +841,11 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           <MobileShell animate={false}>
             <div className="flex h-full flex-col items-center justify-center px-6 text-center">
               <TheaCharacter size="large" gesture="Listen" activity="calendar" />
-              <Display className="mt-7 text-[27px]">Reading your calendar…</Display>
+              <Display className="mt-7 text-[27px]">
+                <TypewriterLine text="Reading your calendar…" speedMs={32} caret={false} />
+              </Display>
               <p className="mt-2" style={{ fontSize: 15, color: U.subtle, maxWidth: 260, lineHeight: 1.5 }}>
-                Finding the people who matter and the dates that count.
+                Finding dates that matter…
               </p>
               <div className="mt-8 flex w-full max-w-[270px] flex-col gap-3">
                 {[90, 70, 80].map((w, i) => (
@@ -583,112 +867,24 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         );
       }
       return (
-        <MobileShell
-          contentClassName="px-5 pt-5 pb-4"
-          footer={
-            <>
-              <PrimaryButton onClick={handleFindMyPeople} disabled={connecting}>
-                {connecting ? 'Connecting…' : 'Connect Google Calendar'}
-              </PrimaryButton>
-              <button
-                type="button"
-                onClick={startManualAdd}
-                className="mt-2 min-h-11 w-full text-[13.5px] font-semibold"
-                style={{ color: U.textSecondary }}
-              >
-                Add someone manually
-              </button>
-            </>
-          }
-        >
-          <Eyebrow className="mb-1 text-center">Step 1 of 4</Eyebrow>
-          <TheaCharacter size="large" animated className="u-thea-character--greeting" />
-          <div className="-mt-2 rounded-[22px] border bg-white/80 px-5 py-4 text-center" style={{ borderColor: U.border }}>
-            <Display style={{ fontSize: 28, lineHeight: 1.08 }}>Who should I remember?</Display>
-            <p className="mt-2 text-[14px] leading-5" style={{ color: U.textSecondary }}>
-              I can find upcoming birthdays and anniversaries from your calendar, or we can start with one person.
-            </p>
-          </div>
-          <div className="mt-4 flex items-center justify-center gap-2" style={{ color: U.muted, fontSize: 12 }}>
-            <ShieldCheck size={16} aria-hidden="true" />
-            <span>Read-only access. Disconnect whenever.</span>
-          </div>
-        </MobileShell>
+        <ImportPromptScreen
+          connecting={connecting}
+          onConnect={handleFindMyPeople}
+        />
       );
 
     // ════════ FOUND PEOPLE ════════
     case 'found': {
-      const selectedCount = selectedPeople.length;
       const selectedPerson = selectedPeople[0];
       const selectedFirst = firstNameOf(selectedPerson?.name || 'them');
       return (
-        <MobileShell
-          contentClassName="px-5 pt-5 pb-4"
-          footer={
-            <PrimaryButton onClick={focusSelectedPerson} disabled={selectedCount === 0 || !!focusingId}>
-              {focusingId ? `Starting with ${selectedFirst}…` : `Continue with ${selectedFirst}`}
-            </PrimaryButton>
-          }
-        >
-          <Eyebrow className="text-center">Step 2 of 4</Eyebrow>
-          <TheaCharacter size="medium" gesture="Present" activity="clipboard" />
-          <div className="-mt-2 mb-4 rounded-[22px] border bg-white/80 px-5 py-4 text-center" style={{ borderColor: U.border }} aria-live="polite">
-            <Display style={{ fontSize: 27, lineHeight: 1.1 }}>
-              {focusingId
-                ? `Let’s start with ${selectedFirst}.`
-                : <>I found <span style={{ color: U.accent }}>{people.length} {people.length === 1 ? 'person' : 'people'}</span> in your calendar.</>}
-            </Display>
-          </div>
-          <Eyebrow className="mb-3" color={U.subtle}>Choose one person</Eyebrow>
-          <div className="flex flex-col gap-2.5" role="radiogroup" aria-label="Choose one person to start with">
-            {people.map((p) => (
-              <button
-                type="button"
-                key={p.id}
-                onClick={() => selectPerson(p.id)}
-                disabled={!!focusingId}
-                role="radio"
-                aria-checked={p.selected}
-                className="flex w-full cursor-pointer items-center gap-3.5 text-left"
-                style={{
-                  padding: '13px 14px', borderRadius: 18, background: U.surface, border: `1px solid ${U.border}`,
-                  transform: focusingId ? (p.id === focusingId ? 'scale(1.045)' : 'scale(.91)') : 'scale(1)',
-                  opacity: focusingId && p.id !== focusingId ? 0.35 : 1,
-                  transition: 'transform 700ms cubic-bezier(.22,1,.36,1), opacity 500ms ease',
-                }}
-              >
-                <PersonAvatar initials={initialsOf(p.name)} tone={p.tone} dim={!p.selected} />
-                <div className="min-w-0 flex-1" style={{ opacity: p.selected ? 1 : 0.5 }}>
-                  <div style={{ fontWeight: 600, fontSize: 15.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-                  <div style={{ fontSize: 12.5, color: U.muted }}>
-                    {p.relationship ? `${p.relationship} · ` : ''}{formatDateLabel(p)}
-                  </div>
-                </div>
-                <div
-                  className="flex items-center justify-center"
-                  style={{
-                    width: 26, height: 26, borderRadius: '50%', flexShrink: 0, fontSize: 14,
-                    background: p.selected ? U.accent : 'transparent',
-                    border: p.selected ? `1.5px solid ${U.accent}` : '1.5px solid rgba(42,37,32,0.22)',
-                    color: p.selected ? U.cream : 'transparent',
-                  }}
-                >
-                  ✓
-                </div>
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={startManualAdd}
-              disabled={!!focusingId}
-              className="flex w-full cursor-pointer items-center gap-3.5 text-left"
-              style={{ padding: '13px 14px', borderRadius: 18, border: '1px dashed rgba(42,37,32,0.18)', color: U.muted, opacity: focusingId ? 0.3 : 1, transition: 'opacity 500ms ease' }}
-            >
-              <div className="flex items-center justify-center" style={{ width: 44, height: 44, borderRadius: '50%', border: '1px dashed rgba(42,37,32,0.2)', fontSize: 22, color: U.accent }}>+</div>
-              <div className="flex-1" style={{ fontSize: 14 }}>Add someone manually</div>
-            </button>
-          </div>
-        </MobileShell>
+        <FoundPeopleScreen
+          people={people}
+          focusingId={focusingId}
+          selectedFirst={selectedFirst}
+          onSelect={selectPerson}
+          onContinue={focusSelectedPerson}
+        />
       );
     }
 
@@ -777,15 +973,18 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             {/* header */}
             <div className="relative text-center" style={{ padding: '16px 20px 14px', borderBottom: `1px solid rgba(42,37,32,0.07)` }}>
               <button type="button" aria-label="Back to people" onClick={() => setScreen(people.length > 1 || activePerson?.fromCalendar ? 'found' : 'import')} className="absolute left-4 top-5 flex min-h-11 min-w-11 items-center text-[22px]" style={{ color: U.subtle }}>‹</button>
+              <StepPips step={3} />
               <TheaCharacter size="compact" className="mx-auto u-thea-character--chat" activity="chat" gesture={intelFacts.length ? "Present" : "Listen"} />
               <div className="-mt-1">
                 <div style={{ fontWeight: 600, fontSize: 15.5 }}>Getting to know {first}</div>
-                <Eyebrow>Thea · {intelFacts.length}/{MAX_INTERESTS} interests</Eyebrow>
+                <Eyebrow>{intelFacts.length}/{MAX_INTERESTS} interests unlocked</Eyebrow>
               </div>
             </div>
             {/* messages */}
             <div className="flex flex-1 flex-col gap-3 overflow-y-auto" style={{ padding: '20px 20px 8px' }}>
-              {intelMessages.map((m, i) => (
+              {intelMessages.map((m, i) => {
+                const isLatestThea = m.from === 'thea' && i === intelMessages.length - 1 && !intelSending;
+                return (
                 <div key={i} className="flex" style={{ justifyContent: m.from === 'thea' ? 'flex-start' : 'flex-end' }}>
                   <div
                     style={{
@@ -797,10 +996,11 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
                       borderBottomRightRadius: m.from === 'thea' ? 20 : 6,
                     }}
                   >
-                    {m.text}
+                    {isLatestThea ? <TypewriterLine text={m.text} speedMs={18} /> : m.text}
                   </div>
                 </div>
-              ))}
+                );
+              })}
               {intelSending && <p role="status" className="text-sm" style={{ color: U.subtle }}>Thea is thinking…</p>}
               <InlineGiftPreview recipientFirstName={first} interests={intelFacts} />
             </div>
@@ -893,13 +1093,16 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           >
             ‹
           </button>
+          <StepPips step={4} />
           <div className="mb-2 flex items-center gap-2.5">
-            <Eyebrow>Personalized for {first}</Eyebrow>
+            <Eyebrow>For {first}</Eyebrow>
           </div>
           <TheaCharacter size="medium" gesture="Present" />
-          <Display style={{ fontSize: 31, lineHeight: 1.08 }}>This is where their interests can lead.</Display>
+          <Display style={{ fontSize: 31, lineHeight: 1.08 }}>
+            <TypewriterLine text={`Gift ideas for ${first}.`} speedMs={24} />
+          </Display>
           <p className="mb-5 mt-2.5" style={{ fontSize: 15, lineHeight: 1.5, color: U.textSecondary }}>
-            Live catalog ideas from what you shared. This is the magic — Thea gets sharper every time you talk.
+            From what you just shared.
           </p>
           <GiftRecommendationPreview recipientFirstName={first} interests={activePerson.interests} />
         </MobileShell>
