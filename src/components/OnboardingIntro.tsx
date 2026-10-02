@@ -35,12 +35,6 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
   const slide = ONBOARDING_SLIDES[index];
   const isLastSlide = index === ONBOARDING_SLIDES.length - 1;
 
-  const getAppUrl = () => {
-    return window.location.hostname === 'localhost'
-      ? 'http://localhost:8080'
-      : 'https://app.unwrapt.io';
-  };
-
   useEffect(() => {
     setTypedText('');
     setIsTypingDone(false);
@@ -71,17 +65,7 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
     return () => clearTimeout(timeout);
   }, [isTypingDone, index, isLastSlide]);
 
-  const handleSkip = () => {
-    localStorage.setItem('hasSeenIntro', 'true');
-    markSkipAgentWelcome();
-    if (window.location.hostname === 'unwrapt.io') {
-      window.location.href = getAppUrl();
-      return;
-    }
-    onComplete();
-  };
-
-  const handleGetStarted = () => {
+  const finish = () => {
     localStorage.setItem('hasSeenIntro', 'true');
     markSkipAgentWelcome();
     onComplete();
@@ -104,7 +88,7 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
   return (
     <div className={`onb-root onb-bg-${index + 1}`}>
       <div className="onb-card">
-        <button className="onb-skip" onClick={handleSkip}>
+        <button type="button" className="onb-skip" onClick={finish}>
           Skip intro
         </button>
 
@@ -125,7 +109,8 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
 
         {isLastSlide && isTypingDone && (
           <button
-            onClick={handleGetStarted}
+            type="button"
+            onClick={finish}
             className="mt-8 mb-4 px-8 py-3 rounded-full font-medium text-lg text-white transition-all duration-300 hover:scale-[1.02] flex items-center gap-2 mx-auto"
             style={{
               backgroundColor: "#D4AF7A",

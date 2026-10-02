@@ -4,12 +4,12 @@ import { ArrowRight, Heart, Clock, Gift } from "lucide-react";
 import { GlassButton } from "@/components/GlassButton";
 import { Logo } from "@/components/ui/logo";
 import ceramicCollection from "@/assets/ceramic-collection.png";
-import GiftBoxOpeningIntro from "@/components/GiftBoxOpeningIntro";
 import GiftingScenesScroll from "@/components/GiftingScenesScroll";
 import AnimatedGiftingJourney from "@/components/AnimatedGiftingJourney";
 import LuxuryGiftShowcase from "@/components/LuxuryGiftShowcase";
 import PricingSection from "@/components/landing/PricingSection";
 import FAQSection from "@/components/landing/FAQSection";
+import OnboardingIntro from "@/components/OnboardingIntro";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { motion } from "framer-motion";
 import SEOHead from "@/components/seo/SEOHead";
@@ -23,8 +23,9 @@ import { trackProductEvent } from "@/lib/productAnalytics";
 const Landing = () => {
   const { signInWithGoogle } = useAuth();
   const [showNav, setShowNav] = useState(false);
-  const [showIntro, setShowIntro] = useState(
-    () => localStorage.getItem("hasSeenLandingIntro") !== "true",
+  // Story intro plays once before the marketing landing page.
+  const [showStoryIntro, setShowStoryIntro] = useState(
+    () => localStorage.getItem("hasSeenIntro") !== "true",
   );
   const [ctaVariant] = useState(() =>
     getExperimentVariant("landing_primary_cta_copy_v1"),
@@ -42,17 +43,6 @@ const Landing = () => {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-
-  useEffect(() => {
-    if (!showIntro) return;
-
-    const timer = window.setTimeout(() => {
-      localStorage.setItem("hasSeenLandingIntro", "true");
-      setShowIntro(false);
-    }, 2300);
-
-    return () => window.clearTimeout(timer);
-  }, [showIntro]);
 
   useEffect(() => {
     trackExperimentExposure("landing_primary_cta_copy_v1", ctaVariant);
@@ -79,6 +69,17 @@ const Landing = () => {
     { icon: Gift, value: "You decide", label: "Before anything ships" },
   ];
 
+  if (showStoryIntro) {
+    return (
+      <OnboardingIntro
+        onComplete={() => {
+          localStorage.setItem("hasSeenIntro", "true");
+          setShowStoryIntro(false);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[hsl(var(--ivory))]" style={{ color: "#4B3B2A" }}>
       <SEOHead
@@ -86,7 +87,6 @@ const Landing = () => {
         description="Never forget special occasions. Unwrapt automatically schedules and delivers personalized, premium gifts for birthdays, anniversaries, and holidays. Smart reminders, curated gifts, effortless planning."
         canonical="https://unwrapt.io/"
       />
-      {showIntro && <GiftBoxOpeningIntro />}
 
       {/* Sticky Navigation */}
       <nav
@@ -136,7 +136,7 @@ const Landing = () => {
             className="w-[700px] md:w-[900px] max-w-none opacity-[0.07] object-cover rounded-full blur-[2px]"
             initial={{ opacity: 0, scale: 1.1 }}
             animate={{ opacity: 0.07, scale: 1 }}
-            transition={{ duration: 1.5, delay: 2.4, ease: "easeOut" }}
+            transition={{ duration: 1.5, delay: 0.2, ease: "easeOut" }}
           />
         </div>
 
@@ -145,7 +145,7 @@ const Landing = () => {
             className="flex flex-col items-center text-center"
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 2.2, ease: "easeOut" }}
+            transition={{ duration: 0.8, delay: 0.1, ease: "easeOut" }}
           >
             {/* Eyebrow */}
             <p

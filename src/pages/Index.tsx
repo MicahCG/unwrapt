@@ -4,7 +4,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import LoginPage from '@/components/auth/LoginPage';
 import OnboardingFlow from '@/components/OnboardingFlow';
-import OnboardingIntro from '@/components/OnboardingIntro';
 import Dashboard from '@/components/Dashboard';
 import SubscribeGate from '@/components/subscription/SubscribeGate';
 import { markSkipAgentWelcome } from '@/lib/funnel';
@@ -12,30 +11,24 @@ import { isPaidVip } from '@/lib/stripe';
 
 const Index = () => {
   const { user, loading } = useAuth();
-  const [showIntro, setShowIntro] = useState(false);
   const [showLoginPage, setShowLoginPage] = useState(false);
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    // Landing signup already chose "Get started"  -  skip stacked intro + welcome.
+    // Landing signup already chose Get Started - skip agent welcome on app.
     const shouldShowIntro = localStorage.getItem('shouldShowOnboardingIntro');
 
     if (shouldShowIntro === 'true' && user && !loading) {
       localStorage.removeItem('shouldShowOnboardingIntro');
       markSkipAgentWelcome();
       localStorage.setItem('hasSeenIntro', 'true');
-      setShowIntro(false);
       return;
     }
 
-    // Unauthenticated first visit: short story, then login (not another Get started).
+    // Unauthenticated visitors go straight to login on the app.
+    // The story intro lives on unwrapt.io before the marketing landing.
     if (!user && !loading) {
-      const hasSeenIntro = localStorage.getItem('hasSeenIntro');
-      if (!hasSeenIntro) {
-        setShowIntro(true);
-      } else {
-        setShowLoginPage(true);
-      }
+      setShowLoginPage(true);
     }
   }, [user, loading]);
 
@@ -83,29 +76,8 @@ const Index = () => {
     );
   }
 
-  const handleIntroComplete = () => {
-    localStorage.setItem('hasSeenIntro', 'true');
-    markSkipAgentWelcome();
-    setShowIntro(false);
-
-    if (!user) {
-      if (window.location.hostname === 'unwrapt.io') {
-        window.location.href = 'https://app.unwrapt.io';
-        return;
-      }
-
-      setTimeout(() => {
-        setShowLoginPage(true);
-      }, 100);
-    }
-  };
-
   if (user) {
-    if (showIntro) {
-      return <OnboardingIntro onComplete={handleIntroComplete} />;
-    }
-
-    // Paid members only  -  dashboard is gated.
+    // Paid members only - dashboard is gated.
     if (access?.isPaid) {
       return <Dashboard />;
     }
@@ -123,10 +95,6 @@ const Index = () => {
         }}
       />
     );
-  }
-
-  if (showIntro) {
-    return <OnboardingIntro onComplete={handleIntroComplete} />;
   }
 
   return (
