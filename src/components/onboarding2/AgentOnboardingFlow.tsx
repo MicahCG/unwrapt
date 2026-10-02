@@ -11,12 +11,23 @@ import { TheaCharacter } from '@/components/unwrapt2/TheaCharacter';
 import { U, toneForIndex, initialsOf } from '@/components/unwrapt2/theme';
 import { format } from 'date-fns';
 import { trackProductEvent } from '@/lib/productAnalytics';
-import InlineGiftPreview from '@/components/onboarding2/InlineGiftPreview';
 import GachaReveal from '@/components/onboarding2/GachaReveal';
 import StrongGiftPicks from '@/components/onboarding2/StrongGiftPicks';
 import { clearSkipAgentWelcome, markTheaValueSeen, shouldSkipAgentWelcome } from '@/lib/funnel';
 import { VIP_MONTHLY_AMOUNT_LABEL, VIP_MONTHLY_PRICE_ID } from '@/lib/stripe';
-import { getGiftRecommendations, type GiftCatalogItem } from '@/lib/giftCatalog';
+import { type GiftCatalogItem } from '@/lib/giftCatalog';
+import {
+  STARTER_CATEGORIES,
+  CATEGORY_FOLLOWUPS,
+  type InterestSignal,
+  discoveryReadyCopy,
+  isDiscoveryReady,
+  isStarterCategory,
+  searchLabelsFromSignals,
+  signalFromCategory,
+  signalFromText,
+  upsertSignal,
+} from '@/lib/interestDiscovery';
 
 interface AgentOnboardingFlowProps {
   /** Called once recipients are created so the parent can show the dashboard. */
@@ -47,14 +58,6 @@ interface Person {
 type Screen = 'welcome' | 'import' | 'found' | 'addperson' | 'intel' | 'reveal' | 'subscription';
 
 const FREE_TIER_LIMIT = 3;
-/** After this many signals, chat locks and reveal becomes the only path. */
-const READY_INTERESTS = 2;
-const MAX_INTERESTS = 3;
-
-const INTEREST_TAXONOMY = [
-  'Golf', 'Travel', 'Coffee', 'Fitness', 'Cooking', 'Wine', 'Reading', 'Music',
-  'Fashion', 'Gaming', 'Art', 'Pets', 'Tech', 'Outdoors', 'Whiskey', 'Premium experiences',
-];
 
 const REL_OPTIONS = ['Friend', 'Family', 'Partner', 'Colleague', 'Mentor'];
 
@@ -420,14 +423,18 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   const [activeId, setActiveId] = useState<string | null>(null);
   const [focusingId, setFocusingId] = useState<string | null>(null);
 
-  // Intel chat state
+  // Intel chat state: learn about the recipient before any gift shopping UI.
   const [intelMessages, setIntelMessages] = useState<{ from: 'thea' | 'user'; text: string }[]>([]);
-  const [intelFacts, setIntelFacts] = useState<string[]>([]);
+  const [intelSignals, setIntelSignals] = useState<InterestSignal[]>([]);
+  const [followUpChips, setFollowUpChips] = useState<string[]>([]);
+  const [pendingCategory, setPendingCategory] = useState<string | null>(null);
   const [intelInput, setIntelInput] = useState('');
   const [intelSending, setIntelSending] = useState(false);
   const [revealPicks, setRevealPicks] = useState<GiftCatalogItem[]>([]);
   const [unmatchedRevealInterests, setUnmatchedRevealInterests] = useState<string[]>([]);
   const intelRequest = useRef(0);
+  const intelFacts = useMemo(() => searchLabelsFromSignals(intelSignals), [intelSignals]);
+  const discoveryReady = useMemo(() => isDiscoveryReady(intelSignals), [intelSignals]);
   useEffect(() => {
     intelRequest.current += 1;
     setIntelSending(false);
@@ -649,6 +656,11 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   };
 
   // ── Intel chat ────────────────────────────────────────────────────────────────
+  const syncPersonInterests = (personId: string, signals: InterestSignal[]) => {
+    const labels = searchLabelsFromSignals(signals);
+    setPeople((prev) => prev.map((p) => (p.id === personId ? { ...p, interests: labels } : p)));
+  };
+
   const enterIntel = (id?: string, personOverride?: Person) => {
     const target = id || selectedPeople[0]?.id || people[0]?.id || null;
     if (!target) {
@@ -658,76 +670,90 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     const person = personOverride || people.find((p) => p.id === target);
     const first = firstNameOf(person?.name || '');
     setActiveId(target);
-    setIntelFacts(person?.interests || []);
+    const seeded: InterestSignal[] = (person?.interests || []).map((interest) =>
+      isStarterCategory(interest)
+        ? signalFromCategory(interest)
+        : signalFromText(interest, null),
+    );
+    setIntelSignals(seeded);
+    setFollowUpChips([]);
+    setPendingCategory(null);
     setIntelInput('');
     setRevealPicks([]);
     setUnmatchedRevealInterests([]);
     setIntelMessages([
       {
         from: 'thea',
-        text: `What’s ${first} into? Tap one thing to start, and I’ll take it from there.`,
+        text: `What's ${first} into? Tap a starting point, or tell me in your own words. I'll dig in before I show gifts.`,
       },
     ]);
     setScreen('intel');
   };
 
-  const readyReply = async (first: string, facts: string[]) => {
-    const list = facts.map((f) => f.toLowerCase()).join(', ');
-    if (facts.length < READY_INTERESTS) {
-      return `Love that: ${list}. Tell me a bit more about what ${first} is into.`;
+  const readyReply = (first: string, signals: InterestSignal[]) => {
+    if (!isDiscoveryReady(signals)) {
+      const list = searchLabelsFromSignals(signals).map((f) => f.toLowerCase()).join(', ');
+      return list
+        ? `Love that: ${list}. Tell me a bit more about what ${first} is into.`
+        : `Tell me a bit more about what ${first} is into.`;
     }
-
-    try {
-      const result = await getGiftRecommendations(facts, 4);
-      if (result.unmatchedInterests.length > 0) {
-        const missing = result.unmatchedInterests.map((i) => i.toLowerCase()).join(' / ');
-        const have = result.matchedInterests.length
-          ? result.matchedInterests.map((i) => i.toLowerCase()).join(' + ')
-          : 'what is in stock';
-        return `I love that ${first} is into ${list}. I don’t have a strong live match for ${missing} right now. Want me to lean on ${have}, or try something adjacent like beach or fashion?`;
-      }
-      return `Ooh, ${list}. I have a few options that pull that together. Ready to see what I recommend for ${first}?`;
-    } catch {
-      return `Ooh, ${list}. Ready to see what I recommend for ${first}?`;
-    }
+    return discoveryReadyCopy(first, signals);
   };
 
   const sendIntelMessage = async (text: string, selectedInterest?: string) => {
     const message = text.trim().slice(0, 2000);
     if (!activePerson || !message || intelSending) return;
-    if (intelFacts.length >= READY_INTERESTS) return;
     const personId = activePerson.id;
     const first = firstNameOf(activePerson.name);
     const request = ++intelRequest.current;
-    let facts = selectedInterest
-      ? [...intelFacts, selectedInterest]
-          .filter((v, i, arr) => arr.findIndex((x) => x.toLowerCase() === v.toLowerCase()) === i)
-          .slice(0, MAX_INTERESTS)
-      : intelFacts;
+    const isCategoryPick = Boolean(selectedInterest && isStarterCategory(selectedInterest));
+    const categoryContext = pendingCategory;
 
-    // Short free-text replies (e.g. "accessories") refine the interest set.
-    if (!selectedInterest && message.length <= 40 && intelFacts.length < READY_INTERESTS) {
-      const token = message.replace(/^[+]/, '').trim();
-      if (token && !intelFacts.some((f) => f.toLowerCase() === token.toLowerCase())) {
-        facts = [...intelFacts, token].slice(0, MAX_INTERESTS);
-        setIntelFacts(facts);
-        setPeople((prev) => prev.map((p) => (p.id === personId ? { ...p, interests: facts } : p)));
+    let nextSignals = intelSignals;
+    if (selectedInterest) {
+      if (isCategoryPick) {
+        nextSignals = upsertSignal(intelSignals, signalFromCategory(selectedInterest));
+        setPendingCategory(selectedInterest);
+      } else {
+        nextSignals = upsertSignal(
+          intelSignals,
+          signalFromText(selectedInterest, categoryContext),
+        );
+        setPendingCategory(null);
+        setFollowUpChips([]);
       }
+    } else {
+      nextSignals = upsertSignal(intelSignals, signalFromText(message, categoryContext));
+      setPendingCategory(null);
+      setFollowUpChips([]);
     }
 
     const nextMessages = [...intelMessages, { from: 'user' as const, text: message }];
     setIntelMessages(nextMessages);
     setIntelInput('');
     setIntelSending(true);
-    if (selectedInterest) {
-      setIntelFacts(facts);
-      setPeople((prev) => prev.map((p) => (p.id === personId ? { ...p, interests: facts } : p)));
+    setIntelSignals(nextSignals);
+    syncPersonInterests(personId, nextSignals);
+
+    // Broad category chips: acknowledge + narrow, never jump to products.
+    if (isCategoryPick && selectedInterest) {
+      const follow = CATEGORY_FOLLOWUPS[selectedInterest];
+      const reply = follow
+        ? follow.prompt(first)
+        : `Got it. What about ${selectedInterest.toLowerCase()} matters most for ${first}?`;
+      if (follow) setFollowUpChips(follow.chips);
+      window.setTimeout(() => {
+        if (request !== intelRequest.current) return;
+        setIntelMessages((m) => [...m, { from: 'thea', text: reply }]);
+        setIntelSending(false);
+      }, 280);
+      return;
     }
 
-    // Chip picks stay snappy + on-script; free text can use Thea LLM when available.
-    if (selectedInterest) {
+    // Specific chip follow-ups stay snappy on-client.
+    if (selectedInterest && !isCategoryPick) {
       void (async () => {
-        const reply = await readyReply(first, facts);
+        const reply = readyReply(first, nextSignals);
         if (request !== intelRequest.current) return;
         setIntelMessages((m) => [...m, { from: 'thea', text: reply }]);
         setIntelSending(false);
@@ -740,7 +766,9 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         body: {
           mode: 'onboarding',
           recipientName: first,
-          interests: facts,
+          interests: searchLabelsFromSignals(nextSignals),
+          signals: nextSignals,
+          pendingCategory: categoryContext,
           messages: nextMessages.slice(-30).map((m) => ({
             role: m.from === 'thea' ? 'assistant' : 'user',
             content: m.text,
@@ -749,30 +777,49 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       });
       if (request !== intelRequest.current) return;
       if (error || !data?.success || typeof data.reply !== 'string') throw new Error('Thea unavailable');
-      const learned: string[] = Array.isArray(data.interests)
-        ? data.interests
-            .filter((v: unknown): v is string => typeof v === 'string' && v.trim().length > 0 && v.length <= 80)
-            .slice(0, MAX_INTERESTS)
-        : facts;
-      const merged = learned.length ? learned : facts;
-      setIntelFacts(merged);
-      setPeople((prev) => prev.map((p) => (p.id === personId ? { ...p, interests: merged } : p)));
-      const reply = merged.length >= READY_INTERESTS ? await readyReply(first, merged) : data.reply;
+
+      let merged = nextSignals;
+      if (Array.isArray(data.interests) && data.interests.length) {
+        const learned = data.interests.filter(
+          (v: unknown): v is string => typeof v === 'string' && v.trim().length > 0 && v.length <= 80,
+        );
+        for (const label of learned) {
+          merged = upsertSignal(merged, signalFromText(label, categoryContext));
+        }
+      }
+      // Trust Thea when she says the signal is strong enough.
+      if (data.ready === true && !isDiscoveryReady(merged) && merged.length) {
+        merged = merged.map((signal, index) =>
+          index === 0 ? { ...signal, confidence: 'high' as const } : signal,
+        );
+      }
+      if (merged !== nextSignals) {
+        setIntelSignals(merged);
+        syncPersonInterests(personId, merged);
+      }
+
+      if (Array.isArray(data.followUps)) {
+        const chips = data.followUps
+          .filter((v: unknown): v is string => typeof v === 'string' && v.trim().length > 0 && v.length <= 40)
+          .slice(0, 6);
+        if (chips.length && !isDiscoveryReady(merged)) setFollowUpChips(chips);
+        else if (isDiscoveryReady(merged)) setFollowUpChips([]);
+      }
+
+      const reply = isDiscoveryReady(merged)
+        ? readyReply(first, merged)
+        : data.reply.replace(/\s*[\u2014\u2013]\s*/g, ', ').trim();
       if (request !== intelRequest.current) return;
       setIntelMessages((m) => [...m, { from: 'thea', text: reply }]);
     } catch {
       if (request !== intelRequest.current) return;
-      const fallbackFacts =
-        message.length <= 48 && !facts.length
-          ? [message]
-          : facts.length
-            ? facts
-            : intelFacts;
-      if (fallbackFacts !== intelFacts && fallbackFacts.length) {
-        setIntelFacts(fallbackFacts);
-        setPeople((prev) => prev.map((p) => (p.id === personId ? { ...p, interests: fallbackFacts } : p)));
+      let fallback = nextSignals;
+      if (!fallback.length && message.length <= 80) {
+        fallback = upsertSignal([], signalFromText(message, categoryContext));
+        setIntelSignals(fallback);
+        syncPersonInterests(personId, fallback);
       }
-      const reply = await readyReply(first, fallbackFacts.length ? fallbackFacts : [message]);
+      const reply = readyReply(first, fallback.length ? fallback : [signalFromText(message, null)]);
       if (request !== intelRequest.current) return;
       setIntelMessages((m) => [...m, { from: 'thea', text: reply }]);
     } finally {
@@ -781,7 +828,9 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   };
 
   const addInterest = (label: string) => {
-    if (intelFacts.length >= READY_INTERESTS || intelFacts.some((f) => f.toLowerCase() === label.toLowerCase())) return;
+    if (intelSignals.some((s) => s.interest.toLowerCase() === label.toLowerCase() && s.confidence !== 'low')) {
+      return;
+    }
     void sendIntelMessage(label, label);
   };
   const submitInterest = () => {
@@ -1078,12 +1127,12 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     // ════════ INTEL (Thea chat) ════════
     case 'intel': {
       const first = firstNameOf(activePerson?.name || '');
-      const available = INTEREST_TAXONOMY.filter(
-        (t) => !intelFacts.some((f) => f.toLowerCase() === t.toLowerCase()),
-      ).slice(0, 9);
-      const showChips = intelFacts.length === 0;
-      const chatLocked = intelFacts.length >= READY_INTERESTS;
-      const canReveal = chatLocked && !intelSending;
+      const starterChips = STARTER_CATEGORIES.filter(
+        (t) => !intelSignals.some((s) => s.category?.toLowerCase() === t.toLowerCase() || s.interest.toLowerCase() === t.toLowerCase()),
+      );
+      const showStarterChips = intelSignals.length === 0;
+      const showNarrowChips = !showStarterChips && !discoveryReady && followUpChips.length > 0;
+      const canReveal = discoveryReady && !intelSending && intelFacts.length > 0;
       return (
         <MobileShell contentClassName="flex flex-col px-0 pt-0" animate>
           <div className="flex h-full flex-col">
@@ -1105,12 +1154,16 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
                 size="compact"
                 className="mx-auto u-thea-character--chat"
                 activity="chat"
-                gesture={intelFacts.length ? 'Present' : 'Listen'}
+                gesture={intelSignals.length ? 'Present' : 'Listen'}
               />
               <div className="-mt-1">
                 <div style={{ fontWeight: 600, fontSize: 15.5 }}>Getting to know {first}</div>
                 <Eyebrow>
-                  {chatLocked ? 'Ready for recommendations' : intelFacts.length ? 'Narrowing it down' : 'Pick a starting point'}
+                  {discoveryReady
+                    ? 'Ready for recommendations'
+                    : intelSignals.length
+                      ? 'Learning what they love'
+                      : 'Pick a starting point'}
                 </Eyebrow>
               </div>
             </div>
@@ -1144,13 +1197,12 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
                   Thea is thinking…
                 </p>
               )}
-              <InlineGiftPreview recipientFirstName={first} interests={intelFacts} />
             </div>
 
             <div className="shrink-0" style={{ padding: '8px 16px 28px' }}>
-              {showChips && (
+              {showStarterChips && (
                 <div className="mb-3 flex flex-wrap gap-2">
-                  {available.map((c) => (
+                  {starterChips.map((c) => (
                     <button
                       type="button"
                       key={c}
@@ -1173,6 +1225,31 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
                 </div>
               )}
 
+              {showNarrowChips && (
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {followUpChips.map((c) => (
+                    <button
+                      type="button"
+                      key={c}
+                      onClick={() => addInterest(c)}
+                      disabled={intelSending}
+                      className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                      style={{
+                        padding: '9px 14px',
+                        borderRadius: 14,
+                        background: U.chip,
+                        border: `1px solid rgba(42,37,32,0.1)`,
+                        fontSize: 13.5,
+                        fontWeight: 500,
+                        color: '#5A5147',
+                      }}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {canReveal && (
                 <button
                   type="button"
@@ -1180,59 +1257,59 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
                   className="u-btn-primary animate-u-pop mb-3"
                   style={{ fontSize: 16, padding: 16 }}
                 >
-                  Show me gift ideas
+                  See gift ideas
                 </button>
               )}
 
-              {!chatLocked && (
-                <div
-                  className="flex items-center gap-2.5"
+              <div
+                className="flex items-center gap-2.5"
+                style={{
+                  padding: '7px 7px 7px 18px',
+                  borderRadius: 24,
+                  background: U.surface,
+                  border: `1px solid rgba(42,37,32,0.1)`,
+                }}
+              >
+                <input
+                  value={intelInput}
+                  disabled={intelSending}
+                  maxLength={2000}
+                  placeholder={
+                    discoveryReady
+                      ? `Add anything else about ${first}…`
+                      : intelSignals.length
+                        ? `Tell me more about ${first}…`
+                        : `Or tell me about ${first}…`
+                  }
+                  className="flex-1"
+                  style={{ border: 'none', background: 'transparent', fontSize: 14.5, color: U.ink }}
+                  onChange={(event) => setIntelInput(event.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      submitInterest();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  aria-label="Send message"
+                  onClick={submitInterest}
+                  disabled={!intelInput.trim() || intelSending}
+                  className="flex items-center justify-center disabled:opacity-40"
                   style={{
-                    padding: '7px 7px 7px 18px',
-                    borderRadius: 24,
-                    background: U.surface,
-                    border: `1px solid rgba(42,37,32,0.1)`,
+                    width: 38,
+                    height: 38,
+                    borderRadius: '50%',
+                    background: U.ink,
+                    color: U.buttonText,
+                    fontSize: 17,
+                    flexShrink: 0,
                   }}
                 >
-                  <input
-                    value={intelInput}
-                    disabled={intelSending}
-                    maxLength={2000}
-                    placeholder={
-                      intelFacts.length
-                        ? `Add one more detail about ${first}…`
-                        : `Or tell me about ${first}…`
-                    }
-                    className="flex-1"
-                    style={{ border: 'none', background: 'transparent', fontSize: 14.5, color: U.ink }}
-                    onChange={(event) => setIntelInput(event.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        submitInterest();
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    aria-label="Send message"
-                    onClick={submitInterest}
-                    disabled={!intelInput.trim() || intelSending}
-                    className="flex items-center justify-center disabled:opacity-40"
-                    style={{
-                      width: 38,
-                      height: 38,
-                      borderRadius: '50%',
-                      background: U.ink,
-                      color: U.buttonText,
-                      fontSize: 17,
-                      flexShrink: 0,
-                    }}
-                  >
-                    ↑
-                  </button>
-                </div>
-              )}
+                  ↑
+                </button>
+              </div>
             </div>
           </div>
         </MobileShell>

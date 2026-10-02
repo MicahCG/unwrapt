@@ -51,7 +51,7 @@ export const getGiftRecommendations = async (
   const { data, error } = await supabase.functions.invoke<GiftCatalogResponse>('gift-catalog', {
     body: {
       action: 'recommend',
-      interests: interests.slice(0, 3),
+      interests: interests.slice(0, 5),
       limit: Math.min(Math.max(limit, 1), 6),
     },
   });

@@ -30,23 +30,23 @@ const interestHits = (blob: string, interest: string) => {
   return words.some((w) => w && blob.includes(w));
 };
 
-/** Honest 5–7 word why line from what the product actually matches. */
+/** Honest why line tying the product back to what Unwrapt learned. */
 export function whyForGift(product: GiftCatalogItem, interests: string[]): string {
   const tags = interests.map((i) => i.toLowerCase()).filter(Boolean);
   const blob = productBlob(product);
   const hits = tags.filter((tag) => interestHits(blob, tag));
 
   if (hits.length >= 2) {
-    return `Ties ${hits[0]} + ${hits[1]} together`;
+    return `Fits their ${hits[0]} and ${hits[1]}`;
   }
   if (hits.length === 1) {
     const focus = hits[0];
     if (/book|journal|print/.test(blob)) return `A thoughtful ${focus} keepsake`;
-    if (/mug|cup|brew|coffee|tea/.test(blob)) return `Daily ritual they’ll actually use`;
-    if (/bag|pouch|case|accessory|wear|swim|beach/.test(blob)) return `Stylish everyday ${focus} touch`;
-    if (/game|play|console|puzzle/.test(blob)) return `Playful pick for game nights`;
-    if (/candle|spa|self/.test(blob)) return `Warm, personal feel-good gift`;
-    return `Strong match for ${focus}`;
+    if (/mug|cup|brew|coffee|tea|matcha/.test(blob)) return `For their daily ${focus} ritual`;
+    if (/bag|pouch|case|accessory|wear|swim|beach/.test(blob)) return `A stylish ${focus} everyday pick`;
+    if (/game|play|console|puzzle/.test(blob)) return `Playful pick for their ${focus}`;
+    if (/candle|spa|self|yoga|pilates|run/.test(blob)) return `Because they're into ${focus}`;
+    return `Because they're into ${focus}`;
   }
 
   return 'Closest fit from the live catalog';

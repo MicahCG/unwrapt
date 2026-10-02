@@ -89,26 +89,41 @@ const cleanInterests = (value: unknown) => {
     .filter((interest): interest is string => typeof interest === "string")
     .map((interest) => interest.trim().toLowerCase().slice(0, 40))
     .filter(Boolean)
-    .slice(0, 3);
+    .slice(0, 5);
 };
 
 const INTEREST_KEYWORDS: Record<string, string[]> = {
   golf: ["golf", "golfer", "course", "putting", "tee"],
   travel: ["travel", "luggage", "passport", "carry-on", "weekender", "trip", "airport"],
   coffee: ["coffee", "espresso", "latte", "roast", "mug", "brew", "barista", "cappuccino"],
+  tea: ["tea", "matcha", "loose-leaf", "teapot", "infuser"],
+  matcha: ["matcha", "tea", "ceremonial", "whisk"],
   fitness: ["fitness", "workout", "gym", "yoga", "recovery", "active", "run"],
+  pilates: ["pilates", "reformer", "mat", "studio", "wellness"],
+  running: ["run", "running", "marathon", "trail", "jog", "sneaker"],
+  yoga: ["yoga", "mat", "meditation", "stretch", "wellness"],
   cooking: ["cooking", "cookware", "cookbook", "kitchen", "chef", "recipe", "culinary", "pantry", "sauce", "spice", "olive oil"],
+  baking: ["baking", "bake", "pastry", "oven", "flour", "kitchen"],
   wine: ["wine", "sommelier", "vineyard", "bottle", "barware", "tumbler", "vino"],
   reading: ["book", "reading", "literary", "journal", "bookstore", "novel"],
   music: ["music", "audio", "speaker", "vinyl", "concert", "headphone"],
+  vinyl: ["vinyl", "record", "turntable", "music", "lp"],
   fashion: ["fashion", "style", "jewelry", "scarf", "leather", "accessory", "apparel", "wardrobe"],
+  beauty: ["beauty", "skincare", "fragrance", "serum", "cosmetic", "spa"],
+  skincare: ["skincare", "serum", "moisturizer", "beauty", "skin"],
   gaming: ["game", "gaming", "puzzle", "cards", "board game", "console"],
   art: ["art", "artist", "paint", "design", "museum", "craft", "illustration"],
   pets: ["pet", "dog", "cat", "leash"],
   tech: ["tech", "charger", "wireless", "bluetooth", "gadget"],
   outdoors: ["outdoor", "camping", "hiking", "picnic", "adventure"],
+  hiking: ["hike", "hiking", "trail", "backpack", "outdoor"],
+  camping: ["camp", "camping", "tent", "outdoor", "adventure"],
+  home: ["home", "cozy", "candle", "throw", "living", "decor"],
   whiskey: ["whiskey", "whisky", "bourbon", "scotch", "barware"],
   "premium experiences": ["experience", "tasting", "class", "tour", "membership"],
+  photography: ["photo", "photography", "camera", "lens"],
+  gardening: ["garden", "gardening", "plant", "herb", "soil"],
+  ceramics: ["ceramic", "ceramics", "pottery", "mug", "clay"],
   // Free-text / adjacent interests Thea often hears
   bikini: ["bikini", "bikinis", "swimwear", "swimsuit", "swim", "beach", "resort", "pool", "towel", "sun"],
   swimwear: ["swimwear", "swimsuit", "bikini", "bikinis", "swim", "beach", "resort", "pool"],
