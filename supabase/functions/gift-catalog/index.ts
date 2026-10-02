@@ -93,31 +93,60 @@ const cleanInterests = (value: unknown) => {
 };
 
 const INTEREST_KEYWORDS: Record<string, string[]> = {
-  golf: ["golf", "golfer", "course", "putting"],
-  travel: ["travel", "luggage", "passport", "carry-on", "weekender", "trip"],
-  coffee: ["coffee", "espresso", "latte", "roast", "mug", "brew"],
-  fitness: ["fitness", "workout", "gym", "yoga", "recovery", "active"],
+  golf: ["golf", "golfer", "course", "putting", "tee"],
+  travel: ["travel", "luggage", "passport", "carry-on", "weekender", "trip", "airport"],
+  coffee: ["coffee", "espresso", "latte", "roast", "mug", "brew", "barista", "cappuccino"],
+  fitness: ["fitness", "workout", "gym", "yoga", "recovery", "active", "run"],
   cooking: ["cooking", "cookware", "cookbook", "kitchen", "chef", "recipe", "culinary", "pantry", "sauce", "spice", "olive oil"],
-  wine: ["wine", "sommelier", "vineyard", "bottle", "barware", "tumbler"],
-  reading: ["book", "reading", "literary", "journal", "bookstore"],
+  wine: ["wine", "sommelier", "vineyard", "bottle", "barware", "tumbler", "vino"],
+  reading: ["book", "reading", "literary", "journal", "bookstore", "novel"],
   music: ["music", "audio", "speaker", "vinyl", "concert", "headphone"],
-  fashion: ["fashion", "style", "jewelry", "scarf", "bag", "leather", "accessory"],
-  gaming: ["game", "gaming", "puzzle", "cards", "board game"],
-  art: ["art", "artist", "paint", "design", "museum", "craft"],
+  fashion: ["fashion", "style", "jewelry", "scarf", "leather", "accessory", "apparel", "wardrobe"],
+  gaming: ["game", "gaming", "puzzle", "cards", "board game", "console"],
+  art: ["art", "artist", "paint", "design", "museum", "craft", "illustration"],
   pets: ["pet", "dog", "cat", "leash"],
   tech: ["tech", "charger", "wireless", "bluetooth", "gadget"],
   outdoors: ["outdoor", "camping", "hiking", "picnic", "adventure"],
   whiskey: ["whiskey", "whisky", "bourbon", "scotch", "barware"],
   "premium experiences": ["experience", "tasting", "class", "tour", "membership"],
+  // Free-text / adjacent interests Thea often hears
+  bikini: ["bikini", "bikinis", "swimwear", "swimsuit", "swim", "beach", "resort", "pool", "towel", "sun"],
+  swimwear: ["swimwear", "swimsuit", "bikini", "bikinis", "swim", "beach", "resort", "pool"],
+  beach: ["beach", "resort", "towel", "sun", "pool", "swim", "coastal"],
+  accessories: ["accessory", "accessories", "jewelry", "scarf", "bag", "wallet", "case"],
+};
+
+/** Expand a free-text interest into searchable keywords. */
+const keywordsForInterest = (interest: string): string[] => {
+  const key = interest.trim().toLowerCase();
+  if (!key) return [];
+  if (INTEREST_KEYWORDS[key]) return INTEREST_KEYWORDS[key];
+
+  // Plural / partial matches against known keys and alias bags.
+  for (const [canonical, words] of Object.entries(INTEREST_KEYWORDS)) {
+    if (key === canonical || key.includes(canonical) || canonical.includes(key)) return words;
+    if (words.some((w) => key === w || key.includes(w) || w.includes(key))) return words;
+  }
+
+  const singular = key.replace(/ies$/, "y").replace(/s$/, "");
+  return singular && singular !== key ? [key, singular] : [key];
+};
+
+const interestHitsText = (text: string, interest: string) => {
+  const keywords = keywordsForInterest(interest);
+  return keywords.some((keyword) => text.includes(keyword));
 };
 
 const scoreText = (text: string, interests: string[]) =>
   interests.reduce((score, interest) => {
-    const keywords = INTEREST_KEYWORDS[interest] || [interest];
+    const keywords = keywordsForInterest(interest);
     return score + keywords.reduce((interestScore, keyword) => (
-      interestScore + (text.includes(keyword) ? (keyword === interest ? 4 : 1) : 0)
+      interestScore + (text.includes(keyword) ? (keyword === interest.toLowerCase() ? 4 : 2) : 0)
     ), 0);
   }, 0);
+
+const coverageForProduct = (text: string, interests: string[]) =>
+  interests.filter((interest) => interestHitsText(text, interest));
 
 const goodyImage = (product: GoodyProduct) =>
   product.images?.[0]?.image_large?.url || product.variants?.[0]?.image_large?.url || null;
@@ -162,21 +191,51 @@ const toCatalogItem = (product: GoodyProduct): CatalogItem => ({
   providerProductId: product.id!,
 });
 
-const getGoodyCatalog = async (interests: string[], limit: number): Promise<CatalogItem[]> => {
+const getGoodyCatalog = async (
+  interests: string[],
+  limit: number,
+): Promise<{ products: CatalogItem[]; matchedInterests: string[]; unmatchedInterests: string[] }> => {
   const products = await fetchGoodyProducts();
-  const scoredProducts = products
-    .map((product) => ({
+  const scoredProducts = products.map((product) => {
+    const fullText = productText(product);
+    const labelText = productLabelText(product);
+    const covered = coverageForProduct(fullText, interests);
+    return {
       product,
-      score: scoreText(productText(product), interests),
-      labelScore: scoreText(productLabelText(product), interests),
-    }));
+      score: scoreText(fullText, interests),
+      labelScore: scoreText(labelText, interests),
+      coverage: covered.length,
+      covered,
+    };
+  });
+
+  // Prefer items that hit interest keywords; if nothing matches, fall back to
+  // the full catalog so we still have something to show (with unmatched flags).
   const relevantProducts = interests.length
-    ? scoredProducts.filter(({ labelScore }) => labelScore > 0)
+    ? scoredProducts.filter(({ coverage, labelScore, score }) => coverage > 0 || labelScore > 0 || score > 0)
     : scoredProducts;
-  return relevantProducts
-    .sort((a, b) => b.score - a.score || Number(a.product.price || 0) - Number(b.product.price || 0))
-    .slice(0, limit)
-    .map(({ product }) => toCatalogItem(product));
+
+  const ranked = (relevantProducts.length ? relevantProducts : scoredProducts)
+    .sort((a, b) =>
+      b.coverage - a.coverage ||
+      b.score - a.score ||
+      Number(a.product.price || 0) - Number(b.product.price || 0)
+    )
+    .slice(0, limit);
+
+  const matchedSet = new Set<string>();
+  for (const row of ranked) {
+    for (const interest of row.covered) matchedSet.add(interest);
+  }
+
+  const matchedInterests = interests.filter((interest) => matchedSet.has(interest));
+  const unmatchedInterests = interests.filter((interest) => !matchedSet.has(interest));
+
+  return {
+    products: ranked.map(({ product }) => toCatalogItem(product)),
+    matchedInterests,
+    unmatchedInterests,
+  };
 };
 
 // Tags every product with its best-guess vibe so callers (the gift-vibe
@@ -221,8 +280,14 @@ Deno.serve(async (req: Request) => {
     const interests = cleanInterests(body.interests);
     const limit = Math.min(Math.max(Number(body.limit) || 3, 1), 6);
 
-    const products = await getGoodyCatalog(interests, limit);
-    return json({ success: true, source: "goody", products });
+    const { products, matchedInterests, unmatchedInterests } = await getGoodyCatalog(interests, limit);
+    return json({
+      success: true,
+      source: "goody",
+      products,
+      matchedInterests,
+      unmatchedInterests,
+    });
   } catch (error) {
     console.error("gift-catalog failed", error);
     return json({

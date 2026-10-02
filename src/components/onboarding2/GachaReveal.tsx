@@ -10,7 +10,7 @@ interface GachaRevealProps {
   recipientFirstName: string;
   interests: string[];
   occasionLabel?: string | null;
-  onDone: (picks: GiftCatalogItem[]) => void;
+  onDone: (picks: GiftCatalogItem[], unmatchedInterests?: string[]) => void;
 }
 
 const GachaReveal: React.FC<GachaRevealProps> = ({
@@ -29,6 +29,7 @@ const GachaReveal: React.FC<GachaRevealProps> = ({
 
   const pool = useMemo(() => data?.products || [], [data]);
   const picks = useMemo(() => pool.slice(0, 2), [pool]);
+  const unmatched = useMemo(() => data?.unmatchedInterests || [], [data]);
 
   useEffect(() => {
     if (!pool.length) return;
@@ -41,15 +42,18 @@ const GachaReveal: React.FC<GachaRevealProps> = ({
   useEffect(() => {
     if (isLoading) return;
     const delay = isError || !picks.length ? 900 : 2800;
-    const t = window.setTimeout(() => onDone(picks), delay);
+    const t = window.setTimeout(() => onDone(picks, unmatched), delay);
     return () => window.clearTimeout(t);
-  }, [isLoading, isError, picks, onDone]);
+  }, [isLoading, isError, picks, unmatched, onDone]);
 
   const visible = pool.length
     ? [0, 1, 2].map((offset) => pool[(spinIndex + offset) % pool.length])
     : [];
 
   const occasionBit = occasionLabel ? ` ${occasionLabel}` : '';
+  const huntingLine = unmatched.length
+    ? `Looking hard for ${unmatched.map((i) => i.toLowerCase()).join(' / ')} alongside ${interests.filter((i) => !unmatched.includes(i)).map((i) => i.toLowerCase()).join(', ') || 'the rest'}…`
+    : `Pulling together ${interests.map((i) => i.toLowerCase()).join(', ') || 'what you shared'}.`;
 
   return (
     <MobileShell glow animate={false} contentClassName="px-6 flex flex-col items-center justify-center text-center">
@@ -59,7 +63,7 @@ const GachaReveal: React.FC<GachaRevealProps> = ({
         {occasionBit}…
       </Display>
       <p className="mt-2 max-w-[280px] text-[14px] leading-5" style={{ color: U.subtle }}>
-        Pulling together {interests.map((i) => i.toLowerCase()).join(', ') || 'what you shared'}.
+        {huntingLine}
       </p>
 
       <div className="mt-8 flex items-end justify-center gap-3" aria-hidden="true">

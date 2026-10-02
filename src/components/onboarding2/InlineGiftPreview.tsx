@@ -10,7 +10,7 @@ interface InlineGiftPreviewProps {
   interests: string[];
 }
 
-/** Soft, non-committal inspiration strip  -  not a picker. */
+/** Soft, non-committal inspiration strip - not a picker. */
 const InlineGiftPreview: React.FC<InlineGiftPreviewProps> = ({ recipientFirstName, interests }) => {
   const previewRef = useRef<HTMLDivElement>(null);
   const { data, isLoading } = useQuery({
@@ -28,15 +28,21 @@ const InlineGiftPreview: React.FC<InlineGiftPreviewProps> = ({ recipientFirstNam
       catalog_source: data.source,
       recommendation_count: data.products.length,
       interest_count: interests.length,
+      unmatched_count: data.unmatchedInterests.length,
     });
   }, [data, interests.length]);
 
   if (!interests.length) return null;
 
-  const caption =
-    interests.length === 1
-      ? `A few directions inspired by ${interests[0].toLowerCase()}…`
-      : `Narrowing with ${interests.map((i) => i.toLowerCase()).join(' + ')} in mind…`;
+  const unmatched = data?.unmatchedInterests || [];
+  const matched = data?.matchedInterests || [];
+  const caption = unmatched.length && matched.length
+    ? `Stronger on ${matched.map((i) => i.toLowerCase()).join(' + ')} right now. Still light on ${unmatched.map((i) => i.toLowerCase()).join(' / ')}…`
+    : unmatched.length && !matched.length
+      ? `I don’t see ${unmatched.map((i) => i.toLowerCase()).join(' / ')} in the live catalog yet. Showing nearby inspiration…`
+      : interests.length === 1
+        ? `A few directions inspired by ${interests[0].toLowerCase()}…`
+        : `Narrowing with ${interests.map((i) => i.toLowerCase()).join(' + ')} in mind…`;
 
   if (isLoading) {
     return (

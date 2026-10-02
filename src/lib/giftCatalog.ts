@@ -12,10 +12,19 @@ export type GiftCatalogItem = {
   providerProductId: string | null;
 };
 
+export type GiftRecommendationResult = {
+  products: GiftCatalogItem[];
+  source: 'goody' | 'unwrapt';
+  matchedInterests: string[];
+  unmatchedInterests: string[];
+};
+
 type GiftCatalogResponse = {
   success: boolean;
   products?: GiftCatalogItem[];
   source?: 'goody' | 'unwrapt';
+  matchedInterests?: string[];
+  unmatchedInterests?: string[];
   error?: string;
 };
 
@@ -38,7 +47,7 @@ const functionErrorMessage = async (error: unknown) => {
 export const getGiftRecommendations = async (
   interests: string[],
   limit = 3,
-): Promise<{ products: GiftCatalogItem[]; source: 'goody' | 'unwrapt' }> => {
+): Promise<GiftRecommendationResult> => {
   const { data, error } = await supabase.functions.invoke<GiftCatalogResponse>('gift-catalog', {
     body: {
       action: 'recommend',
@@ -52,5 +61,10 @@ export const getGiftRecommendations = async (
     throw new Error(data?.error || 'Unable to load gift recommendations');
   }
 
-  return { products: data.products, source: data.source };
+  return {
+    products: data.products,
+    source: data.source,
+    matchedInterests: data.matchedInterests || [],
+    unmatchedInterests: data.unmatchedInterests || [],
+  };
 };

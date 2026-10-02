@@ -16,7 +16,7 @@ import GachaReveal from '@/components/onboarding2/GachaReveal';
 import StrongGiftPicks from '@/components/onboarding2/StrongGiftPicks';
 import { clearSkipAgentWelcome, markTheaValueSeen, shouldSkipAgentWelcome } from '@/lib/funnel';
 import { VIP_MONTHLY_AMOUNT_LABEL, VIP_MONTHLY_PRICE_ID } from '@/lib/stripe';
-import type { GiftCatalogItem } from '@/lib/giftCatalog';
+import { getGiftRecommendations, type GiftCatalogItem } from '@/lib/giftCatalog';
 
 interface AgentOnboardingFlowProps {
   /** Called once recipients are created so the parent can show the dashboard. */
@@ -426,6 +426,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   const [intelInput, setIntelInput] = useState('');
   const [intelSending, setIntelSending] = useState(false);
   const [revealPicks, setRevealPicks] = useState<GiftCatalogItem[]>([]);
+  const [unmatchedRevealInterests, setUnmatchedRevealInterests] = useState<string[]>([]);
   const intelRequest = useRef(0);
   useEffect(() => {
     intelRequest.current += 1;
@@ -534,7 +535,17 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       const { data: authData, error: authError } = await Promise.race([invokePromise, timeoutPromise]);
 
       if (authError) {
-        throw new Error(authError.message || 'Failed to get authorization URL');
+        let detail = authError.message || 'Failed to get authorization URL';
+        const response = (authError as { context?: unknown }).context;
+        if (response instanceof Response) {
+          try {
+            const payload = (await response.clone().json()) as { error?: string; message?: string };
+            detail = payload.error || payload.message || detail;
+          } catch {
+            /* keep SDK message */
+          }
+        }
+        throw new Error(detail);
       }
       if (authData && typeof authData === 'object' && 'error' in authData && (authData as { error?: unknown }).error) {
         throw new Error(String((authData as { error: unknown }).error));
@@ -650,6 +661,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     setIntelFacts(person?.interests || []);
     setIntelInput('');
     setRevealPicks([]);
+    setUnmatchedRevealInterests([]);
     setIntelMessages([
       {
         from: 'thea',
@@ -659,12 +671,25 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     setScreen('intel');
   };
 
-  const readyReply = (first: string, facts: string[]) => {
+  const readyReply = async (first: string, facts: string[]) => {
     const list = facts.map((f) => f.toLowerCase()).join(', ');
-    if (facts.length >= READY_INTERESTS) {
-      return `Ooh, ${list}. I have a few options that tie that together. Ready to see what I recommend for ${first}?`;
+    if (facts.length < READY_INTERESTS) {
+      return `Love that: ${list}. Tell me a bit more about what ${first} is into.`;
     }
-    return `Love that: ${list}. Tell me a bit more about what ${first} is into.`;
+
+    try {
+      const result = await getGiftRecommendations(facts, 4);
+      if (result.unmatchedInterests.length > 0) {
+        const missing = result.unmatchedInterests.map((i) => i.toLowerCase()).join(' / ');
+        const have = result.matchedInterests.length
+          ? result.matchedInterests.map((i) => i.toLowerCase()).join(' + ')
+          : 'what is in stock';
+        return `I love that ${first} is into ${list}. I don’t have a strong live match for ${missing} right now. Want me to lean on ${have}, or try something adjacent like beach or fashion?`;
+      }
+      return `Ooh, ${list}. I have a few options that pull that together. Ready to see what I recommend for ${first}?`;
+    } catch {
+      return `Ooh, ${list}. Ready to see what I recommend for ${first}?`;
+    }
   };
 
   const sendIntelMessage = async (text: string, selectedInterest?: string) => {
@@ -701,11 +726,12 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
 
     // Chip picks stay snappy + on-script; free text can use Thea LLM when available.
     if (selectedInterest) {
-      window.setTimeout(() => {
+      void (async () => {
+        const reply = await readyReply(first, facts);
         if (request !== intelRequest.current) return;
-        setIntelMessages((m) => [...m, { from: 'thea', text: readyReply(first, facts) }]);
+        setIntelMessages((m) => [...m, { from: 'thea', text: reply }]);
         setIntelSending(false);
-      }, 420);
+      })();
       return;
     }
 
@@ -731,7 +757,8 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       const merged = learned.length ? learned : facts;
       setIntelFacts(merged);
       setPeople((prev) => prev.map((p) => (p.id === personId ? { ...p, interests: merged } : p)));
-      const reply = merged.length >= READY_INTERESTS ? readyReply(first, merged) : data.reply;
+      const reply = merged.length >= READY_INTERESTS ? await readyReply(first, merged) : data.reply;
+      if (request !== intelRequest.current) return;
       setIntelMessages((m) => [...m, { from: 'thea', text: reply }]);
     } catch {
       if (request !== intelRequest.current) return;
@@ -745,10 +772,9 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         setIntelFacts(fallbackFacts);
         setPeople((prev) => prev.map((p) => (p.id === personId ? { ...p, interests: fallbackFacts } : p)));
       }
-      setIntelMessages((m) => [
-        ...m,
-        { from: 'thea', text: readyReply(first, fallbackFacts.length ? fallbackFacts : [message]) },
-      ]);
+      const reply = await readyReply(first, fallbackFacts.length ? fallbackFacts : [message]);
+      if (request !== intelRequest.current) return;
+      setIntelMessages((m) => [...m, { from: 'thea', text: reply }]);
     } finally {
       if (request === intelRequest.current) setIntelSending(false);
     }
@@ -770,8 +796,9 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     setScreen('reveal');
   };
 
-  const finishReveal = useCallback((picks: GiftCatalogItem[]) => {
+  const finishReveal = useCallback((picks: GiftCatalogItem[], unmatched: string[] = []) => {
     setRevealPicks(picks);
+    setUnmatchedRevealInterests(unmatched);
     setScreen('subscription');
   }, []);
 
@@ -1267,6 +1294,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
               recipientFirstName={first}
               interests={interests}
               products={revealPicks}
+              unmatchedInterests={unmatchedRevealInterests}
             />
           </section>
 

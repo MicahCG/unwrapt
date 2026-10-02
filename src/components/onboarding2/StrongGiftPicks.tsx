@@ -9,30 +9,54 @@ interface StrongGiftPicksProps {
   recipientFirstName: string;
   interests: string[];
   products: GiftCatalogItem[];
+  unmatchedInterests?: string[];
 }
 
-/** 5-7 word why line from interests + product cues. */
+const productBlob = (product: GiftCatalogItem) =>
+  `${product.name} ${product.brand || ''} ${product.description || ''}`.toLowerCase();
+
+const interestHits = (blob: string, interest: string) => {
+  const key = interest.toLowerCase();
+  const aliases: Record<string, string[]> = {
+    coffee: ['coffee', 'espresso', 'latte', 'brew', 'mug', 'roast'],
+    bikini: ['bikini', 'swim', 'beach', 'resort', 'pool', 'towel'],
+    bikinis: ['bikini', 'swim', 'beach', 'resort', 'pool', 'towel'],
+    swimwear: ['swim', 'bikini', 'beach', 'resort', 'pool'],
+    fashion: ['fashion', 'style', 'jewelry', 'scarf', 'leather', 'apparel'],
+    gaming: ['game', 'gaming', 'puzzle', 'cards'],
+    accessories: ['accessory', 'jewelry', 'scarf', 'bag', 'wallet'],
+  };
+  const words = aliases[key] || [key, key.replace(/s$/, '')];
+  return words.some((w) => w && blob.includes(w));
+};
+
+/** Honest 5–7 word why line from what the product actually matches. */
 export function whyForGift(product: GiftCatalogItem, interests: string[]): string {
   const tags = interests.map((i) => i.toLowerCase()).filter(Boolean);
-  const name = `${product.name} ${product.brand || ''} ${product.description || ''}`.toLowerCase();
+  const blob = productBlob(product);
+  const hits = tags.filter((tag) => interestHits(blob, tag));
 
-  if (tags.length >= 2) {
-    return `Ties ${tags[0]} + ${tags[1]} together`;
+  if (hits.length >= 2) {
+    return `Ties ${hits[0]} + ${hits[1]} together`;
+  }
+  if (hits.length === 1) {
+    const focus = hits[0];
+    if (/book|journal|print/.test(blob)) return `A thoughtful ${focus} keepsake`;
+    if (/mug|cup|brew|coffee|tea/.test(blob)) return `Daily ritual they’ll actually use`;
+    if (/bag|pouch|case|accessory|wear|swim|beach/.test(blob)) return `Stylish everyday ${focus} touch`;
+    if (/game|play|console|puzzle/.test(blob)) return `Playful pick for game nights`;
+    if (/candle|spa|self/.test(blob)) return `Warm, personal feel-good gift`;
+    return `Strong match for ${focus}`;
   }
 
-  const focus = tags[0] || 'them';
-  if (/book|journal|print/.test(name)) return `A thoughtful ${focus} keepsake`;
-  if (/mug|cup|brew|coffee|tea/.test(name)) return `Daily ritual they’ll actually use`;
-  if (/bag|pouch|case|accessory|wear/.test(name)) return `Stylish everyday ${focus} touch`;
-  if (/game|play|console|puzzle/.test(name)) return `Playful pick for game nights`;
-  if (/candle|spa|self/.test(name)) return `Warm, personal feel-good gift`;
-  return `Feels personal for ${focus} lovers`;
+  return 'Closest fit from the live catalog';
 }
 
 const StrongGiftPicks: React.FC<StrongGiftPicksProps> = ({
   recipientFirstName,
   interests,
   products,
+  unmatchedInterests = [],
 }) => {
   useEffect(() => {
     if (!products.length) return;
@@ -40,8 +64,9 @@ const StrongGiftPicks: React.FC<StrongGiftPicksProps> = ({
       catalog_source: products[0]?.provider === 'goody' ? 'goody' : 'unwrapt',
       recommendation_count: products.length,
       interest_count: interests.length,
+      unmatched_count: unmatchedInterests.length,
     });
-  }, [products, interests.length]);
+  }, [products, interests.length, unmatchedInterests.length]);
 
   if (!products.length) {
     return (
@@ -56,6 +81,15 @@ const StrongGiftPicks: React.FC<StrongGiftPicksProps> = ({
 
   return (
     <div className="flex flex-col gap-3">
+      {unmatchedInterests.length > 0 && (
+        <p className="rounded-[16px] px-3.5 py-3 text-[13px] leading-5" style={{ background: U.chip, color: U.textSecondary }}>
+          I don&apos;t have a strong live match for{' '}
+          <span style={{ color: U.ink, fontWeight: 600 }}>
+            {unmatchedInterests.map((i) => i.toLowerCase()).join(' / ')}
+          </span>{' '}
+          yet, so these lean on what is in stock. Thea can keep hunting after you subscribe.
+        </p>
+      )}
       {products.slice(0, 2).map((product, index) => (
         <article
           key={`${product.provider}-${product.id}`}
