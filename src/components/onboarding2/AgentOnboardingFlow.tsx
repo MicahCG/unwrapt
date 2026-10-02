@@ -15,7 +15,7 @@ import GachaReveal from '@/components/onboarding2/GachaReveal';
 import StrongGiftPicks from '@/components/onboarding2/StrongGiftPicks';
 import { clearSkipAgentWelcome, markTheaValueSeen, shouldSkipAgentWelcome } from '@/lib/funnel';
 import { VIP_MONTHLY_AMOUNT_LABEL, VIP_MONTHLY_PRICE_ID } from '@/lib/stripe';
-import { type GiftCatalogItem } from '@/lib/giftCatalog';
+import { type GiftAskUserOffer, type GiftCatalogItem } from '@/lib/giftCatalog';
 import {
   STARTER_CATEGORIES,
   CATEGORY_FOLLOWUPS,
@@ -432,6 +432,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   const [intelSending, setIntelSending] = useState(false);
   const [revealPicks, setRevealPicks] = useState<GiftCatalogItem[]>([]);
   const [unmatchedRevealInterests, setUnmatchedRevealInterests] = useState<string[]>([]);
+  const [revealAskUser, setRevealAskUser] = useState<GiftAskUserOffer[]>([]);
   const intelRequest = useRef(0);
   const intelFacts = useMemo(() => searchLabelsFromSignals(intelSignals), [intelSignals]);
   const discoveryReady = useMemo(() => isDiscoveryReady(intelSignals), [intelSignals]);
@@ -681,6 +682,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     setIntelInput('');
     setRevealPicks([]);
     setUnmatchedRevealInterests([]);
+    setRevealAskUser([]);
     setIntelMessages([
       {
         from: 'thea',
@@ -845,9 +847,14 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     setScreen('reveal');
   };
 
-  const finishReveal = useCallback((picks: GiftCatalogItem[], unmatched: string[] = []) => {
+  const finishReveal = useCallback((
+    picks: GiftCatalogItem[],
+    unmatched: string[] = [],
+    askUser: GiftAskUserOffer[] = [],
+  ) => {
     setRevealPicks(picks);
     setUnmatchedRevealInterests(unmatched);
+    setRevealAskUser(askUser);
     setScreen('subscription');
   }, []);
 
@@ -1372,6 +1379,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
               interests={interests}
               products={revealPicks}
               unmatchedInterests={unmatchedRevealInterests}
+              askUser={revealAskUser}
             />
           </section>
 

@@ -10,6 +10,15 @@ export type GiftCatalogItem = {
   currency: string;
   provider: 'goody' | 'unwrapt';
   providerProductId: string | null;
+  /** Curator reason when available from gift-catalog. */
+  why?: string | null;
+  fit?: 'exact' | 'adjacent';
+};
+
+export type GiftAskUserOffer = {
+  interest: string;
+  alternative: string;
+  question: string;
 };
 
 export type GiftRecommendationResult = {
@@ -17,6 +26,7 @@ export type GiftRecommendationResult = {
   source: 'goody' | 'unwrapt';
   matchedInterests: string[];
   unmatchedInterests: string[];
+  askUser: GiftAskUserOffer[];
 };
 
 type GiftCatalogResponse = {
@@ -25,6 +35,7 @@ type GiftCatalogResponse = {
   source?: 'goody' | 'unwrapt';
   matchedInterests?: string[];
   unmatchedInterests?: string[];
+  askUser?: GiftAskUserOffer[];
   error?: string;
 };
 
@@ -66,5 +77,6 @@ export const getGiftRecommendations = async (
     source: data.source,
     matchedInterests: data.matchedInterests || [],
     unmatchedInterests: data.unmatchedInterests || [],
+    askUser: data.askUser || [],
   };
 };

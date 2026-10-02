@@ -110,8 +110,14 @@ Use what is already known and gather only missing essentials naturally, with at 
 
 ## How to recommend
 - Always call the search_gifts tool before recommending anything. Never recommend from memory and never invent products or prices, only use what search_gifts returns.
-- Recommend 2 to 3 specific products from the results. Only recommend items within budget. If nothing in their preferred vibe fits, say so plainly, offer the closest affordable option (can be a different vibe), and mention what they would need to spend to unlock their first choice.
-- Give one short, specific reason per pick, tied to the relationship or occasion. Never generic marketing language ("perfect for any occasion" is banned).
+- Pass the recipient's real interests in the interests field (e.g. plants, succulents, coffee, pilates). Do not search only by vibe when you know specific hobbies.
+- Recommend 2 to 3 specific products from the results only when they clearly fit those interests.
+- Prefer exact matches. If exact stock is missing, recommend the closest gift in the same interest family and say so plainly (example: no succulents live, but another plant or planter is fair).
+- If the best live option is a substitute that needs permission, ask first instead of forcing it.
+  Example: they want red wine and only white wine is live. Ask: "I don't see red wine gifts live right now. Would white wine also work?"
+- Never invent stretch connections across unrelated categories (plants are not nail polish or random kitchen tools).
+- Only recommend items within budget.
+- Give one short, specific reason per pick, tied to the interest, relationship, or occasion. Never generic marketing language ("perfect for any occasion" is banned).
 - On lock in, confirm the exact product and price back clearly, in one line, and say it's ready to send. You do not process payment or place the order yourself.
 
 This is a hard rule with no exceptions: any reply that names a specific product must end on its own new line with:
@@ -122,14 +128,23 @@ const SEARCH_GIFTS_TOOL = {
   type: "function",
   function: {
     name: "search_gifts",
-    description: "Search Unwrapt's live gift catalog, which combines the curated Unwrapt shop and live Goody inventory. Always call this before recommending, never recommend from memory.",
+    description: "Search Unwrapt's live Goody gift catalog for products that match the recipient's interests. Always call this before recommending. Pass concrete interests whenever known.",
     parameters: {
       type: "object",
       properties: {
+        interests: {
+          type: "array",
+          items: { type: "string" },
+          description: "Specific recipient interests to match, e.g. plants, succulents, coffee, running.",
+        },
+        query: {
+          type: "string",
+          description: "Optional free-text search hint, e.g. houseplant planter succulent.",
+        },
         vibe: {
           type: "string",
           enum: ["CALM_COMFORT", "ARTFUL_UNIQUE", "REFINED_STYLISH"],
-          description: "The gift vibe category to search within.",
+          description: "Optional gift vibe filter. Prefer interests when both are available.",
         },
         max_price: { type: "number", description: "Maximum price in USD." },
         min_price: { type: "number", description: "Minimum price in USD." },
@@ -180,11 +195,57 @@ const VIBE_KEYWORDS: Record<string, string[]> = {
 const scoreVibe = (text: string, vibe: string) =>
   (VIBE_KEYWORDS[vibe] || []).reduce((score, keyword) => score + (text.includes(keyword) ? 1 : 0), 0);
 
+const INTEREST_SEARCH_KEYWORDS: Record<string, string[]> = {
+  plants: ["plant", "plants", "planter", "houseplant", "botanical", "garden", "succulent", "terrarium", "greenery", "cactus", "herb"],
+  plant: ["plant", "plants", "planter", "houseplant", "botanical", "garden", "succulent", "terrarium", "greenery", "cactus"],
+  succulents: ["succulent", "succulents", "cactus", "plant", "planter", "terrarium", "botanical"],
+  succulent: ["succulent", "succulents", "cactus", "plant", "planter", "terrarium", "botanical"],
+  gardening: ["garden", "gardening", "plant", "planter", "herb", "soil", "botanical", "succulent"],
+  coffee: ["coffee", "espresso", "latte", "brew", "mug", "roast", "barista"],
+  tea: ["tea", "matcha", "teapot", "infuser"],
+  fitness: ["fitness", "workout", "gym", "yoga", "run", "active"],
+  pilates: ["pilates", "reformer", "mat", "wellness"],
+  running: ["run", "running", "marathon", "trail", "jog"],
+  cooking: ["cooking", "cookware", "kitchen", "chef", "recipe", "culinary"],
+  wine: ["wine", "vineyard", "sommelier", "barware"],
+  travel: ["travel", "luggage", "passport", "weekender", "trip"],
+  reading: ["book", "reading", "journal", "literary"],
+  gaming: ["game", "gaming", "console", "puzzle"],
+  beauty: ["beauty", "skincare", "fragrance", "serum"],
+  fashion: ["fashion", "style", "jewelry", "scarf", "apparel"],
+};
+
+const keywordsForSearchInterest = (interest: string): string[] => {
+  const key = interest.trim().toLowerCase();
+  if (!key) return [];
+  if (INTEREST_SEARCH_KEYWORDS[key]) return INTEREST_SEARCH_KEYWORDS[key];
+  for (const [canonical, words] of Object.entries(INTEREST_SEARCH_KEYWORDS)) {
+    if (key.includes(canonical) || canonical.includes(key)) return words;
+  }
+  const singular = key.replace(/ies$/, "y").replace(/s$/, "");
+  return singular && singular !== key ? [key, singular] : [key];
+};
+
+const scoreInterestText = (text: string, interests: string[], query?: string) => {
+  const tokens = [
+    ...interests.flatMap((interest) => keywordsForSearchInterest(interest)),
+    ...(query ? query.toLowerCase().split(/\s+/).filter((t) => t.length >= 3) : []),
+  ];
+  const unique = [...new Set(tokens)];
+  return unique.reduce((score, token) => score + (text.includes(token) ? (token.length >= 6 ? 4 : 2) : 0), 0);
+};
+
 const goodyImage = (product: GoodyProduct) =>
   product.images?.[0]?.image_large?.url || product.variants?.[0]?.image_large?.url || null;
 
 const searchGoodyGifts = async (
-  args: { vibe?: string; max_price?: number; min_price?: number },
+  args: {
+    vibe?: string;
+    max_price?: number;
+    min_price?: number;
+    interests?: string[];
+    query?: string;
+  },
 ): Promise<Product[]> => {
   const environment = Deno.env.get("GOODY_API_ENV") === "production" ? "production" : "sandbox";
   const apiKey = environment === "production"
@@ -197,14 +258,33 @@ const searchGoodyGifts = async (
     : "https://api.sandbox.ongoody.com";
 
   try {
-    const response = await fetch(`${baseUrl}/v1/products?page=1&per_page=100`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!response.ok) throw new Error(`Goody catalog request failed with ${response.status}`);
-    const payload = await response.json() as { data?: GoodyProduct[] };
+    const pages = [1, 2, 3];
+    const seen = new Set<string>();
+    const raw: GoodyProduct[] = [];
+    for (const page of pages) {
+      const response = await fetch(`${baseUrl}/v1/products?page=${page}&per_page=100`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!response.ok) break;
+      const payload = await response.json() as { data?: GoodyProduct[] };
+      const batch = payload.data || [];
+      if (!batch.length) break;
+      for (const product of batch) {
+        if (!product.id || seen.has(product.id)) continue;
+        seen.add(product.id);
+        raw.push(product);
+      }
+      if (batch.length < 100) break;
+    }
 
-    const candidates = (payload.data || [])
+    const interests = (args.interests || [])
+      .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+      .map((v) => v.trim().toLowerCase())
+      .slice(0, 5);
+    const query = typeof args.query === "string" ? args.query.trim().slice(0, 120) : undefined;
+
+    const candidates = raw
       .filter((product): product is GoodyProduct & { id: string; name: string; price: number } =>
         Boolean(product.id && product.name && typeof product.price === "number"))
       .map((product) => ({ ...product, price: product.price / 100 }))
@@ -218,14 +298,24 @@ const searchGoodyGifts = async (
       [product.name, product.brand?.name, product.subtitle, product.subtitle_short, product.recipient_description]
         .filter(Boolean).join(" ").toLowerCase();
 
-    const scored = args.vibe
-      ? candidates
-        .map((product) => ({ product, score: scoreVibe(text(product), args.vibe!) }))
-        .sort((a, b) => b.score - a.score || a.product.price - b.product.price)
-        .map(({ product }) => product)
-      : candidates.sort((a, b) => a.price - b.price);
+    const scored = candidates.map((product) => {
+      const blob = text(product);
+      const interestScore = scoreInterestText(blob, interests, query);
+      const vibeScore = args.vibe ? scoreVibe(blob, args.vibe) : 0;
+      return { product, interestScore, vibeScore, total: interestScore * 3 + vibeScore };
+    });
 
-    return scored.map((product) => ({
+    // When interests are provided, only return products that actually match them.
+    const filtered = interests.length || query
+      ? scored.filter((row) => row.interestScore > 0)
+      : scored;
+
+    const ranked = filtered
+      .sort((a, b) => b.total - a.total || a.product.price - b.product.price)
+      .slice(0, 12)
+      .map(({ product, vibeScore }) => product);
+
+    return ranked.map((product) => ({
       id: product.id,
       title: product.name,
       description: product.subtitle_short || product.subtitle || product.recipient_description || null,
@@ -243,7 +333,13 @@ const searchGoodyGifts = async (
 };
 
 const searchGifts = async (
-  args: { vibe?: string; max_price?: number; min_price?: number },
+  args: {
+    vibe?: string;
+    max_price?: number;
+    min_price?: number;
+    interests?: string[];
+    query?: string;
+  },
 ): Promise<Product[]> => searchGoodyGifts(args);
 
 const callOpenAI = async (apiKey: string, messages: unknown[], forceSearch = false) => {

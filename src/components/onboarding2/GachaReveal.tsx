@@ -10,7 +10,11 @@ interface GachaRevealProps {
   recipientFirstName: string;
   interests: string[];
   occasionLabel?: string | null;
-  onDone: (picks: GiftCatalogItem[], unmatchedInterests?: string[]) => void;
+  onDone: (
+    picks: GiftCatalogItem[],
+    unmatchedInterests?: string[],
+    askUser?: import('@/lib/giftCatalog').GiftAskUserOffer[],
+  ) => void;
 }
 
 const GachaReveal: React.FC<GachaRevealProps> = ({
@@ -30,6 +34,7 @@ const GachaReveal: React.FC<GachaRevealProps> = ({
   const pool = useMemo(() => data?.products || [], [data]);
   const picks = useMemo(() => pool.slice(0, 2), [pool]);
   const unmatched = useMemo(() => data?.unmatchedInterests || [], [data]);
+  const askUser = useMemo(() => data?.askUser || [], [data]);
 
   useEffect(() => {
     if (!pool.length) return;
@@ -41,10 +46,10 @@ const GachaReveal: React.FC<GachaRevealProps> = ({
 
   useEffect(() => {
     if (isLoading) return;
-    const delay = isError || !picks.length ? 900 : 2800;
-    const t = window.setTimeout(() => onDone(picks, unmatched), delay);
+    const delay = isError || (!picks.length && !askUser.length) ? 900 : 2800;
+    const t = window.setTimeout(() => onDone(picks, unmatched, askUser), delay);
     return () => window.clearTimeout(t);
-  }, [isLoading, isError, picks, unmatched, onDone]);
+  }, [isLoading, isError, picks, unmatched, askUser, onDone]);
 
   const visible = pool.length
     ? [0, 1, 2].map((offset) => pool[(spinIndex + offset) % pool.length])
