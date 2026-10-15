@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQuery } from '@tanstack/react-query';
@@ -10,30 +10,25 @@ import AddRecipientModal from '@/components/AddRecipientModal';
 import ScheduleGiftModal from '@/components/ScheduleGiftModal';
 import EditRecipientModal from '@/components/EditRecipientModal';
 import { AddFundsModal } from '@/components/wallet/AddFundsModal';
-import { VIPUpgradeModal } from '@/components/subscription/VIPUpgradeModal';
 import { VIPWelcomeModal } from '@/components/onboarding/VIPWelcomeModal';
-import { AutomationToggle, EnableAutomationModal, AutomationDetailModal } from '@/components/automation';
-import { MobileShell, Eyebrow, PrimaryButton, Display } from '@/components/unwrapt2/MobileShell';
-import { TheaAvatar, PersonAvatar } from '@/components/unwrapt2/TheaAvatar';
+import { MobileShell } from '@/components/unwrapt2/MobileShell';
+import { TheaAvatar } from '@/components/unwrapt2/TheaAvatar';
 import { ApprovalScreen } from '@/components/unwrapt2/ApprovalScreen';
-import { U, toneForIndex, initialsOf } from '@/components/unwrapt2/theme';
-import { VIP_MONTHLY_PRICE_ID } from '@/lib/stripe';
-import { cleanName } from '@/lib/utils';
-import { getNextOccurrence, formatOccasionDate, getDaysUntil, getDaysUntilExact } from '@/lib/dateUtils';
+import { U, initialsOf } from '@/components/unwrapt2/theme';
 import RecipientDetailSheet from '@/components/RecipientDetailSheet';
 import CatalogPreviewSheet from '@/components/CatalogPreviewSheet';
-import GiftStatusBadge from '@/components/GiftStatusBadge';
-import { getRecipientStatus, type RecipientRecord, type GiftRecord } from '@/lib/giftStatus';
+import { type RecipientRecord, type GiftRecord } from '@/lib/giftStatus';
 import { findResumableGift, resumeGiftPayment, hasCompleteShippingAddress } from '@/lib/giftPayment';
-import { useThea } from '@/hooks/useThea';
-import { hasTheaValueSeen } from '@/lib/funnel';
-import { VIP_MONTHLY_AMOUNT_LABEL } from '@/lib/stripe';
+import TheaHomeTab from '@/components/dashboard/TheaHomeTab';
+import ManualHomeTab from '@/components/dashboard/ManualHomeTab';
+import type { BriefingItem } from '@/lib/dashboardBriefing';
+
+type DashboardTab = 'thea' | 'manual';
 
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { openThea } = useThea();
   const [showMonthlyOpportunities, setShowMonthlyOpportunities] = useState(false);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [successRecipient, setSuccessRecipient] = useState(null);
@@ -45,36 +40,24 @@ const Dashboard = () => {
   const [catalogRecipient, setCatalogRecipient] = useState<RecipientRecord | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
   const [showAddFunds, setShowAddFunds] = useState(false);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [showEnableAutomation, setShowEnableAutomation] = useState(false);
-  const [automationRecipient, setAutomationRecipient] = useState<any>(null);
   const [showVIPOnboarding, setShowVIPOnboarding] = useState(false);
   const [previousTier, setPreviousTier] = useState<string | null>(null);
   const [showEditRecipient, setShowEditRecipient] = useState(false);
   const [editingRecipient, setEditingRecipient] = useState<any>(null);
-  const [showAutomationDetail, setShowAutomationDetail] = useState(false);
-  const [detailRecipient, setDetailRecipient] = useState<any>(null);
-  const [isUpgrading, setIsUpgrading] = useState(false);
   const [approval, setApproval] = useState<{ gift: any; recipient: any } | null>(null);
 
-  // Direct Stripe checkout for VIP upgrade
-  const handleDirectUpgrade = async () => {
-    if (!user) return;
-    setIsUpgrading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('create-subscription-checkout', {
-        body: { priceId: VIP_MONTHLY_PRICE_ID, planType: 'vip_monthly' },
-      });
-      if (error) throw error;
-      if (data?.url) window.location.href = data.url;
-    } catch (error) {
-      console.error('Error creating checkout session:', error);
-      toast({ title: 'Error', description: 'Failed to start checkout. Please try again.', variant: 'destructive' });
-      setIsUpgrading(false);
-    }
-  };
+  const tabParam = searchParams.get('tab');
+  const activeTab: DashboardTab = tabParam === 'manual' ? 'manual' : 'thea';
 
-  // Fetch user profile with subscription info and wallet balance
+  const setActiveTab = useCallback((tab: DashboardTab) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (tab === 'thea') next.delete('tab');
+      else next.set('tab', 'manual');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
   const { data: userProfile, refetch: refetchProfile } = useQuery({
     queryKey: ['user-profile', user?.id],
     queryFn: async () => {
@@ -90,7 +73,6 @@ const Dashboard = () => {
     enabled: !!user?.id,
   });
 
-  // Real-time wallet balance updates
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
@@ -104,7 +86,6 @@ const Dashboard = () => {
     };
   }, [user?.id, refetchProfile]);
 
-  // Trigger VIP onboarding when user upgrades from free to VIP
   useEffect(() => {
     if (!userProfile?.subscription_tier) return;
     const currentTier = userProfile.subscription_tier;
@@ -114,7 +95,6 @@ const Dashboard = () => {
     setPreviousTier(currentTier);
   }, [userProfile?.subscription_tier, previousTier]);
 
-  // Fetch recipients with their upcoming occasions
   const { data: recipients = [] } = useQuery({
     queryKey: ['recipients', user?.id],
     queryFn: async () => {
@@ -132,7 +112,6 @@ const Dashboard = () => {
     refetchOnWindowFocus: true,
   });
 
-  // Check for recently scheduled gift to show success animation
   const { data: recentGift } = useQuery({
     queryKey: ['recent-gift', user?.id],
     queryFn: async () => {
@@ -174,10 +153,22 @@ const Dashboard = () => {
 
   useEffect(() => {
     const action = searchParams.get('action');
-    if (action === 'add-person') setShowAddRecipient(true);
-    if (action === 'catalog') setShowCatalog(true);
-    if (action) setSearchParams({}, { replace: true });
-  }, [searchParams, setSearchParams]);
+    if (action === 'add-person') {
+      setShowAddRecipient(true);
+      setActiveTab('manual');
+    }
+    if (action === 'catalog') {
+      setShowCatalog(true);
+      setActiveTab('manual');
+    }
+    if (action) {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('action');
+        return next;
+      }, { replace: true });
+    }
+  }, [searchParams, setSearchParams, setActiveTab]);
 
   useEffect(() => {
     if (recentGift && !showMonthlyOpportunities) {
@@ -195,7 +186,6 @@ const Dashboard = () => {
 
   const resumeOrCollectAddress = async (gift: GiftRecord, recipient: RecipientRecord) => {
     if (!hasCompleteShippingAddress(recipient)) {
-      // Address is missing — open the modal to collect it, then auto-proceed to payment.
       setSelectedRecipient(recipient);
       setResumingGiftId(gift.id || null);
       setShowScheduleGift(true);
@@ -216,8 +206,6 @@ const Dashboard = () => {
 
   const handleScheduleGift = (recipient: RecipientRecord) => {
     setRecipientDetail(null);
-    // If an earlier attempt was scheduled but never paid for, resume it instead
-    // of creating a duplicate gift.
     const resumable = findResumableGift(recipient);
     if (resumable) {
       void resumeOrCollectAddress(resumable, recipient);
@@ -232,8 +220,6 @@ const Dashboard = () => {
     void resumeOrCollectAddress(gift, recipient);
   };
 
-  // ScheduleGiftModal dispatches this once it has collected a missing address
-  // for a gift we're resuming payment on.
   useEffect(() => {
     const handleProceedWithPayment = async (event: Event) => {
       const detail = (event as CustomEvent<{ giftId: string }>).detail;
@@ -263,90 +249,62 @@ const Dashboard = () => {
     window.addEventListener('proceedWithPayment', handleProceedWithPayment);
     return () => window.removeEventListener('proceedWithPayment', handleProceedWithPayment);
   }, []);
+
   const handleOpenRecipient = (recipient: RecipientRecord) => {
     setRecipientDetail(recipient);
   };
+
+  const handleOpenRecipientById = (recipientId: string, intent?: BriefingItem['action']) => {
+    const recipient = (recipients as RecipientRecord[]).find((r) => r.id === recipientId);
+    if (!recipient) return;
+
+    if (intent === 'review') {
+      const gift = (recipient.scheduled_gifts || []).find(
+        (g) => g?.wallet_reserved && !g?.fulfilled_at && g?.status !== 'ordered' && g?.status !== 'delivered',
+      );
+      if (gift) {
+        setApproval({ gift, recipient });
+        return;
+      }
+    }
+
+    if (intent === 'payment') {
+      const resumable = findResumableGift(recipient);
+      if (resumable) {
+        void resumeOrCollectAddress(resumable, recipient);
+        return;
+      }
+    }
+
+    if (intent === 'address' || intent === 'interests') {
+      setActiveTab('manual');
+      if (intent === 'address') {
+        setEditingRecipient(recipient);
+        setShowEditRecipient(true);
+        return;
+      }
+    }
+
+    setRecipientDetail(recipient);
+  };
+
   const handleBrowseCatalog = (recipient?: RecipientRecord) => {
     setRecipientDetail(null);
     setCatalogRecipient(recipient || null);
     setShowCatalog(true);
   };
+
   const handleEditRecipient = (recipient: RecipientRecord) => {
     setRecipientDetail(null);
     setEditingRecipient(recipient);
     setShowEditRecipient(true);
   };
-  const handleEnableAutomation = (recipient: any) => {
-    setAutomationRecipient(recipient);
-    setShowEnableAutomation(true);
-  };
-  const handleDisableAutomation = async (recipientId: string) => {
-    if (!user) return;
-    try {
-      await supabase.from('scheduled_gifts').update({ automation_enabled: false }).eq('recipient_id', recipientId).eq('user_id', user.id);
-      window.location.reload();
-    } catch (error) {
-      console.error('Error disabling automation:', error);
-    }
-  };
 
-  // Sort recipients by next upcoming birthday/anniversary
-  const sortedRecipients = useMemo(() => {
-    return [...recipients].sort((a, b) => {
-      const aDateString = a.birthday || a.anniversary;
-      const bDateString = b.birthday || b.anniversary;
-      if (!aDateString && !bDateString) return 0;
-      if (!aDateString) return 1;
-      if (!bDateString) return -1;
-      return getNextOccurrence(aDateString).getTime() - getNextOccurrence(bDateString).getTime();
-    });
-  }, [recipients]);
-
-  // Derive concierge inbox state from loaded data.
-  const giftNeedsReview = (g: any) => g?.wallet_reserved && !g?.fulfilled_at && g?.status !== 'ordered' && g?.status !== 'delivered';
-
-  const needsReview = useMemo(() => {
-    const out: { gift: any; recipient: any }[] = [];
-    recipients.forEach((r: any) => (r.scheduled_gifts || []).forEach((g: any) => {
-      if (giftNeedsReview(g)) out.push({ gift: g, recipient: r });
-    }));
-    return out;
-  }, [recipients]);
-
-  const inMotionCount = useMemo(() => {
-    let n = 0;
-    recipients.forEach((r: any) => (r.scheduled_gifts || []).forEach((g: any) => {
-      if (g.status === 'ordered') n++;
-    }));
-    return n;
-  }, [recipients]);
-
-  const greeting = (() => {
-    const h = new Date().getHours();
-    if (h < 12) return 'Good morning';
-    if (h < 18) return 'Good afternoon';
-    return 'Good evening';
-  })();
   const displayName = (user?.user_metadata?.full_name || user?.email || 'there').split(' ')[0].split('@')[0];
   const tier = (userProfile?.subscription_tier as 'free' | 'vip') || 'free';
   const planLabel = tier === 'vip' ? 'VIP' : (userProfile?.trial_ends_at ? 'Free trial' : 'Free');
-  const isFree = tier === 'free';
 
-  const heroRecipient = sortedRecipients[0];
-  const heroNextDate = heroRecipient ? (heroRecipient.birthday || heroRecipient.anniversary) : null;
-  const heroDays = heroNextDate ? getDaysUntil(heroNextDate) : null;
-  const [theaValueSeen, setTheaValueSeen] = useState(() => hasTheaValueSeen());
-  const showActivateBanner = isFree && (theaValueSeen || sortedRecipients.length > 3);
-
-  useEffect(() => {
-    const sync = () => setTheaValueSeen(hasTheaValueSeen());
-    window.addEventListener('unwrapt:thea-value-seen', sync);
-    window.addEventListener('storage', sync);
-    return () => {
-      window.removeEventListener('unwrapt:thea-value-seen', sync);
-      window.removeEventListener('storage', sync);
-    };
-  }, []);
+  const typedRecipients = recipients as RecipientRecord[];
 
   return (
     <>
@@ -365,277 +323,79 @@ const Dashboard = () => {
       )}
 
       <MobileShell
-        contentClassName="px-5 pt-12 pb-3"
+        contentClassName={`flex min-h-0 flex-col px-5 pt-10 pb-2 ${activeTab === 'thea' ? 'overflow-hidden' : 'overflow-y-auto'}`}
         footer={
-          <nav aria-label="Primary actions" className="grid grid-cols-[1fr_1fr_1.15fr_1fr_1fr] items-center gap-1 rounded-[22px] border border-[#D9CDBD] bg-[#FAF6EE]/95 p-2 shadow-[0_12px_30px_rgba(42,37,32,0.08)] backdrop-blur">
-            <button onClick={() => setShowAddRecipient(true)} className="u-touch-card rounded-[13px] px-1 py-2.5 text-[9.5px] font-semibold text-[#5A5147]"><span className="mb-0.5 block text-base">＋</span>People</button>
-            <button onClick={() => handleBrowseCatalog()} className="u-touch-card rounded-[13px] px-1 py-2.5 text-[9.5px] font-semibold text-[#5A5147]"><span className="mb-0.5 block text-base">✦</span>Catalog</button>
-            <button onClick={() => openThea({ surface: 'dashboard' })} className="u-touch-card -my-4 flex flex-col items-center rounded-[18px] bg-[#2A2520] px-1 py-2 text-[9.5px] font-semibold text-[#F4ECDD] shadow-[0_8px_20px_rgba(42,37,32,0.2)]" aria-label="Ask Thea"><TheaAvatar size={34} /><span className="mt-1">Ask Thea</span></button>
-            <button onClick={() => navigate('/gift-history')} className="u-touch-card rounded-[13px] px-1 py-2.5 text-[9.5px] font-semibold text-[#5A5147]"><span className="mb-0.5 block text-base">◎</span>Gifts</button>
-            <button onClick={() => navigate('/settings')} className="u-touch-card rounded-[13px] px-1 py-2.5 text-[9.5px] font-semibold text-[#5A5147]"><span className="mb-0.5 block text-base">○</span>Account</button>
+          <nav
+            aria-label="Dashboard tabs"
+            className="grid grid-cols-2 items-center gap-1.5 rounded-[22px] border p-1.5 shadow-[0_12px_30px_rgba(42,37,32,0.08)] backdrop-blur"
+            style={{ borderColor: '#D9CDBD', background: 'rgba(250,246,238,0.95)' }}
+          >
+            <button
+              type="button"
+              onClick={() => setActiveTab('thea')}
+              aria-current={activeTab === 'thea' ? 'page' : undefined}
+              className="u-touch-card flex items-center justify-center gap-2 rounded-[16px] px-3 py-3 text-[13px] font-semibold"
+              style={{
+                background: activeTab === 'thea' ? U.ink : 'transparent',
+                color: activeTab === 'thea' ? U.buttonText : '#5A5147',
+              }}
+            >
+              <TheaAvatar size={28} />
+              Thea
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('manual')}
+              aria-current={activeTab === 'manual' ? 'page' : undefined}
+              className="u-touch-card flex items-center justify-center gap-2 rounded-[16px] px-3 py-3 text-[13px] font-semibold"
+              style={{
+                background: activeTab === 'manual' ? U.ink : 'transparent',
+                color: activeTab === 'manual' ? U.buttonText : '#5A5147',
+              }}
+            >
+              <span aria-hidden="true" className="text-[15px]">▦</span>
+              Manual
+            </button>
           </nav>
         }
       >
-        {/* Header */}
-        <div className="flex items-end justify-between">
-          <div>
-            <Eyebrow className="mb-0.5">{greeting}, {displayName}</Eyebrow>
-            <span className="font-display" style={{ fontSize: 27, letterSpacing: '-0.4px' }}>Your inbox</span>
+        <div className="mb-3 flex shrink-0 items-center justify-between">
+          <div className="font-mono text-[9px] uppercase tracking-[1px]" style={{ color: U.accent, border: '1px solid rgba(182,91,60,0.4)', padding: '3px 7px', borderRadius: 8 }}>
+            {planLabel}
           </div>
-          <div className="flex items-center gap-2.5">
-            <span className="font-mono uppercase" style={{ fontSize: 9, letterSpacing: '1px', color: U.accent, border: '1px solid rgba(182,91,60,0.4)', padding: '3px 7px', borderRadius: 8 }}>{planLabel}</span>
-            <div onClick={() => navigate('/settings')} className="flex cursor-pointer items-center justify-center" style={{ width: 34, height: 34, borderRadius: '50%', background: '#E5DBC6', fontFamily: "'Newsreader', serif", fontStyle: 'italic', fontSize: 15, color: '#5A5147' }}>
-              {initialsOf(displayName).charAt(0)}
-            </div>
-          </div>
-        </div>
-
-        {/* Thea status */}
-        <button type="button" onClick={() => openThea({ surface: 'dashboard' })} className="my-4 flex w-full items-center gap-2.5 text-left" style={{ padding: '11px 14px', borderRadius: 14, background: U.chip }} aria-label="Open Thea, your gifting agent">
-          <TheaAvatar size={26} />
-          <span style={{ fontSize: 13.5, color: '#5A5147' }}>
-            <strong>Thea</strong> · {needsReview.length} {needsReview.length === 1 ? 'needs' : 'need'} you, {inMotionCount} in motion
-          </span>
-          <span className="ml-auto text-[#9A8E7C]">›</span>
-        </button>
-
-        {/* Value strip (pre-proof) or Activate (after value / limit) */}
-        {isFree && !showActivateBanner && (
           <button
             type="button"
-            onClick={() => openThea({ surface: 'dashboard' })}
-            className="mb-4 flex w-full cursor-pointer items-center gap-2.5 text-left"
-            style={{ padding: '12px 14px', borderRadius: 14, background: U.chip, border: '1px solid rgba(42,37,32,0.08)' }}
+            onClick={() => navigate('/settings')}
+            className="flex cursor-pointer items-center justify-center"
+            style={{ width: 34, height: 34, borderRadius: '50%', background: '#E5DBC6', fontFamily: "'Newsreader', serif", fontStyle: 'italic', fontSize: 15, color: '#5A5147' }}
+            aria-label="Open settings"
           >
-            <span style={{ fontSize: 15 }}>✦</span>
-            <div className="flex-1" style={{ fontSize: 13, color: '#5A5147' }}>
-              <strong>See what Thea finds</strong> · thoughtful picks in minutes, you approve before anything ships
-            </div>
-            <span className="font-mono uppercase" style={{ fontSize: 10, letterSpacing: '1px', color: U.accent }}>Ask</span>
+            {initialsOf(displayName).charAt(0)}
           </button>
-        )}
-        {showActivateBanner && (
-          <div onClick={() => setShowUpgradeModal(true)} className="mb-4 flex cursor-pointer items-center gap-2.5" style={{ padding: '12px 14px', borderRadius: 14, background: U.accentSoft, border: '1px solid rgba(182,91,60,0.25)' }}>
-            <span style={{ fontSize: 15 }}>✦</span>
-            <div className="flex-1" style={{ fontSize: 13, color: '#5A5147' }}>
-              <strong>{userProfile?.trial_ends_at ? 'Keep Thea watching' : 'Continue with Thea'}</strong>
-              {' '}· unlimited people & priority picks · {VIP_MONTHLY_AMOUNT_LABEL}/mo
-            </div>
-            <span className="font-mono uppercase" style={{ fontSize: 10, letterSpacing: '1px', color: U.accent }}>Activate</span>
-          </div>
-        )}
+        </div>
 
-        {/* People strip */}
-        {sortedRecipients.length > 0 && (
-          <div className="mb-4">
-            <Eyebrow className="mb-2.5">Your people</Eyebrow>
-            <div className="flex gap-3.5 overflow-x-auto pb-0.5">
-              {sortedRecipients.map((p: any, i: number) => (
-                <button key={p.id} onClick={() => handleOpenRecipient(p as RecipientRecord)} className="u-tray-item flex flex-shrink-0 cursor-pointer flex-col items-center gap-1.5" style={{ width: 60 }} aria-label={`Open ${cleanName(p.name)}`}>
-                  <div className="relative">
-                    <PersonAvatar initials={initialsOf(cleanName(p.name))} tone={toneForIndex(i)} size={52} />
-                    <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[#EDE6D8]" style={{ background: getRecipientStatus(p as RecipientRecord).dot }} />
-                  </div>
-                  <span style={{ fontSize: 11.5, color: '#5A5147', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 56 }}>{cleanName(p.name).split(' ')[0]}</span>
-                  <span className="max-w-[60px] truncate text-[8.5px] font-semibold uppercase tracking-wide" style={{ color: getRecipientStatus(p as RecipientRecord).dot }}>{getRecipientStatus(p as RecipientRecord).label}</span>
-                </button>
-              ))}
-              <button onClick={() => setShowAddRecipient(true)} className="u-tray-item flex flex-shrink-0 cursor-pointer flex-col items-center gap-1.5" style={{ width: 60 }} aria-label="Add a recipient">
-                <div className="flex items-center justify-center" style={{ width: 52, height: 52, borderRadius: '50%', border: '1.5px dashed rgba(42,37,32,0.25)', color: U.accent, fontSize: 24 }}>+</div>
-                <span style={{ fontSize: 11.5, color: U.muted }}>Add</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Needs-you hero cards (gifts awaiting confirmation) */}
-        {needsReview.map(({ gift, recipient }) => {
-          const name = cleanName(recipient.name);
-          const occ = gift.occasion_date || recipient.birthday || recipient.anniversary;
-          const days = occ ? getDaysUntil(occ) : null;
-          return (
-            <div key={gift.id} className="mb-3.5" style={{ borderRadius: 24, overflow: 'hidden', border: '1px solid rgba(182,91,60,0.25)', background: 'linear-gradient(180deg,#FBEFE5,#FAF6EE)' }}>
-              <div className="flex items-center justify-between" style={{ padding: '18px 18px 0' }}>
-                <Eyebrow color={U.accent}>{gift.occasion || 'Occasion'}{days != null ? ` · in ${days} days` : ''}</Eyebrow>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: U.accent }} />
-              </div>
-              <div className="flex items-center gap-3.5" style={{ padding: '10px 18px 0' }}>
-                <PersonAvatar initials={initialsOf(name)} tone={U.accent} size={46} />
-                <div>
-                  <div className="font-display" style={{ fontSize: 19, letterSpacing: '-0.3px' }}>{name}'s gift is ready</div>
-                  <div style={{ fontSize: 12.5, color: U.muted }}>{recipient.relationship || 'Someone special'}</div>
-                </div>
-              </div>
-              <div style={{ padding: '14px 18px 4px' }}>
-                <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5, color: '#5A5147' }}>
-                  <em className="font-display" style={{ fontStyle: 'italic', color: U.ink }}>"I found something I think they'll love. It fits what you've told me."</em>
-                </p>
-              </div>
-              <div className="flex items-center gap-3" style={{ padding: '14px 18px 18px' }}>
-                <div className="flex flex-1 items-center gap-2.5" style={{ padding: 9, borderRadius: 13, background: '#fff', border: '1px solid rgba(42,37,32,0.07)' }}>
-                  {gift.gift_image_url ? (
-                    <img src={gift.gift_image_url} alt="" style={{ width: 42, height: 42, borderRadius: 9, objectFit: 'cover', flexShrink: 0 }} />
-                  ) : (
-                    <div style={{ width: 42, height: 42, borderRadius: 9, flexShrink: 0, background: 'repeating-linear-gradient(135deg,#E8DFCC,#E8DFCC 6px,#E0D5BD 6px,#E0D5BD 12px)' }} />
-                  )}
-                  <div className="min-w-0">
-                    <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{gift.gift_description || gift.gift_type || 'Curated gift'}</div>
-                    <div className="font-mono" style={{ fontSize: 12, color: U.subtle }}>{gift.estimated_cost ? `$${Math.round(gift.estimated_cost)}` : (gift.price_range || '')}</div>
-                  </div>
-                </div>
-                <button onClick={() => setApproval({ gift, recipient })} style={{ appearance: 'none', border: 'none', cursor: 'pointer', background: U.ink, color: U.buttonText, fontWeight: 600, fontSize: 14.5, padding: '14px 20px', borderRadius: 14, whiteSpace: 'nowrap' }}>
-                  Review
-                </button>
-              </div>
-            </div>
-          );
-        })}
-
-        {/* Upcoming people list */}
-        {sortedRecipients.length === 0 ? (
-          <div className="mt-2" style={{ borderRadius: 22, border: `1px dashed rgba(42,37,32,0.18)`, padding: '28px 20px', textAlign: 'center' }}>
-            <TheaAvatar size={40} className="mx-auto mb-3" />
-            <Display style={{ fontSize: 21 }}>Let's find your people</Display>
-            <p className="mx-auto mt-1.5" style={{ fontSize: 13.5, color: U.muted, maxWidth: 260, lineHeight: 1.5 }}>
-              Add someone you care about and I'll watch for the moments that matter.
-            </p>
-            <div className="mt-4">
-              <PrimaryButton onClick={() => setShowAddRecipient(true)}>Add someone</PrimaryButton>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2.5">
-            <Eyebrow className="mb-0.5">Upcoming</Eyebrow>
-            {sortedRecipients.map((recipient: any, index: number) => {
-              const nextOccasionDate = recipient.birthday || recipient.anniversary;
-              const occasionType = recipient.birthday ? 'Birthday' : 'Anniversary';
-              const isLocked = isFree && index >= 3;
-              const daysUntil = nextOccasionDate ? getDaysUntil(nextOccasionDate) : null;
-              const recipientStatus = getRecipientStatus(recipient as RecipientRecord);
-
-              const activeOrder = recipient.scheduled_gifts?.find((gift: any) =>
-                (gift.status === 'ordered' || gift.status === 'delivered') && gift.delivery_date);
-              const deliveryDaysUntil = activeOrder?.delivery_date ? getDaysUntilExact(activeOrder.delivery_date) : null;
-
-              const nextOccasionGiftDate = nextOccasionDate ? getNextOccurrence(nextOccasionDate) : null;
-              const relevantAutomatedGift = recipient.scheduled_gifts
-                ?.filter((g: any) => g.automation_enabled && g.occasion_date)
-                ?.sort((a: any, b: any) => {
-                  const aDiff = Math.abs(new Date(a.occasion_date).getTime() - (nextOccasionGiftDate?.getTime() || 0));
-                  const bDiff = Math.abs(new Date(b.occasion_date).getTime() - (nextOccasionGiftDate?.getTime() || 0));
-                  return aDiff - bDiff;
-                })[0];
-
-              if (isLocked) {
-                return (
-                  <div key={recipient.id} style={{ borderRadius: 18, border: `1px solid ${U.border}`, background: U.surface, padding: '16px 18px', filter: 'blur(3px)', pointerEvents: 'none' }}>
-                    <div className="flex items-center gap-3">
-                      <PersonAvatar initials={initialsOf(cleanName(recipient.name))} tone={toneForIndex(index)} size={38} />
-                      <div><div style={{ fontWeight: 600, fontSize: 15 }}>{cleanName(recipient.name)}</div></div>
-                    </div>
-                  </div>
-                );
-              }
-
-              return (
-                <div key={recipient.id} className="u-recipient-card" style={{ borderRadius: 20, border: `1px solid ${U.border}`, background: U.surface, padding: '16px 18px' }}>
-                  <button className="flex w-full cursor-pointer items-center justify-between text-left" onClick={() => handleOpenRecipient(recipient as RecipientRecord)}>
-                    <div className="flex items-center gap-3">
-                      <PersonAvatar initials={initialsOf(cleanName(recipient.name))} tone={toneForIndex(index)} size={38} />
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 15 }}>{cleanName(recipient.name)}</div>
-                        {nextOccasionDate ? (
-                          <div className="flex items-baseline gap-2" style={{ fontSize: 12.5, color: U.muted }}>
-                            <span>{occasionType} · {formatOccasionDate(nextOccasionDate)}</span>
-                            {daysUntil != null && <span>{daysUntil === 0 ? '· Today!' : daysUntil === 1 ? '· Tomorrow' : `· in ${daysUntil}d`}</span>}
-                          </div>
-                        ) : (
-                          <div style={{ fontSize: 12.5, color: U.muted }}>No date set</div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2"><GiftStatusBadge status={recipientStatus} compact /><span style={{ fontSize: 20, color: U.muted }}>›</span></div>
-                  </button>
-
-                  {/* Active order status */}
-                  {activeOrder && (
-                    <div className="mt-2.5 flex items-center gap-3 pt-2.5" style={{ borderTop: `1px solid ${U.border}` }}>
-                      {activeOrder.gift_image_url && (
-                        <img src={activeOrder.gift_image_url} alt="" style={{ width: 40, height: 40, borderRadius: 9, objectFit: 'cover' }} />
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: U.sage }} />
-                          <span style={{ fontSize: 13, fontWeight: 600, color: U.sage }}>
-                            {activeOrder.status === 'delivered' ? 'Delivered' : 'On its way'}
-                          </span>
-                        </div>
-                        {activeOrder.delivery_date && deliveryDaysUntil != null && (
-                          <p style={{ margin: 0, fontSize: 12, color: U.muted }}>
-                            {deliveryDaysUntil < 0 ? `Delivered ${formatOccasionDate(activeOrder.delivery_date)}` : deliveryDaysUntil === 0 ? 'Delivers today' : `Delivers ${formatOccasionDate(activeOrder.delivery_date)}`}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Automation toggle (VIP)  -  preserves existing logic */}
-                  {nextOccasionDate && tier === 'vip' && (() => {
-                    const activeOrderDate = activeOrder?.occasion_date;
-                    const automatedGiftDate = relevantAutomatedGift?.occasion_date;
-                    const isSameOccasion = activeOrderDate && automatedGiftDate &&
-                      new Date(activeOrderDate).getTime() === new Date(automatedGiftDate).getTime();
-                    if (activeOrder && isSameOccasion) return null;
-                    return (
-                      <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${U.border}` }} onClick={(e) => e.stopPropagation()}>
-                        <AutomationToggle
-                          recipientId={recipient.id}
-                          recipientName={cleanName(recipient.name)}
-                          estimatedCost={42.0}
-                          onEnableAutomation={() => handleEnableAutomation(recipient)}
-                          onDisableAutomation={() => handleDisableAutomation(recipient.id)}
-                          onViewDetails={() => {
-                            setDetailRecipient(recipient);
-                            setShowAutomationDetail(true);
-                          }}
-                          tier={tier}
-                          isEnabled={recipient.automation_enabled || recipient.scheduled_gifts?.some((g: any) => g.automation_enabled)}
-                          hasCompleteAddress={!!(recipient.street && recipient.city && recipient.state && recipient.zip_code)}
-                          hasGiftSelected={!!(recipient.default_gift_variant_id || recipient.preferred_gift_vibe)}
-                          scheduledGift={relevantAutomatedGift}
-                          walletBalance={userProfile?.gift_wallet_balance || 0}
-                        />
-                      </div>
-                    );
-                  })()}
-                </div>
-              );
-            })}
-
-            {/* Free-tier upgrade prompt */}
-            {isFree && sortedRecipients.length > 3 && (
-              <div style={{ borderRadius: 18, background: U.accentSoft, border: '1px solid rgba(182,91,60,0.25)', padding: '16px 18px', textAlign: 'center' }}>
-                <Display style={{ fontSize: 19 }}>Look after everyone</Display>
-                <p className="mx-auto mb-3 mt-1" style={{ fontSize: 13, color: '#5A5147', maxWidth: 280 }}>
-                  Your free plan covers 3 people. Upgrade for unlimited people and priority recommendations.
-                </p>
-                <PrimaryButton onClick={handleDirectUpgrade} disabled={isUpgrading}>
-                  {isUpgrading ? 'Redirecting…' : 'Activate Unwrapt'}
-                </PrimaryButton>
-              </div>
-            )}
-
-            {tier === 'vip' && (userProfile?.gift_wallet_balance != null) && (
-              <div onClick={() => setShowAddFunds(true)} className="flex cursor-pointer items-center justify-between" style={{ borderRadius: 16, background: U.chip, padding: '13px 16px' }}>
-                <span style={{ fontSize: 13, color: '#5A5147' }}>Gift wallet</span>
-                <span className="font-mono" style={{ fontSize: 14, fontWeight: 500 }}>${(userProfile?.gift_wallet_balance || 0).toFixed(2)} · Add funds</span>
-              </div>
-            )}
-          </div>
-        )}
+        <div className="min-h-0 flex-1">
+          {activeTab === 'thea' ? (
+            <TheaHomeTab
+              displayName={displayName}
+              recipients={typedRecipients}
+              onOpenRecipient={handleOpenRecipientById}
+              onSwitchToManual={() => setActiveTab('manual')}
+            />
+          ) : (
+            <ManualHomeTab
+              recipients={typedRecipients}
+              tier={tier}
+              walletBalance={userProfile?.gift_wallet_balance}
+              onOpenRecipient={handleOpenRecipient}
+              onAddRecipient={() => setShowAddRecipient(true)}
+              onBrowseCatalog={() => handleBrowseCatalog()}
+              onAddFunds={() => setShowAddFunds(true)}
+            />
+          )}
+        </div>
       </MobileShell>
 
-      {/* Modals  -  unchanged logic */}
       {showAddRecipient && (
         <AddRecipientModal isOpen={showAddRecipient} onClose={() => setShowAddRecipient(false)} onRecipientAdded={() => setShowAddRecipient(false)} />
       )}
@@ -668,30 +428,7 @@ const Dashboard = () => {
       {showEditRecipient && editingRecipient && (
         <EditRecipientModal isOpen={showEditRecipient} onClose={() => { setShowEditRecipient(false); setEditingRecipient(null); }} recipient={editingRecipient} />
       )}
-      <VIPUpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
       <VIPWelcomeModal open={showVIPOnboarding} onComplete={() => { setShowVIPOnboarding(false); refetchProfile(); }} />
-      {showEnableAutomation && automationRecipient && (
-        <EnableAutomationModal
-          open={showEnableAutomation}
-          onOpenChange={setShowEnableAutomation}
-          recipientId={automationRecipient.id}
-          recipientName={cleanName(automationRecipient.name)}
-          occasionType={automationRecipient.birthday ? 'birthday' : 'anniversary'}
-          occasionDate={automationRecipient.birthday || automationRecipient.anniversary}
-          currentGiftVibe={automationRecipient.preferred_gift_vibe}
-          onSuccess={() => { setShowEnableAutomation(false); setAutomationRecipient(null); window.location.reload(); }}
-        />
-      )}
-      {showAutomationDetail && detailRecipient && userProfile && (
-        <AutomationDetailModal
-          open={showAutomationDetail}
-          onOpenChange={setShowAutomationDetail}
-          recipient={detailRecipient}
-          walletBalance={userProfile.gift_wallet_balance || 0}
-          onEditAddress={() => { setEditingRecipient(detailRecipient); setShowEditRecipient(true); }}
-          onEditGift={() => { setAutomationRecipient(detailRecipient); setShowEnableAutomation(true); }}
-        />
-      )}
     </>
   );
 };
