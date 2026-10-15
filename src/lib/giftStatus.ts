@@ -109,8 +109,8 @@ export const getGiftReadiness = (gift: GiftRecord, recipient: RecipientRecord): 
     help: 'Add an address, or use recipient choice when Goody is activated.',
   },
   {
-    key: 'payment', label: 'Payment approval', complete: gift.payment_status === 'paid' || Boolean(gift.wallet_reserved),
-    help: 'Approve payment before the order is submitted.',
+    key: 'payment', label: 'Complete payment', complete: gift.payment_status === 'paid' || Boolean(gift.wallet_reserved),
+    help: 'Pay for the gift so Thea can submit the order.',
   },
 ];
 

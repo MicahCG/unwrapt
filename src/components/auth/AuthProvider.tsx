@@ -186,43 +186,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    try {
-      console.log('🔧 AuthProvider: Signing out');
+    console.log('🔧 AuthProvider: Signing out');
 
-      if (process.env.NODE_ENV === 'development') {
-        // Clear dev auth rate limiting
-        localStorage.removeItem('last-dev-auth');
-      }
-
-      const { error } = await supabase.auth.signOut({ scope: 'local' });
-      if (error) {
-        console.error('🔧 AuthProvider: Error signing out:', error);
-      }
-    } catch (error: any) {
-      const friendlyMessage = ErrorHandler.handleAuthError(error, user?.id);
-      console.error('Sign out error:', friendlyMessage);
-    } finally {
-      // supabase-js can fail to clear the stored session when the server
-      // rejects an already-stale access token (throws AuthSessionMissingError
-      // instead of falling through to remove the local session - seen for
-      // real in testing). Force-clear it directly so the user isn't stuck
-      // "signed in" with a UI that still has their data on screen.
-      try {
-        Object.keys(localStorage)
-          .filter((key) => key.startsWith('sb-') && key.endsWith('-auth-token'))
-          .forEach((key) => localStorage.removeItem(key));
-      } catch (storageError) {
-        console.error('🔧 AuthProvider: Could not clear local session storage:', storageError);
-      }
-      setUser(null);
-
-      // The SDK's background auto-refresh timer lives on the in-memory
-      // GoTrueClient instance and keeps running even after we clear storage
-      // out from under it, silently restoring the session a tick later. A
-      // hard reload throws away that instance so the fresh one on reload
-      // starts from the now-empty storage with nothing to refresh.
-      window.location.href = '/';
+    if (process.env.NODE_ENV === 'development') {
+      // Clear dev auth rate limiting
+      localStorage.removeItem('last-dev-auth');
     }
+
+    // supabase-js can fail to clear the stored session when the server
+    // rejects an already-stale access token (throws AuthSessionMissingError
+    // instead of falling through to remove the local session - seen for
+    // real in testing). Force-clear it directly, synchronously, so the user
+    // isn't stuck "signed in" with a UI that still has their data on screen.
+    try {
+      Object.keys(localStorage)
+        .filter((key) => key.startsWith('sb-') && key.endsWith('-auth-token'))
+        .forEach((key) => localStorage.removeItem(key));
+    } catch (storageError) {
+      console.error('🔧 AuthProvider: Could not clear local session storage:', storageError);
+    }
+    setUser(null);
+
+    // Don't await the network round trip (it's what was causing Sign out to
+    // appear to do nothing until the user also hit "Done" - the call can
+    // hang or error for several seconds on an already-stale session). Local
+    // state and storage are already cleared above, so this is best-effort.
+    supabase.auth.signOut({ scope: 'local' }).catch((error) => {
+      console.error('🔧 AuthProvider: Error signing out (non-blocking):', error);
+    });
+
+    // The SDK's background auto-refresh timer lives on the in-memory
+    // GoTrueClient instance and keeps running even after we clear storage
+    // out from under it, silently restoring the session a tick later. A
+    // hard reload throws away that instance so the fresh one on reload
+    // starts from the now-empty storage with nothing to refresh.
+    window.location.href = '/';
   };
 
   const value = {
