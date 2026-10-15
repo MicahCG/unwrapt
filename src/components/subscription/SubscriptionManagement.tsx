@@ -120,12 +120,12 @@ export const SubscriptionManagement = () => {
   };
 
   return (
-    <>
-      <Card className="border-brand-charcoal/10">
+    <div className="w-full min-w-0">
+      <Card className="w-full min-w-0 border-brand-charcoal/10">
         <CardHeader>
-          <CardTitle className="flex items-center justify-between text-brand-charcoal">
+          <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-brand-charcoal">
             <div className="flex items-center">
-              <Crown className="h-5 w-5 mr-2 text-[#D2B887]" />
+              <Crown className="mr-2 h-5 w-5 text-[#D2B887]" />
               Subscription
             </div>
             {getStatusBadge()}
@@ -239,6 +239,6 @@ export const SubscriptionManagement = () => {
       </Card>
 
       <VIPUpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
-    </>
+    </div>
   );
 };
