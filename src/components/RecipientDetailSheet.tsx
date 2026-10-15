@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, Check, Gift, MapPin, Pencil, Plus, Sparkles, X } from 'lucide-react';
+import { CalendarDays, Check, CreditCard, Gift, MapPin, Pencil, Plus, Sparkles, X } from 'lucide-react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -197,7 +197,13 @@ const RecipientDetailSheet: React.FC<RecipientDetailSheetProps> = ({
                   </div>
                 )}
                 {needsPaymentOnly && (
-                  <p className="mt-2 text-[11.5px] font-semibold text-[#B65B3C]">Tap to finish payment →</p>
+                  <button
+                    type="button"
+                    onClick={(event) => { event.stopPropagation(); onResumeGift(gift, recipient); }}
+                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#B65B3C] px-4 py-3 text-[13px] font-semibold text-white transition-transform active:scale-[0.99]"
+                  >
+                    <CreditCard className="h-4 w-4" /> Complete payment
+                  </button>
                 )}
               </article>
             );
