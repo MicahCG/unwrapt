@@ -68,19 +68,46 @@ serve(async (req) => {
           }
           
           // Update gift payment status
-          const { error: giftError } = await supabaseClient
+          const { data: updatedGift, error: giftError } = await supabaseClient
             .from("scheduled_gifts")
-            .update({ 
+            .update({
               payment_status: "paid",
               payment_amount: session.amount_total,
               updated_at: new Date().toISOString()
             })
-            .eq("id", scheduledGiftId);
-          
+            .eq("id", scheduledGiftId)
+            .select("occasion, occasion_date, gift_type, price_range, recipients(name)")
+            .single();
+
           if (giftError) {
             console.error("❌ Error updating gift:", giftError);
           }
-          
+
+          // Now that payment is actually confirmed, let the user know
+          const { data: payerProfile } = await supabaseClient
+            .from("profiles")
+            .select("email, full_name")
+            .eq("id", userId)
+            .single();
+
+          if (payerProfile?.email && updatedGift) {
+            const recipientName = (updatedGift as { recipients?: { name?: string } }).recipients?.name || "your recipient";
+            await supabaseClient.functions.invoke("send-notification-email", {
+              body: {
+                type: "gift_scheduled",
+                recipientEmail: payerProfile.email,
+                userName: payerProfile.full_name,
+                data: {
+                  recipientName,
+                  occasion: updatedGift.occasion,
+                  occasionDate: updatedGift.occasion_date,
+                  giftType: updatedGift.gift_type,
+                  priceRange: updatedGift.price_range,
+                },
+              },
+            });
+          }
+
           // Trigger fulfillment (Shopify order)
           console.log("🚀 Triggering gift fulfillment from webhook...");
           try {

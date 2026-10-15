@@ -9,7 +9,7 @@ import { useThea } from '@/hooks/useThea';
 import { initialsOf, U } from '@/components/unwrapt2/theme';
 import { cleanName } from '@/lib/utils';
 import { formatOccasionDate } from '@/lib/dateUtils';
-import { getGiftReadiness, getGiftStatus, getRecipientStatus, type RecipientRecord } from '@/lib/giftStatus';
+import { getGiftReadiness, getGiftStatus, getRecipientStatus, type GiftRecord, type RecipientRecord } from '@/lib/giftStatus';
 import GiftStatusBadge from '@/components/GiftStatusBadge';
 
 interface RecipientDetailSheetProps {
@@ -17,6 +17,7 @@ interface RecipientDetailSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSchedule: (recipient: RecipientRecord) => void;
+  onResumeGift: (gift: GiftRecord, recipient: RecipientRecord) => void;
   onEdit: (recipient: RecipientRecord) => void;
   onBrowseCatalog: (recipient: RecipientRecord) => void;
 }
@@ -28,6 +29,7 @@ const RecipientDetailSheet: React.FC<RecipientDetailSheetProps> = ({
   open,
   onOpenChange,
   onSchedule,
+  onResumeGift,
   onEdit,
   onBrowseCatalog,
 }) => {
@@ -164,8 +166,13 @@ const RecipientDetailSheet: React.FC<RecipientDetailSheetProps> = ({
             const status = getGiftStatus(gift, recipient);
             const readiness = getGiftReadiness(gift, recipient);
             const missing = readiness.filter((item) => !item.complete);
+            const needsPaymentOnly = missing.length === 1 && missing[0].key === 'payment' && gift.payment_status === 'unpaid' && !gift.shopify_order_id;
             return (
-              <article key={gift.id} className="mb-3 rounded-[20px] bg-white p-4 shadow-[0_8px_24px_rgba(42,37,32,0.04)]">
+              <article
+                key={gift.id}
+                onClick={needsPaymentOnly ? () => onResumeGift(gift, recipient) : undefined}
+                className={`mb-3 rounded-[20px] bg-white p-4 shadow-[0_8px_24px_rgba(42,37,32,0.04)] ${needsPaymentOnly ? 'cursor-pointer transition-transform active:scale-[0.99]' : ''}`}
+              >
                 <div className="flex items-start gap-3">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[14px] bg-[#EEE5D5]">
                     {gift.gift_image_url ? <img src={gift.gift_image_url} alt="" className="h-full w-full object-cover" /> : <Gift className="h-5 w-5 text-[#B65B3C]" />}
@@ -188,6 +195,9 @@ const RecipientDetailSheet: React.FC<RecipientDetailSheetProps> = ({
                       ))}
                     </div>
                   </div>
+                )}
+                {needsPaymentOnly && (
+                  <p className="mt-2 text-[11.5px] font-semibold text-[#B65B3C]">Tap to finish payment →</p>
                 )}
               </article>
             );

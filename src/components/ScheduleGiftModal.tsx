@@ -437,11 +437,9 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         if (paymentError) throw paymentError;
 
         if (paymentData?.url) {
-          await sendGiftNotificationEmail({
-            ...formData,
-            gift_type: selectedProduct.title,
-            price: selectedProduct.price
-          });
+          // Confirmation email now fires from the Stripe webhook once payment
+          // actually succeeds (see supabase/functions/stripe-webhook) — sending
+          // it here was misleading since the user hadn't paid yet.
 
           sessionStorage.setItem('giftScheduledSuccess', JSON.stringify({
             recipientId: recipient.id,

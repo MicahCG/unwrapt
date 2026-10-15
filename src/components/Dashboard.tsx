@@ -23,7 +23,8 @@ import { getNextOccurrence, formatOccasionDate, getDaysUntil, getDaysUntilExact 
 import RecipientDetailSheet from '@/components/RecipientDetailSheet';
 import CatalogPreviewSheet from '@/components/CatalogPreviewSheet';
 import GiftStatusBadge from '@/components/GiftStatusBadge';
-import { getRecipientStatus, type RecipientRecord } from '@/lib/giftStatus';
+import { getRecipientStatus, type RecipientRecord, type GiftRecord } from '@/lib/giftStatus';
+import { findResumableGift, resumeGiftPayment, hasCompleteShippingAddress } from '@/lib/giftPayment';
 import { useThea } from '@/hooks/useThea';
 import { hasTheaValueSeen } from '@/lib/funnel';
 import { VIP_MONTHLY_AMOUNT_LABEL } from '@/lib/stripe';
@@ -39,6 +40,7 @@ const Dashboard = () => {
   const [showAddRecipient, setShowAddRecipient] = useState(false);
   const [showScheduleGift, setShowScheduleGift] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState(null);
+  const [resumingGiftId, setResumingGiftId] = useState<string | null>(null);
   const [recipientDetail, setRecipientDetail] = useState<RecipientRecord | null>(null);
   const [catalogRecipient, setCatalogRecipient] = useState<RecipientRecord | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
@@ -191,11 +193,76 @@ const Dashboard = () => {
     sessionStorage.removeItem('giftScheduledSuccess');
   };
 
-  const handleScheduleGift = (recipient: any) => {
+  const resumeOrCollectAddress = async (gift: GiftRecord, recipient: RecipientRecord) => {
+    if (!hasCompleteShippingAddress(recipient)) {
+      // Address is missing — open the modal to collect it, then auto-proceed to payment.
+      setSelectedRecipient(recipient);
+      setResumingGiftId(gift.id || null);
+      setShowScheduleGift(true);
+      return;
+    }
+    try {
+      const url = await resumeGiftPayment(gift, recipient);
+      window.location.href = url;
+    } catch (error) {
+      console.error('Failed to resume gift payment:', error);
+      toast({
+        title: 'Payment error',
+        description: 'Could not resume payment for this gift. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleScheduleGift = (recipient: RecipientRecord) => {
     setRecipientDetail(null);
+    // If an earlier attempt was scheduled but never paid for, resume it instead
+    // of creating a duplicate gift.
+    const resumable = findResumableGift(recipient);
+    if (resumable) {
+      void resumeOrCollectAddress(resumable, recipient);
+      return;
+    }
     setSelectedRecipient(recipient);
     setShowScheduleGift(true);
   };
+
+  const handleResumeGift = (gift: GiftRecord, recipient: RecipientRecord) => {
+    setRecipientDetail(null);
+    void resumeOrCollectAddress(gift, recipient);
+  };
+
+  // ScheduleGiftModal dispatches this once it has collected a missing address
+  // for a gift we're resuming payment on.
+  useEffect(() => {
+    const handleProceedWithPayment = async (event: Event) => {
+      const detail = (event as CustomEvent<{ giftId: string }>).detail;
+      if (!detail?.giftId) return;
+      try {
+        const { data: gift, error } = await supabase
+          .from('scheduled_gifts')
+          .select('*, recipients(*)')
+          .eq('id', detail.giftId)
+          .single();
+        if (error || !gift) throw error || new Error('Gift not found');
+        const { recipients: recipient, ...giftFields } = gift as typeof gift & { recipients: RecipientRecord };
+        const url = await resumeGiftPayment(giftFields, recipient);
+        window.location.href = url;
+      } catch (error) {
+        console.error('Failed to resume gift payment:', error);
+        toast({
+          title: 'Payment error',
+          description: 'Could not resume payment for this gift. Please try again.',
+          variant: 'destructive',
+        });
+      } finally {
+        setResumingGiftId(null);
+      }
+    };
+
+    window.addEventListener('proceedWithPayment', handleProceedWithPayment);
+    return () => window.removeEventListener('proceedWithPayment', handleProceedWithPayment);
+  }, []);
   const handleOpenRecipient = (recipient: RecipientRecord) => {
     setRecipientDetail(recipient);
   };
@@ -573,13 +640,19 @@ const Dashboard = () => {
         <AddRecipientModal isOpen={showAddRecipient} onClose={() => setShowAddRecipient(false)} onRecipientAdded={() => setShowAddRecipient(false)} />
       )}
       {showScheduleGift && selectedRecipient && (
-        <ScheduleGiftModal isOpen={showScheduleGift} onClose={() => setShowScheduleGift(false)} recipient={selectedRecipient} />
+        <ScheduleGiftModal
+          isOpen={showScheduleGift}
+          onClose={() => { setShowScheduleGift(false); setResumingGiftId(null); }}
+          recipient={selectedRecipient}
+          payingForGiftId={resumingGiftId}
+        />
       )}
       <RecipientDetailSheet
         recipient={recipientDetail}
         open={Boolean(recipientDetail)}
         onOpenChange={(open) => { if (!open) setRecipientDetail(null); }}
         onSchedule={handleScheduleGift}
+        onResumeGift={handleResumeGift}
         onEdit={handleEditRecipient}
         onBrowseCatalog={handleBrowseCatalog}
       />
