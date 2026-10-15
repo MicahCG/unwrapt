@@ -337,34 +337,41 @@ function FoundPeopleScreen({
     >
       <StepPips step={2} />
       <TheaCharacter size="medium" gesture="Present" activity="clipboard" />
-      <div className="-mt-2 mb-4 rounded-[22px] border bg-white/80 px-5 py-4 text-center" style={{ borderColor: U.border }} aria-live="polite">
-        <Display style={{ fontSize: 27, lineHeight: 1.15 }}>
+      <div
+        className="-mt-2 mb-4 w-full shrink-0 rounded-[22px] border bg-white px-5 py-4 text-center"
+        style={{ borderColor: U.border }}
+        aria-live="polite"
+      >
+        <Display style={{ fontSize: 24, lineHeight: 1.25, fontWeight: 500 }}>
           {focusingId ? (
             `Let’s start with ${selectedFirst}.`
           ) : (
-            <HoldThenType
-              hold={
-                <>
-                  I found{' '}
-                  <span style={{ color: U.accent }}>
-                    {people.length} {people.length === 1 ? 'person' : 'people'}
-                  </span>{' '}
-                  in your calendar.
-                </>
-              }
-              next="choose one person to get started"
-              onComplete={() => setListReady(true)}
-            />
+            <>
+              I found{' '}
+              <span style={{ color: U.accent }}>
+                {people.length} {people.length === 1 ? 'person' : 'people'}
+              </span>{' '}
+              in your calendar.
+            </>
           )}
         </Display>
+        {!focusingId && (
+          <p className="mt-2 min-h-[22px] text-[14.5px] leading-5" style={{ color: U.textSecondary }}>
+            <TypewriterLine
+              text="Choose one person to get started."
+              speedMs={22}
+              onComplete={() => setListReady(true)}
+            />
+          </p>
+        )}
       </div>
       <div
-        className="flex flex-col gap-2.5"
+        className="flex w-full flex-col gap-2.5"
         role="radiogroup"
         aria-label="Choose one person to start with"
         style={{
-          opacity: listReady || focusingId ? 1 : 0,
-          transform: listReady || focusingId ? 'translateY(0)' : 'translateY(10px)',
+          opacity: listReady || focusingId ? 1 : 0.35,
+          transform: listReady || focusingId ? 'translateY(0)' : 'translateY(6px)',
           transition: 'opacity 380ms ease, transform 380ms ease',
           pointerEvents: listReady || focusingId ? 'auto' : 'none',
         }}
@@ -985,9 +992,14 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       return (
         <MobileShell
           glow
-          contentClassName="px-7 pt-16 pb-4 flex flex-col justify-between"
+          contentClassName="flex flex-col justify-between overflow-y-auto px-7 pt-16 pb-4"
           footer={
-            <PrimaryButton onClick={() => setScreen('import')}>Get started</PrimaryButton>
+            <div className="space-y-2">
+              <PrimaryButton onClick={() => setScreen('import')}>Get started</PrimaryButton>
+              <p className="text-center text-[12px] leading-4" style={{ color: U.muted }}>
+                Takes about two minutes
+              </p>
+            </div>
           }
         >
           <div className="flex items-center justify-between">

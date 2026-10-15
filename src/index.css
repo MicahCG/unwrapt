@@ -544,11 +544,18 @@
     border-radius: 17px;
     width: 100%;
     letter-spacing: 0.2px;
-    transition: transform .15s ease, opacity .15s ease;
+    box-shadow: 0 10px 24px rgba(42, 37, 32, 0.18);
+    transition: transform .15s ease, opacity .15s ease, box-shadow .15s ease;
   }
   .u-btn-primary:hover { opacity: .94; }
   .u-btn-primary:active { transform: scale(.99); }
-  .u-btn-primary:disabled { opacity: .5; cursor: default; }
+  .u-btn-primary:disabled {
+    opacity: 0.72;
+    cursor: default;
+    box-shadow: none;
+    background: #4A433B;
+    color: #F4ECDD;
+  }
 
   /* Soft warm card */
   .u-card {
