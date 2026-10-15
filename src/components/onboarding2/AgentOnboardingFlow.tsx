@@ -524,6 +524,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     try {
       try {
         sessionStorage.setItem('unwrapt_calendar_redirect_uri', redirectUri);
+        sessionStorage.setItem('unwrapt_calendar_return_to', '/onboarding');
       } catch {
         /* ignore */
       }

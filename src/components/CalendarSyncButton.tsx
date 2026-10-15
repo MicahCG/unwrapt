@@ -1,5 +1,6 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Calendar, Loader2, Check } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -8,10 +9,21 @@ import { useToast } from '@/hooks/use-toast';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { normalizeRecipientName } from '@/lib/dateUtils';
 
-const CalendarSyncButton = () => {
+const RETURN_TO_KEY = 'unwrapt_calendar_return_to';
+const REDIRECT_URI_KEY = 'unwrapt_calendar_redirect_uri';
+let postOAuthSyncStarted = false;
+
+interface CalendarSyncButtonProps {
+  className?: string;
+  /** Softer pill that matches the Manual tab chrome. */
+  appearance?: 'default' | 'pill';
+}
+
+const CalendarSyncButton = ({ className, appearance = 'default' }: CalendarSyncButtonProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [syncing, setSyncing] = useState(false);
   const [justSynced, setJustSynced] = useState(false);
 
@@ -41,8 +53,16 @@ const CalendarSyncButton = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('No active session found');
 
+      const redirectUri = `${window.location.origin}/auth/calendar/callback`;
+      try {
+        sessionStorage.setItem(REDIRECT_URI_KEY, redirectUri);
+        sessionStorage.setItem(RETURN_TO_KEY, '/?tab=manual&syncCalendar=1');
+      } catch {
+        /* ignore */
+      }
+
       const { data: authData, error: authError } = await supabase.functions.invoke('google-calendar', {
-        body: { action: 'get_auth_url' },
+        body: { action: 'get_auth_url', redirectUri },
         headers: { Authorization: `Bearer ${session.access_token}` }
       });
 
@@ -230,28 +250,77 @@ const CalendarSyncButton = () => {
     }
   };
 
+  // After OAuth returns to Manual tab, import events once (shared across duplicate buttons).
+  useEffect(() => {
+    if (searchParams.get('syncCalendar') !== '1') return;
+    if (!user || !isConnected || syncing || postOAuthSyncStarted) return;
+    postOAuthSyncStarted = true;
+    const next = new URLSearchParams(searchParams);
+    next.delete('syncCalendar');
+    setSearchParams(next, { replace: true });
+    void handleCalendarSync();
+  }, [searchParams, user, isConnected, syncing, setSearchParams]);
+
+  const label = syncing
+    ? isConnected
+      ? 'Syncing…'
+      : 'Connecting…'
+    : justSynced
+      ? 'Synced!'
+      : isConnected
+        ? 'Sync calendar'
+        : 'Connect calendar';
+
+  if (appearance === 'pill') {
+    return (
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={syncing}
+        className={
+          className ||
+          'inline-flex w-full items-center justify-center gap-2 rounded-full border px-3.5 py-2.5 text-[12.5px] font-semibold disabled:opacity-60'
+        }
+        style={{
+          borderColor: 'rgba(42,37,32,0.14)',
+          background: '#F1E7D5',
+          color: '#2A2520',
+        }}
+      >
+        {syncing ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : justSynced ? (
+          <Check className="h-3.5 w-3.5" />
+        ) : (
+          <Calendar className="h-3.5 w-3.5" />
+        )}
+        {label}
+      </button>
+    );
+  }
+
   return (
     <Button
       variant="outline"
       size="sm"
       onClick={handleClick}
       disabled={syncing}
-      className="border-brand-charcoal text-brand-charcoal hover:bg-brand-cream w-full sm:w-auto"
+      className={className || 'w-full border-brand-charcoal text-brand-charcoal hover:bg-brand-cream sm:w-auto'}
     >
       {syncing ? (
         <>
-          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          {isConnected ? 'Syncing...' : 'Connecting...'}
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          {label}
         </>
       ) : justSynced ? (
         <>
-          <Check className="h-4 w-4 mr-2" />
-          Synced!
+          <Check className="mr-2 h-4 w-4" />
+          {label}
         </>
       ) : (
         <>
-          <Calendar className="h-4 w-4 mr-2" />
-          {isConnected ? 'Sync Calendar' : 'Connect Calendar'}
+          <Calendar className="mr-2 h-4 w-4" />
+          {label}
         </>
       )}
     </Button>

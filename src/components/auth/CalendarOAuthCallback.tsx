@@ -135,15 +135,28 @@ const CalendarOAuthCallback: React.FC = () => {
           throw new Error('No access token received from Google');
         }
 
-        console.log('📅 CalendarOAuthCallback: Calendar connected successfully, redirecting to onboarding');
-        
+        let returnTo = '/onboarding';
+        try {
+          const stored = sessionStorage.getItem('unwrapt_calendar_return_to');
+          sessionStorage.removeItem('unwrapt_calendar_return_to');
+          if (stored && stored.startsWith('/') && !stored.startsWith('//')) {
+            returnTo = stored;
+          }
+        } catch {
+          /* ignore */
+        }
+
+        console.log('📅 CalendarOAuthCallback: Calendar connected successfully, redirecting to', returnTo);
+
         toast({
-          title: "Calendar Connected Successfully!",
-          description: "Your Google Calendar has been connected. Returning to setup...",
+          title: 'Calendar Connected Successfully!',
+          description:
+            returnTo.startsWith('/onboarding')
+              ? 'Your Google Calendar has been connected. Returning to setup...'
+              : 'Your Google Calendar has been connected. Syncing your people…',
         });
 
-        // Redirect back to app onboarding - it will detect the connection and show events
-        window.location.href = 'https://app.unwrapt.io/onboarding';
+        window.location.href = `${window.location.origin}${returnTo}`;
 
       } catch (error) {
         console.error('📅 CalendarOAuthCallback: Error processing OAuth callback:', error);

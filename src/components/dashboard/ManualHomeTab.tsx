@@ -4,6 +4,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { PersonAvatar } from '@/components/unwrapt2/TheaAvatar';
 import { Eyebrow, PrimaryButton, Display } from '@/components/unwrapt2/MobileShell';
 import GiftStatusBadge from '@/components/GiftStatusBadge';
+import CalendarSyncButton from '@/components/CalendarSyncButton';
 import { U, toneForIndex, initialsOf } from '@/components/unwrapt2/theme';
 import { cleanName } from '@/lib/utils';
 import { formatOccasionDate, getDaysUntil, getNextOccurrence } from '@/lib/dateUtils';
@@ -224,6 +225,12 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
             Clear day filter
           </button>
         )}
+        <div className="mt-3 border-t pt-3" style={{ borderColor: U.border }}>
+          <CalendarSyncButton appearance="pill" />
+          <p className="mt-2 text-center text-[11.5px] leading-4" style={{ color: U.muted }}>
+            Pull birthdays and anniversaries from Google Calendar into Your people.
+          </p>
+        </div>
       </section>
 
       {/* Recipients */}
@@ -248,10 +255,11 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
                 ? 'No occasions on this day. Clear the filter or pick another date.'
                 : 'Add someone you care about and Thea will watch the moments that matter.'}
             </p>
-            <div className="mt-4">
+            <div className="mt-4 flex flex-col gap-2.5">
               <PrimaryButton onClick={selectedDay ? () => setSelectedDay(null) : onAddRecipient}>
                 {selectedDay ? 'Clear filter' : 'Add someone'}
               </PrimaryButton>
+              {!selectedDay && <CalendarSyncButton appearance="pill" />}
             </div>
           </div>
         ) : (
