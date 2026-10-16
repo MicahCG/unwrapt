@@ -154,7 +154,7 @@ const Settings = () => {
 
   return (
     <MobileShell
-      contentClassName="px-5 pt-14 pb-4"
+      contentClassName="overflow-y-auto px-5 pt-14 pb-4"
       footer={<PrimaryButton onClick={() => navigate('/')}>Done</PrimaryButton>}
     >
       {/* Header */}
