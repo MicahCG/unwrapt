@@ -55,6 +55,7 @@ const TypewriterText: React.FC<{ text: string }> = ({ text }) => {
 interface TheaHomeTabProps {
   displayName: string;
   recipients: RecipientRecord[];
+  autopilotThreshold?: number;
   onOpenRecipient: (recipientId: string, intent?: BriefingItem['action']) => void;
   onSwitchToManual: () => void;
 }
@@ -62,10 +63,11 @@ interface TheaHomeTabProps {
 const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   displayName,
   recipients,
+  autopilotThreshold,
   onOpenRecipient,
   onSwitchToManual,
 }) => {
-  const briefing = useMemo(() => buildDashboardBriefing(recipients), [recipients]);
+  const briefing = useMemo(() => buildDashboardBriefing(recipients, autopilotThreshold), [recipients, autopilotThreshold]);
   const seed = useMemo(() => buildBriefingMessage(displayName, briefing), [displayName, briefing]);
   const chips = useMemo(() => briefingQuickChips(briefing), [briefing]);
 

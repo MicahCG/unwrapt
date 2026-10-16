@@ -127,9 +127,12 @@ const Settings = () => {
     }
     if (next.autopilot) payload.autopilot_level = next.autopilot;
     try {
-      await supabase.from('profiles').update(payload as any).eq('id', user.id);
-    } catch (e) {
-      /* preference columns may not exist yet  -  non-fatal */
+      const { error } = await supabase.from('profiles').update(payload as any).eq('id', user.id);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['user-profile', user.id] });
+    } catch (error: any) {
+      console.error('Error saving gifting guardrails:', error);
+      toast({ title: 'Error saving preference', description: error.message || 'Something went wrong.', variant: 'destructive' });
     }
   };
 
@@ -146,7 +149,6 @@ const Settings = () => {
   };
 
   const budgetLabel = `$${budget.lo} - $${budget.hi}`;
-  const tier = ((profile as Record<string, any>)?.subscription_tier as string) || 'free';
 
   return (
     <MobileShell
@@ -164,13 +166,10 @@ const Settings = () => {
         <div className="flex items-center justify-center" style={{ width: 50, height: 50, borderRadius: '50%', background: U.accent, color: U.cream, fontFamily: "'Newsreader', serif", fontStyle: 'italic', fontSize: 21 }}>
           {initialsOf(fullName || email || 'U').charAt(0)}
         </div>
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1">
           <div style={{ fontWeight: 600, fontSize: 16 }}>{fullName || 'Your name'}</div>
           <div style={{ fontSize: 12.5, color: U.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</div>
         </div>
-        <span className="font-mono uppercase" style={{ fontSize: 10, letterSpacing: '1px', color: U.accent, border: '1px solid rgba(182,91,60,0.4)', padding: '4px 9px', borderRadius: 9 }}>
-          {tier === 'vip' ? 'VIP' : 'Free'}
-        </span>
       </div>
 
       {/* Subscription management (existing logic) */}

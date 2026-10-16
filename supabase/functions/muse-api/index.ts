@@ -221,7 +221,25 @@ Deno.serve(async (req) => {
     if (req.method === "POST" && path === "/v1/recommendations") {
       const body = await req.json().catch(() => ({}));
       const recipientName = String(body.recipient_name || body.recipientName || "them");
-      const budgetMax = Number(body.budget_max ?? body.budgetMax ?? 100);
+
+      // When the caller doesn't pass an explicit budget, fall back to the
+      // linked user's own "Default gift budget" preference (Settings) rather
+      // than a flat $100 for everyone.
+      let fallbackBudgetMax = 100;
+      if (body.budget_max == null && body.budgetMax == null) {
+        const { userId: linkedUserId } = await resolveUserId(req, admin);
+        if (linkedUserId) {
+          const { data: linkedProfile } = await admin
+            .from("profiles")
+            .select("default_gift_budget_max")
+            .eq("id", linkedUserId)
+            .maybeSingle();
+          if (linkedProfile?.default_gift_budget_max != null) {
+            fallbackBudgetMax = Number(linkedProfile.default_gift_budget_max);
+          }
+        }
+      }
+      const budgetMax = Number(body.budget_max ?? body.budgetMax ?? fallbackBudgetMax);
       const interests = Array.isArray(body.interests) ? body.interests.map(String) : [];
       const occasion = body.occasion ? String(body.occasion) : null;
 

@@ -14,6 +14,7 @@ interface ManualHomeTabProps {
   recipients: RecipientRecord[];
   tier: 'free' | 'vip';
   walletBalance?: number | null;
+  autopilotThreshold?: number;
   onOpenRecipient: (recipient: RecipientRecord) => void;
   onAddRecipient: () => void;
   onBrowseCatalog: () => void;
@@ -27,6 +28,7 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
   recipients,
   tier,
   walletBalance,
+  autopilotThreshold,
   onOpenRecipient,
   onAddRecipient,
   onBrowseCatalog,
@@ -40,7 +42,7 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
   }, []);
   const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
-  const briefing = useMemo(() => buildDashboardBriefing(recipients), [recipients]);
+  const briefing = useMemo(() => buildDashboardBriefing(recipients, autopilotThreshold), [recipients, autopilotThreshold]);
 
   const occasionDays = useMemo(() => {
     const map = new Map<string, { recipient: RecipientRecord; label: string }[]>();

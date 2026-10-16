@@ -21,7 +21,7 @@ import { type RecipientRecord, type GiftRecord } from '@/lib/giftStatus';
 import { findResumableGift, resumeGiftPayment, hasCompleteShippingAddress } from '@/lib/giftPayment';
 import TheaHomeTab from '@/components/dashboard/TheaHomeTab';
 import ManualHomeTab from '@/components/dashboard/ManualHomeTab';
-import type { BriefingItem } from '@/lib/dashboardBriefing';
+import { AUTOPILOT_THRESHOLDS, type BriefingItem } from '@/lib/dashboardBriefing';
 
 type DashboardTab = 'thea' | 'manual';
 
@@ -64,7 +64,7 @@ const Dashboard = () => {
       if (!user?.id) return null;
       const { data, error } = await supabase
         .from('profiles')
-        .select('subscription_tier, trial_ends_at, gift_wallet_balance')
+        .select('subscription_tier, trial_ends_at, gift_wallet_balance, autopilot_level')
         .eq('id', user.id)
         .single();
       if (error) throw error;
@@ -305,6 +305,7 @@ const Dashboard = () => {
   const planLabel = tier === 'vip' ? 'VIP' : (userProfile?.trial_ends_at ? 'Free trial' : 'Free');
 
   const typedRecipients = recipients as RecipientRecord[];
+  const autopilotThreshold = AUTOPILOT_THRESHOLDS[(userProfile as any)?.autopilot_level] ?? AUTOPILOT_THRESHOLDS.ask100;
 
   return (
     <>
@@ -379,12 +380,14 @@ const Dashboard = () => {
             <TheaHomeTab
               displayName={displayName}
               recipients={typedRecipients}
+              autopilotThreshold={autopilotThreshold}
               onOpenRecipient={handleOpenRecipientById}
               onSwitchToManual={() => setActiveTab('manual')}
             />
           ) : (
             <ManualHomeTab
               recipients={typedRecipients}
+              autopilotThreshold={autopilotThreshold}
               tier={tier}
               walletBalance={userProfile?.gift_wallet_balance}
               onOpenRecipient={handleOpenRecipient}

@@ -27,14 +27,32 @@ export type DashboardBriefing = {
 
 const firstName = (name: string) => cleanName(name).split(/\s+/)[0] || 'them';
 
-const giftNeedsReview = (g: GiftRecord) =>
-  Boolean(g?.wallet_reserved) &&
-  !g?.fulfilled_at &&
-  g?.status !== 'ordered' &&
-  g?.status !== 'delivered';
+/** profiles.autopilot_level -> the $ amount Thea can confirm without asking first. */
+export const AUTOPILOT_THRESHOLDS: Record<string, number> = {
+  always: 0,
+  ask100: 100,
+  ask250: 250,
+};
+
+/**
+ * A reserved gift needs the user's review unless its cost falls at or under
+ * their autopilot threshold - above that (or when cost isn't known yet),
+ * Thea surfaces it instead of confirming silently.
+ */
+const giftNeedsReview = (g: GiftRecord, autopilotThreshold: number) => {
+  if (!Boolean(g?.wallet_reserved) || g?.fulfilled_at || g?.status === 'ordered' || g?.status === 'delivered') {
+    return false;
+  }
+  const cost = g?.estimated_cost;
+  if (cost == null) return true;
+  return cost > autopilotThreshold;
+};
 
 /** Derive Thea briefing buckets from live recipient + gift rows. */
-export function buildDashboardBriefing(recipients: RecipientRecord[]): DashboardBriefing {
+export function buildDashboardBriefing(
+  recipients: RecipientRecord[],
+  autopilotThreshold: number = AUTOPILOT_THRESHOLDS.ask100,
+): DashboardBriefing {
   const upcoming: BriefingItem[] = [];
   const needsInfo: BriefingItem[] = [];
   const inMotion: BriefingItem[] = [];
@@ -98,7 +116,7 @@ export function buildDashboardBriefing(recipients: RecipientRecord[]): Dashboard
     }
 
     for (const gift of recipient.scheduled_gifts || []) {
-      if (giftNeedsReview(gift)) {
+      if (giftNeedsReview(gift, autopilotThreshold)) {
         needsInfo.push({
           recipientId: recipient.id,
           recipientName: cleanName(recipient.name),
