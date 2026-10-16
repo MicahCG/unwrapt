@@ -11,6 +11,18 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Supabase query errors are plain {message, details, hint, code} objects,
+// not real Error instances, so String(error) prints "[object Object]".
+const errorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object" && "message" in error) return String((error as { message: unknown }).message);
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+};
+
 const REMINDER_LEAD_DAYS = 7;
 
 /** Roll a recurring MM-DD date (stored as YYYY-MM-DD) forward to its next occurrence. */
@@ -124,7 +136,7 @@ serve(async (req) => {
             occasion_type: occasionType,
             occasion_date: nextDate,
             status: "failed",
-            error_message: sendError instanceof Error ? sendError.message : String(sendError),
+            error_message: errorMessage(sendError),
             processed_at: new Date().toISOString(),
           });
         }
@@ -138,7 +150,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error sending occasion reminders:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
+      JSON.stringify({ error: errorMessage(error) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
