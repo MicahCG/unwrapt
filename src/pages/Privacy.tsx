@@ -41,9 +41,10 @@ const Privacy = () => {
 
           <div className="prose prose-lg max-w-none text-brand-charcoal">
             <p className="text-lg leading-relaxed mb-6">
-              Unwrapt respects your privacy and is committed to protecting your personal information.
-              This Privacy Policy explains how we collect, use, and protect data when you use our
-              application and services, including our AI gifting assistant, Thea.
+              Unwrapt is operated by KinGira LLC, a Texas limited liability company ("Unwrapt," "Company,"
+              "we," "us," or "our"). We respect your privacy and are committed to protecting your personal
+              information. This Privacy Policy explains how we collect, use, and protect data when you use
+              our application and services, including our AI gifting assistant, Thea.
             </p>
 
             <section className="mb-8">

@@ -41,9 +41,10 @@ const TermsOfService = () => {
 
           <div className="prose prose-lg max-w-none text-brand-charcoal">
             <p className="text-lg leading-relaxed mb-6">
-              Welcome to Unwrapt. By accessing or using our application and services, you agree to be bound by 
-              these Terms of Service. Please read them carefully. If you do not agree to these terms, you may 
-              not use our services.
+              Welcome to Unwrapt. Unwrapt is operated by KinGira LLC, a Texas limited liability company
+              ("Unwrapt," "Company," "we," "us," or "our"). By accessing or using our application and services,
+              you agree to be bound by these Terms of Service. Please read them carefully. If you do not agree
+              to these terms, you may not use our services.
             </p>
 
             <section className="mb-8">
@@ -167,8 +168,8 @@ const TermsOfService = () => {
                 12. Governing Law
               </h2>
               <p>
-                These Terms of Service shall be governed by and construed in accordance with the laws of 
-                [Insert Jurisdiction], without regard to conflict of law principles.
+                These Terms of Service shall be governed by and construed in accordance with the laws of
+                the State of Texas, without regard to conflict of law principles.
               </p>
             </section>
 
