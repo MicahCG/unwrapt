@@ -57,24 +57,39 @@ serve(async (req) => {
     today.setHours(0, 0, 0, 0);
     const cooldownCutoff = new Date(today.getTime() - RETIP_COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
 
-    const { data: recipients, error } = await supabaseClient
-      .from("recipients")
-      .select(`
-        id, name, birthday, anniversary, interests,
-        scheduled_gifts(status),
-        profiles!inner(id, email, full_name, marketing_emails, default_gift_budget_max)
-      `)
-      .eq("profiles.marketing_emails", true);
+    // recipients has no formal FK to profiles for PostgREST to auto-embed,
+    // so fetch the two separately and join in code.
+    const { data: profiles, error: profilesError } = await supabaseClient
+      .from("profiles")
+      .select("id, email, full_name, default_gift_budget_max")
+      .eq("marketing_emails", true);
 
-    if (error) throw error;
+    if (profilesError) throw profilesError;
+
+    const profileById = new Map((profiles || []).map((p) => [p.id, p]));
+    const userIds = [...profileById.keys()];
 
     let sent = 0;
     let skippedNoIdea = 0;
     let skippedHasGift = 0;
     let skippedCooldown = 0;
 
+    if (userIds.length === 0) {
+      return new Response(
+        JSON.stringify({ success: true, sent, skippedNoIdea, skippedHasGift, skippedCooldown }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const { data: recipients, error } = await supabaseClient
+      .from("recipients")
+      .select("id, name, birthday, anniversary, interests, user_id, scheduled_gifts(status)")
+      .in("user_id", userIds);
+
+    if (error) throw error;
+
     for (const recipient of recipients || []) {
-      const profile = (recipient as any).profiles;
+      const profile = profileById.get((recipient as any).user_id);
       if (!profile?.email) continue;
 
       const occasionDate: string | null = recipient.birthday || recipient.anniversary;

@@ -58,18 +58,37 @@ serve(async (req) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const { data: recipients, error } = await supabaseClient
-      .from("recipients")
-      .select("id, name, birthday, anniversary, profiles!inner(email, full_name, email_reminders)")
-      .eq("profiles.email_reminders", true);
+    // recipients has no formal FK to profiles for PostgREST to auto-embed,
+    // so fetch the two separately and join in code.
+    const { data: profiles, error: profilesError } = await supabaseClient
+      .from("profiles")
+      .select("id, email, full_name")
+      .eq("email_reminders", true);
 
-    if (error) throw error;
+    if (profilesError) throw profilesError;
+
+    const profileById = new Map((profiles || []).map((p) => [p.id, p]));
+    const userIds = [...profileById.keys()];
 
     let sent = 0;
     let skipped = 0;
 
+    if (userIds.length === 0) {
+      return new Response(
+        JSON.stringify({ success: true, sent, skipped }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const { data: recipients, error } = await supabaseClient
+      .from("recipients")
+      .select("id, name, birthday, anniversary, user_id")
+      .in("user_id", userIds);
+
+    if (error) throw error;
+
     for (const recipient of recipients || []) {
-      const profile = (recipient as any).profiles;
+      const profile = profileById.get((recipient as any).user_id);
       if (!profile?.email) continue;
 
       const occasions: Array<["birthday" | "anniversary", string | null]> = [
