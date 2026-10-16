@@ -26,7 +26,9 @@ type EmailType =
   | 'trial_ending'
   | 'trial_ended'
   | 'subscription_cancelled'
-  | 'order_cancelled';
+  | 'order_cancelled'
+  | 'occasion_reminder'
+  | 'gift_tip';
 
 interface EmailRequest {
   type: EmailType;
@@ -164,6 +166,10 @@ function getEmailSubject(type: EmailType, data: any): string {
       return `Your VIP subscription has been cancelled`;
     case 'order_cancelled':
       return `❌ Gift order for ${data?.recipientName} has been cancelled`;
+    case 'occasion_reminder':
+      return `🎂 ${data?.recipientName}'s ${data?.occasion} is in ${data?.daysRemaining} days`;
+    case 'gift_tip':
+      return `✨ A gift idea for ${data?.recipientName}`;
     default:
       return 'Notification from Unwrapt';
   }
@@ -681,6 +687,50 @@ function getEmailContent(type: EmailType, userName: string | undefined, data: an
 
     case 'gift_scheduled':
       return getGiftScheduledEmail(greeting, userName, data, appUrl);
+
+    case 'occasion_reminder':
+      return `
+        ${baseStyles}
+        <div class="container">
+          <div class="header">
+            <h2>🎂 ${data?.recipientName}'s ${data?.occasion} is coming up</h2>
+            <p>${greeting}</p>
+          </div>
+          <div class="content">
+            <p><strong>${data?.recipientName}'s</strong> ${data?.occasion} is in <strong>${data?.daysRemaining} days</strong> (${formatDate(data?.occasionDate)}).</p>
+            <div class="info-box">
+              <p>Schedule a gift now so it has time to arrive  -  or let Thea handle it for you.</p>
+            </div>
+            <div class="cta">
+              <a href="${data?.modifyLink || appUrl}" class="button primary">Plan ${data?.recipientName}'s gift</a>
+            </div>
+          </div>
+          ${getFooter()}
+        </div>
+      `;
+
+    case 'gift_tip':
+      return `
+        ${baseStyles}
+        <div class="container">
+          <div class="header">
+            <h2>✨ A gift idea for ${data?.recipientName}</h2>
+            <p>${greeting}</p>
+          </div>
+          <div class="content">
+            <p>${data?.recipientName} doesn't have a gift scheduled yet${data?.occasion ? ` for their ${data?.occasion}` : ''}. Thea found something that fits your usual budget:</p>
+            <div class="info-box">
+              ${data?.giftImage ? `<img src="${data.giftImage}" alt="${data?.giftDescription || 'Gift idea'}" style="width:100%;max-width:280px;border-radius:12px;display:block;margin:0 auto 12px;" />` : ''}
+              <p style="text-align:center;"><strong>${data?.giftDescription || 'A curated pick'}</strong></p>
+              ${data?.priceRange ? `<p style="text-align:center;color:#999;">${data.priceRange}</p>` : ''}
+            </div>
+            <div class="cta">
+              <a href="${data?.modifyLink || appUrl}" class="button primary">See this idea</a>
+            </div>
+          </div>
+          ${getFooter()}
+        </div>
+      `;
 
     default:
       return `
