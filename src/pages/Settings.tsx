@@ -133,10 +133,6 @@ const Settings = () => {
     }
   };
 
-  const handlePasswordReset = () => {
-    toast({ title: 'Password reset email sent', description: 'Check your email for password reset instructions.' });
-  };
-
   const handleDeleteAccount = async () => {
     try {
       const { error } = await supabase.functions.invoke('send-account-deletion-request', {
@@ -248,9 +244,6 @@ const Settings = () => {
         <div className="flex flex-wrap gap-2 pt-1">
           <button onClick={handleSaveProfile} disabled={isSaving} className="u-btn-primary" style={{ width: 'auto', flex: 1, fontSize: 14.5, padding: '13px 18px' }}>
             {isSaving ? 'Saving…' : 'Save changes'}
-          </button>
-          <button onClick={handlePasswordReset} style={{ appearance: 'none', cursor: 'pointer', background: 'transparent', border: `1px solid ${U.borderStrong}`, color: U.ink, fontWeight: 600, fontSize: 14, padding: '13px 16px', borderRadius: 14 }}>
-            Change password
           </button>
         </div>
       </div>
