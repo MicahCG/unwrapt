@@ -31,6 +31,94 @@ const RETIP_COOLDOWN_DAYS = 14;
 const DEFAULT_BUDGET_MAX = 150;
 const ACTIVE_GIFT_STATUSES = new Set(["cancelled", "expired"]);
 
+type CatalogItem = {
+  title: string;
+  description: string | null;
+  image_url: string | null;
+  price: number | null;
+  provider: "goody" | "unwrapt";
+};
+
+const goodyEnvironment = () =>
+  Deno.env.get("GOODY_API_ENV") === "production" ? "production" : "sandbox";
+
+const goodyApiKey = () =>
+  goodyEnvironment() === "production"
+    ? Deno.env.get("GOODY_PRODUCTION_COMMERCE_API_KEY")
+    : Deno.env.get("GOODY_SANDBOX_COMMERCE_API_KEY") || Deno.env.get("GOODY_API_KEY");
+
+const goodyBaseUrl = () =>
+  goodyEnvironment() === "production"
+    ? "https://api.ongoody.com"
+    : "https://api.sandbox.ongoody.com";
+
+/** Fetch the live Goody catalog once per invocation (same products for every user). */
+async function fetchGoodyCatalog(): Promise<CatalogItem[]> {
+  const token = goodyApiKey();
+  if (!token) return [];
+
+  const response = await fetch(`${goodyBaseUrl()}/v1/products?page=1&per_page=100`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) return [];
+  const payload = await response.json();
+  const products = (payload?.data || payload?.products || []) as Array<Record<string, unknown>>;
+
+  return products
+    .map((p): CatalogItem => {
+      const priceCents = typeof p.price === "number" ? p.price : null;
+      const images = p.images as Array<{ image_large?: { url?: string } }> | undefined;
+      const image =
+        images?.[0]?.image_large?.url ||
+        ((p.variants as Array<{ image_large?: { url?: string } }>)?.[0]?.image_large?.url) ||
+        null;
+      return {
+        title: String(p.name || "Gift"),
+        description: String(p.recipient_description || p.subtitle || "") || null,
+        image_url: image,
+        price: priceCents != null ? priceCents / 100 : null,
+        provider: "goody",
+      };
+    })
+    .filter((p) => p.price != null);
+}
+
+/** Fallback only - the pre-Goody local catalog, kept in case Goody is unreachable/unconfigured. */
+async function fetchLocalCatalog(supabaseClient: ReturnType<typeof createClient>): Promise<CatalogItem[]> {
+  const { data } = await supabaseClient
+    .from("products")
+    .select("title, description, featured_image_url, price")
+    .eq("active", true)
+    .eq("available_for_sale", true)
+    .order("rank", { ascending: true })
+    .limit(100);
+
+  return (data || []).map((p) => ({
+    title: p.title,
+    description: p.description,
+    image_url: p.featured_image_url,
+    price: p.price,
+    provider: "unwrapt" as const,
+  }));
+}
+
+function pickBestMatch(catalog: CatalogItem[], budgetMax: number, interests: string[]): CatalogItem | null {
+  const inBudget = catalog.filter((p) => p.price != null && p.price <= budgetMax);
+  if (inBudget.length === 0) return null;
+
+  if (interests.length === 0) return inBudget[0];
+
+  const scored = inBudget
+    .map((p) => {
+      const hay = `${p.title} ${p.description || ""}`.toLowerCase();
+      const score = interests.reduce((s, i) => s + (hay.includes(i) ? 1 : 0), 0);
+      return { p, score };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  return scored[0].score > 0 ? scored[0].p : inBudget[0];
+}
+
 function nextOccurrenceDays(dateString: string, today: Date): number {
   const [, month, day] = dateString.split("-").map(Number);
   const thisYear = new Date(today.getFullYear(), month - 1, day);
@@ -88,6 +176,9 @@ serve(async (req) => {
 
     if (error) throw error;
 
+    let catalog = await fetchGoodyCatalog();
+    if (catalog.length === 0) catalog = await fetchLocalCatalog(supabaseClient);
+
     for (const recipient of recipients || []) {
       const profile = profileById.get((recipient as any).user_id);
       if (!profile?.email) continue;
@@ -121,29 +212,10 @@ serve(async (req) => {
       const budgetMax = profile.default_gift_budget_max ?? DEFAULT_BUDGET_MAX;
       const interests: string[] = (recipient.interests || []).map((i: string) => i.toLowerCase());
 
-      const { data: candidates } = await supabaseClient
-        .from("products")
-        .select("title, description, featured_image_url, price, currency, product_type")
-        .eq("active", true)
-        .eq("available_for_sale", true)
-        .lte("price", budgetMax)
-        .order("rank", { ascending: true })
-        .limit(25);
-      if (!candidates || candidates.length === 0) {
+      const pick = pickBestMatch(catalog, budgetMax, interests);
+      if (!pick) {
         skippedNoIdea++;
         continue;
-      }
-
-      let pick = candidates[0];
-      if (interests.length > 0) {
-        const scored = candidates
-          .map((p) => {
-            const hay = `${p.title} ${p.description || ""} ${p.product_type || ""}`.toLowerCase();
-            const score = interests.reduce((s, i) => s + (hay.includes(i) ? 1 : 0), 0);
-            return { p, score };
-          })
-          .sort((a, b) => b.score - a.score);
-        if (scored[0].score > 0) pick = scored[0].p;
       }
 
       try {
@@ -156,7 +228,7 @@ serve(async (req) => {
               recipientName: recipient.name,
               occasion: recipient.birthday === occasionDate ? "birthday" : "anniversary",
               giftDescription: pick.title,
-              giftImage: pick.featured_image_url,
+              giftImage: pick.image_url,
               priceRange: typeof pick.price === "number" ? `$${pick.price.toFixed(2)}` : undefined,
               modifyLink: "https://app.unwrapt.io/",
             },
