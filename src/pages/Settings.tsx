@@ -152,7 +152,8 @@ const Settings = () => {
 
   return (
     <MobileShell
-      contentClassName="overflow-y-auto px-5 pt-14 pb-4"
+      contentClassName="overflow-y-auto px-5 pt-14 pb-4 lg:px-10"
+      maxWidthClassName="max-w-[440px] lg:max-w-[980px]"
       footer={<PrimaryButton onClick={() => navigate('/')}>Done</PrimaryButton>}
     >
       {/* Header */}
@@ -161,148 +162,158 @@ const Settings = () => {
         <Display style={{ fontSize: 22 }}>Account</Display>
       </div>
 
-      {/* Identity row */}
-      <div className="mb-3 flex items-center gap-3.5" style={{ padding: 16, borderRadius: 20, background: U.surface, border: `1px solid ${U.border}` }}>
-        <div className="flex items-center justify-center" style={{ width: 50, height: 50, borderRadius: '50%', background: U.accent, color: U.cream, fontFamily: "'Newsreader', serif", fontStyle: 'italic', fontSize: 21 }}>
-          {initialsOf(fullName || email || 'U').charAt(0)}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div style={{ fontWeight: 600, fontSize: 16 }}>{fullName || 'Your name'}</div>
-          <div style={{ fontSize: 12.5, color: U.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</div>
-        </div>
-      </div>
-
-      {/* Subscription management (existing logic) */}
-      <div className="mb-6">
-        <SubscriptionManagement />
-      </div>
-
-      {/* Default gift budget */}
-      <Eyebrow className="mb-1">Default gift budget</Eyebrow>
-      <p className="mb-3.5" style={{ margin: '0 0 14px', fontSize: 13, color: U.muted }}>
-        Thea shops within this range for everyone. You can set a different range on any person.
-      </p>
-      <div className="mb-3 text-center" style={{ background: U.surface, border: `1px solid ${U.border}`, borderRadius: 20, padding: '18px' }}>
-        <span className="font-display" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>{budgetLabel}</span>
-        <div style={{ fontSize: 12.5, color: U.muted }}>Your typical gift range</div>
-      </div>
-      <div className="mb-6 flex flex-wrap gap-2">
-        {RANGE_PRESETS.map((r) => {
-          const sel = budget.lo === r.lo && budget.hi === r.hi;
-          return (
-            <div
-              key={r.id}
-              onClick={() => { const b = { lo: r.lo, hi: r.hi }; setBudget(b); persistGuardrails({ budget: b }); }}
-              className="flex cursor-pointer items-baseline"
-              style={{ padding: '10px 13px', borderRadius: 14, background: sel ? '#F1E7D5' : U.surface, border: sel ? `1.5px solid ${U.ink}` : '1px solid rgba(42,37,32,0.12)' }}
-            >
-              <span style={{ fontWeight: 600, fontSize: 13 }}>{r.label}</span>
-              <span className="font-mono" style={{ fontSize: 11, opacity: 0.65, marginLeft: 6 }}>{r.range}</span>
+      <div className="grid grid-cols-1 gap-x-10 lg:grid-cols-2">
+        {/* Left column: identity, plan, personal details */}
+        <div className="flex flex-col">
+          {/* Identity row */}
+          <div className="mb-3 flex items-center gap-3.5" style={{ padding: 16, borderRadius: 20, background: U.surface, border: `1px solid ${U.border}` }}>
+            <div className="flex items-center justify-center" style={{ width: 50, height: 50, borderRadius: '50%', background: U.accent, color: U.cream, fontFamily: "'Newsreader', serif", fontStyle: 'italic', fontSize: 21 }}>
+              {initialsOf(fullName || email || 'U').charAt(0)}
             </div>
-          );
-        })}
-      </div>
-
-      {/* Auto-approve */}
-      <Eyebrow className="mb-3">How much Thea can approve alone</Eyebrow>
-      <div className="mb-6 flex flex-col gap-2.5">
-        {AUTOPILOT_OPTIONS.map((o) => {
-          const sel = autopilot === o.id;
-          return (
-            <div
-              key={o.id}
-              onClick={() => { setAutopilot(o.id); persistGuardrails({ autopilot: o.id }); }}
-              className="flex cursor-pointer items-start gap-3.5"
-              style={{ padding: 16, borderRadius: 18, background: sel ? '#F1E7D5' : U.surface, border: sel ? `1.5px solid ${U.ink}` : '1px solid rgba(42,37,32,0.1)' }}
-            >
-              <div style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, marginTop: 1, border: sel ? `6.5px solid ${U.ink}` : '1.5px solid rgba(42,37,32,0.25)', background: sel ? U.surface : 'transparent' }} />
-              <div className="flex-1">
-                <div style={{ fontWeight: 600, fontSize: 15.5 }}>{o.label}</div>
-                <div style={{ fontSize: 13, color: U.muted, marginTop: 2, lineHeight: 1.4 }}>{o.desc}</div>
-              </div>
+            <div className="min-w-0 flex-1">
+              <div style={{ fontWeight: 600, fontSize: 16 }}>{fullName || 'Your name'}</div>
+              <div style={{ fontSize: 12.5, color: U.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</div>
             </div>
-          );
-        })}
-      </div>
-
-      {/* Account details */}
-      <Eyebrow className="mb-3">Your details</Eyebrow>
-      <div className="mb-6 flex flex-col gap-3" style={{ background: U.surface, border: `1px solid ${U.border}`, borderRadius: 20, padding: 18 }}>
-        <div>
-          <Eyebrow className="mb-1.5">Full name</Eyebrow>
-          <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Your name" className="bg-white/60" />
-        </div>
-        <div>
-          <Eyebrow className="mb-1.5">Email</Eyebrow>
-          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" className="bg-white/60" />
-        </div>
-        <div>
-          <Eyebrow className="mb-1.5">Phone (optional)</Eyebrow>
-          <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 123-4567" className="bg-white/60" />
-        </div>
-        <div className="flex flex-wrap gap-2 pt-1">
-          <button onClick={handleSaveProfile} disabled={isSaving} className="u-btn-primary" style={{ width: 'auto', flex: 1, fontSize: 14.5, padding: '13px 18px' }}>
-            {isSaving ? 'Saving…' : 'Save changes'}
-          </button>
-        </div>
-      </div>
-
-      {/* Notifications */}
-      <Eyebrow className="mb-3">Notifications</Eyebrow>
-      <div className="mb-6 flex flex-col" style={{ background: U.surface, border: `1px solid ${U.border}`, borderRadius: 20, padding: '4px 18px' }}>
-        {([
-          { key: 'email_reminders', label: 'Email reminders', sub: 'Upcoming occasions', val: emailReminders, set: setEmailReminders },
-          { key: 'marketing_emails', label: 'Tips & recommendations', sub: 'Occasional gift ideas', val: marketingEmails, set: setMarketingEmails },
-          { key: 'savings_alerts', label: 'Savings alerts', sub: 'Deals under your budget', val: savingsAlerts, set: setSavingsAlerts },
-        ] as const).map((row, i) => (
-          <div key={row.key} className="flex items-center justify-between" style={{ padding: '15px 0', borderBottom: i < 2 ? `1px solid rgba(42,37,32,0.07)` : 'none' }}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 14.5 }}>{row.label}</div>
-              <div style={{ fontSize: 12.5, color: U.muted }}>{row.sub}</div>
-            </div>
-            <Switch
-              checked={row.val}
-              disabled={isSavingNotifications}
-              onCheckedChange={(v) => { row.set(v); handleSaveNotificationPreference(row.key, v); }}
-            />
           </div>
-        ))}
+
+          {/* Subscription management (existing logic) */}
+          <div className="mb-6">
+            <SubscriptionManagement />
+          </div>
+
+          {/* Account details */}
+          <Eyebrow className="mb-3">Your details</Eyebrow>
+          <div className="mb-6 flex flex-col gap-3" style={{ background: U.surface, border: `1px solid ${U.border}`, borderRadius: 20, padding: 18 }}>
+            <div>
+              <Eyebrow className="mb-1.5">Full name</Eyebrow>
+              <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Your name" className="bg-white/60" />
+            </div>
+            <div>
+              <Eyebrow className="mb-1.5">Email</Eyebrow>
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" className="bg-white/60" />
+            </div>
+            <div>
+              <Eyebrow className="mb-1.5">Phone (optional)</Eyebrow>
+              <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 123-4567" className="bg-white/60" />
+            </div>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <button onClick={handleSaveProfile} disabled={isSaving} className="u-btn-primary" style={{ width: 'auto', flex: 1, fontSize: 14.5, padding: '13px 18px' }}>
+                {isSaving ? 'Saving…' : 'Save changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right column: gifting preferences */}
+        <div className="flex flex-col">
+          {/* Default gift budget */}
+          <Eyebrow className="mb-1">Default gift budget</Eyebrow>
+          <p className="mb-3.5" style={{ margin: '0 0 14px', fontSize: 13, color: U.muted }}>
+            Thea shops within this range for everyone. You can set a different range on any person.
+          </p>
+          <div className="mb-3 text-center" style={{ background: U.surface, border: `1px solid ${U.border}`, borderRadius: 20, padding: '18px' }}>
+            <span className="font-display" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>{budgetLabel}</span>
+            <div style={{ fontSize: 12.5, color: U.muted }}>Your typical gift range</div>
+          </div>
+          <div className="mb-6 flex flex-wrap gap-2">
+            {RANGE_PRESETS.map((r) => {
+              const sel = budget.lo === r.lo && budget.hi === r.hi;
+              return (
+                <div
+                  key={r.id}
+                  onClick={() => { const b = { lo: r.lo, hi: r.hi }; setBudget(b); persistGuardrails({ budget: b }); }}
+                  className="flex cursor-pointer items-baseline"
+                  style={{ padding: '10px 13px', borderRadius: 14, background: sel ? '#F1E7D5' : U.surface, border: sel ? `1.5px solid ${U.ink}` : '1px solid rgba(42,37,32,0.12)' }}
+                >
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>{r.label}</span>
+                  <span className="font-mono" style={{ fontSize: 11, opacity: 0.65, marginLeft: 6 }}>{r.range}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Auto-approve */}
+          <Eyebrow className="mb-3">How much Thea can approve alone</Eyebrow>
+          <div className="mb-6 flex flex-col gap-2.5">
+            {AUTOPILOT_OPTIONS.map((o) => {
+              const sel = autopilot === o.id;
+              return (
+                <div
+                  key={o.id}
+                  onClick={() => { setAutopilot(o.id); persistGuardrails({ autopilot: o.id }); }}
+                  className="flex cursor-pointer items-start gap-3.5"
+                  style={{ padding: 16, borderRadius: 18, background: sel ? '#F1E7D5' : U.surface, border: sel ? `1.5px solid ${U.ink}` : '1px solid rgba(42,37,32,0.1)' }}
+                >
+                  <div style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, marginTop: 1, border: sel ? `6.5px solid ${U.ink}` : '1.5px solid rgba(42,37,32,0.25)', background: sel ? U.surface : 'transparent' }} />
+                  <div className="flex-1">
+                    <div style={{ fontWeight: 600, fontSize: 15.5 }}>{o.label}</div>
+                    <div style={{ fontSize: 13, color: U.muted, marginTop: 2, lineHeight: 1.4 }}>{o.desc}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Notifications */}
+          <Eyebrow className="mb-3">Notifications</Eyebrow>
+          <div className="mb-6 flex flex-col" style={{ background: U.surface, border: `1px solid ${U.border}`, borderRadius: 20, padding: '4px 18px' }}>
+            {([
+              { key: 'email_reminders', label: 'Email reminders', sub: 'Upcoming occasions', val: emailReminders, set: setEmailReminders },
+              { key: 'marketing_emails', label: 'Tips & recommendations', sub: 'Occasional gift ideas', val: marketingEmails, set: setMarketingEmails },
+              { key: 'savings_alerts', label: 'Savings alerts', sub: 'Deals under your budget', val: savingsAlerts, set: setSavingsAlerts },
+            ] as const).map((row, i) => (
+              <div key={row.key} className="flex items-center justify-between" style={{ padding: '15px 0', borderBottom: i < 2 ? `1px solid rgba(42,37,32,0.07)` : 'none' }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14.5 }}>{row.label}</div>
+                  <div style={{ fontSize: 12.5, color: U.muted }}>{row.sub}</div>
+                </div>
+                <Switch
+                  checked={row.val}
+                  disabled={isSavingNotifications}
+                  onCheckedChange={(v) => { row.set(v); handleSaveNotificationPreference(row.key, v); }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* Sign out */}
-      <button
-        onClick={() => signOut()}
-        className="mb-3"
-        style={{ appearance: 'none', cursor: 'pointer', background: U.surface, border: `1px solid ${U.border}`, color: U.ink, fontWeight: 600, fontSize: 14, padding: '13px', borderRadius: 14, width: '100%' }}
-      >
-        Sign out
-      </button>
+      {/* Account actions - full width below the two columns */}
+      <div className="lg:mx-auto lg:w-full lg:max-w-[460px]">
+        <button
+          onClick={() => signOut()}
+          className="mb-3"
+          style={{ appearance: 'none', cursor: 'pointer', background: U.surface, border: `1px solid ${U.border}`, color: U.ink, fontWeight: 600, fontSize: 14, padding: '13px', borderRadius: 14, width: '100%' }}
+        >
+          Sign out
+        </button>
 
-      {/* Danger zone */}
-      <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <button style={{ appearance: 'none', cursor: 'pointer', background: 'transparent', border: '1px solid rgba(182,91,60,0.4)', color: U.accent, fontWeight: 600, fontSize: 14, padding: '13px', borderRadius: 14, width: '100%' }}>
-            Delete account
-          </button>
-        </AlertDialogTrigger>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete your account and remove all your data.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteAccount} className="bg-accent text-accent-foreground hover:opacity-90">
+        {/* Danger zone */}
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <button style={{ appearance: 'none', cursor: 'pointer', background: 'transparent', border: '1px solid rgba(182,91,60,0.4)', color: U.accent, fontWeight: 600, fontSize: 14, padding: '13px', borderRadius: 14, width: '100%' }}>
               Delete account
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete your account and remove all your data.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteAccount} className="bg-accent text-accent-foreground hover:opacity-90">
+                Delete account
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-      <div className="mt-4">
-        <AdminDeleteUser />
+        <div className="mt-4">
+          <AdminDeleteUser />
+        </div>
       </div>
 
       <div className="flex items-center gap-2 pt-5" style={{ color: U.muted, fontSize: 12.5 }}>

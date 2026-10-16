@@ -11,6 +11,12 @@ interface MobileShellProps {
   contentClassName?: string;
   /** Animate the whole screen in. */
   animate?: boolean;
+  /**
+   * Canvas width classes. Defaults to the narrow phone-width canvas every
+   * agent-first screen uses. A content-dense screen (e.g. Settings) can pass
+   * a wider `lg:max-w-[...]` to use more of a desktop viewport instead.
+   */
+  maxWidthClassName?: string;
 }
 
 /**
@@ -26,6 +32,7 @@ export const MobileShell: React.FC<MobileShellProps> = ({
   glow,
   contentClassName,
   animate = true,
+  maxWidthClassName = 'max-w-[440px] lg:max-w-[600px]',
 }) => (
   <div
     style={{ background: U.bg }}
@@ -45,7 +52,7 @@ export const MobileShell: React.FC<MobileShellProps> = ({
     </div>
 
     <div
-      className={`relative z-10 flex h-[100dvh] min-h-screen w-full max-w-[440px] flex-col overflow-hidden lg:max-w-[600px] ${
+      className={`relative z-10 flex h-[100dvh] min-h-screen w-full flex-col overflow-hidden ${maxWidthClassName} ${
         animate ? 'animate-u-fadeUp' : ''
       }`}
       style={{
