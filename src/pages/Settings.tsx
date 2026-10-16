@@ -154,7 +154,7 @@ const Settings = () => {
     <MobileShell
       contentClassName="overflow-y-auto px-5 pt-14 pb-4 lg:px-10"
       maxWidthClassName="max-w-[440px] lg:max-w-[980px]"
-      footer={<PrimaryButton onClick={() => navigate('/')}>Done</PrimaryButton>}
+      footer={<PrimaryButton onClick={async () => { await handleSaveProfile(); navigate('/'); }}>Save</PrimaryButton>}
     >
       {/* Header */}
       <div className="mb-4 flex items-center gap-3">
