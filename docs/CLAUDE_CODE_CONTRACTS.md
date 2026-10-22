@@ -6,6 +6,117 @@ they're implemented, for Cursor (or anyone building the matching frontend) to
 build against without re-reading edge function source. Updated incrementally
 as each ticket lands - see the per-ticket section for status.
 
+## CC-01/CC-03/CC-04/CC-07: Thea agent tools, durable conversation, write acknowledgement
+
+`supabase/functions/thea-chat/index.ts`. Thea gained five new OpenAI tools
+(`get_recipients`, `update_recipient`, `create_recipient`, `select_gift`,
+`confirm_scheduled_gift`) alongside the existing `search_gifts`. None of
+this changes the request shape the frontend already sends
+(`{ messages, mode, briefing? }`) - the new surface is entirely in the
+response and in two new request additions below.
+
+### New top-level response field: `writes`
+
+Every non-onboarding chat response (`{ success, reply, products, writes }`)
+now includes `writes`: an array of every write-tool call made during that
+turn, in the write-acknowledgement shape the shared brief asks for -
+`{ tool, ok, recordId?, saved?, error?, alreadyScheduled?, paymentPending? }`.
+This is how the frontend should learn "a recipient was updated" or "a gift
+was scheduled" and invalidate the right queries (`recipients`,
+`upcoming-gifts`, etc.) immediately, rather than parsing Thea's natural-
+language reply. `writes` is `[]` when the turn made no writes (e.g. just
+chatting or searching). Example:
+```json
+{
+  "success": true,
+  "reply": "Got it, I've saved his address.",
+  "products": [],
+  "writes": [
+    { "tool": "update_recipient", "ok": true, "recordId": "9c2e...", "saved": { "street": "1219 South Lamar Blvd", "city": "Austin", "state": "TX", "zip_code": "78704" } }
+  ]
+}
+```
+A failed write still appears in `writes` with `ok: false` and an `error`
+string - Thea is instructed never to announce a successful save on a failed
+write, but `writes` lets the frontend double-check independent of the text.
+
+### New request addition: `action: "history"`
+
+To restore a conversation on mount/refresh instead of starting empty, POST
+the same endpoint with `{ action: "history", mode }` (no `messages` needed).
+Returns the persisted conversation for that mode, already in display-ready
+form (no internal markers - see CC-03 below):
+```json
+{ "success": true, "messages": [ { "role": "user", "content": "..." }, { "role": "assistant", "content": "..." } ] }
+```
+Gated by the same VIP check as normal chat (except `mode: "onboarding"`).
+
+### CC-03: durable conversation (new tables)
+
+`supabase/migrations/20261022130000_add_thea_conversations.sql` adds
+`conversations` (one row per active user+mode thread) and
+`conversation_messages` (append-only). Every normal chat turn now persists
+the user's new message and Thea's reply server-side automatically - no
+frontend change required for that part. Persistence failures are logged and
+swallowed; they never block or corrupt the in-flight response.
+**Known gap, not yet addressed**: `messages` sent in a normal chat request
+is still capped at `MAX_MESSAGES = 40` and the frontend still owns resending
+full local history each turn. Switching the frontend to seed from
+`action: "history"` on mount and trim its own local window is a reasonable
+follow-up, not required for CC-03 to function.
+
+### CC-04: selection -> review -> confirm (two-step, not one tool)
+
+`select_gift` returns a **review**, not a save:
+```json
+{
+  "ok": true,
+  "review": {
+    "recipientId": "...", "recipientName": "Cydel", "productId": "...",
+    "productTitle": "Coffee Beans by Methodical Coffee", "price": 24,
+    "currency": "USD", "occasionDate": "2026-10-24", "occasion": "Birthday",
+    "hasAddress": false
+  }
+}
+```
+or, if an active gift already exists for that recipient+date:
+`{ "ok": true, "alreadyScheduled": true, "recordId": "...", "saved": { "gift_type": "...", "status": "scheduled" } }`.
+
+`confirm_scheduled_gift` only succeeds if the model already showed that
+exact review to the user in a prior, already-delivered turn (verified
+server-side against persisted conversation metadata, not anything the
+client claims) - this is what actually enforces "explicit confirmation" as
+a real turn boundary rather than the model silently chaining both calls.
+On success: `{ "ok": true, "recordId": "...", "saved": { "recipientName", "gift_type", "price", "occasion_date" }, "paymentPending": true }`.
+
+**Deliberate scope boundary**: confirming only creates the `scheduled_gifts`
+row (`status: "scheduled"`, `payment_status: "unpaid"`). It does not charge
+a wallet, create a Stripe session, or place a Goody order - "scheduling
+success is not partner order acceptance" per the brief. Payment completion
+is the existing flow (the gift shows up the same way a `needsInfo`/"Finish
+payment" item from `dashboardBriefing.ts` already does). If product work
+wants Thea to also kick off payment inline, that's a scoped follow-up to
+discuss, not something silently bundled in here.
+
+### CC-01/CC-07: recipient tools
+
+`get_recipients` (read) returns each recipient's id, name, relationship,
+interests, `hasAddress` (boolean, not the actual address), and
+`nextOccasion` (computed, same birthday > anniversary priority as
+`ScheduleGiftModal`'s `getDefaultOccasionDate`). Thea is instructed to call
+this before any write, both to get real ids and to check for an existing
+match before `create_recipient`.
+
+`update_recipient` merges `interests` into what's already saved (case-
+insensitive dedupe, capped at 3, newest wins on overflow) rather than
+replacing the list - the model only needs to pass what's new. Address
+fields are set directly if provided; parsing free text into
+street/city/state/zip is the model's job, not server-side parsing.
+
+`create_recipient` requires only `name`; relationship/birthday/
+anniversary/interests are optional. Used for the CC-07 handoff ("schedule
+my friend Jordan's birthday" with no existing Jordan).
+
 ## CC-06: Calendar connection/recovery states
 
 `supabase/functions/google-calendar/index.ts`. Every response now carries a
