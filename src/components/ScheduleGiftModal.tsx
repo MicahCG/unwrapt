@@ -319,66 +319,40 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
       if (giftError) throw giftError;
 
-      // VIP users with sufficient balance: deduct from wallet
+      // VIP users with sufficient balance: charge the gift wallet. The debit
+      // itself happens server-side in process-gift-fulfillment
+      // (manualTrigger: true), which re-reads the balance from the DB
+      // instead of trusting a client-supplied amount, verifies the gift
+      // belongs to this user, and is idempotent against double-charging.
+      // profiles.gift_wallet_balance can no longer be written directly from
+      // the client (see 20261022120000_protect_profile_privileged_columns).
       if (isVIP && hasEnoughBalance) {
-        // Create wallet transaction
-        const { error: transactionError } = await supabase
-          .from('wallet_transactions')
-          .insert({
-            user_id: currentUser.id,
-            amount: -totalCost,
-            balance_after: walletBalance - totalCost,
-            transaction_type: 'charge',
-            scheduled_gift_id: giftData.id,
-            status: 'completed'
-          });
-
-        if (transactionError) throw transactionError;
-
-        // Update wallet balance
-        const { error: balanceError } = await supabase
-          .from('profiles')
-          .update({
-            gift_wallet_balance: walletBalance - totalCost
-          })
-          .eq('id', currentUser.id);
-
-        if (balanceError) throw balanceError;
-
-        // Update gift payment status and image
-        await supabase
-          .from('scheduled_gifts')
-          .update({ 
-            payment_status: 'paid', 
-            payment_amount: totalCost,
-            gift_image_url: selectedProduct.featured_image_url
-          })
-          .eq('id', giftData.id);
-
-        // Call process-gift-fulfillment to place the Shopify order
         console.log('🎁 Calling process-gift-fulfillment for wallet payment...');
         const { data: fulfillmentData, error: fulfillmentError } = await supabase.functions.invoke('process-gift-fulfillment', {
-          body: { scheduledGiftId: giftData.id }
+          body: { scheduledGiftId: giftData.id, manualTrigger: true }
         });
 
-        if (fulfillmentError) {
-          console.error('🎁 Gift fulfillment error:', fulfillmentError);
+        if (fulfillmentError || fulfillmentData?.success === false) {
+          console.error('🎁 Gift fulfillment error:', fulfillmentError || fulfillmentData?.error);
           toast({
-            title: "Payment Processed",
-            description: "Gift scheduled but order placement pending. We'll process it shortly.",
-            variant: "default"
+            title: "Payment Failed",
+            description: fulfillmentData?.error || "Could not charge your gift wallet. Please try again.",
+            variant: "destructive"
           });
-        } else if (fulfillmentData?.success) {
+          return;
+        }
+
+        if (fulfillmentData?.alreadyFulfilled) {
+          console.log('🎁 Gift fulfillment: already fulfilled, skipped duplicate charge');
+          toast({
+            title: "Gift Already Scheduled",
+            description: "This gift has already been ordered.",
+          });
+        } else {
           console.log('🎁 Gift fulfillment successful:', fulfillmentData);
           toast({
             title: "Gift Ordered!",
             description: `$${totalCost.toFixed(2)} deducted. Order placed successfully!`,
-          });
-        } else {
-          console.log('🎁 Gift fulfillment response:', fulfillmentData);
-          toast({
-            title: "Gift Scheduled!",
-            description: `$${totalCost.toFixed(2)} deducted from your wallet.`,
           });
         }
 
