@@ -1142,6 +1142,10 @@ Rules:
     const writes: Array<{ tool: string } & ToolResult> = [];
     let finalContent = "";
     let forceSearchNextCall = false;
+    // Captured directly from select_gift's tool result (not from the
+    // model's reply text) so persisting it never depends on the model
+    // reliably echoing an invisible marker string - see GIFT_REVIEW below.
+    let lastReviewMarker: string | null = null;
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
       const completion = await callOpenAI(openaiApiKey, conversation, forceSearchNextCall);
@@ -1215,7 +1219,9 @@ Rules:
           writes.push({ tool: toolName, ...result });
           toolContent = result;
         } else if (toolName === "select_gift") {
-          toolContent = await handleSelectGift(authClient, user.id, args as Parameters<typeof handleSelectGift>[2]);
+          const result = await handleSelectGift(authClient, user.id, args as Parameters<typeof handleSelectGift>[2]);
+          lastReviewMarker = typeof result.reviewMarker === "string" ? result.reviewMarker : null;
+          toolContent = result;
         } else if (toolName === "confirm_scheduled_gift") {
           const result = await handleConfirmScheduledGift(authClient, user.id, args as Parameters<typeof handleConfirmScheduledGift>[2], conversationId);
           writes.push({ tool: toolName, ...result });
@@ -1248,11 +1254,11 @@ Rules:
         .map((id) => id.trim().replace(/^["']|["']$/g, ""))
         .filter(Boolean)
       : [];
-    // Extracted before stripping: this is what select_gift asked the model
-    // to echo once it actually presented a review to the user. Stored in
-    // conversation_messages.metadata, never in the displayed reply itself.
-    const reviewMarkerMatch = finalContent.match(/GIFT_REVIEW:\s*(\S+)/i);
-    const reviewMarkerValue = reviewMarkerMatch ? reviewMarkerMatch[1].trim() : null;
+    // The model is asked to echo this into its reply too (belt and
+    // suspenders), but persistence relies on lastReviewMarker - captured
+    // directly from select_gift's tool result above - rather than this
+    // regex match, since the model doesn't always include the line even
+    // when told to. Still stripped below on the rare chance it appears.
 
     // The prompt already says never use an em dash, but that rule isn't
     // always followed, so enforce it here rather than relying on the model.
@@ -1271,7 +1277,7 @@ Rules:
     const newestUserMessage = messages[messages.length - 1];
     await appendConversationMessages(authClient, conversationId, [
       newestUserMessage,
-      { role: "assistant", content: reply, reviewMarker: reviewMarkerValue },
+      { role: "assistant", content: reply, reviewMarker: lastReviewMarker },
     ]);
 
     return json({ success: true, reply, products, writes });
