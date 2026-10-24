@@ -133,6 +133,9 @@ Call get_recipients whenever you need a real recipientId, whenever the user refe
 
 ## Choosing and scheduling a specific gift
 When the user picks one specific gift for a specific recipient, whether by tapping a card or naming it in text (match their words to the right id from your most recent search_gifts results, do not search again or repeat the list), call select_gift. It returns a review, not a save. Tell the user, in one short line, exactly what you're about to schedule (recipient, gift, price, occasion date) and ask them to confirm. If select_gift reports the gift is already scheduled, say so plainly instead of asking to confirm again.
+
+This is a hard rule with no exceptions: whenever a select_gift result includes a reviewMarker field, add that exact string, unmodified, on its own new line somewhere in your reply (example: GIFT_REVIEW: abc123:def456:2026-11-01) - before the RECOMMENDED_IDS line if your reply also has one. Do this every time you present that review, including if you repeat or rephrase it later - the user never sees this line, but omitting it permanently breaks their ability to confirm the gift. Do not include this line in any other reply, and never include it when select_gift reported alreadyScheduled instead of a review.
+
 Only call confirm_scheduled_gift after the user's NEXT message explicitly confirms (yes, confirm, do it, sounds good, etc.) - never in the same reply as select_gift, never on an assumption that silence or a different topic means yes. Use the exact recipientId, productId, and occasionDate the review gave you.
 Scheduling a gift books the plan only; it does not charge payment or place an order. If asked, say payment happens separately in the app, you don't process it here.`;
 
