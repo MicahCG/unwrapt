@@ -764,6 +764,14 @@ const handleSelectGift = async (
     occasionDate = computed.date;
     occasionLabel = computed.occasion;
   } else {
+    // An explicit date that isn't the recipient's known birthday/anniversary
+    // and is already in the past is almost certainly the model inventing a
+    // date rather than a deliberate "just because" gift - reject it instead
+    // of silently scheduling something dated in the past.
+    const isKnownOccasion = recipient.birthday === occasionDate || recipient.anniversary === occasionDate;
+    if (!isKnownOccasion && occasionDate < new Date().toISOString().split("T")[0]) {
+      return { ok: false, error: "That occasion date is in the past - omit occasionDate to use the recipient's next birthday/anniversary, or ask the user for the correct date." };
+    }
     occasionLabel = recipient.birthday === occasionDate ? "Birthday" : recipient.anniversary === occasionDate ? "Anniversary" : "Special occasion";
   }
 
@@ -1220,7 +1228,13 @@ Rules:
           toolContent = result;
         } else if (toolName === "select_gift") {
           const result = await handleSelectGift(authClient, user.id, args as Parameters<typeof handleSelectGift>[2]);
-          lastReviewMarker = typeof result.reviewMarker === "string" ? result.reviewMarker : null;
+          // reviewMarker carries a "GIFT_REVIEW: " prefix meant for the
+          // model to copy into its reply text verbatim - strip it here so
+          // what's persisted matches the bare "id:id:date" hasPersistedReviewMarker
+          // looks up, same as the old text-regex extraction did.
+          lastReviewMarker = typeof result.reviewMarker === "string"
+            ? result.reviewMarker.replace(/^GIFT_REVIEW:\s*/i, "")
+            : null;
           toolContent = result;
         } else if (toolName === "confirm_scheduled_gift") {
           const result = await handleConfirmScheduledGift(authClient, user.id, args as Parameters<typeof handleConfirmScheduledGift>[2], conversationId);
