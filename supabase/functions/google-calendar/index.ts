@@ -160,7 +160,7 @@ Deno.serve(async (req) => {
     
     if (!authHeader) {
       console.error('❌ No Authorization header found')
-      return new Response(JSON.stringify({ error: 'No Authorization header' }), {
+      return new Response(JSON.stringify({ error: 'No Authorization header', code: 'unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
@@ -187,7 +187,7 @@ Deno.serve(async (req) => {
 
     if (!user) {
       console.error('❌ No user found in auth header')
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return new Response(JSON.stringify({ error: 'Unauthorized', code: 'unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
@@ -202,7 +202,7 @@ Deno.serve(async (req) => {
       const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
       if (!clientId) {
         console.error('❌ GOOGLE_CLIENT_ID is not configured')
-        return new Response(JSON.stringify({ error: 'Google Calendar is not configured' }), {
+        return new Response(JSON.stringify({ error: 'Google Calendar is not configured', code: 'not_configured' }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
@@ -262,7 +262,16 @@ Deno.serve(async (req) => {
 
       if (tokenData.error) {
         console.error('❌ Token exchange error:', tokenData.error)
-        return new Response(JSON.stringify({ error: tokenData.error }), {
+        // invalid_grant covers an authorization code that was already used,
+        // expired, or doesn't match the redirect_uri it was issued for - all
+        // retryable by starting a fresh connect attempt, vs. a config/network
+        // problem on our end for anything else.
+        const code = tokenData.error === 'invalid_grant' ? 'code_expired_or_reused' : 'code_exchange_failed'
+        return new Response(JSON.stringify({
+          error: typeof tokenData.error_description === 'string' ? tokenData.error_description : tokenData.error,
+          code,
+          retryable: true,
+        }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
@@ -289,14 +298,14 @@ Deno.serve(async (req) => {
 
       if (insertError) {
         console.error('❌ Error storing integration:', insertError)
-        return new Response(JSON.stringify({ error: 'Failed to store integration' }), {
+        return new Response(JSON.stringify({ error: 'Failed to store integration', code: 'storage_failed', retryable: true }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
       }
 
       console.log('✅ Calendar integration stored successfully (encrypted)')
-      return new Response(JSON.stringify({ success: true }), {
+      return new Response(JSON.stringify({ success: true, code: 'connected' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
@@ -311,7 +320,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (!currentIntegration) {
-        return new Response(JSON.stringify({ error: 'No calendar integration found' }), {
+        return new Response(JSON.stringify({ error: 'No calendar integration found', code: 'not_connected' }), {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
@@ -347,8 +356,10 @@ Deno.serve(async (req) => {
 
         if (refreshData.error) {
           console.error('❌ Token refresh failed (onboarding):', refreshData.error);
-          return new Response(JSON.stringify({ 
-            error: 'Calendar access expired. Please reconnect your Google Calendar.' 
+          return new Response(JSON.stringify({
+            error: 'Calendar access expired. Please reconnect your Google Calendar.',
+            code: 'access_expired',
+            retryable: true,
           }), {
             status: 401,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -373,7 +384,7 @@ Deno.serve(async (req) => {
         // Decrypt the existing token
         validAccessToken = await decryptToken(currentIntegration.access_token);
       } else {
-        return new Response(JSON.stringify({ error: 'No valid access token found' }), {
+        return new Response(JSON.stringify({ error: 'No valid access token found', code: 'access_expired', retryable: true }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
@@ -398,15 +409,17 @@ Deno.serve(async (req) => {
         
         // If it's an auth error, suggest reconnection
         if (calendarData.error.code === 401 || calendarData.error.status === 'UNAUTHENTICATED') {
-          return new Response(JSON.stringify({ 
-            error: 'Calendar access expired. Please reconnect your Google Calendar.' 
+          return new Response(JSON.stringify({
+            error: 'Calendar access expired. Please reconnect your Google Calendar.',
+            code: 'access_expired',
+            retryable: true,
           }), {
             status: 401,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
         }
-        
-        return new Response(JSON.stringify({ error: calendarData.error }), {
+
+        return new Response(JSON.stringify({ error: calendarData.error, code: 'calendar_fetch_failed', retryable: true }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
@@ -433,7 +446,7 @@ Deno.serve(async (req) => {
         personName: extractPersonFromEvent(event.summary)
       })) || []
 
-      return new Response(JSON.stringify({ events: importantDates }), {
+      return new Response(JSON.stringify({ events: importantDates, code: 'events_fetched' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
@@ -448,7 +461,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (!currentIntegration) {
-        return new Response(JSON.stringify({ error: 'No calendar integration found' }), {
+        return new Response(JSON.stringify({ error: 'No calendar integration found', code: 'not_connected' }), {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
@@ -484,8 +497,10 @@ Deno.serve(async (req) => {
 
         if (refreshData.error) {
           console.error('❌ Token refresh failed:', refreshData.error);
-          return new Response(JSON.stringify({ 
-            error: 'Calendar access expired. Please reconnect your Google Calendar.' 
+          return new Response(JSON.stringify({
+            error: 'Calendar access expired. Please reconnect your Google Calendar.',
+            code: 'access_expired',
+            retryable: true,
           }), {
             status: 401,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -510,7 +525,7 @@ Deno.serve(async (req) => {
         // Decrypt the existing token
         validAccessToken = await decryptToken(currentIntegration.access_token);
       } else {
-        return new Response(JSON.stringify({ error: 'No valid access token found' }), {
+        return new Response(JSON.stringify({ error: 'No valid access token found', code: 'access_expired', retryable: true }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
@@ -535,15 +550,17 @@ Deno.serve(async (req) => {
         
         // If it's an auth error, suggest reconnection
         if (calendarData.error.code === 401 || calendarData.error.status === 'UNAUTHENTICATED') {
-          return new Response(JSON.stringify({ 
-            error: 'Calendar access expired. Please reconnect your Google Calendar.' 
+          return new Response(JSON.stringify({
+            error: 'Calendar access expired. Please reconnect your Google Calendar.',
+            code: 'access_expired',
+            retryable: true,
           }), {
             status: 401,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
         }
-        
-        return new Response(JSON.stringify({ error: calendarData.error }), {
+
+        return new Response(JSON.stringify({ error: calendarData.error, code: 'calendar_fetch_failed', retryable: true }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
@@ -640,19 +657,19 @@ Deno.serve(async (req) => {
         console.log(`  - ${e.summary} (${e.category}) on ${e.date} - person: ${e.personName || 'N/A'}`);
       });
 
-      return new Response(JSON.stringify({ events: giftWorthyEvents }), {
+      return new Response(JSON.stringify({ events: giftWorthyEvents, code: 'events_fetched' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    return new Response(JSON.stringify({ error: 'Invalid action' }), {
+    return new Response(JSON.stringify({ error: 'Invalid action', code: 'invalid_action' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
   } catch (error) {
     console.error('💥 Error:', error)
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+    return new Response(JSON.stringify({ error: 'Internal server error', code: 'internal_error', retryable: true }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
