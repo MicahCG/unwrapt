@@ -155,7 +155,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center gap-3 border-b px-1 pb-3" style={{ borderColor: 'rgba(42,37,32,0.08)' }}>
-        <TheaCharacter size="compact" activity="chat" gesture="Listen" className="u-thea-character--chat" />
+        <TheaCharacter size="compact" pose="basic" className="u-thea-character--chat" />
         <div className="min-w-0 text-left">
           <div className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: U.accent }}>
             Your gifting agent
@@ -195,7 +195,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
         )}
         {sending && (
           <div className="flex items-start gap-2">
-            <TheaAvatar size={26} />
+            <TheaAvatar size={26} pose="thinking" />
             <div
               className="rounded-[18px] rounded-tl-[6px] border px-3.5 py-2.5 text-[13.5px]"
               style={{ background: U.surface, borderColor: U.border, color: U.subtle }}

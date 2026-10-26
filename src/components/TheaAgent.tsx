@@ -393,7 +393,7 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 )}
                 {sending && (
                   <div className="flex items-start gap-2">
-                    <TheaAvatar size={24} />
+                    <TheaAvatar size={24} pose="thinking" />
                     <div className="rounded-[16px] rounded-tl-[4px] border border-[#D9CDBD] bg-white px-3.5 py-2.5 text-[13.5px] text-[#9A8E7C]">
                       Thinking…
                     </div>

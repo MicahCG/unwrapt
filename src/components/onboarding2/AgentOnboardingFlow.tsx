@@ -284,7 +284,7 @@ function ImportPromptScreen({
       }
     >
       <StepPips step={1} />
-      <TheaCharacter size="large" animated className="u-thea-character--greeting" />
+      <TheaCharacter size="large" pose="welcome" className="u-thea-character--greeting" />
       <div
         className="-mt-2 rounded-[22px] border bg-white/80 px-5 py-5 text-center"
         style={{ borderColor: U.border }}
@@ -336,7 +336,7 @@ function FoundPeopleScreen({
       }
     >
       <StepPips step={2} />
-      <TheaCharacter size="medium" gesture="Present" activity="clipboard" />
+      <TheaCharacter size="medium" pose="basic" />
       <div
         className="-mt-2 mb-4 w-full shrink-0 rounded-[22px] border bg-white px-5 py-4 text-center"
         style={{ borderColor: U.border }}
@@ -990,7 +990,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     return (
       <MobileShell glow animate={false}>
         <div className="flex h-full flex-col items-center justify-center text-center">
-          <TheaCharacter size="large" speaking={false} gesture="Listen" />
+          <TheaCharacter size="large" speaking={false} pose="thinking" />
           <Display className="mt-7 text-[27px]">
             {startingCheckout ? 'Opening secure checkout…' : 'Setting up your concierge…'}
           </Display>
@@ -1023,7 +1023,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             <Eyebrow>Concierge</Eyebrow>
           </div>
           <div className="flex flex-1 flex-col justify-center pt-4 text-center">
-            <TheaCharacter size="large" bubble="Hi, I’m Thea, your gifting agent" />
+            <TheaCharacter size="large" pose="welcome" bubble="Hi, I’m Thea, your gifting agent" />
             <Display className="mt-5" style={{ fontSize: 40, lineHeight: 1.02, letterSpacing: '-0.03em' }}>
               Never forget another<br />
               <em style={{ fontStyle: 'italic', fontWeight: 400, color: U.accent }}>moment.</em>
@@ -1041,7 +1041,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         return (
           <MobileShell animate={false}>
             <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-              <TheaCharacter size="large" gesture="Listen" activity="calendar" />
+              <TheaCharacter size="large" pose="thinking" />
               <Display className="mt-7 text-[27px]">
                 <TypewriterLine text="Reading your calendar…" speedMs={32} caret={false} />
               </Display>
@@ -1109,7 +1109,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
               <Eyebrow>Thea</Eyebrow>
             </div>
           </div>
-          <TheaCharacter size="compact" gesture="Listen" />
+          <TheaCharacter size="compact" pose="basic" />
           <p className="font-display mb-4 mt-4" style={{ fontSize: 20, lineHeight: 1.3 }}>Who would you like me to look after?</p>
           <div className="mb-5 flex items-center gap-3.5" style={{ padding: 14, borderRadius: 18, background: U.chip }}>
             <PersonAvatar initials={npInitials} tone={U.accent} size={48} />
@@ -1395,7 +1395,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           </button>
 
           <StepPips step={4} />
-          <TheaCharacter size="compact" gesture="Present" />
+          <TheaCharacter size="compact" pose="gift" />
           <Display className="mt-3 text-[28px] leading-tight">{headline}</Display>
           <p className="mt-2 text-[14px] leading-5" style={{ color: U.textSecondary }}>
             Based on {interests.map((i) => i.toLowerCase()).join(', ') || 'what you shared'}. Thea watches the date and asks before anything is bought.

@@ -131,7 +131,7 @@ const ConfirmAddress = () => {
     return (
       <MobileShell glow animate={false}>
         <div className="flex h-full items-center justify-center">
-          <TheaAvatar size={48} pulse />
+          <TheaAvatar size={48} pose="thinking" pulse />
         </div>
       </MobileShell>
     );
@@ -143,7 +143,7 @@ const ConfirmAddress = () => {
     return (
       <MobileShell glow animate={false}>
         <div className="flex h-full flex-col items-center justify-center text-center">
-          <TheaAvatar size={48} pulse />
+          <TheaAvatar size={48} pose="thinking" pulse />
           <p className="mt-4" style={{ color: U.subtle }}>Loading gift details…</p>
         </div>
       </MobileShell>

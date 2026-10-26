@@ -106,7 +106,7 @@ const SubscribeGate: React.FC = () => {
       }
     >
       <Eyebrow className="text-center">Membership required</Eyebrow>
-      <TheaCharacter size="large" gesture="Present" />
+      <TheaCharacter size="large" pose="gift" />
       <Display className="mt-4 text-center text-[30px] leading-tight">
         Unlock Thea to keep going.
       </Display>
