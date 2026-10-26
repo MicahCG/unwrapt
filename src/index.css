@@ -715,6 +715,19 @@
 .u-thea--gift .u-thea__gift { animation: u-thea-bob 2.4s ease-in-out infinite; }
 .u-thea--surprised { animation: u-thea-hop .5s ease-out both; }
 .u-thea--surprised .u-thea__sparkle { transform-origin: center; animation: u-thea-sparkle 1.6s ease-in-out infinite; }
+/* Reactions to what the user just said: short, then she settles back */
+.u-thea--cheer .u-thea__wave { transform-box: view-box; transform-origin: 334px 374px; animation: u-thea-wave 1.3s ease-in-out infinite; }
+.u-thea--cheer .u-thea__wave--late { animation-delay: -.65s; }
+.u-thea--thumbsup .u-thea__thumb { transform-box: view-box; transform-origin: 334px 374px; animation: u-thea-thumb .9s ease-out both; }
+.u-thea--sparkle .u-thea__twinkle, .u-thea--clap .u-thea__twinkle { transform-box: fill-box; transform-origin: center; animation: u-thea-sparkle .8s ease-in-out infinite; }
+.u-thea--clap .u-thea__clap-l { transform-box: view-box; transform-origin: 104px 404px; animation: u-thea-clap-l .36s ease-in-out infinite; }
+.u-thea--clap .u-thea__clap-r { transform-box: view-box; transform-origin: 278px 404px; animation: u-thea-clap-r .36s ease-in-out infinite; }
+.u-thea--upset .u-thea__huff { animation: u-thea-huff .6s ease-out both; }
+.u-thea--thumbsup, .u-thea--sparkle, .u-thea--clap, .u-thea--cheer { animation: u-thea-hop .45s ease-out both; }
+@keyframes u-thea-thumb { 0% { transform: rotate(14deg) scale(.9); } 55% { transform: rotate(-6deg) scale(1.05); } 100% { transform: none; } }
+@keyframes u-thea-clap-l { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(7deg); } }
+@keyframes u-thea-clap-r { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-7deg); } }
+@keyframes u-thea-huff { 0% { transform: translateY(0); } 30% { transform: translateY(-3px); } 55% { transform: translateY(1px); } 100% { transform: none; } }
 .u-thea--still *, .u-thea--still { animation: none !important; }
 @keyframes u-thea-blink { 0%, 46%, 50%, 100% { transform: scaleY(1); } 48% { transform: scaleY(.08); } }
 @keyframes u-thea-brow { 0%, 58%, 76%, 100% { transform: none; } 62%, 72% { transform: translateY(-5px) rotate(-5deg); } }

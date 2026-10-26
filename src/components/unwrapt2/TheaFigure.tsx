@@ -1,11 +1,14 @@
 import React, { useId } from 'react';
 
 export type TheaPose = 'basic' | 'welcome' | 'thinking' | 'gift' | 'surprised';
+/** Short reactions to something the user just said: four positive, one upset. */
+export type TheaReaction = 'thumbsup' | 'sparkle' | 'clap' | 'cheer' | 'upset';
+type FigurePose = TheaPose | TheaReaction;
 
 interface TheaFigureProps {
   /** `full` shows her waist-up; `portrait` crops to head and shoulders for avatars. */
   framing?: 'full' | 'portrait';
-  pose?: TheaPose;
+  pose?: FigurePose;
   animated?: boolean;
   className?: string;
   style?: React.CSSProperties;
@@ -22,12 +25,47 @@ const CHAIN: [number, number, number][] = [
 ];
 
 // Per-pose offsets for the brow groups and the irises, as SVG transforms.
-const BROW_L: Record<TheaPose, string> = { basic: '', welcome: 'translate(0 -4)', thinking: 'translate(0 1)', gift: 'translate(0 -3)', surprised: 'translate(0 -10) rotate(-4 150 152)' };
-const BROW_R: Record<TheaPose, string> = { basic: '', welcome: 'translate(0 -4)', thinking: 'translate(0 -8) rotate(-4 232 152)', gift: 'translate(0 -3)', surprised: 'translate(0 -10) rotate(4 232 152)' };
+const BROW_L: Record<FigurePose, string> = {
+  basic: '', welcome: 'translate(0 -4)', thinking: 'translate(0 1)', gift: 'translate(0 -3)', surprised: 'translate(0 -10) rotate(-4 150 152)',
+  thumbsup: 'translate(0 -4)', sparkle: 'translate(0 -6)', clap: 'translate(0 -5)', cheer: 'translate(0 -6)', upset: 'translate(3 6) rotate(13 150 152)',
+};
+const BROW_R: Record<FigurePose, string> = {
+  basic: '', welcome: 'translate(0 -4)', thinking: 'translate(0 -8) rotate(-4 232 152)', gift: 'translate(0 -3)', surprised: 'translate(0 -10) rotate(4 232 152)',
+  thumbsup: 'translate(0 -4)', sparkle: 'translate(0 -6)', clap: 'translate(0 -5)', cheer: 'translate(0 -6)', upset: 'translate(-3 6) rotate(-13 232 152)',
+};
 // Thinking glances up and away; surprised shrinks the irises so more white shows.
-const iris = (pose: TheaPose, cx: number) =>
+const iris = (pose: FigurePose, cx: number) =>
   pose === 'thinking' ? 'translate(5 -5)' : pose === 'surprised' ? `translate(${cx} 192) scale(.85) translate(${-cx} -192)` : undefined;
-const EYE_SCALE: Record<TheaPose, number> = { basic: 1.04, welcome: 1.04, thinking: 1.04, gift: 1.04, surprised: 1.12 };
+const EYE_SCALE: Record<FigurePose, number> = {
+  basic: 1.04, welcome: 1.04, thinking: 1.04, gift: 1.04, surprised: 1.12,
+  thumbsup: 1.04, sparkle: 1.08, clap: 1.04, cheer: 1.04, upset: 1.0,
+};
+const OPEN_SMILE: FigurePose[] = ['welcome', 'sparkle', 'clap', 'cheer'];
+const NO_CHEEK_LIFT: FigurePose[] = ['surprised', 'clap', 'upset'];
+
+/** Four-point twinkle star centered on (cx, cy). */
+const star = (cx: number, cy: number, r: number) =>
+  `M${cx} ${cy - r} Q${cx} ${cy} ${cx + r} ${cy} Q${cx} ${cy} ${cx} ${cy + r} Q${cx} ${cy} ${cx - r} ${cy} Q${cx} ${cy} ${cx} ${cy - r} Z`;
+
+/** One arm segment: a cream sleeve with a soft outline so it reads against the sweater. */
+const Sleeve: React.FC<{ d: string; width: number }> = ({ d, width }) => (
+  <>
+    <path d={d} stroke="#e6cfab" strokeWidth={width + 6} strokeLinecap="round" fill="none" />
+    <path d={d} stroke="#f6e4c9" strokeWidth={width} strokeLinecap="round" fill="none" />
+  </>
+);
+
+/** Her right arm raised and bent at the elbow, ending in an open waving hand. */
+const WavingArm: React.FC<{ className?: string }> = ({ className }) => (
+  <>
+    <Sleeve d="M262 332 Q308 338 334 374" width={38} />
+    <g className={className}>
+      <Sleeve d="M334 374 Q334 330 326 292" width={34} />
+      <circle cx="325" cy="272" r="23" fill="#eaa27a" />
+      <path d="M310 256 Q307 244 315 239 M322 250 Q322 238 330 236 M334 254 Q338 244 345 246" stroke="#eaa27a" strokeWidth="9.5" strokeLinecap="round" fill="none" />
+    </g>
+  </>
+);
 
 /**
  * Thea, drawn as layered SVG (approved benchmark v1 in Design/Thea Concepts).
@@ -39,8 +77,9 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
   const uid = useId().replace(/:/g, '');
   const id = (name: string) => `${uid}-${name}`;
   const url = (name: string) => `url(#${id(name)})`;
-  const restingLeft = pose === 'basic' || pose === 'welcome' || pose === 'surprised';
-  const restingRight = pose === 'basic' || pose === 'thinking' || pose === 'surprised';
+  const restingLeft = ['basic', 'welcome', 'surprised', 'thumbsup', 'sparkle'].includes(pose);
+  const restingRight = ['basic', 'thinking', 'surprised', 'sparkle'].includes(pose);
+  const eyesClosed = pose === 'clap';
 
   return (
     <svg
@@ -139,6 +178,13 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
           </g></g>
 
           {/* Eyes: dark iris, reflection arc, two highlights, thin liner and winged lashes */}
+          {eyesClosed && (
+            <g stroke="#4a1f0c" strokeWidth="6.5" strokeLinecap="round" fill="none">
+              <path d="M124 198 Q148 172 174 198" /><path d="M208 198 Q234 172 258 198" />
+              <path d="M126 192 L114 186 M256 192 L268 186" strokeWidth="5" />
+            </g>
+          )}
+          {!eyesClosed && <>
           <g transform={`translate(148 191) scale(${EYE_SCALE[pose]}) translate(-152 -190)`}>
             <g className="u-thea__eye">
               <g clipPath={url('eyeL')}>
@@ -146,9 +192,13 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
                 <g transform={iris(pose, 153)}>
                   <circle cx="153" cy="192" r="19.5" fill="#5a250c" />
                   <path d="M157.6 204.7 Q162.9 202.8 165.2 197.7" stroke="#97553a" strokeWidth="3.5" strokeLinecap="round" fill="none" />
-                  <circle cx="146" cy="181" r="5.8" fill="#fff" /><circle cx="139" cy="190" r="2.7" fill="#fff" />
+                  {pose === 'sparkle'
+                    ? <path d={`${star(148, 186, 10)} ${star(162, 201, 4.5)}`} fill="#fff" />
+                    : <><circle cx="146" cy="181" r="5.8" fill="#fff" /><circle cx="139" cy="190" r="2.7" fill="#fff" /></>}
                 </g>
+                {pose === 'upset' && <rect x="118" y="160" width="70" height="20" fill="#e9a077" />}
                 <path d="M120 194 A32 28 0 0 1 184 194" stroke="#4a1f0c" strokeWidth="9" fill="none" />
+                {pose === 'upset' && <path d="M121 181 L184 183" stroke="#4a1f0c" strokeWidth="5" strokeLinecap="round" />}
               </g>
               <path d="M133 171 Q124 173 118 165 Q119 175 128 179 Z M126 180 Q118 183 111 177 Q113 187 124 187 Z" fill="#4a1f0c" />
             </g>
@@ -160,16 +210,21 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
                 <g transform={iris(pose, 230)}>
                   <circle cx="230" cy="192" r="19.5" fill="#5a250c" />
                   <path d="M234.6 204.7 Q239.9 202.8 242.2 197.7" stroke="#97553a" strokeWidth="3.5" strokeLinecap="round" fill="none" />
-                  <circle cx="223" cy="181" r="5.8" fill="#fff" /><circle cx="216" cy="190" r="2.7" fill="#fff" />
+                  {pose === 'sparkle'
+                    ? <path d={`${star(225, 186, 10)} ${star(239, 201, 4.5)}`} fill="#fff" />
+                    : <><circle cx="223" cy="181" r="5.8" fill="#fff" /><circle cx="216" cy="190" r="2.7" fill="#fff" /></>}
                 </g>
+                {pose === 'upset' && <rect x="194" y="160" width="70" height="20" fill="#e9a077" />}
                 <path d="M198 194 A32 28 0 0 1 262 194" stroke="#4a1f0c" strokeWidth="9" fill="none" />
+                {pose === 'upset' && <path d="M198 183 L261 181" stroke="#4a1f0c" strokeWidth="5" strokeLinecap="round" />}
               </g>
               <path d="M249 171 Q258 173 264 165 Q263 175 254 179 Z M256 180 Q264 183 271 177 Q269 187 258 187 Z" fill="#4a1f0c" />
             </g>
           </g>
+          </>}
 
           {/* Cheeks lifted into the eyes: her default smirk, pushed further on the smug beat */}
-          {pose !== 'surprised' && <>
+          {!NO_CHEEK_LIFT.includes(pose) && <>
           <g clipPath={url('eyeLw')}><g className="u-thea__cheek"><path d="M110 222 Q148 205 186 216 L186 244 L110 244 Z" fill="#eaa27a" /></g></g>
           <g clipPath={url('eyeRw')}><g className="u-thea__cheek"><path d="M196 216 Q234 205 272 222 L272 244 L196 244 Z" fill="#eaa27a" /></g></g>
           <g className="u-thea__cheek" stroke="#d98d68" strokeWidth="2.2" strokeLinecap="round" fill="none">
@@ -181,13 +236,14 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
           <ellipse cx="254" cy="230" rx="14" ry="8" fill="#e7866f" opacity=".22" />
           <ellipse cx="191" cy="217" rx="10.5" ry="7" fill="#cd7c5d" />
           {pose === 'basic' && <path className="u-thea__mouth" d="M172 241 Q197 247 219 228" stroke="#b9603f" strokeWidth="4.2" strokeLinecap="round" fill="none" />}
-          {pose === 'welcome' && <>
+          {OPEN_SMILE.includes(pose) && <>
             <path d="M168 233 Q191 237 216 231 Q212 257 191 258 Q171 257 168 233 Z" fill="#8f3523" />
             <path d="M176 251 Q191 245 206 251 Q199 257 191 257 Q182 257 176 251 Z" fill="#d9705a" />
             <path d="M171 234 Q191 238 213 232 L212 238 Q191 242 172 239 Z" fill="#fff" />
           </>}
           {pose === 'thinking' && <path d="M181 243 Q193 238 206 242" stroke="#b9603f" strokeWidth="4.2" strokeLinecap="round" fill="none" />}
-          {pose === 'gift' && <path d="M170 235 Q191 255 214 233" stroke="#b9603f" strokeWidth="4.5" strokeLinecap="round" fill="none" />}
+          {(pose === 'gift' || pose === 'thumbsup') && <path d="M170 235 Q191 255 214 233" stroke="#b9603f" strokeWidth="4.5" strokeLinecap="round" fill="none" />}
+          {pose === 'upset' && <path d="M175 249 Q191 236 208 248" stroke="#b9603f" strokeWidth="4.5" strokeLinecap="round" fill="none" />}
           {pose === 'surprised' && <ellipse cx="191" cy="245" rx="8" ry="10" fill="#8f3523" />}
           <path d="M185 252 Q195 255 205 251" stroke="#d98d6a" strokeWidth="3" strokeLinecap="round" fill="none" />
 
@@ -203,22 +259,7 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
           <circle cx="110" cy="72" r="1.8" fill="#eadbd0" /><circle cx="272" cy="72" r="1.8" fill="#eadbd0" />
         </g>
 
-        {pose === 'welcome' && (
-          <>
-            {/* Upper arm drops from the shoulder to an elbow just outside her body; a soft
-                outline keeps each segment readable against the sweater */}
-            <path d="M262 332 Q308 338 334 374" stroke="#e6cfab" strokeWidth="44" strokeLinecap="round" fill="none" />
-            <path d="M262 332 Q308 338 334 374" stroke="#f6e4c9" strokeWidth="38" strokeLinecap="round" fill="none" />
-            {/* Forearm and hand wave from the elbow */}
-            <g className="u-thea__wave">
-              <path d="M334 374 Q334 330 326 292" stroke="#e6cfab" strokeWidth="40" strokeLinecap="round" fill="none" />
-              <path d="M334 374 Q334 330 326 292" stroke="#f6e4c9" strokeWidth="34" strokeLinecap="round" fill="none" />
-              <path d="M311 302 Q326 296 342 302" stroke="#e6cfab" strokeWidth="4.5" strokeLinecap="round" fill="none" />
-              <circle cx="325" cy="272" r="23" fill="#eaa27a" />
-              <path d="M310 256 Q307 244 315 239 M322 250 Q322 238 330 236 M334 254 Q338 244 345 246" stroke="#eaa27a" strokeWidth="9.5" strokeLinecap="round" fill="none" />
-            </g>
-          </>
-        )}
+        {pose === 'welcome' && <WavingArm className="u-thea__wave" />}
 
         {pose === 'thinking' && (
           <>
@@ -249,6 +290,57 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
           <g className="u-thea__sparkle" stroke="#e7b13b" strokeWidth="5" strokeLinecap="round">
             <path d="M58 92 L72 104 M44 128 L62 130 M70 64 L76 82" />
             <path d="M324 92 L310 104 M338 128 L320 130 M312 64 L306 82" />
+          </g>
+        )}
+
+        {pose === 'thumbsup' && (
+          <>
+            <Sleeve d="M262 332 Q308 338 334 374" width={38} />
+            <g className="u-thea__thumb">
+              <Sleeve d="M334 374 Q334 336 326 304" width={34} />
+              <rect x="308" y="268" width="36" height="34" rx="13" fill="#eaa27a" />
+              <path d="M314 280 H336 M314 290 H336" stroke="#d98a63" strokeWidth="3" strokeLinecap="round" />
+              <path d="M318 270 Q314 248 326 242" stroke="#eaa27a" strokeWidth="12" strokeLinecap="round" fill="none" />
+            </g>
+          </>
+        )}
+
+        {pose === 'sparkle' && (
+          <path className="u-thea__twinkle" d={`${star(62, 104, 13)} ${star(322, 90, 11)} ${star(336, 150, 7)} ${star(48, 160, 7)}`} fill="#e7b13b" />
+        )}
+
+        {pose === 'clap' && (
+          <>
+            <Sleeve d="M120 332 Q102 364 104 404" width={38} />
+            <Sleeve d="M262 332 Q280 364 278 404" width={38} />
+            <g className="u-thea__clap-l">
+              <Sleeve d="M104 404 Q140 404 172 398" width={32} />
+              <ellipse cx="181" cy="390" rx="17" ry="24" fill="#eaa27a" transform="rotate(-12 181 390)" />
+            </g>
+            <g className="u-thea__clap-r">
+              <Sleeve d="M278 404 Q242 404 210 398" width={32} />
+              <ellipse cx="201" cy="390" rx="17" ry="24" fill="#eaa27a" transform="rotate(12 201 390)" />
+            </g>
+            <path className="u-thea__twinkle" d="M152 376 L140 368 M150 396 H136 M230 376 L242 368 M232 396 H246" stroke="#e7b13b" strokeWidth="4.5" strokeLinecap="round" />
+          </>
+        )}
+
+        {pose === 'cheer' && (
+          <>
+            <WavingArm className="u-thea__wave" />
+            <g transform="translate(382 0) scale(-1 1)"><WavingArm className="u-thea__wave u-thea__wave--late" /></g>
+          </>
+        )}
+
+        {pose === 'upset' && (
+          <g className="u-thea__huff">
+            <Sleeve d="M120 332 Q100 370 104 410" width={38} />
+            <Sleeve d="M262 332 Q282 370 278 410" width={38} />
+            <Sleeve d="M104 410 Q170 418 236 398" width={34} />
+            <circle cx="242" cy="396" r="17" fill="#eaa27a" />
+            <circle cx="140" cy="398" r="17" fill="#eaa27a" />
+            <Sleeve d="M278 410 Q212 420 146 400" width={34} />
+            <path d="M318 112 q10 10 0 20 M334 102 q-10 10 0 20 M306 128 q10 -10 20 0 M306 142 q10 10 20 0" stroke="#d0533a" strokeWidth="5" strokeLinecap="round" fill="none" />
           </g>
         )}
       </g>

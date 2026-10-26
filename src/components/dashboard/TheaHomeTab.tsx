@@ -12,6 +12,7 @@ import {
 } from '@/lib/dashboardBriefing';
 import type { RecipientRecord } from '@/lib/giftStatus';
 import { trackProductEvent } from '@/lib/productAnalytics';
+import { useTheaReaction } from '@/hooks/useTheaReaction';
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
 
@@ -74,6 +75,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const { reaction, reactTo } = useTheaReaction();
   const seededFor = useRef<string>('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -103,6 +105,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     setMessages(nextMessages);
     setInput('');
     setSending(true);
+    reactTo(trimmed);
     void trackProductEvent('dashboard_thea_message_sent', {
       turn: nextMessages.filter((m) => m.role === 'user').length,
     });
@@ -155,7 +158,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center gap-3 border-b px-1 pb-3" style={{ borderColor: 'rgba(42,37,32,0.08)' }}>
-        <TheaCharacter size="compact" pose="basic" className="u-thea-character--chat" />
+        <TheaCharacter size="compact" pose={sending ? 'thinking' : 'basic'} reaction={reaction} speaking={false} className="u-thea-character--chat" />
         <div className="min-w-0 text-left">
           <div className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: U.accent }}>
             Your gifting agent

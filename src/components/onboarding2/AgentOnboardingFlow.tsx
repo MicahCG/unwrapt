@@ -7,6 +7,8 @@ import { useToast } from '@/hooks/use-toast';
 import { normalizeRecipientName } from '@/lib/dateUtils';
 import { MobileShell, Eyebrow, PrimaryButton, Display } from '@/components/unwrapt2/MobileShell';
 import { PersonAvatar } from '@/components/unwrapt2/TheaAvatar';
+import { useTheaReaction } from '@/hooks/useTheaReaction';
+import { classifyUserReply } from '@/lib/theaReactions';
 import { TheaCharacter } from '@/components/unwrapt2/TheaCharacter';
 import { U, toneForIndex, initialsOf } from '@/components/unwrapt2/theme';
 import { format } from 'date-fns';
@@ -468,6 +470,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   const [followUpChips, setFollowUpChips] = useState<string[]>([]);
   const [pendingCategory, setPendingCategory] = useState<string | null>(null);
   const [intelInput, setIntelInput] = useState('');
+  const { reaction: theaReaction, reactTo } = useTheaReaction();
   const [intelSending, setIntelSending] = useState(false);
   const [revealPicks, setRevealPicks] = useState<GiftCatalogItem[]>([]);
   const [unmatchedRevealInterests, setUnmatchedRevealInterests] = useState<string[]>([]);
@@ -753,9 +756,14 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     const request = ++intelRequest.current;
     const isCategoryPick = Boolean(selectedInterest && isStarterCategory(selectedInterest));
     const categoryContext = pendingCategory;
+    // Thea reacts to the answer itself, before her reply arrives.
+    reactTo(message);
+    const isRude = classifyUserReply(message) === 'negative';
 
     let nextSignals = intelSignals;
-    if (selectedInterest) {
+    if (isRude) {
+      // A rude message is not an interest; keep what we already learned.
+    } else if (selectedInterest) {
       if (isCategoryPick) {
         nextSignals = upsertSignal(intelSignals, signalFromCategory(selectedInterest));
         setPendingCategory(selectedInterest);
@@ -1219,6 +1227,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
               <TheaCharacter
                 size="compact"
                 className="mx-auto u-thea-character--chat"
+                reaction={theaReaction}
                 activity="chat"
                 gesture={intelSignals.length ? 'Present' : 'Listen'}
               />
