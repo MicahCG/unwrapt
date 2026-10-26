@@ -10,6 +10,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import type { RecipientRecord } from '@/lib/giftStatus';
+import OccasionFields from '@/components/recipients/OccasionFields';
 
 interface EditRecipientModalProps {
   recipient: RecipientRecord;
@@ -29,6 +30,8 @@ const EditRecipientModal: React.FC<EditRecipientModalProps> = ({ recipient, isOp
   const [formData, setFormData] = useState(blankForm);
   const [newInterest, setNewInterest] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  // Bumped whenever a recipient's saved values load, so the occasion rows start from them.
+  const [formVersion, setFormVersion] = useState(0);
 
   useEffect(() => {
     setFormData({
@@ -38,6 +41,7 @@ const EditRecipientModal: React.FC<EditRecipientModalProps> = ({ recipient, isOp
       interests: (recipient?.interests || []).slice(0, 3),
     });
     setNewInterest('');
+    setFormVersion((v) => v + 1);
   }, [recipient]);
 
   const addInterest = () => {
@@ -77,10 +81,12 @@ const EditRecipientModal: React.FC<EditRecipientModalProps> = ({ recipient, isOp
             <div className="space-y-2"><Label htmlFor="edit-name">Name *</Label><Input id="edit-name" value={formData.name} onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))} required /></div>
             <div className="space-y-2"><Label>Relationship</Label><Select value={formData.relationship} onValueChange={(value) => setFormData((p) => ({ ...p, relationship: value }))}><SelectTrigger><SelectValue placeholder="Select relationship" /></SelectTrigger><SelectContent>{['Mom','Dad','Partner','Sibling','Friend','Child','Grandparent','Other'].map((label) => <SelectItem key={label} value={label.toLowerCase()}>{label}</SelectItem>)}</SelectContent></Select></div>
           </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2"><Label htmlFor="edit-birthday">Birthday</Label><Input id="edit-birthday" type="date" value={formData.birthday} onChange={(e) => setFormData((p) => ({ ...p, birthday: e.target.value }))} /></div>
-            <div className="space-y-2"><Label htmlFor="edit-anniversary">Anniversary</Label><Input id="edit-anniversary" type="date" value={formData.anniversary} onChange={(e) => setFormData((p) => ({ ...p, anniversary: e.target.value }))} /></div>
-          </div>
+          <OccasionFields
+            key={formVersion}
+            idPrefix="edit-occasion"
+            value={{ birthday: formData.birthday, anniversary: formData.anniversary }}
+            onChange={(occasions) => setFormData((p) => ({ ...p, ...occasions }))}
+          />
 
           <div>
             <div className="mb-2 flex items-center justify-between"><Label>Interests</Label><span className="text-xs text-muted-foreground">{formData.interests.length}/3</span></div>

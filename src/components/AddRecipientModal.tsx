@@ -13,6 +13,7 @@ import { sanitizeInput, sanitizeAddress } from '@/utils/inputSanitization';
 import { ErrorHandler } from '@/utils/errorHandler';
 import { rateLimiter, RATE_LIMITS } from '@/utils/rateLimiter';
 import { useQueryClient } from '@tanstack/react-query';
+import OccasionFields from '@/components/recipients/OccasionFields';
 
 interface AddRecipientModalProps {
   onRecipientAdded?: () => void;
@@ -247,26 +248,11 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="birthday">Birthday</Label>
-              <Input
-                id="birthday"
-                type="date"
-                value={formData.birthday}
-                onChange={(e) => handleInputChange('birthday', e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="anniversary">Anniversary</Label>
-              <Input
-                id="anniversary"
-                type="date"
-                value={formData.anniversary}
-                onChange={(e) => handleInputChange('anniversary', e.target.value)}
-              />
-            </div>
-          </div>
+          <OccasionFields
+            idPrefix="add-occasion"
+            value={{ birthday: formData.birthday, anniversary: formData.anniversary }}
+            onChange={(occasions) => setFormData((prev) => ({ ...prev, ...occasions }))}
+          />
 
           <div className="space-y-4 rounded-2xl border border-[#E4DCD2] bg-[#FAF8F3] p-4">
             <button type="button" onClick={() => setShowAddress((value) => !value)} className="flex w-full items-center justify-between text-left">
