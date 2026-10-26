@@ -1,10 +1,22 @@
-
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Logo } from '@/components/ui/logo';
+import { TheaCharacter } from '@/components/unwrapt2/TheaCharacter';
 import { useAuth } from './AuthProvider';
 import { trackProductEvent } from '@/lib/productAnalytics';
+
+const IDLE_MS = 3000;
+const WAVE_MS = 3200;
+
+/** Thea rests in her default pose, waves hello after a few seconds, then settles again. */
+const GreetingThea: React.FC = () => {
+  const [waving, setWaving] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setWaving((w) => !w), waving ? WAVE_MS : IDLE_MS);
+    return () => window.clearTimeout(timer);
+  }, [waving]);
+  return <TheaCharacter size="medium" pose={waving ? 'welcome' : 'basic'} speaking={false} />;
+};
 
 const LoginPage: React.FC = () => {
   const { signInWithGoogle, loading } = useAuth();
@@ -17,9 +29,10 @@ const LoginPage: React.FC = () => {
     <div className="min-h-screen bg-brand-cream flex items-center justify-center px-4">
       <Card className="w-full max-w-md animate-fadeInUp border-brand-cream shadow-lg">
         <CardHeader className="text-center pb-2">
-          <div className="flex justify-center mb-6">
-            <Logo variant="full" size="lg" />
-          </div>
+          <GreetingThea />
+          <p className="mt-2 text-sm text-brand-charcoal/70">
+            Meet Thea, your Unwrapt gifting agent.
+          </p>
         </CardHeader>
         
         <CardContent className="pt-6">
