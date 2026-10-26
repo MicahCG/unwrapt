@@ -226,9 +226,9 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
           </button>
         )}
         <div className="mt-3 border-t pt-3" style={{ borderColor: U.border }}>
-          <CalendarSyncButton appearance="pill" />
+          <CalendarSyncButton appearance="pill" onAddManually={onAddRecipient} />
           <p className="mt-2 text-center text-[11.5px] leading-4" style={{ color: U.muted }}>
-            Pull birthdays and anniversaries from Google Calendar into Your people.
+            Read-only. Thea only looks for birthdays and anniversaries, and you choose who to add.
           </p>
         </div>
       </section>
@@ -259,7 +259,6 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
               <PrimaryButton onClick={selectedDay ? () => setSelectedDay(null) : onAddRecipient}>
                 {selectedDay ? 'Clear filter' : 'Add someone'}
               </PrimaryButton>
-              {!selectedDay && <CalendarSyncButton appearance="pill" />}
             </div>
           </div>
         ) : (

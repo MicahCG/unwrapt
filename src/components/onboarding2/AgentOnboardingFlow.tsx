@@ -252,9 +252,14 @@ function StepPips({ step, total = 4 }: { step: number; total?: number }) {
 function ImportPromptScreen({
   connecting,
   onConnect,
+  onAddManually,
+  notice,
 }: {
   connecting: boolean;
   onConnect: () => void;
+  onAddManually: () => void;
+  /** What happened on the last calendar attempt, so a cancel or empty calendar is never a dead end. */
+  notice: string | null;
 }) {
   const [ctaReady, setCtaReady] = useState(false);
 
@@ -271,8 +276,17 @@ function ImportPromptScreen({
           }}
         >
           <PrimaryButton onClick={onConnect} disabled={connecting || !ctaReady}>
-            {connecting ? 'Connecting…' : 'Connect Google Calendar'}
+            {connecting ? 'Connecting…' : notice ? 'Try Google Calendar again' : 'Connect Google Calendar'}
           </PrimaryButton>
+          <button
+            type="button"
+            onClick={onAddManually}
+            disabled={connecting}
+            className="u-press mt-1.5 min-h-11 w-full text-[13.5px] font-semibold disabled:opacity-50"
+            style={{ color: U.ink }}
+          >
+            Add someone myself
+          </button>
           <p
             className="mt-3 flex items-center justify-center gap-1.5 text-center"
             style={{ color: U.muted, fontSize: 10.5, opacity: 0.55, letterSpacing: '0.02em' }}
@@ -297,6 +311,11 @@ function ImportPromptScreen({
           />
         </Display>
       </div>
+      {notice && (
+        <p className="mx-auto mt-3 max-w-[320px] rounded-[16px] px-4 py-3 text-center text-[13px] leading-5" role="status" style={{ background: U.accentSoft, color: U.inkSoft }}>
+          {notice}
+        </p>
+      )}
     </MobileShell>
   );
 }
@@ -422,8 +441,21 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [screen, setScreen] = useState<Screen>(() => (shouldSkipAgentWelcome() ? 'import' : 'welcome'));
+  const [screen, setScreen] = useState<Screen>(() =>
+    shouldSkipAgentWelcome() || new URLSearchParams(window.location.search).has('calendar') ? 'import' : 'welcome',
+  );
   const [scanning, setScanning] = useState(false);
+  const [calendarNotice, setCalendarNotice] = useState<string | null>(() => {
+    // The calendar OAuth callback returns here with ?calendar=<result>.
+    const result = new URLSearchParams(window.location.search).get('calendar');
+    if (!result || result === 'connected') return null;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('calendar');
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    if (result === 'cancelled') return 'No problem, nothing was connected. Try again, or add someone yourself.';
+    if (result === 'expired') return 'That Google sign-in expired before it finished. Try once more.';
+    return 'Google didn’t finish connecting. Try again, or add someone yourself.';
+  });
   const [isConnected, setIsConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [people, setPeople] = useState<Person[]>([]);
@@ -612,15 +644,12 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           setPeople(grouped);
           setScreen('found');
         } else {
-          toast({
-            title: 'No events found',
-            description: "I couldn't find birthdays or anniversaries yet. Make sure they’re on your Google Calendar, then try again.",
-          });
+          setCalendarNotice('Your calendar is connected, but I didn’t find birthdays or anniversaries yet. Add someone yourself and I’ll take it from there.');
         }
       }, 1400);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to fetch calendar events';
-      toast({ title: 'Fetch failed', description: message, variant: 'destructive' });
+      console.error('Calendar fetch failed', error);
+      setCalendarNotice('I couldn’t read your calendar just now. Try again, or add someone yourself.');
       setScanning(false);
     }
   };
@@ -1071,6 +1100,8 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         <ImportPromptScreen
           connecting={connecting}
           onConnect={handleFindMyPeople}
+          onAddManually={startManualAdd}
+          notice={calendarNotice}
         />
       );
 

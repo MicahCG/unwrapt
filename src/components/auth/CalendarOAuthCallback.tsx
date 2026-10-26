@@ -1,190 +1,83 @@
-
-import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/components/auth/AuthProvider';
+import {
+  consumeReturnTo,
+  storedRedirectUri,
+  toCalendarError,
+  withCalendarResult,
+  type CalendarResult,
+} from '@/lib/calendarConnection';
 
+const MAX_AUTH_WAITS = 15;
+const AUTH_WAIT_MS = 500;
+
+/**
+ * Google redirects here after consent. Every outcome returns the user to the screen that
+ * started the connection with `?calendar=<result>`, where that screen explains what happened
+ * and offers the next step. Nothing here is a dead end.
+ */
 const CalendarOAuthCallback: React.FC = () => {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { toast } = useToast();
   const { user, loading } = useAuth();
-  const [hasProcessed, setHasProcessed] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const maxRetries = 15;
-  const retryDelay = 500;
+  const [authWaits, setAuthWaits] = useState(0);
+  const handled = useRef(false);
 
   useEffect(() => {
-    const handleOAuthCallback = async () => {
-      if (hasProcessed || isProcessing) {
-        console.log('📅 CalendarOAuthCallback: Already processed or processing, skipping...');
-        return;
-      }
-
-      console.log('📅 CalendarOAuthCallback: Processing callback');
-      console.log('📅 CalendarOAuthCallback: Current URL:', window.location.href);
-      console.log('📅 CalendarOAuthCallback: User from AuthProvider:', { 
-        hasUser: !!user, 
-        userId: user?.id,
-        loading
-      });
-      
-      const code = searchParams.get('code');
-      const error = searchParams.get('error');
-      const state = searchParams.get('state');
-
-      console.log('📅 CalendarOAuthCallback: OAuth params:', { 
-        hasCode: !!code, 
-        error, 
-        state,
-        retryCount
-      });
-
-      if (error) {
-        console.error('📅 CalendarOAuthCallback: OAuth error received:', error);
-        setHasProcessed(true);
-        toast({
-          title: "Calendar Connection Failed",
-          description: error,
-          variant: "destructive"
-        });
-        window.location.href = `${window.location.origin}/`;
-        return;
-      }
-
-      if (!code) {
-        console.log('📅 CalendarOAuthCallback: No code received, redirecting...');
-        setHasProcessed(true);
-        window.location.href = `${window.location.origin}/`;
-        return;
-      }
-
-      // Wait for auth loading to complete
-      if (loading) {
-        console.log('📅 CalendarOAuthCallback: Auth still loading, waiting...');
-        return;
-      }
-
-      // Wait for user to be available from AuthProvider instead of checking session directly
-      let currentUser = user;
-
-      // Retry logic if user is still not available
-      if (!currentUser) {
-        if (retryCount < maxRetries) {
-          console.log(`📅 CalendarOAuthCallback: No user found, retry ${retryCount + 1}/${maxRetries}`);
-          setTimeout(() => {
-            setRetryCount(prev => prev + 1);
-          }, retryDelay);
-          return;
-        } else {
-          console.error('📅 CalendarOAuthCallback: Max retries reached, user still not available');
-          setHasProcessed(true);
-          toast({
-            title: "Authentication Required",
-            description: "Please log in again to connect your calendar.",
-            variant: "destructive"
-          });
-          window.location.href = `${window.location.origin}/`;
-          return;
-        }
-      }
-
-      // Process the OAuth callback
-      setIsProcessing(true);
-      setHasProcessed(true);
-
-      try {
-        console.log('📅 CalendarOAuthCallback: Processing OAuth code for user:', currentUser.id);
-        
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError || !session) {
-          throw new Error('No active session found');
-        }
-
-        console.log('📅 CalendarOAuthCallback: Exchanging authorization code...');
-        let redirectUri = `${window.location.origin}/auth/calendar/callback`;
-        try {
-          redirectUri =
-            sessionStorage.getItem('unwrapt_calendar_redirect_uri') ||
-            'https://app.unwrapt.io/auth/calendar/callback';
-        } catch {
-          redirectUri = 'https://app.unwrapt.io/auth/calendar/callback';
-        }
-
-        const { data: tokenData, error: tokenError } = await supabase.functions.invoke('google-calendar', {
-          body: { action: 'exchange_code', code, redirectUri },
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          }
-        });
-
-        console.log('📅 CalendarOAuthCallback: Token exchange response:', { 
-          success: !!tokenData, 
-          hasAccessToken: !!tokenData?.access_token,
-          error: tokenError 
-        });
-
-        if (tokenError) {
-          console.error('📅 CalendarOAuthCallback: Token exchange error:', tokenError);
-          throw new Error(tokenError.message || 'Failed to exchange authorization code');
-        }
-
-        if (!tokenData?.access_token) {
-          throw new Error('No access token received from Google');
-        }
-
-        let returnTo = '/onboarding';
-        try {
-          const stored = sessionStorage.getItem('unwrapt_calendar_return_to');
-          sessionStorage.removeItem('unwrapt_calendar_return_to');
-          if (stored && stored.startsWith('/') && !stored.startsWith('//')) {
-            returnTo = stored;
-          }
-        } catch {
-          /* ignore */
-        }
-
-        console.log('📅 CalendarOAuthCallback: Calendar connected successfully, redirecting to', returnTo);
-
-        toast({
-          title: 'Calendar Connected Successfully!',
-          description:
-            returnTo.startsWith('/onboarding')
-              ? 'Your Google Calendar has been connected. Returning to setup...'
-              : 'Your Google Calendar has been connected. Syncing your people…',
-        });
-
-        window.location.href = `${window.location.origin}${returnTo}`;
-
-      } catch (error) {
-        console.error('📅 CalendarOAuthCallback: Error processing OAuth callback:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Failed to process calendar connection';
-        toast({
-          title: "Calendar Connection Failed",
-          description: errorMessage,
-          variant: "destructive"
-        });
-        window.location.href = `${window.location.origin}/`;
-      } finally {
-        setIsProcessing(false);
-      }
+    if (handled.current) return;
+    const finish = (result: CalendarResult) => {
+      handled.current = true;
+      window.location.replace(withCalendarResult(consumeReturnTo('/?tab=manual'), result));
     };
 
-    handleOAuthCallback();
-  }, [navigate, searchParams, toast, user, loading, hasProcessed, retryCount, isProcessing]);
+    // Google sends the same `access_denied` whether the user clicked Deny or closed the window.
+    if (searchParams.get('error')) return finish('cancelled');
+    const code = searchParams.get('code');
+    if (!code) return finish('cancelled');
+
+    if (loading) return;
+    if (!user) {
+      if (authWaits < MAX_AUTH_WAITS) {
+        const timer = window.setTimeout(() => setAuthWaits((n) => n + 1), AUTH_WAIT_MS);
+        return () => window.clearTimeout(timer);
+      }
+      return finish('failed');
+    }
+
+    handled.current = true;
+    void (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('No active session');
+        const { data, error } = await supabase.functions.invoke('google-calendar', {
+          body: {
+            action: 'exchange_code',
+            code,
+            redirectUri: storedRedirectUri('https://app.unwrapt.io/auth/calendar/callback'),
+          },
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        // The function answers `{ success: true, code: 'connected' }`; it never returns tokens.
+        if (error || !(data?.success || data?.code === 'connected')) throw await toCalendarError(error, data);
+        handled.current = false;
+        finish('connected');
+      } catch (error) {
+        console.error('Calendar connection failed', error);
+        const code = (error as { code?: string }).code;
+        handled.current = false;
+        finish(code === 'code_expired_or_reused' ? 'expired' : 'failed');
+      }
+    })();
+  }, [searchParams, user, loading, authWaits]);
 
   return (
-    <div className="min-h-screen bg-brand-cream flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal mx-auto mb-4"></div>
-        <p className="text-brand-charcoal">Connecting Google Calendar...</p>
-        <p className="text-brand-charcoal/70 text-sm mt-2">
-          {loading ? 'Loading authentication...' : 
-           !user ? `Waiting for authentication... (${retryCount}/${maxRetries})` : 
-           'Processing connection...'}
+    <div className="flex min-h-screen items-center justify-center bg-[#EDE6D8] px-6">
+      <div className="text-center" role="status" aria-live="polite">
+        <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[#2A2520]/15 border-b-[#2A2520]" />
+        <p className="text-[15px] font-semibold text-[#2A2520]">Connecting Google Calendar…</p>
+        <p className="mt-1.5 text-[13px] text-[#6B6256]">
+          {loading || !user ? 'Checking your sign-in…' : 'Saving the connection. You’ll be right back.'}
         </p>
       </div>
     </div>

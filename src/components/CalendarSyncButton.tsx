@@ -1,336 +1,164 @@
-
 import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Calendar, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Calendar, Loader2, Check } from 'lucide-react';
-import { useAuth } from '@/components/auth/AuthProvider';
-import { supabase } from '@/integrations/supabase/client';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { useQueryClient, useQuery } from '@tanstack/react-query';
-import { normalizeRecipientName } from '@/lib/dateUtils';
-
-const RETURN_TO_KEY = 'unwrapt_calendar_return_to';
-const REDIRECT_URI_KEY = 'unwrapt_calendar_redirect_uri';
-let postOAuthSyncStarted = false;
+import { useCalendarConnection, type CalendarCandidate, type CalendarStatus } from '@/hooks/useCalendarConnection';
+import { formatOccasionDate } from '@/lib/dateUtils';
 
 interface CalendarSyncButtonProps {
   className?: string;
-  /** Softer pill that matches the Manual tab chrome. */
+  /** Softer pill that matches the Manual tab chrome, with inline status and next steps. */
   appearance?: 'default' | 'pill';
+  /** Offered whenever the calendar can't help, so the user can keep going by hand. */
+  onAddManually?: () => void;
 }
 
-const CalendarSyncButton = ({ className, appearance = 'default' }: CalendarSyncButtonProps) => {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [syncing, setSyncing] = useState(false);
-  const [justSynced, setJustSynced] = useState(false);
+const statusCopy = (status: CalendarStatus): { tone: 'info' | 'warn'; text: string } | null => {
+  switch (status.kind) {
+    case 'cancelled': return { tone: 'warn', text: 'You didn’t finish connecting. Nothing changed, and your people are still here.' };
+    case 'expired': return { tone: 'warn', text: 'Calendar access expired. Reconnect to keep birthdays in sync.' };
+    case 'failed': return { tone: 'warn', text: `Couldn’t connect Google Calendar. ${status.message}` };
+    case 'no_events': return { tone: 'info', text: 'Connected, but no birthdays or anniversaries turned up in your calendar.' };
+    case 'up_to_date': return { tone: 'info', text: 'Everyone from your calendar is already in Your people.' };
+    case 'imported': return { tone: 'info', text: `Added ${status.count} ${status.count === 1 ? 'person' : 'people'} from your calendar.` };
+    default: return null;
+  }
+};
 
-  const normalizeDate = (date: string | null) => {
-    if (!date) return null;
-    return date.split('T')[0];
-  };
-
-  // Check calendar connection status
-  const { data: isConnected } = useQuery({
-    queryKey: ['calendar-connection', user?.id],
-    queryFn: async () => {
-      const { data: integrations, error } = await supabase
-        .rpc('get_my_calendar_integration');
-
-      if (error || !integrations || integrations.length === 0) {
-        return false;
-      }
-      return integrations[0]?.is_connected ?? false;
-    },
-    enabled: !!user
+const CalendarImportReview: React.FC<{
+  candidates: CalendarCandidate[];
+  importing: boolean;
+  onImport: (selected: CalendarCandidate[]) => void;
+  onCancel: () => void;
+}> = ({ candidates, importing, onImport, onCancel }) => {
+  const [chosen, setChosen] = useState(() => new Set(candidates.map((c) => c.key)));
+  useEffect(() => setChosen(new Set(candidates.map((c) => c.key))), [candidates]);
+  const selected = candidates.filter((c) => chosen.has(c.key));
+  const toggle = (key: string) => setChosen((prev) => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    return next;
   });
 
-  const connectGoogleCalendar = async () => {
-    setSyncing(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('No active session found');
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open && !importing) onCancel(); }}>
+      <DialogContent className="max-h-[88dvh] w-[calc(100%-1.5rem)] max-w-md overflow-y-auto rounded-[24px] p-5">
+        <DialogHeader className="text-left">
+          <DialogTitle>Found in your calendar</DialogTitle>
+          <DialogDescription>Choose who Thea should look after. You can add details later.</DialogDescription>
+        </DialogHeader>
+        <ul className="mt-1 flex flex-col gap-2">
+          {candidates.map((person) => (
+            <li key={person.key}>
+              <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-[14px] border border-[#E4DCD2] bg-[#FAF8F3] px-3.5 py-2.5">
+                <input type="checkbox" checked={chosen.has(person.key)} onChange={() => toggle(person.key)} className="h-4 w-4 accent-[#2A2520]" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[14px] font-semibold text-[#2A2520]">{person.name}</span>
+                  <span className="block text-[12px] text-[#7A6F62]">
+                    {[person.birthday && `Birthday · ${formatOccasionDate(person.birthday)}`, person.anniversary && `Anniversary · ${formatOccasionDate(person.anniversary)}`].filter(Boolean).join('  ·  ')}
+                  </span>
+                </span>
+              </label>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-4 grid grid-cols-[auto_1fr] gap-2">
+          <Button type="button" variant="outline" onClick={onCancel} disabled={importing}>Not now</Button>
+          <Button type="button" onClick={() => onImport(selected)} disabled={importing || !selected.length} className="h-11 bg-[#2A2520] text-[#F4ECDD] hover:bg-[#2A2520]/90">
+            {importing ? 'Adding…' : `Add ${selected.length} ${selected.length === 1 ? 'person' : 'people'}`}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
-      const { appOrigin, isNativeApp } = await import('@/lib/native');
-      const { openExternalAuthUrl } = await import('@/lib/nativeBootstrap');
-      // Always use HTTPS callback so Google OAuth + Universal Links work in the iOS shell
-      const redirectUri = `${appOrigin()}/auth/calendar/callback`;
-      try {
-        sessionStorage.setItem(REDIRECT_URI_KEY, redirectUri);
-        sessionStorage.setItem(RETURN_TO_KEY, '/?tab=manual&syncCalendar=1');
-      } catch {
-        /* ignore */
-      }
-
-      const { data: authData, error: authError } = await supabase.functions.invoke('google-calendar', {
-        body: { action: 'get_auth_url', redirectUri },
-        headers: { Authorization: `Bearer ${session.access_token}` }
-      });
-
-      if (authError) throw new Error(authError.message || 'Failed to get authorization URL');
-      if (authData?.authUrl) {
-        if (isNativeApp()) {
-          await openExternalAuthUrl(authData.authUrl);
-        } else {
-          window.location.href = authData.authUrl;
-        }
-      }
-    } catch (error) {
-      console.error('Calendar connection error:', error);
-      toast({
-        title: "Connection Failed",
-        description: error instanceof Error ? error.message : 'Failed to connect calendar',
-        variant: "destructive"
-      });
-      setSyncing(false);
-    }
-  };
-
-  const handleCalendarSync = async () => {
-    if (!user) return;
-
-    setSyncing(true);
-    
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('No active session found');
-
-      console.log('🔄 Syncing calendar events...');
-      const { data: eventsData, error: eventsError } = await supabase.functions.invoke('google-calendar', {
-        body: { action: 'fetch_dashboard_events' },
-        headers: { Authorization: `Bearer ${session.access_token}` }
-      });
-
-      if (eventsError) {
-        console.error('❌ Calendar sync error:', eventsError);
-        
-        if (eventsError.status === 401 || eventsError.message?.includes('Calendar access expired')) {
-          toast({
-            title: "Calendar Access Expired",
-            description: "Please reconnect your Google Calendar to sync recipients.",
-            variant: "destructive"
-          });
-          return;
-        }
-        
-        throw new Error(eventsError.message || 'Failed to fetch calendar events');
-      }
-
-      const events = eventsData?.events || [];
-      console.log('📅 Found calendar events:', events.length);
-
-      const importantEvents = events.filter((event: any) => 
-        event.category === 'birthday' || event.category === 'anniversary'
-      );
-
-      if (importantEvents.length === 0) {
-        toast({
-          title: "No Events Found",
-          description: "No birthday or anniversary events found in your calendar.",
-        });
-        return;
-      }
-
-      const peopleMap = new Map<string, any>();
-      
-      importantEvents.forEach((event: any) => {
-        if (event.personName) {
-          const personKey = event.personName.toLowerCase().trim();
-          
-          if (!peopleMap.has(personKey)) {
-            peopleMap.set(personKey, {
-              name: event.personName,
-              birthday: event.category === 'birthday' ? event.date : null,
-              anniversary: event.category === 'anniversary' ? event.date : null,
-              events: [event]
-            });
-          } else {
-            const person = peopleMap.get(personKey)!;
-            if (event.category === 'birthday' && !person.birthday) {
-              person.birthday = event.date;
-            }
-            if (event.category === 'anniversary' && !person.anniversary) {
-              person.anniversary = event.date;
-            }
-            person.events.push(event);
-          }
-        }
-      });
-
-      const calendarPeople = Array.from(peopleMap.values());
-      console.log('👥 Found unique people in calendar:', calendarPeople.length);
-
-      const { data: existingRecipients } = await supabase
-        .from('recipients')
-        .select('name, birthday, anniversary')
-        .eq('user_id', user.id);
-
-      console.log('📊 Calendar people to check:', calendarPeople);
-      console.log('📊 Existing recipients:', existingRecipients);
-      
-      const newPeople = calendarPeople.filter(person => {
-        const normalizedPersonName = normalizeRecipientName(person.name);
-        const isDuplicate = existingRecipients?.some(existing => {
-          const normalizedExistingName = normalizeRecipientName(existing.name);
-          const nameMatch = normalizedExistingName === normalizedPersonName;
-          // Normalize dates for comparison
-          const personBday = normalizeDate(person.birthday);
-          const existingBday = normalizeDate(existing.birthday);
-          const personAnniv = normalizeDate(person.anniversary);
-          const existingAnniv = normalizeDate(existing.anniversary);
-          
-          const birthdayMatch = personBday && existingBday && personBday === existingBday;
-          const anniversaryMatch = personAnniv && existingAnniv && personAnniv === existingAnniv;
-          
-          // Also match by name alone if names are identical after normalization
-          // This prevents "Stella" and "Stella's" from creating duplicates
-          const nameOnlyMatch = nameMatch;
-          
-          console.log(`🔍 Comparing: "${person.name}" vs "${existing.name}" | normalized: "${normalizedPersonName}" vs "${normalizedExistingName}" | name: ${nameMatch} | bday: ${personBday} vs ${existingBday} = ${birthdayMatch}`);
-          
-          return nameOnlyMatch || (nameMatch && (birthdayMatch || anniversaryMatch));
-        });
-        console.log(`  → ${person.name}: isDuplicate=${isDuplicate}`);
-        return !isDuplicate;
-      });
-
-      if (newPeople.length === 0) {
-        toast({
-          title: "Already Up to Date",
-          description: "All people from your calendar are already in your recipients list.",
-        });
-        setJustSynced(true);
-        setTimeout(() => setJustSynced(false), 3000);
-        return;
-      }
-
-      const newRecipients = newPeople.map(person => ({
-        user_id: user.id,
-        name: person.name,
-        birthday: normalizeDate(person.birthday),
-        anniversary: normalizeDate(person.anniversary),
-        interests: [],
-        notes: 'Auto-imported from Google Calendar'
-      }));
-
-      const { data: insertedRecipients, error: insertError } = await supabase
-        .from('recipients')
-        .insert(newRecipients)
-        .select();
-
-      if (insertError) {
-        console.error('❌ Error inserting recipients:', insertError);
-        throw new Error('Failed to create new recipients');
-      }
-
-      console.log('✅ Successfully imported recipients:', insertedRecipients.length);
-
-      queryClient.invalidateQueries({ queryKey: ['recipients', user.id] });
-
-      setJustSynced(true);
-      setTimeout(() => setJustSynced(false), 3000);
-
-      toast({
-        title: "Calendar Synced!",
-        description: `Added ${insertedRecipients.length} new recipients from your calendar.`,
-      });
-
-    } catch (error) {
-      console.error('💥 Calendar sync error:', error);
-      toast({
-        title: "Sync Failed",
-        description: error instanceof Error ? error.message : 'Failed to sync calendar',
-        variant: "destructive"
-      });
-    } finally {
-      setSyncing(false);
-    }
-  };
+const CalendarSyncButton = ({ className, appearance = 'default', onAddManually }: CalendarSyncButtonProps) => {
+  const { toast } = useToast();
+  const { isConnected, status, connect, findCandidates, importCandidates, dismiss } = useCalendarConnection();
+  const busy = status.kind === 'connecting' || status.kind === 'syncing' || status.kind === 'importing';
+  // An expired grant needs the consent screen again, not another sync attempt.
+  const needsConnect = !isConnected || status.kind === 'expired';
 
   const handleClick = () => {
-    if (isConnected) {
-      handleCalendarSync();
-    } else {
-      connectGoogleCalendar();
+    if (needsConnect) void connect();
+    else void findCandidates();
+  };
+
+  const handleImport = async (selected: CalendarCandidate[]) => {
+    try {
+      await importCandidates(selected);
+    } catch {
+      toast({ title: 'Couldn’t add those people', description: 'Nothing was saved. Please try again.', variant: 'destructive' });
     }
   };
 
-  // After OAuth returns to Manual tab, import events once (shared across duplicate buttons).
-  useEffect(() => {
-    if (searchParams.get('syncCalendar') !== '1') return;
-    if (!user || !isConnected || syncing || postOAuthSyncStarted) return;
-    postOAuthSyncStarted = true;
-    const next = new URLSearchParams(searchParams);
-    next.delete('syncCalendar');
-    setSearchParams(next, { replace: true });
-    void handleCalendarSync();
-  }, [searchParams, user, isConnected, syncing, setSearchParams]);
-
-  const label = syncing
-    ? isConnected
-      ? 'Syncing…'
-      : 'Connecting…'
-    : justSynced
-      ? 'Synced!'
-      : isConnected
-        ? 'Sync calendar'
-        : 'Connect calendar';
+  const label = status.kind === 'connecting'
+    ? 'Opening Google…'
+    : status.kind === 'syncing' || status.kind === 'importing'
+      ? 'Checking your calendar…'
+      : status.kind === 'expired'
+        ? 'Reconnect calendar'
+        : status.kind === 'cancelled' || status.kind === 'failed'
+          ? 'Try connecting again'
+          : isConnected
+            ? 'Sync calendar'
+            : 'Connect Google Calendar';
+  const icon = busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : status.kind === 'imported' || status.kind === 'up_to_date' ? <Check className="h-3.5 w-3.5" /> : <Calendar className="h-3.5 w-3.5" />;
+  const message = statusCopy(status);
+  const review = status.kind === 'review' || status.kind === 'importing' ? (
+    <CalendarImportReview candidates={status.candidates} importing={status.kind === 'importing'} onImport={handleImport} onCancel={dismiss} />
+  ) : null;
 
   if (appearance === 'pill') {
     return (
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={syncing}
-        className={
-          className ||
-          'inline-flex w-full items-center justify-center gap-2 rounded-full border px-3.5 py-2.5 text-[12.5px] font-semibold disabled:opacity-60'
-        }
-        style={{
-          borderColor: 'rgba(42,37,32,0.14)',
-          background: '#F1E7D5',
-          color: '#2A2520',
-        }}
-      >
-        {syncing ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        ) : justSynced ? (
-          <Check className="h-3.5 w-3.5" />
-        ) : (
-          <Calendar className="h-3.5 w-3.5" />
+      <div aria-live="polite">
+        <button
+          type="button"
+          onClick={handleClick}
+          disabled={busy}
+          aria-busy={busy}
+          className={className || 'u-press inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border px-3.5 py-2.5 text-[12.5px] font-semibold disabled:opacity-60'}
+          style={{ borderColor: 'rgba(42,37,32,0.14)', background: '#F1E7D5', color: '#2A2520' }}
+        >
+          {icon}
+          {label}
+        </button>
+        {message && (
+          <div
+            className="mt-2.5 rounded-[14px] px-3.5 py-2.5 text-[12.5px] leading-[1.45]"
+            style={{ background: message.tone === 'warn' ? '#FBEFE5' : '#EEF0E4', color: '#3A332B' }}
+          >
+            {message.text}
+            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
+              {onAddManually && (status.kind === 'cancelled' || status.kind === 'failed' || status.kind === 'no_events' || status.kind === 'expired') && (
+                <button type="button" onClick={onAddManually} className="min-h-8 font-semibold text-[#B65B3C]">Add someone manually</button>
+              )}
+              <button type="button" onClick={dismiss} className="min-h-8 font-semibold text-[#6B6256]">Dismiss</button>
+            </div>
+          </div>
         )}
-        {label}
-      </button>
+        {review}
+      </div>
     );
   }
 
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={handleClick}
-      disabled={syncing}
-      className={className || 'w-full border-brand-charcoal text-brand-charcoal hover:bg-brand-cream sm:w-auto'}
-    >
-      {syncing ? (
-        <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          {label}
-        </>
-      ) : justSynced ? (
-        <>
-          <Check className="mr-2 h-4 w-4" />
-          {label}
-        </>
-      ) : (
-        <>
-          <Calendar className="mr-2 h-4 w-4" />
-          {label}
-        </>
-      )}
-    </Button>
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleClick}
+        disabled={busy}
+        className={className || 'w-full border-brand-charcoal text-brand-charcoal hover:bg-brand-cream sm:w-auto'}
+      >
+        <span className="mr-2">{icon}</span>
+        {label}
+      </Button>
+      {review}
+    </>
   );
 };
 
