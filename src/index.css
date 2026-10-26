@@ -676,6 +676,27 @@
 .u-recipient-card:active,
 .u-catalog-card:active { transform: scale(.985); }
 
+/* Shared interaction feedback (CU-10). Press and hover use transform/opacity only, hover is
+   for real pointers so touch works on the first tap, and keyboard focus is always visible. */
+.u-press {
+  transition: transform 140ms ease, opacity 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.u-press:active:not(:disabled) { transform: scale(.97); }
+@media (hover: hover) and (pointer: fine) {
+  .u-press:hover:not(:disabled) { opacity: .9; }
+}
+.u-press:disabled { cursor: not-allowed; }
+.u-press[aria-busy="true"] { cursor: progress; }
+:where(button, a, select, input[type="checkbox"], [role="button"], [tabindex]):focus-visible {
+  outline: 2px solid #B65B3C;
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .u-press:active:not(:disabled) { transform: none; opacity: .8; }
+}
+
 @media (hover: hover) {
   .u-recipient-card:hover,
   .u-catalog-card:hover { transform: translateY(-2px); }
