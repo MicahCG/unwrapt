@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQuery } from '@tanstack/react-query';
@@ -36,7 +36,8 @@ const Dashboard = () => {
   const [showScheduleGift, setShowScheduleGift] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState(null);
   const [resumingGiftId, setResumingGiftId] = useState<string | null>(null);
-  const [recipientDetail, setRecipientDetail] = useState<RecipientRecord | null>(null);
+  // Held by id so the open sheet always shows the latest saved data.
+  const [recipientDetailId, setRecipientDetailId] = useState<string | null>(null);
   const [catalogRecipient, setCatalogRecipient] = useState<RecipientRecord | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
   const [showAddFunds, setShowAddFunds] = useState(false);
@@ -205,7 +206,7 @@ const Dashboard = () => {
   };
 
   const handleScheduleGift = (recipient: RecipientRecord) => {
-    setRecipientDetail(null);
+    setRecipientDetailId(null);
     const resumable = findResumableGift(recipient);
     if (resumable) {
       void resumeOrCollectAddress(resumable, recipient);
@@ -216,7 +217,7 @@ const Dashboard = () => {
   };
 
   const handleResumeGift = (gift: GiftRecord, recipient: RecipientRecord) => {
-    setRecipientDetail(null);
+    setRecipientDetailId(null);
     void resumeOrCollectAddress(gift, recipient);
   };
 
@@ -251,7 +252,7 @@ const Dashboard = () => {
   }, []);
 
   const handleOpenRecipient = (recipient: RecipientRecord) => {
-    setRecipientDetail(recipient);
+    setRecipientDetailId(recipient.id);
   };
 
   const handleOpenRecipientById = (recipientId: string, intent?: BriefingItem['action']) => {
@@ -276,26 +277,25 @@ const Dashboard = () => {
       }
     }
 
-    if (intent === 'address' || intent === 'interests') {
-      setActiveTab('manual');
-      if (intent === 'address') {
-        setEditingRecipient(recipient);
-        setShowEditRecipient(true);
-        return;
-      }
+    if (intent === 'address') {
+      // The edit form opens over whichever tab is active, so Thea's conversation stays put.
+      setEditingRecipient(recipient);
+      setShowEditRecipient(true);
+      return;
     }
+    if (intent === 'interests') setActiveTab('manual');
 
-    setRecipientDetail(recipient);
+    setRecipientDetailId(recipient.id);
   };
 
   const handleBrowseCatalog = (recipient?: RecipientRecord) => {
-    setRecipientDetail(null);
+    setRecipientDetailId(null);
     setCatalogRecipient(recipient || null);
     setShowCatalog(true);
   };
 
   const handleEditRecipient = (recipient: RecipientRecord) => {
-    setRecipientDetail(null);
+    setRecipientDetailId(null);
     setEditingRecipient(recipient);
     setShowEditRecipient(true);
   };
@@ -305,6 +305,10 @@ const Dashboard = () => {
   const planLabel = tier === 'vip' ? 'VIP' : (userProfile?.trial_ends_at ? 'Free trial' : 'Free');
 
   const typedRecipients = recipients as RecipientRecord[];
+  const recipientDetail = useMemo(
+    () => typedRecipients.find((r) => r.id === recipientDetailId) || null,
+    [typedRecipients, recipientDetailId],
+  );
   const autopilotThreshold = AUTOPILOT_THRESHOLDS[(userProfile as any)?.autopilot_level] ?? AUTOPILOT_THRESHOLDS.ask100;
 
   return (
@@ -376,7 +380,8 @@ const Dashboard = () => {
         </div>
 
         <div className="min-h-0 flex-1">
-          {activeTab === 'thea' ? (
+          {/* Both tabs stay mounted so switching never loses Thea's conversation or Manual's place. */}
+          <div className={activeTab === 'thea' ? 'h-full' : 'hidden'}>
             <TheaHomeTab
               displayName={displayName}
               recipients={typedRecipients}
@@ -384,7 +389,8 @@ const Dashboard = () => {
               onOpenRecipient={handleOpenRecipientById}
               onSwitchToManual={() => setActiveTab('manual')}
             />
-          ) : (
+          </div>
+          <div className={activeTab === 'manual' ? 'h-full' : 'hidden'}>
             <ManualHomeTab
               recipients={typedRecipients}
               autopilotThreshold={autopilotThreshold}
@@ -395,7 +401,7 @@ const Dashboard = () => {
               onBrowseCatalog={() => handleBrowseCatalog()}
               onAddFunds={() => setShowAddFunds(true)}
             />
-          )}
+          </div>
         </div>
       </MobileShell>
 
@@ -413,7 +419,7 @@ const Dashboard = () => {
       <RecipientDetailSheet
         recipient={recipientDetail}
         open={Boolean(recipientDetail)}
-        onOpenChange={(open) => { if (!open) setRecipientDetail(null); }}
+        onOpenChange={(open) => { if (!open) setRecipientDetailId(null); }}
         onSchedule={handleScheduleGift}
         onResumeGift={handleResumeGift}
         onEdit={handleEditRecipient}

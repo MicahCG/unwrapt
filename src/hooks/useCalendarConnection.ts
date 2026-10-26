@@ -30,6 +30,20 @@ type CalendarEvent = { category?: string; personName?: string; date?: string };
 
 const dateOnly = (date: string | null | undefined) => (date ? date.split('T')[0] : null);
 
+/** Whether this user has a live Google Calendar connection (shared cache across screens). */
+export function useCalendarConnected() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['calendar-connection', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_my_calendar_integration');
+      if (error || !data?.length) return false;
+      return data[0]?.is_connected ?? false;
+    },
+    enabled: !!user,
+  });
+}
+
 // Several buttons can mount at once; only one should act on the OAuth return.
 let oauthReturnHandled = false;
 
@@ -44,15 +58,7 @@ export function useCalendarConnection(returnTo = '/?tab=manual') {
   const [searchParams, setSearchParams] = useSearchParams();
   const [status, setStatus] = useState<CalendarStatus>({ kind: 'idle' });
 
-  const { data: isConnected = false, isLoading: checkingConnection } = useQuery({
-    queryKey: ['calendar-connection', user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_my_calendar_integration');
-      if (error || !data?.length) return false;
-      return data[0]?.is_connected ?? false;
-    },
-    enabled: !!user,
-  });
+  const { data: isConnected = false, isLoading: checkingConnection } = useCalendarConnected();
 
   const connect = useCallback(async () => {
     setStatus({ kind: 'connecting' });
