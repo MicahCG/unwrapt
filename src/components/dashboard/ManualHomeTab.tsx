@@ -13,13 +13,10 @@ import { buildDashboardBriefing } from '@/lib/dashboardBriefing';
 
 interface ManualHomeTabProps {
   recipients: RecipientRecord[];
-  tier: 'free' | 'vip';
-  walletBalance?: number | null;
   autopilotThreshold?: number;
   onOpenRecipient: (recipient: RecipientRecord) => void;
   onAddRecipient: () => void;
   onBrowseCatalog: () => void;
-  onAddFunds: () => void;
 }
 
 const sameDay = (a: Date, b: Date) =>
@@ -27,13 +24,10 @@ const sameDay = (a: Date, b: Date) =>
 
 const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
   recipients,
-  tier,
-  walletBalance,
   autopilotThreshold,
   onOpenRecipient,
   onAddRecipient,
   onBrowseCatalog,
-  onAddFunds,
 }) => {
   const navigate = useNavigate();
   const today = useMemo(() => {
@@ -44,6 +38,12 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
   const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const briefing = useMemo(() => buildDashboardBriefing(recipients, autopilotThreshold), [recipients, autopilotThreshold]);
+  // The one thing to do next for each person, shown on their card.
+  const nextTask = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const item of briefing.needsInfo) if (!map.has(item.recipientId)) map.set(item.recipientId, item.label);
+    return map;
+  }, [briefing]);
 
   const occasionDays = useMemo(() => {
     const map = new Map<string, { recipient: RecipientRecord; label: string }[]>();
@@ -305,6 +305,11 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
                         ) : (
                           <div className="text-[12.5px]" style={{ color: U.muted }}>No date set</div>
                         )}
+                        {nextTask.get(recipient.id) && (
+                          <div className="mt-0.5 truncate text-[12px] font-semibold" style={{ color: U.accent }}>
+                            Next: {nextTask.get(recipient.id)}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
@@ -343,19 +348,6 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
         )}
       </section>
 
-      {tier === 'vip' && walletBalance != null && (
-        <button
-          type="button"
-          onClick={onAddFunds}
-          className="flex items-center justify-between rounded-[16px] px-4 py-3.5"
-          style={{ background: U.chip }}
-        >
-          <span className="text-[13px]" style={{ color: '#5A5147' }}>Gift wallet</span>
-          <span className="font-mono text-[14px] font-medium">
-            ${walletBalance.toFixed(2)} · Add funds
-          </span>
-        </button>
-      )}
     </div>
   );
 };

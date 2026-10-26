@@ -14,13 +14,14 @@ import { VIPWelcomeModal } from '@/components/onboarding/VIPWelcomeModal';
 import { MobileShell } from '@/components/unwrapt2/MobileShell';
 import { TheaAvatar } from '@/components/unwrapt2/TheaAvatar';
 import { ApprovalScreen } from '@/components/unwrapt2/ApprovalScreen';
-import { U, initialsOf } from '@/components/unwrapt2/theme';
+import { U } from '@/components/unwrapt2/theme';
 import RecipientDetailSheet from '@/components/RecipientDetailSheet';
 import CatalogPreviewSheet from '@/components/CatalogPreviewSheet';
 import { type RecipientRecord, type GiftRecord } from '@/lib/giftStatus';
 import { findResumableGift, resumeGiftPayment, hasCompleteShippingAddress } from '@/lib/giftPayment';
 import TheaHomeTab from '@/components/dashboard/TheaHomeTab';
 import ManualHomeTab from '@/components/dashboard/ManualHomeTab';
+import AccountMenu from '@/components/dashboard/AccountMenu';
 import { AUTOPILOT_THRESHOLDS, type BriefingItem } from '@/lib/dashboardBriefing';
 
 type DashboardTab = 'thea' | 'manual';
@@ -368,15 +369,15 @@ const Dashboard = () => {
           <div className="font-mono text-[9px] uppercase tracking-[1px]" style={{ color: U.accent, border: '1px solid rgba(182,91,60,0.4)', padding: '3px 7px', borderRadius: 8 }}>
             {planLabel}
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/settings')}
-            className="flex cursor-pointer items-center justify-center"
-            style={{ width: 34, height: 34, borderRadius: '50%', background: '#E5DBC6', fontFamily: "'Newsreader', serif", fontStyle: 'italic', fontSize: 15, color: '#5A5147' }}
-            aria-label="Open settings"
-          >
-            {initialsOf(displayName).charAt(0)}
-          </button>
+          <AccountMenu
+            displayName={displayName}
+            planLabel={planLabel}
+            tier={tier}
+            walletBalance={userProfile?.gift_wallet_balance}
+            autopilotThreshold={autopilotThreshold}
+            onAddFunds={() => setShowAddFunds(true)}
+            onOpenSettings={() => navigate('/settings')}
+          />
         </div>
 
         <div className="min-h-0 flex-1">
@@ -394,12 +395,9 @@ const Dashboard = () => {
             <ManualHomeTab
               recipients={typedRecipients}
               autopilotThreshold={autopilotThreshold}
-              tier={tier}
-              walletBalance={userProfile?.gift_wallet_balance}
               onOpenRecipient={handleOpenRecipient}
               onAddRecipient={() => setShowAddRecipient(true)}
               onBrowseCatalog={() => handleBrowseCatalog()}
-              onAddFunds={() => setShowAddFunds(true)}
             />
           </div>
         </div>
