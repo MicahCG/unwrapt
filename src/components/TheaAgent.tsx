@@ -3,6 +3,8 @@ import { CalendarDays, ChevronRight, Gift, Heart, Send, Settings, Sparkles, User
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { TheaAvatar } from '@/components/unwrapt2/TheaAvatar';
+import { TheaCharacter } from '@/components/unwrapt2/TheaCharacter';
+import { useTheaReaction } from '@/hooks/useTheaReaction';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { trackProductEvent } from '@/lib/productAnalytics';
 import { TheaContextValue, type TheaContext } from '@/hooks/useThea';
@@ -125,6 +127,7 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatProducts, setChatProducts] = useState<ThreadProduct[]>([]);
   const [sending, setSending] = useState(false);
+  const { reaction, reactTo } = useTheaReaction();
   const [hasGiftVisuals, setHasGiftVisuals] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeDismissed, setUpgradeDismissed] = useState(() => isTheaUpgradeDismissed());
@@ -261,6 +264,7 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     stickToBottomRef.current = true;
     const nextMessages: ChatMessage[] = [...chatMessages, { role: 'user', content: text }];
+    reactTo(text);
     setChatMessages(nextMessages);
     setQuestion('');
     setSending(true);
@@ -352,7 +356,13 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
           <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-[#2A2520]/15" />
           <SheetHeader className="text-left">
             <div className="flex items-center gap-3">
-              <TheaAvatar size={48} />
+              <TheaCharacter
+                size="compact"
+                pose={sending ? 'thinking' : 'basic'}
+                reaction={reaction}
+                speaking={false}
+                className="u-thea-character--chat !mx-0 !w-auto shrink-0"
+              />
               <div>
                 <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#B65B3C]">Your gifting agent</div>
                 <SheetTitle className="font-display text-[28px] font-normal text-[#2A2520]">Ask Thea</SheetTitle>
