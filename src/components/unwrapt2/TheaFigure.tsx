@@ -204,12 +204,20 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
         </g>
 
         {pose === 'welcome' && (
-          <g className="u-thea__wave">
-            <path d="M262 400 Q298 350 314 284" stroke="#f6e4c9" strokeWidth="46" strokeLinecap="round" fill="none" />
-            <path d="M296 302 Q314 296 330 304" stroke="#ead2b2" strokeWidth="4.5" strokeLinecap="round" fill="none" />
-            <circle cx="318" cy="268" r="25" fill="#eaa27a" />
-            <path d="M302 252 Q300 240 308 236 M314 246 Q314 234 322 232 M326 250 Q330 240 337 242" stroke="#eaa27a" strokeWidth="10" strokeLinecap="round" fill="none" />
-          </g>
+          <>
+            {/* Upper arm drops from the shoulder to an elbow just outside her body; a soft
+                outline keeps each segment readable against the sweater */}
+            <path d="M262 332 Q308 338 334 374" stroke="#e6cfab" strokeWidth="44" strokeLinecap="round" fill="none" />
+            <path d="M262 332 Q308 338 334 374" stroke="#f6e4c9" strokeWidth="38" strokeLinecap="round" fill="none" />
+            {/* Forearm and hand wave from the elbow */}
+            <g className="u-thea__wave">
+              <path d="M334 374 Q334 330 326 292" stroke="#e6cfab" strokeWidth="40" strokeLinecap="round" fill="none" />
+              <path d="M334 374 Q334 330 326 292" stroke="#f6e4c9" strokeWidth="34" strokeLinecap="round" fill="none" />
+              <path d="M311 302 Q326 296 342 302" stroke="#e6cfab" strokeWidth="4.5" strokeLinecap="round" fill="none" />
+              <circle cx="325" cy="272" r="23" fill="#eaa27a" />
+              <path d="M310 256 Q307 244 315 239 M322 250 Q322 238 330 236 M334 254 Q338 244 345 246" stroke="#eaa27a" strokeWidth="9.5" strokeLinecap="round" fill="none" />
+            </g>
+          </>
         )}
 
         {pose === 'thinking' && (
