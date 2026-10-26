@@ -98,6 +98,13 @@ payment" item from `dashboardBriefing.ts` already does). If product work
 wants Thea to also kick off payment inline, that's a scoped follow-up to
 discuss, not something silently bundled in here.
 
+### Response field: `review` (added for the Cursor review card)
+
+When `select_gift` produced a review this turn, the chat response also carries it as a
+top-level `review` (same shape as `select_gift`'s `review` above), otherwise `review: null`.
+The app renders it as a review card whose Confirm action sends an explicit confirmation
+message; confirmation itself is still verified server-side against the persisted marker.
+
 ### CC-01/CC-07: recipient tools
 
 `get_recipients` (read) returns each recipient's id, name, relationship,
