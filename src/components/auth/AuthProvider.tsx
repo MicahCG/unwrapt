@@ -1,10 +1,11 @@
-
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { ErrorHandler } from '@/utils/errorHandler';
 import { rateLimiter, RATE_LIMITS } from '@/utils/rateLimiter';
+import { appOrigin, isNativeApp } from '@/lib/native';
+import { openExternalAuthUrl } from '@/lib/nativeBootstrap';
+import { logoutIapUser } from '@/lib/iap';
 
 interface AuthContextType {
   user: User | null;
@@ -147,37 +148,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log('🔧 AuthProvider: Starting Google sign in');
 
-      // Determine redirect URL based on environment
+      // Native + web: always return to app.unwrapt.io for Universal Links /
+      // custom URL scheme handoff into the Capacitor shell.
       let redirectUrl: string;
-      if (window.location.hostname === 'localhost') {
-        // Development: redirect to localhost
+      if (isNativeApp()) {
+        redirectUrl = `${appOrigin()}/`;
+      } else if (window.location.hostname === 'localhost') {
         redirectUrl = `http://localhost:${window.location.port || '8080'}/`;
       } else if (window.location.hostname === 'unwrapt.io') {
-        // Marketing site: redirect to app subdomain
         redirectUrl = 'https://app.unwrapt.io/';
       } else {
-        // App subdomain or other: redirect to same origin
         redirectUrl = `${window.location.origin}/`;
       }
 
       console.log('🔧 AuthProvider: OAuth redirect URL:', redirectUrl);
 
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
+          skipBrowserRedirect: isNativeApp(),
         },
       });
-      
+
       if (error) {
         console.error('🔧 AuthProvider: Error signing in with Google:', error);
-        // Check for rate limit error
         if (error.message?.includes('rate limit') || error.status === 429) {
           setIsRateLimited(true);
           setTimeout(() => setIsRateLimited(false), 60000);
           throw new Error('Too many authentication attempts. Please wait a minute and try again.');
         }
         throw error;
+      }
+
+      if (isNativeApp() && data?.url) {
+        await openExternalAuthUrl(data.url);
       }
     } catch (error: any) {
       const friendlyMessage = ErrorHandler.handleAuthError(error, user?.id);
@@ -206,6 +211,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('🔧 AuthProvider: Could not clear local session storage:', storageError);
     }
     setUser(null);
+    void logoutIapUser();
 
     // Don't await the network round trip (it's what was causing Sign out to
     // appear to do nothing until the user also hit "Done" - the call can

@@ -50,15 +50,14 @@ const CalendarOAuthCallback: React.FC = () => {
           description: error,
           variant: "destructive"
         });
-        // Redirect back to app
-        window.location.href = 'https://app.unwrapt.io';
+        window.location.href = `${window.location.origin}/`;
         return;
       }
 
       if (!code) {
         console.log('📅 CalendarOAuthCallback: No code received, redirecting...');
         setHasProcessed(true);
-        window.location.href = 'https://app.unwrapt.io';
+        window.location.href = `${window.location.origin}/`;
         return;
       }
 
@@ -87,7 +86,7 @@ const CalendarOAuthCallback: React.FC = () => {
             description: "Please log in again to connect your calendar.",
             variant: "destructive"
           });
-          window.location.href = 'https://app.unwrapt.io';
+          window.location.href = `${window.location.origin}/`;
           return;
         }
       }
@@ -108,9 +107,11 @@ const CalendarOAuthCallback: React.FC = () => {
         console.log('📅 CalendarOAuthCallback: Exchanging authorization code...');
         let redirectUri = `${window.location.origin}/auth/calendar/callback`;
         try {
-          redirectUri = sessionStorage.getItem('unwrapt_calendar_redirect_uri') || redirectUri;
+          redirectUri =
+            sessionStorage.getItem('unwrapt_calendar_redirect_uri') ||
+            'https://app.unwrapt.io/auth/calendar/callback';
         } catch {
-          /* ignore */
+          redirectUri = 'https://app.unwrapt.io/auth/calendar/callback';
         }
 
         const { data: tokenData, error: tokenError } = await supabase.functions.invoke('google-calendar', {
@@ -166,7 +167,7 @@ const CalendarOAuthCallback: React.FC = () => {
           description: errorMessage,
           variant: "destructive"
         });
-        window.location.href = 'https://app.unwrapt.io';
+        window.location.href = `${window.location.origin}/`;
       } finally {
         setIsProcessing(false);
       }

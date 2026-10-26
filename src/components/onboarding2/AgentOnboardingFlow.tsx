@@ -14,7 +14,7 @@ import { trackProductEvent } from '@/lib/productAnalytics';
 import GachaReveal from '@/components/onboarding2/GachaReveal';
 import StrongGiftPicks from '@/components/onboarding2/StrongGiftPicks';
 import { clearSkipAgentWelcome, markTheaValueSeen, shouldSkipAgentWelcome } from '@/lib/funnel';
-import { VIP_MONTHLY_AMOUNT_LABEL, VIP_MONTHLY_PRICE_ID } from '@/lib/stripe';
+import { VIP_MONTHLY_AMOUNT_LABEL } from '@/lib/stripe';
 import { type GiftAskUserOffer, type GiftCatalogItem } from '@/lib/giftCatalog';
 import {
   STARTER_CATEGORIES,
@@ -519,7 +519,9 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     }
 
     setConnecting(true);
-    const redirectUri = `${window.location.origin}/auth/calendar/callback`;
+    const { appOrigin, isNativeApp } = await import('@/lib/native');
+    const { openExternalAuthUrl } = await import('@/lib/nativeBootstrap');
+    const redirectUri = `${appOrigin()}/auth/calendar/callback`;
 
     try {
       try {
@@ -572,8 +574,12 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         throw new Error('No authorization URL returned. Please try again.');
       }
 
-      // Full navigation — keep connecting=true until the page unloads.
-      window.location.assign(authUrl);
+      if (isNativeApp()) {
+        await openExternalAuthUrl(authUrl);
+        setConnecting(false);
+      } else {
+        window.location.assign(authUrl);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to connect calendar';
       toast({ title: 'Connection failed', description: message, variant: 'destructive' });
@@ -950,12 +956,21 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         people_count: selectedPeople.length,
       });
 
-      const response = await supabase.functions.invoke('create-subscription-checkout', {
-        body: { priceId: VIP_MONTHLY_PRICE_ID, planType: 'vip_monthly' },
-      });
-      if (response.error) throw response.error;
-      if (!response.data?.url) throw new Error('No checkout URL returned');
-      window.location.href = response.data.url;
+      const { purchaseVipSubscription } = await import('@/lib/iap');
+      const result = await purchaseVipSubscription();
+      if (result.cancelled) {
+        setCompleting(false);
+        setStartingCheckout(false);
+        await onComplete();
+        return;
+      }
+      if (!result.success) throw new Error(result.error || 'Checkout failed');
+      if (result.checkoutUrl) {
+        window.location.href = result.checkoutUrl;
+        return;
+      }
+      // Native IAP — VIP granted; leave onboarding
+      window.location.href = '/';
     } catch (error) {
       console.error('Error completing onboarding:', error);
       toast({

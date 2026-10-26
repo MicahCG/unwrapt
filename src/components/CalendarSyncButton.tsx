@@ -53,7 +53,10 @@ const CalendarSyncButton = ({ className, appearance = 'default' }: CalendarSyncB
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('No active session found');
 
-      const redirectUri = `${window.location.origin}/auth/calendar/callback`;
+      const { appOrigin, isNativeApp } = await import('@/lib/native');
+      const { openExternalAuthUrl } = await import('@/lib/nativeBootstrap');
+      // Always use HTTPS callback so Google OAuth + Universal Links work in the iOS shell
+      const redirectUri = `${appOrigin()}/auth/calendar/callback`;
       try {
         sessionStorage.setItem(REDIRECT_URI_KEY, redirectUri);
         sessionStorage.setItem(RETURN_TO_KEY, '/?tab=manual&syncCalendar=1');
@@ -68,7 +71,11 @@ const CalendarSyncButton = ({ className, appearance = 'default' }: CalendarSyncB
 
       if (authError) throw new Error(authError.message || 'Failed to get authorization URL');
       if (authData?.authUrl) {
-        window.location.href = authData.authUrl;
+        if (isNativeApp()) {
+          await openExternalAuthUrl(authData.authUrl);
+        } else {
+          window.location.href = authData.authUrl;
+        }
       }
     } catch (error) {
       console.error('Calendar connection error:', error);

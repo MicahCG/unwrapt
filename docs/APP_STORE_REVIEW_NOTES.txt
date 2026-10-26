@@ -1,0 +1,23 @@
+Unwrapt — App Review Notes
+
+WHAT THE APP DOES
+Unwrapt is a personal gifting assistant. Users add the people they care about, optionally connect Google Calendar to import birthdays and anniversaries, and subscribe to VIP so Thea (our agent) can watch occasions and recommend gifts.
+
+DEMO LOGIN
+Sign in with Google using the reviewer account we provide in App Store Connect Notes (or request via App Review reply). After sign-in, complete or skip onboarding as needed. VIP can be purchased with a Sandbox Apple ID.
+
+SUBSCRIPTIONS (IAP)
+Digital VIP membership is sold only via Apple In-App Purchase:
+  Product ID: unwrapt_vip_monthly
+  Type: Auto-renewable monthly subscription
+  Price: $4.99/month
+Managed through RevenueCat + StoreKit. “Restore purchases” is available on the paywall.
+
+PHYSICAL GOODS
+When ordering/shipping a physical gift, payment uses Stripe. That charge is for a physical product, not digital content. VIP access itself is IAP-only inside the iOS app.
+
+CALENDAR
+Optional. Connect Google Calendar to import birthdays/anniversaries. We request calendar-related access only for that purpose.
+
+ACCOUNT DELETION
+Settings → Account includes a delete-account request flow.

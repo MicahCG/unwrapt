@@ -52,12 +52,21 @@ export const SubscriptionManagement = () => {
     setIsLoading(true);
 
     try {
+      const { isNativeApp } = await import('@/lib/native');
+      if (isNativeApp()) {
+        // IAP subscribers manage billing in Apple's subscription settings
+        const { Browser } = await import('@capacitor/browser');
+        await Browser.open({
+          url: 'https://apps.apple.com/account/subscriptions',
+        });
+        setIsLoading(false);
+        return;
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error('Not authenticated');
       }
-
-      console.log('Opening Stripe customer portal...');
 
       const response = await supabase.functions.invoke('create-portal-session', {
         body: {},
@@ -69,7 +78,6 @@ export const SubscriptionManagement = () => {
       }
 
       if (response.data?.url) {
-        // Redirect to Stripe customer portal
         window.location.href = response.data.url;
       } else {
         throw new Error('No portal URL returned');
@@ -78,7 +86,10 @@ export const SubscriptionManagement = () => {
       console.error('Error opening portal:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to open subscription management. Please try again.',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Failed to open subscription management. Please try again.',
         variant: 'destructive',
       });
       setIsLoading(false);

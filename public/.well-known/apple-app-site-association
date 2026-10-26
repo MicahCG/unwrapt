@@ -1,0 +1,21 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAMID.io.unwrapt.app",
+        "paths": [
+          "*",
+          "/",
+          "/auth/*",
+          "/auth/calendar/callback",
+          "/payment-success",
+          "/onboarding"
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["TEAMID.io.unwrapt.app"]
+  }
+}

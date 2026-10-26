@@ -6,7 +6,9 @@ import { trackProductEvent } from '@/lib/productAnalytics';
 import { MobileShell, Display, PrimaryButton, Eyebrow } from '@/components/unwrapt2/MobileShell';
 import { TheaCharacter } from '@/components/unwrapt2/TheaCharacter';
 import { U } from '@/components/unwrapt2/theme';
-import { VIP_MONTHLY_AMOUNT_LABEL, VIP_MONTHLY_PRICE_ID } from '@/lib/stripe';
+import { VIP_MONTHLY_AMOUNT_LABEL } from '@/lib/stripe';
+import { purchaseVipSubscription, restoreVipPurchases } from '@/lib/iap';
+import { isNativeApp } from '@/lib/native';
 
 /**
  * Hard paywall for users who finished onboarding but have not subscribed.
@@ -15,22 +17,46 @@ import { VIP_MONTHLY_AMOUNT_LABEL, VIP_MONTHLY_PRICE_ID } from '@/lib/stripe';
 const SubscribeGate: React.FC = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const native = isNativeApp();
 
   const startCheckout = async () => {
     setLoading(true);
     try {
-      void trackProductEvent('subscribe_gate_checkout_started', {});
-      const response = await supabase.functions.invoke('create-subscription-checkout', {
-        body: { priceId: VIP_MONTHLY_PRICE_ID, planType: 'vip_monthly' },
-      });
-      if (response.error) throw response.error;
-      if (!response.data?.url) throw new Error('No checkout URL returned');
-      window.location.href = response.data.url;
+      void trackProductEvent('subscribe_gate_checkout_started', { platform: native ? 'ios' : 'web' });
+      const result = await purchaseVipSubscription();
+      if (result.cancelled) {
+        setLoading(false);
+        return;
+      }
+      if (!result.success) throw new Error(result.error || 'Checkout failed');
+      if (result.checkoutUrl) {
+        window.location.href = result.checkoutUrl;
+        return;
+      }
+      // Native IAP succeeded — reload so RequirePaid sees VIP
+      window.location.href = '/';
     } catch (error) {
       console.error('SubscribeGate checkout failed:', error);
       toast({
-        title: 'Couldn’t open checkout',
-        description: 'Please try again in a moment.',
+        title: native ? 'Couldn’t complete purchase' : 'Couldn’t open checkout',
+        description: error instanceof Error ? error.message : 'Please try again in a moment.',
+        variant: 'destructive',
+      });
+      setLoading(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    setLoading(true);
+    try {
+      const result = await restoreVipPurchases();
+      if (!result.success) throw new Error(result.error || 'Nothing to restore');
+      toast({ title: 'Purchases restored', description: 'Welcome back to VIP.' });
+      window.location.href = '/';
+    } catch (error) {
+      toast({
+        title: 'Restore failed',
+        description: error instanceof Error ? error.message : 'No active subscription found.',
         variant: 'destructive',
       });
       setLoading(false);
@@ -44,12 +70,27 @@ const SubscribeGate: React.FC = () => {
       footer={
         <>
           <PrimaryButton onClick={startCheckout} disabled={loading}>
-            {loading ? 'Opening checkout…' : `Start automating · ${VIP_MONTHLY_AMOUNT_LABEL}/month`}
+            {loading
+              ? native
+                ? 'Starting purchase…'
+                : 'Opening checkout…'
+              : `Start automating · ${VIP_MONTHLY_AMOUNT_LABEL}/month`}
           </PrimaryButton>
           <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-[11.5px]" style={{ color: U.muted }}>
             <ShieldCheck size={13} aria-hidden="true" />
-            Secure Stripe checkout · cancel anytime
+            {native ? 'App Store subscription · cancel anytime' : 'Secure Stripe checkout · cancel anytime'}
           </p>
+          {native && (
+            <button
+              type="button"
+              className="mt-2 min-h-11 w-full text-[13px] font-semibold"
+              style={{ color: U.textSecondary }}
+              disabled={loading}
+              onClick={handleRestore}
+            >
+              Restore purchases
+            </button>
+          )}
           <button
             type="button"
             className="mt-3 min-h-11 w-full text-[13px] font-semibold"

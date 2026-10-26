@@ -26,6 +26,9 @@ export default defineConfig(({ mode }) => ({
       'Referrer-Policy': 'strict-origin-when-cross-origin'
     }
   },
+  // Relative asset URLs only for the Capacitor bundle (`--mode capacitor`). The web deploy
+  // rewrites every path to index.html, so relative URLs would break nested routes there.
+  base: mode === "capacitor" ? "./" : "/",
   build: {
     rollupOptions: {
       output: {

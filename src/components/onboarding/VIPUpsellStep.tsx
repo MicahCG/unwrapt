@@ -34,26 +34,24 @@ const VIPUpsellStep: React.FC<VIPUpsellStepProps> = ({
   const handleUpgrade = async () => {
     setIsLoading(true);
     try {
-      // Create checkout session for VIP subscription
-      const { data, error } = await supabase.functions.invoke('create-subscription-checkout', {
-        body: {
-          tier: 'vip',
-          returnUrl: `${window.location.origin}/payment-success?type=subscription`
-        }
-      });
-
-      if (error) throw error;
-
-      if (data?.url) {
-        // Store a flag to indicate this is from onboarding
-        localStorage.setItem('onboardingUpgradeFlow', 'true');
-        window.location.href = data.url;
+      const { purchaseVipSubscription } = await import('@/lib/iap');
+      localStorage.setItem('onboardingUpgradeFlow', 'true');
+      const result = await purchaseVipSubscription();
+      if (result.cancelled) {
+        setIsLoading(false);
+        return;
       }
+      if (!result.success) throw new Error(result.error || 'Checkout failed');
+      if (result.checkoutUrl) {
+        window.location.href = result.checkoutUrl;
+        return;
+      }
+      onUpgrade();
     } catch (error) {
       console.error('Error creating checkout:', error);
       toast({
         title: "Error",
-        description: "There was a problem starting the upgrade. Please try again.",
+        description: error instanceof Error ? error.message : "There was a problem starting the upgrade. Please try again.",
         variant: "destructive"
       });
       setIsLoading(false);

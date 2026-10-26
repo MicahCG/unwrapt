@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Crown, Loader2, Zap, Users, Calendar, Wallet } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { VIP_MONTHLY_PRICE_ID } from '@/lib/stripe';
+import { purchaseVipSubscription } from '@/lib/iap';
 
 interface VIPUpgradeModalProps {
   isOpen: boolean;
@@ -24,26 +24,23 @@ export const VIPUpgradeModal = ({ isOpen, onClose }: VIPUpgradeModalProps) => {
         throw new Error('Not authenticated');
       }
 
-      const response = await supabase.functions.invoke('create-subscription-checkout', {
-        body: {
-          priceId: VIP_MONTHLY_PRICE_ID,
-          planType: 'vip_monthly',
-        },
-      });
-
-      if (response.error) throw response.error;
-
-      // Redirect to Stripe Checkout
-      if (response.data?.url) {
-        window.location.href = response.data.url;
-      } else {
-        throw new Error('No checkout URL returned');
+      const result = await purchaseVipSubscription();
+      if (result.cancelled) {
+        setIsProcessing(false);
+        return;
       }
+      if (!result.success) throw new Error(result.error || 'Checkout failed');
+      if (result.checkoutUrl) {
+        window.location.href = result.checkoutUrl;
+        return;
+      }
+      onClose();
+      window.location.reload();
     } catch (error) {
       console.error('Error creating checkout:', error);
       toast({
         title: 'Error',
-        description: 'Failed to start checkout process. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to start checkout process. Please try again.',
         variant: 'destructive',
       });
       setIsProcessing(false);
