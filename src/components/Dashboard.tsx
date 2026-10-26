@@ -23,6 +23,7 @@ import TheaHomeTab from '@/components/dashboard/TheaHomeTab';
 import ManualHomeTab from '@/components/dashboard/ManualHomeTab';
 import AccountMenu from '@/components/dashboard/AccountMenu';
 import { AUTOPILOT_THRESHOLDS, type BriefingItem } from '@/lib/dashboardBriefing';
+import type { GiftCatalogItem } from '@/lib/giftCatalog';
 
 type DashboardTab = 'thea' | 'manual';
 
@@ -47,6 +48,7 @@ const Dashboard = () => {
   const [showEditRecipient, setShowEditRecipient] = useState(false);
   const [editingRecipient, setEditingRecipient] = useState<any>(null);
   const [approval, setApproval] = useState<{ gift: any; recipient: any } | null>(null);
+  const [theaQueue, setTheaQueue] = useState<{ id: number; text: string } | null>(null);
 
   const tabParam = searchParams.get('tab');
   const activeTab: DashboardTab = tabParam === 'manual' ? 'manual' : 'thea';
@@ -295,6 +297,14 @@ const Dashboard = () => {
     setShowCatalog(true);
   };
 
+  // A gift picked in the catalog goes to Thea, who builds the review to confirm.
+  const handleCatalogSelect = (product: GiftCatalogItem) => {
+    setShowCatalog(false);
+    setActiveTab('thea');
+    const forWhom = catalogRecipient ? ` for ${catalogRecipient.name}` : '';
+    setTheaQueue({ id: Date.now(), text: `I'd like the ${product.name} (product ${product.id})${forWhom}.` });
+  };
+
   const handleEditRecipient = (recipient: RecipientRecord) => {
     setRecipientDetailId(null);
     setEditingRecipient(recipient);
@@ -389,6 +399,7 @@ const Dashboard = () => {
               autopilotThreshold={autopilotThreshold}
               onOpenRecipient={handleOpenRecipientById}
               onSwitchToManual={() => setActiveTab('manual')}
+              queuedMessage={theaQueue}
             />
           </div>
           <div className={activeTab === 'manual' ? 'h-full' : 'hidden'}>
@@ -428,6 +439,7 @@ const Dashboard = () => {
         onOpenChange={setShowCatalog}
         recipientName={catalogRecipient?.name}
         interests={catalogRecipient?.interests || []}
+        onSelect={handleCatalogSelect}
       />
       {showAddFunds && userProfile && (
         <AddFundsModal isOpen={showAddFunds} onClose={() => setShowAddFunds(false)} currentBalance={userProfile.gift_wallet_balance || 0} />

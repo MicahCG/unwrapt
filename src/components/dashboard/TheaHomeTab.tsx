@@ -81,6 +81,8 @@ interface TheaHomeTabProps {
   autopilotThreshold?: number;
   onOpenRecipient: (recipientId: string, intent?: BriefingItem['action']) => void;
   onSwitchToManual: () => void;
+  /** A message another screen asks Thea to handle (e.g. a gift chosen in the catalog). */
+  queuedMessage?: { id: number; text: string } | null;
 }
 
 const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
@@ -89,6 +91,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   autopilotThreshold,
   onOpenRecipient,
   onSwitchToManual,
+  queuedMessage,
 }) => {
   const queryClient = useQueryClient();
   const briefing = useMemo(() => buildDashboardBriefing(recipients, autopilotThreshold), [recipients, autopilotThreshold]);
@@ -212,6 +215,17 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
       setSending(false);
     }
   };
+
+  // Send a handed-off message once Thea is ready (history loaded, nothing in flight).
+  const handledQueue = useRef<number | null>(null);
+  useEffect(() => {
+    if (!queuedMessage || handledQueue.current === queuedMessage.id) return;
+    if (history === 'loading' || sending) return;
+    handledQueue.current = queuedMessage.id;
+    void send(queuedMessage.text);
+    // send is recreated each render; the queue id guards against repeats.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queuedMessage, history, sending]);
 
   const retry = (index: number) => {
     const failed = messages[index];

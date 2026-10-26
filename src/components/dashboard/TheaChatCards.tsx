@@ -33,7 +33,7 @@ export type ReviewState = 'pending' | 'confirming' | 'scheduled';
 const money = (price: number, currency = 'USD') =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: price % 1 ? 2 : 0 }).format(price);
 
-const ProductImage: React.FC<{ src: string | null; className: string }> = ({ src, className }) => {
+export const ProductImage: React.FC<{ src: string | null; className: string }> = ({ src, className }) => {
   const [broken, setBroken] = useState(false);
   return (
     <div className={`${className} flex items-center justify-center overflow-hidden bg-[#EFE7DA]`}>
