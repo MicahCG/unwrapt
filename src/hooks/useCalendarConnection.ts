@@ -60,10 +60,10 @@ export function useCalendarConnection(returnTo = '/?tab=manual') {
 
   const { data: isConnected = false, isLoading: checkingConnection } = useCalendarConnected();
 
-  const connect = useCallback(async () => {
+  const connect = useCallback(async (options: { chooseAccount?: boolean } = {}) => {
     setStatus({ kind: 'connecting' });
     try {
-      await startCalendarConnect(returnTo);
+      await startCalendarConnect(returnTo, options);
     } catch (error) {
       setStatus({ kind: 'failed', message: error instanceof Error ? error.message : 'Could not reach Google.' });
     }

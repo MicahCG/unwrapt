@@ -59,8 +59,15 @@ export function withCalendarResult(path: string, result: CalendarResult): string
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
+/** Forces Google's account chooser, for connecting a different calendar than last time. */
+export function withAccountPicker(authUrl: string): string {
+  const url = new URL(authUrl);
+  url.searchParams.set('prompt', 'select_account consent');
+  return url.toString();
+}
+
 /** Sends the user to Google's consent screen, remembering where to come back to. */
-export async function startCalendarConnect(returnTo: string): Promise<void> {
+export async function startCalendarConnect(returnTo: string, options: { chooseAccount?: boolean } = {}): Promise<void> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new CalendarError('Please sign in again to connect your calendar.', 'unauthorized');
 
@@ -81,6 +88,7 @@ export async function startCalendarConnect(returnTo: string): Promise<void> {
   });
   if (error || !data?.authUrl) throw await toCalendarError(error, data);
 
-  if (isNativeApp()) await openExternalAuthUrl(data.authUrl);
-  else window.location.href = data.authUrl;
+  const authUrl = options.chooseAccount ? withAccountPicker(data.authUrl) : data.authUrl;
+  if (isNativeApp()) await openExternalAuthUrl(authUrl);
+  else window.location.href = authUrl;
 }

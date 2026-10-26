@@ -136,6 +136,9 @@ const CalendarSyncButton = ({ className, appearance = 'default', onAddManually }
               {onAddManually && (status.kind === 'cancelled' || status.kind === 'failed' || status.kind === 'no_events' || status.kind === 'expired') && (
                 <button type="button" onClick={onAddManually} className="min-h-8 font-semibold text-[#B65B3C]">Add someone manually</button>
               )}
+              {(status.kind === 'failed' || status.kind === 'no_events' || status.kind === 'cancelled') && (
+                <button type="button" onClick={() => void connect({ chooseAccount: true })} className="min-h-8 font-semibold text-[#B65B3C]">Use a different Google account</button>
+              )}
               <button type="button" onClick={dismiss} className="min-h-8 font-semibold text-[#6B6256]">Dismiss</button>
             </div>
           </div>

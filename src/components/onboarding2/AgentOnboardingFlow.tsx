@@ -9,6 +9,7 @@ import { MobileShell, Eyebrow, PrimaryButton, Display } from '@/components/unwra
 import { PersonAvatar } from '@/components/unwrapt2/TheaAvatar';
 import { useTheaReaction } from '@/hooks/useTheaReaction';
 import { classifyUserReply } from '@/lib/theaReactions';
+import { withAccountPicker } from '@/lib/calendarConnection';
 import { TheaCharacter } from '@/components/unwrapt2/TheaCharacter';
 import { U, toneForIndex, initialsOf } from '@/components/unwrapt2/theme';
 import { format } from 'date-fns';
@@ -255,11 +256,13 @@ function ImportPromptScreen({
   connecting,
   onConnect,
   onAddManually,
+  onUseDifferentAccount,
   notice,
 }: {
   connecting: boolean;
   onConnect: () => void;
   onAddManually: () => void;
+  onUseDifferentAccount: () => void;
   /** What happened on the last calendar attempt, so a cancel or empty calendar is never a dead end. */
   notice: string | null;
 }) {
@@ -280,15 +283,17 @@ function ImportPromptScreen({
           <PrimaryButton onClick={onConnect} disabled={connecting || !ctaReady}>
             {connecting ? 'Connecting…' : notice ? 'Try Google Calendar again' : 'Connect Google Calendar'}
           </PrimaryButton>
-          <button
-            type="button"
-            onClick={onAddManually}
-            disabled={connecting}
-            className="u-press mt-1.5 min-h-11 w-full text-[13.5px] font-semibold disabled:opacity-50"
-            style={{ color: U.ink }}
-          >
-            Add someone myself
-          </button>
+          {!notice && (
+            <button
+              type="button"
+              onClick={onAddManually}
+              disabled={connecting}
+              className="u-press mt-1.5 min-h-11 w-full text-[13.5px] font-semibold disabled:opacity-50"
+              style={{ color: U.ink }}
+            >
+              Add someone myself
+            </button>
+          )}
           <p
             className="mt-3 flex items-center justify-center gap-1.5 text-center"
             style={{ color: U.muted, fontSize: 10.5, opacity: 0.55, letterSpacing: '0.02em' }}
@@ -300,7 +305,7 @@ function ImportPromptScreen({
       }
     >
       <StepPips step={1} />
-      <TheaCharacter size="large" pose="welcome" className="u-thea-character--greeting" />
+      <TheaCharacter size="large" pose={notice ? 'thinking' : 'welcome'} className="u-thea-character--greeting" />
       <div
         className="-mt-2 rounded-[22px] border bg-white/80 px-5 py-5 text-center"
         style={{ borderColor: U.border }}
@@ -314,9 +319,18 @@ function ImportPromptScreen({
         </Display>
       </div>
       {notice && (
-        <p className="mx-auto mt-3 max-w-[320px] rounded-[16px] px-4 py-3 text-center text-[13px] leading-5" role="status" style={{ background: U.accentSoft, color: U.inkSoft }}>
+        <div className="mx-auto mt-3 max-w-[340px] rounded-[16px] px-4 py-3 text-center text-[13px] leading-5" role="status" style={{ background: U.accentSoft, color: U.inkSoft }}>
           {notice}
-        </p>
+          {/* Kept here, not only in the footer, so they're visible above mobile browser toolbars. */}
+          <div className="mt-2.5 grid grid-cols-2 gap-2">
+            <button type="button" onClick={onAddManually} disabled={connecting} className="u-press min-h-11 rounded-[12px] px-2 text-[12.5px] font-semibold disabled:opacity-50" style={{ background: U.ink, color: U.buttonText }}>
+              Add someone myself
+            </button>
+            <button type="button" onClick={onUseDifferentAccount} disabled={connecting} className="u-press min-h-11 rounded-[12px] border px-2 text-[12.5px] font-semibold disabled:opacity-50" style={{ borderColor: 'rgba(42,37,32,0.18)', color: U.ink, background: U.surface }}>
+              Use a different Google account
+            </button>
+          </div>
+        </div>
       )}
     </MobileShell>
   );
@@ -543,7 +557,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  const connectGoogleCalendar = async () => {
+  const connectGoogleCalendar = async ({ chooseAccount = false }: { chooseAccount?: boolean } = {}) => {
     if (!user) {
       toast({
         title: 'Sign in required',
@@ -609,11 +623,12 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         throw new Error('No authorization URL returned. Please try again.');
       }
 
+      const destination = chooseAccount ? withAccountPicker(authUrl) : authUrl;
       if (isNativeApp()) {
-        await openExternalAuthUrl(authUrl);
+        await openExternalAuthUrl(destination);
         setConnecting(false);
       } else {
-        window.location.assign(authUrl);
+        window.location.assign(destination);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to connect calendar';
@@ -1109,6 +1124,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           connecting={connecting}
           onConnect={handleFindMyPeople}
           onAddManually={startManualAdd}
+          onUseDifferentAccount={() => void connectGoogleCalendar({ chooseAccount: true })}
           notice={calendarNotice}
         />
       );
