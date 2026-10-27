@@ -8,6 +8,7 @@ import { normalizeRecipientName } from '@/lib/dateUtils';
 import { MobileShell, Eyebrow, PrimaryButton, Display } from '@/components/unwrapt2/MobileShell';
 import { PersonAvatar } from '@/components/unwrapt2/TheaAvatar';
 import { useTheaReaction } from '@/hooks/useTheaReaction';
+import { theaChatPose } from '@/lib/theaState';
 import { classifyUserReply } from '@/lib/theaReactions';
 import { withAccountPicker } from '@/lib/calendarConnection';
 import { TheaCharacter } from '@/components/unwrapt2/TheaCharacter';
@@ -1244,8 +1245,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
                 size="compact"
                 className="mx-auto u-thea-character--chat"
                 reaction={theaReaction}
-                activity="chat"
-                gesture={intelSignals.length ? 'Present' : 'Listen'}
+                pose={theaChatPose({ sending: intelSending, typing: intelInput.trim().length > 0 })}
               />
               <div className="-mt-1">
                 <div style={{ fontWeight: 600, fontSize: 15.5 }}>Getting to know {first}</div>

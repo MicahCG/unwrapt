@@ -1,6 +1,10 @@
 import React, { useId } from 'react';
 
-export type TheaPose = 'basic' | 'welcome' | 'thinking' | 'gift' | 'surprised';
+/**
+ * Named states: basic (idle), welcome, listening (user is typing), thinking (working),
+ * curious (asking a clarifying question), gift (success), surprised, oops (error/recovery).
+ */
+export type TheaPose = 'basic' | 'welcome' | 'listening' | 'thinking' | 'curious' | 'gift' | 'surprised' | 'oops';
 /** Short reactions to something the user just said: four positive, one upset. */
 export type TheaReaction = 'thumbsup' | 'sparkle' | 'clap' | 'cheer' | 'upset';
 type FigurePose = TheaPose | TheaReaction;
@@ -29,21 +33,27 @@ const CHAIN: [number, number, number][] = [
 // Per-pose offsets for the brow groups and the irises, as SVG transforms.
 const BROW_L: Record<FigurePose, string> = {
   basic: '', welcome: 'translate(0 -4)', thinking: 'translate(0 1)', gift: 'translate(0 -3)', surprised: 'translate(0 -10) rotate(-4 150 152)',
+  listening: 'translate(0 -3)', curious: 'translate(0 2)', oops: 'translate(2 -4) rotate(-12 150 152)',
   thumbsup: 'translate(0 -4)', sparkle: 'translate(0 -6)', clap: 'translate(0 -5)', cheer: 'translate(0 -6)', upset: 'translate(3 6) rotate(13 150 152)',
 };
 const BROW_R: Record<FigurePose, string> = {
   basic: '', welcome: 'translate(0 -4)', thinking: 'translate(0 -8) rotate(-4 232 152)', gift: 'translate(0 -3)', surprised: 'translate(0 -10) rotate(4 232 152)',
+  listening: 'translate(0 -3)', curious: 'translate(0 -11) rotate(-6 232 152)', oops: 'translate(-2 -4) rotate(12 232 152)',
   thumbsup: 'translate(0 -4)', sparkle: 'translate(0 -6)', clap: 'translate(0 -5)', cheer: 'translate(0 -6)', upset: 'translate(-3 6) rotate(-13 232 152)',
 };
-// Thinking glances up and away; surprised shrinks the irises so more white shows.
+// Thinking glances up and away, listening looks down at what you're typing, curious looks
+// back at you sideways; surprised shrinks the irises so more white shows.
+const IRIS_SHIFT: Partial<Record<FigurePose, string>> = {
+  thinking: 'translate(5 -5)', listening: 'translate(-2 5)', curious: 'translate(4 -1)', oops: 'translate(-3 2)',
+};
 const iris = (pose: FigurePose, cx: number) =>
-  pose === 'thinking' ? 'translate(5 -5)' : pose === 'surprised' ? `translate(${cx} 192) scale(.85) translate(${-cx} -192)` : undefined;
+  pose === 'surprised' ? `translate(${cx} 192) scale(.85) translate(${-cx} -192)` : IRIS_SHIFT[pose];
 const EYE_SCALE: Record<FigurePose, number> = {
-  basic: 1.04, welcome: 1.04, thinking: 1.04, gift: 1.04, surprised: 1.12,
+  basic: 1.04, welcome: 1.04, thinking: 1.04, gift: 1.04, surprised: 1.12, listening: 1.06, curious: 1.04, oops: 1.08,
   thumbsup: 1.04, sparkle: 1.08, clap: 1.04, cheer: 1.04, upset: 1.0,
 };
 const OPEN_SMILE: FigurePose[] = ['welcome', 'sparkle', 'clap', 'cheer'];
-const NO_CHEEK_LIFT: FigurePose[] = ['surprised', 'clap', 'upset'];
+const NO_CHEEK_LIFT: FigurePose[] = ['surprised', 'clap', 'upset', 'oops'];
 
 /** Four-point twinkle star centered on (cx, cy). */
 const star = (cx: number, cy: number, r: number) =>
@@ -90,8 +100,8 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
   const uid = useId().replace(/:/g, '');
   const id = (name: string) => `${uid}-${name}`;
   const url = (name: string) => `url(#${id(name)})`;
-  const restingLeft = ['basic', 'welcome', 'surprised', 'thumbsup', 'sparkle'].includes(pose);
-  const restingRight = ['basic', 'thinking', 'surprised', 'sparkle'].includes(pose);
+  const restingLeft = ['basic', 'welcome', 'listening', 'curious', 'oops', 'surprised', 'thumbsup', 'sparkle'].includes(pose);
+  const restingRight = ['basic', 'listening', 'curious', 'oops', 'thinking', 'surprised', 'sparkle'].includes(pose);
   const eyesClosed = pose === 'clap';
 
   return (
@@ -252,7 +262,9 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
           <ellipse cx="128" cy="230" rx="14" ry="8" fill="#e7866f" opacity=".22" />
           <ellipse cx="254" cy="230" rx="14" ry="8" fill="#e7866f" opacity=".22" />
           <ellipse cx="191" cy="217" rx="10.5" ry="7" fill="#cd7c5d" />
-          {pose === 'basic' && <path className="u-thea__mouth" d="M172 241 Q197 247 219 228" stroke="#b9603f" strokeWidth="4.2" strokeLinecap="round" fill="none" />}
+          {(pose === 'basic' || pose === 'listening') && <path className="u-thea__mouth" d="M172 241 Q197 247 219 228" stroke="#b9603f" strokeWidth="4.2" strokeLinecap="round" fill="none" />}
+          {pose === 'curious' && <path d="M178 244 Q194 246 208 236" stroke="#b9603f" strokeWidth="4.2" strokeLinecap="round" fill="none" />}
+          {pose === 'oops' && <path d="M172 245 Q179 238 186 244 Q193 250 200 244 Q207 238 213 244" stroke="#b9603f" strokeWidth="4.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />}
           {OPEN_SMILE.includes(pose) && <>
             <path d="M168 233 Q191 237 216 231 Q212 257 191 258 Q171 257 168 233 Z" fill="#8f3523" />
             <path d="M176 251 Q191 245 206 251 Q199 257 191 257 Q182 257 176 251 Z" fill="#d9705a" />
@@ -308,6 +320,17 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
             <path d="M58 92 L72 104 M44 128 L62 130 M70 64 L76 82" />
             <path d="M324 92 L310 104 M338 128 L320 130 M312 64 L306 82" />
           </g>
+        )}
+
+        {pose === 'curious' && (
+          <g className="u-thea__query">
+            <path d="M314 84 Q314 66 330 66 Q346 66 346 81 Q346 92 332 97 Q328 99 328 108" stroke="#b65b3c" strokeWidth="7" strokeLinecap="round" fill="none" />
+            <circle cx="328" cy="123" r="4.5" fill="#b65b3c" />
+          </g>
+        )}
+
+        {pose === 'oops' && (
+          <path className="u-thea__sweat" d="M286 132 Q298 150 298 158 A12 12 0 0 1 274 158 Q274 150 286 132 Z" fill="#9fd0ec" stroke="#6fb3d9" strokeWidth="2.5" />
         )}
 
         {pose === 'thumbsup' && (

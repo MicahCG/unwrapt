@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { TheaAvatar } from '@/components/unwrapt2/TheaAvatar';
 import { TheaCharacter } from '@/components/unwrapt2/TheaCharacter';
 import { useTheaReaction } from '@/hooks/useTheaReaction';
+import { theaChatPose } from '@/lib/theaState';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { trackProductEvent } from '@/lib/productAnalytics';
 import { TheaContextValue, type TheaContext } from '@/hooks/useThea';
@@ -127,6 +128,7 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatProducts, setChatProducts] = useState<ThreadProduct[]>([]);
   const [sending, setSending] = useState(false);
+  const [chatFailed, setChatFailed] = useState(false);
   const { reaction, reactTo } = useTheaReaction();
   const [hasGiftVisuals, setHasGiftVisuals] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -228,6 +230,7 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setMatchedIntent(null);
     setChatMessages([]);
     setChatProducts([]);
+    setChatFailed(false);
     setHasGiftVisuals(false);
     setUpgradeDismissed(isTheaUpgradeDismissed());
     setOpen(true);
@@ -268,6 +271,7 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setChatMessages(nextMessages);
     setQuestion('');
     setSending(true);
+    setChatFailed(false);
     void trackProductEvent('thea_llm_message_sent', {
       surface: context.surface || 'global',
       turn: nextMessages.filter((m) => m.role === 'user').length,
@@ -289,6 +293,7 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (err) {
       console.error('Thea chat failed', err);
+      setChatFailed(true);
       setChatMessages([
         ...nextMessages,
         {
@@ -358,7 +363,12 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
             <div className="flex items-center gap-3">
               <TheaCharacter
                 size="compact"
-                pose={sending ? 'thinking' : 'basic'}
+                pose={theaChatPose({
+                  sending,
+                  failed: chatFailed,
+                  typing: question.trim().length > 0,
+                  lastReply: chatProducts.length ? null : chatMessages[chatMessages.length - 1]?.role === 'assistant' ? chatMessages[chatMessages.length - 1].content : null,
+                })}
                 reaction={reaction}
                 speaking={false}
                 className="u-thea-character--chat !mx-0 !w-auto shrink-0"
