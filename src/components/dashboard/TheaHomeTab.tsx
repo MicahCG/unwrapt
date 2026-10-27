@@ -18,6 +18,8 @@ import { useTheaReaction } from '@/hooks/useTheaReaction';
 import { useCalendarConnected } from '@/hooks/useCalendarConnection';
 import { startCalendarConnect } from '@/lib/calendarConnection';
 import { cleanTheaText, renderTheaText } from '@/lib/theaText';
+import { theaChatPose } from '@/lib/theaState';
+import type { TheaPose } from '@/components/unwrapt2/TheaFigure';
 
 type WriteResult = { tool: string; ok: boolean; recordId?: string; error?: string };
 
@@ -83,7 +85,16 @@ interface TheaHomeTabProps {
   onSwitchToManual: () => void;
   /** A message another screen asks Thea to handle (e.g. a gift chosen in the catalog). */
   queuedMessage?: { id: number; text: string } | null;
+  /** False until the recipients query has loaded, so the greeting isn't written for an empty list. */
+  recipientsLoaded?: boolean;
 }
+
+const STATUS_LINE: Partial<Record<TheaPose, string>> = {
+  thinking: 'Working on it…',
+  gift: 'Gift scheduled',
+  oops: 'Something didn’t go through',
+  listening: 'Listening…',
+};
 
 const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   displayName,
@@ -92,6 +103,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   onOpenRecipient,
   onSwitchToManual,
   queuedMessage,
+  recipientsLoaded = true,
 }) => {
   const queryClient = useQueryClient();
   const briefing = useMemo(() => buildDashboardBriefing(recipients, autopilotThreshold), [recipients, autopilotThreshold]);
@@ -107,7 +119,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   const [reviewStates, setReviewStates] = useState<Record<string, ReviewState>>({});
   const [celebrating, setCelebrating] = useState(false);
   const { reaction, reactTo } = useTheaReaction();
-  const seededFor = useRef<string>('');
+  const seeded = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const celebrateTimer = useRef<number>();
 
@@ -132,13 +144,12 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     void loadHistory();
   }, [loadHistory]);
 
-  // With no saved conversation, open with the briefing. Never wipe an active conversation.
+  // With no saved conversation, open with the briefing once. Adding or editing a person later
+  // must not replay the greeting; the quick chips below already reflect the latest list.
   useEffect(() => {
-    if (history === 'loading') return;
-    if (messages.some((m) => m.role === 'user')) return;
-    const fingerprint = `${displayName}|${[...recipients].map((r) => r.id).sort().join(',')}`;
-    if (seededFor.current === fingerprint && messages.length) return;
-    seededFor.current = fingerprint;
+    if (history === 'loading' || !recipientsLoaded || seeded.current) return;
+    seeded.current = true;
+    if (messages.length) return;
     setMessages([{ role: 'assistant', content: seed }]);
     void trackProductEvent('dashboard_thea_briefing_shown', {
       upcoming: briefing.upcoming.length,
@@ -146,7 +157,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
       in_motion: briefing.inMotion.length,
       recent: briefing.recentlyDelivered.length,
     });
-  }, [history, displayName, recipients, seed, briefing, messages]);
+  }, [history, recipientsLoaded, seed, briefing, messages.length]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -257,7 +268,14 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     void send(item.label);
   };
 
-  const pose = sending ? 'thinking' : celebrating ? 'gift' : 'basic';
+  const lastMessage = messages[messages.length - 1];
+  const pose = theaChatPose({
+    sending,
+    failed: history === 'error' || Boolean(lastMessage?.failed || lastMessage?.unsaved),
+    succeeded: celebrating,
+    typing: input.trim().length > 0,
+    lastReply: lastMessage?.role === 'assistant' && !lastMessage.products?.length && !lastMessage.review ? lastMessage.content : null,
+  });
   const latestReviewIndex = messages.reduce((latest, m, i) => (m.review ? i : latest), -1);
 
   return (
@@ -272,7 +290,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
             Thea
           </div>
           <div className="text-[11.5px]" style={{ color: U.muted }} aria-live="polite">
-            {sending ? 'Working on it…' : celebrating ? 'Gift scheduled' : 'Here when you need me'}
+            {STATUS_LINE[pose] || 'Here when you need me'}
           </div>
         </div>
       </div>

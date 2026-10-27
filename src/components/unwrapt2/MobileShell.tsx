@@ -17,6 +17,8 @@ interface MobileShellProps {
    * a wider `lg:max-w-[...]` to use more of a desktop viewport instead.
    */
   maxWidthClassName?: string;
+  /** Extra classes for the footer area, e.g. `lg:hidden` when desktop shows its content inline. */
+  footerClassName?: string;
 }
 
 /**
@@ -33,6 +35,7 @@ export const MobileShell: React.FC<MobileShellProps> = ({
   contentClassName,
   animate = true,
   maxWidthClassName = 'max-w-[440px] lg:max-w-[600px]',
+  footerClassName = '',
 }) => (
   <div
     style={{ background: U.bg }}
@@ -68,7 +71,7 @@ export const MobileShell: React.FC<MobileShellProps> = ({
         {children}
       </div>
       {footer && (
-        <div className="relative px-6 pb-[max(2.25rem,env(safe-area-inset-bottom))] pt-3">
+        <div className={`relative px-6 pb-[max(2.25rem,env(safe-area-inset-bottom))] pt-3 ${footerClassName}`}>
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-y-0 left-1/2 hidden w-screen -translate-x-1/2 lg:block"

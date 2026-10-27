@@ -86,7 +86,8 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
   }, [recipients, selectedDay, occasionDays]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto pb-2">
+    // Children keep their natural height; only this column scrolls (never squashed rows).
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto pb-2 [&>*]:shrink-0">
       <div className="flex items-start justify-between gap-3">
         <div>
           <Eyebrow className="mb-0.5">Manual view</Eyebrow>
@@ -98,7 +99,7 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
           <button
             type="button"
             onClick={onBrowseCatalog}
-            className="rounded-full border px-3 py-2 text-[11.5px] font-semibold"
+            className="u-press min-h-10 rounded-full border px-3.5 text-[12px] font-semibold"
             style={{ borderColor: U.border, color: '#5A5147', background: U.surface }}
           >
             Catalog
@@ -106,7 +107,7 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
           <button
             type="button"
             onClick={() => navigate('/gift-history')}
-            className="rounded-full border px-3 py-2 text-[11.5px] font-semibold"
+            className="u-press min-h-10 rounded-full border px-3.5 text-[12px] font-semibold"
             style={{ borderColor: U.border, color: '#5A5147', background: U.surface }}
           >
             History
