@@ -50,6 +50,9 @@ Deploy edge functions:
 supabase functions deploy revenuecat-webhook
 supabase functions deploy revenuecat-sync
 supabase secrets set REVENUECAT_WEBHOOK_SECRET=your-secret
+# Secret (sk_...) API key from RevenueCat › Project settings › API keys; revenuecat-sync
+# uses it to confirm a purchase before granting VIP.
+supabase secrets set REVENUECAT_SECRET_API_KEY=sk_xxxxxxxx
 ```
 
 ## OAuth / Universal Links checklist

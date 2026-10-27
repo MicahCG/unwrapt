@@ -53,6 +53,29 @@ serve(async (req) => {
       });
     }
 
+    // Never trust the client's say-so: confirm with RevenueCat that this user really has an
+    // active VIP entitlement before granting it. Without the key, the webhook grants VIP instead.
+    const revenueCatKey = Deno.env.get("REVENUECAT_SECRET_API_KEY");
+    if (!revenueCatKey) {
+      return new Response(JSON.stringify({ ok: false, skipped: "not_configured" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const rcResponse = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(user.id)}`, {
+      headers: { Authorization: `Bearer ${revenueCatKey}`, "Content-Type": "application/json" },
+    });
+    if (!rcResponse.ok) throw new Error(`RevenueCat lookup failed (${rcResponse.status})`);
+    const rcData = await rcResponse.json();
+    const entitlement = rcData?.subscriber?.entitlements?.vip;
+    const active = entitlement && (!entitlement.expires_date || new Date(entitlement.expires_date).getTime() > Date.now());
+    if (!active) {
+      return new Response(JSON.stringify({ ok: false, active: false }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
