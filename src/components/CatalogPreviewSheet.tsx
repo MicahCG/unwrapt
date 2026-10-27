@@ -12,7 +12,7 @@ interface CatalogPreviewSheetProps {
   onOpenChange: (open: boolean) => void;
   recipientName?: string;
   interests?: string[];
-  /** Hands the chosen gift to Thea, who builds the review for confirmation. */
+  /** Opens the review for the chosen gift (Manual with a person, Thea without). */
   onSelect: (product: GiftCatalogItem) => void;
 }
 
@@ -60,7 +60,7 @@ const CatalogPreviewSheet: React.FC<CatalogPreviewSheetProps> = ({
             {first ? `Ideas for ${first}` : 'Explore the collection'}
           </SheetTitle>
           <SheetDescription className="max-w-sm text-sm leading-6 text-[#6F6559]">
-            {saved.length ? `Ranked by what ${first || 'they'} love. Pick one and Thea will set up the review.` : 'Add interests to a person for a sharper list, or ask Thea to narrow it down.'}
+            {saved.length ? `Ranked by what ${first || 'they'} love. Pick one to review it before anything is ordered.` : 'Add interests to a person for a sharper list, or ask Thea to narrow it down.'}
           </SheetDescription>
         </SheetHeader>
 

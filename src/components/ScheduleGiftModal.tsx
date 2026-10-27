@@ -1,22 +1,21 @@
-import React, { useCallback, useState, useEffect } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { Heart, MapPin, CreditCard, Package, Truck } from 'lucide-react';
+import { CreditCard, MapPin, Package, Truck } from 'lucide-react';
 import { format, subDays, parseISO } from 'date-fns';
 import { cleanName } from '@/lib/utils';
-import { GIFT_VIBE_OPTIONS, type GiftVibe, type Product, getAllProducts } from '@/lib/giftVibes';
+import { getGiftRecommendations, type GiftCatalogItem } from '@/lib/giftCatalog';
+import { ProductImage } from '@/components/dashboard/TheaChatCards';
+import { U } from '@/components/unwrapt2/theme';
 import type { RecipientRecord } from '@/lib/giftStatus';
 
 type ScheduleRecipient = RecipientRecord & {
-  preferred_gift_vibe?: GiftVibe | null;
   _holidayPreset?: Partial<{ occasion_date: string; street: string; city: string; state: string; zip_code: string; country: string }>;
 };
 
@@ -24,582 +23,481 @@ interface ScheduleGiftModalProps {
   recipient: ScheduleRecipient;
   isOpen: boolean;
   onClose: () => void;
+  /** An unpaid gift that only needs a shipping address before payment resumes. */
   payingForGiftId?: string | null;
+  /** A gift already picked (e.g. in the catalog); the sheet opens on its review. */
+  initialProduct?: GiftCatalogItem | null;
 }
 
-const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen, onClose, payingForGiftId }) => {
+type Step = 'choose' | 'review';
+type Address = { street: string; city: string; state: string; zip_code: string; country: string };
+
+const ALL = '__all__';
+// Matches thea-chat's confirm_scheduled_gift: these statuses don't block a new plan for the same date.
+const NON_BLOCKING_STATUSES = new Set(['cancelled', 'expired']);
+
+const money = (value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+const hasFullAddress = (a: Address) => Boolean(a.street && a.city && a.state && a.zip_code);
+
+/** The next birthday or anniversary on file, or a blank custom occasion. */
+const nextOccasion = (recipient: ScheduleRecipient) => {
+  const today = new Date();
+  const upcoming = (iso: string | null | undefined, occasion: string) => {
+    if (!iso) return null;
+    const d = parseISO(iso);
+    const next = new Date(today.getFullYear(), d.getMonth(), d.getDate());
+    if (next < today) next.setFullYear(today.getFullYear() + 1);
+    return { occasion, date: format(next, 'yyyy-MM-dd') };
+  };
+  return upcoming(recipient.birthday, 'Birthday') || upcoming(recipient.anniversary, 'Anniversary') || { occasion: 'Special occasion', date: '' };
+};
+
+const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen, onClose, payingForGiftId, initialProduct }) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const [selectedVibe, setSelectedVibe] = useState<GiftVibe | null>('CALM_COMFORT');
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-
-  const [formData, setFormData] = useState({
-    occasion_date: '',
-    street: '',
-    city: '',
-    state: '',
-    zip_code: '',
-    country: 'United States'
-  });
-
+  const defaults = nextOccasion(recipient);
+  const [step, setStep] = useState<Step>(initialProduct || payingForGiftId ? 'review' : 'choose');
+  const [filter, setFilter] = useState<string>(ALL);
+  const [product, setProduct] = useState<GiftCatalogItem | null>(initialProduct || null);
+  const [occasionDate, setOccasionDate] = useState('');
+  const [address, setAddress] = useState<Address>({ street: '', city: '', state: '', zip_code: '', country: 'United States' });
   const [editingAddress, setEditingAddress] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [showScrollHint, setShowScrollHint] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  // State updates are async; the ref stops a fast double tap from creating two plans.
+  const submitLock = useRef(false);
 
-  const isRecipientValid = !isOpen || Boolean(recipient?.id);
+  const first = cleanName(recipient.name).split(' ')[0];
+  const savedInterests = (recipient.interests || []).slice(0, 3);
+
+  // Seed once per opening; edits to details never reset the chosen gift.
+  useEffect(() => {
+    if (!isOpen) return;
+    const preset = recipient._holidayPreset || {};
+    const next: Address = {
+      street: preset.street ?? recipient.street ?? '',
+      city: preset.city ?? recipient.city ?? '',
+      state: preset.state ?? recipient.state ?? '',
+      zip_code: preset.zip_code ?? recipient.zip_code ?? '',
+      country: preset.country || recipient.country || 'United States',
+    };
+    setAddress(next);
+    setEditingAddress(!hasFullAddress(next));
+    setOccasionDate(preset.occasion_date || nextOccasion(recipient).date);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, recipient.id]);
 
   useEffect(() => {
-    if (isRecipientValid) return;
-    toast({
-      title: 'Recipient unavailable',
-      description: 'Close this screen and choose the recipient again.',
-      variant: 'destructive',
-    });
-    onClose();
-  }, [isRecipientValid, onClose, toast]);
+    if (!isOpen) return;
+    setProduct(initialProduct || null);
+    setStep(initialProduct || payingForGiftId ? 'review' : 'choose');
+    setFilter(ALL);
+  }, [isOpen, initialProduct, payingForGiftId]);
 
-  // Fetch user wallet balance
-  const { data: userProfile } = useQuery({
+  const { data: profile } = useQuery({
     queryKey: ['user-profile', user?.id],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
       const { data, error } = await supabase
         .from('profiles')
         .select('gift_wallet_balance, subscription_tier')
-        .eq('id', user.id)
+        .eq('id', user!.id)
         .single();
-
       if (error) throw error;
       return data;
     },
     enabled: isOpen && !!user?.id,
   });
+  const walletBalance = profile?.gift_wallet_balance || 0;
 
-  // Fetch all products from Supabase products table
-  const { data: allProducts = [], isLoading: productsLoading } = useQuery({
-    queryKey: ['products', 'all'],
-    queryFn: () => getAllProducts(),
-    enabled: isOpen,
-    staleTime: 5 * 60 * 1000,
+  const requested = filter === ALL ? savedInterests : [filter];
+  const catalog = useQuery({
+    queryKey: ['catalog-preview', [...requested].sort().join('|')],
+    queryFn: () => getGiftRecommendations(requested, 6),
+    enabled: isOpen && step === 'choose' && !payingForGiftId,
+    staleTime: 10 * 60 * 1000,
+    retry: 1,
   });
+  // Only priced catalog items can be scheduled; the order partner needs a real price.
+  const products = (catalog.data?.products || []).filter((p) => p.price != null);
 
-  // Fetch existing scheduled gift for this recipient
   const { data: existingGift } = useQuery({
-    queryKey: ['scheduled-gift', recipient?.id],
+    queryKey: ['scheduled-gift', recipient.id],
     queryFn: async () => {
-      if (!recipient?.id || !user?.id) return null;
-      
-      const today = new Date().toISOString().split('T')[0];
-      const { data, error } = await supabase
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const { data } = await supabase
         .from('scheduled_gifts')
         .select('*')
         .eq('recipient_id', recipient.id)
-        .eq('user_id', user.id)
         .gte('occasion_date', today)
         .order('occasion_date', { ascending: true })
         .limit(1)
         .maybeSingle();
-      
-      if (error) {
-        console.error('Error fetching existing gift:', error);
-        return null;
-      }
       return data;
     },
-    enabled: isOpen && !!recipient?.id && !!user?.id,
+    enabled: isOpen && !!recipient.id,
   });
 
-  // Filter products by selected vibe
-  const filteredProducts = selectedVibe
-    ? allProducts.filter(p => p.gift_vibe === selectedVibe)
-    : allProducts;
-
-  const getDefaultOccasionDate = useCallback(() => {
-    const today = new Date();
-    const currentYear = today.getFullYear();
-
-    if (recipient.birthday) {
-      const birthdayParts = recipient.birthday.split('-');
-      const birthday = new Date(parseInt(birthdayParts[0]), parseInt(birthdayParts[1]) - 1, parseInt(birthdayParts[2]));
-      const thisYearBirthday = new Date(currentYear, birthday.getMonth(), birthday.getDate());
-      if (thisYearBirthday < today) {
-        thisYearBirthday.setFullYear(currentYear + 1);
-      }
-      return {
-        occasion: 'Birthday',
-        date: thisYearBirthday.toISOString().split('T')[0]
-      };
-    }
-
-    if (recipient?.anniversary) {
-      const anniversary = parseISO(recipient.anniversary);
-      const thisYearAnniversary = new Date(currentYear, anniversary.getMonth(), anniversary.getDate());
-      if (thisYearAnniversary < today) thisYearAnniversary.setFullYear(currentYear + 1);
-      return { occasion: 'Anniversary', date: thisYearAnniversary.toISOString().split('T')[0] };
-    }
-
-    return { occasion: 'Special occasion', date: '' };
-  }, [recipient?.anniversary, recipient?.birthday]);
-
-  useEffect(() => {
-    if (isOpen) {
-      // Initialize with recipient's preferred vibe if available, otherwise default to CALM_COMFORT
-      if (recipient.preferred_gift_vibe) {
-        setSelectedVibe(recipient.preferred_gift_vibe);
-      } else {
-        setSelectedVibe('CALM_COMFORT');
-      }
-
-      // Check if this is a holiday preset
-      if (recipient._holidayPreset) {
-        setFormData(prev => ({
-          ...prev,
-          ...recipient._holidayPreset
-        }));
-      } else {
-        const defaultOccasion = getDefaultOccasionDate();
-        setFormData(prev => ({
-          ...prev,
-          occasion_date: defaultOccasion.date
-        }));
-      }
-
-      // Auto-populate address if recipient has one
-      const hasExistingAddress = recipient.street && recipient.city && recipient.state && recipient.zip_code;
-      if (recipient.street || recipient.city || recipient.state || recipient.zip_code) {
-        setFormData(prev => ({
-          ...prev,
-          street: recipient.street || '',
-          city: recipient.city || '',
-          state: recipient.state || '',
-          zip_code: recipient.zip_code || '',
-          country: recipient.country || 'United States'
-        }));
-      }
-      setEditingAddress(!hasExistingAddress);
-    }
-  }, [getDefaultOccasionDate, isOpen, recipient]);
-
-  const getSenderName = () => {
-    return user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Someone special';
+  const pick = (item: GiftCatalogItem) => {
+    setProduct(item);
+    setStep('review');
   };
 
-  const sendGiftNotificationEmail = async (giftDetails: { occasion_date: string; gift_type: string; price: number }) => {
+  const occasionLabel = recipient._holidayPreset ? 'Occasion' : defaults.occasion;
+  const occasionType = occasionDate && occasionDate === defaults.date && defaults.occasion !== 'Special occasion'
+    ? defaults.occasion.toLowerCase()
+    : 'custom';
+  const occasionName = occasionType === 'custom' ? 'Special occasion' : defaults.occasion;
+  const isPast = Boolean(occasionDate) && occasionDate < format(new Date(), 'yyyy-MM-dd');
+  const price = product?.price ?? 0;
+  const payFromWallet = profile?.subscription_tier === 'vip' && walletBalance >= price;
+  const missing = [
+    !payingForGiftId && !product && 'a gift',
+    !payingForGiftId && (!occasionDate || isPast) && 'an upcoming date',
+    !hasFullAddress(address) && 'a shipping address',
+  ].filter(Boolean) as string[];
+
+  const invalidate = useCallback(() => {
+    for (const key of ['recipients', 'upcoming-gifts', 'user-metrics', 'user-profile', 'scheduled-gift', 'recent-gift']) {
+      void queryClient.invalidateQueries({ queryKey: [key] });
+    }
+  }, [queryClient]);
+
+  const fail = (description: string) => toast({ title: 'Not scheduled', description, variant: 'destructive' });
+
+  const saveAddress = async (userId: string) => {
+    const { error } = await supabase
+      .from('recipients')
+      .update({ ...address, updated_at: new Date().toISOString() })
+      .eq('id', recipient.id)
+      .eq('user_id', userId);
+    if (error) throw error;
+  };
+
+  // Existing confirmation email for wallet-paid gifts; card payments send theirs from the Stripe webhook.
+  const notifyScheduled = async (giftType: string, amount: number) => {
     try {
       await supabase.functions.invoke('send-notification-email', {
         body: {
           type: 'gift_scheduled',
           recipientEmail: user?.email,
           userName: user?.user_metadata?.full_name || user?.email?.split('@')[0],
-          data: {
-            recipientName: cleanName(recipient.name),
-            occasion: getDefaultOccasionDate().occasion,
-            occasionDate: giftDetails.occasion_date,
-            giftType: giftDetails.gift_type,
-            priceRange: giftDetails.price
-          }
-        }
+          data: { recipientName: cleanName(recipient.name), occasion: occasionName, occasionDate, giftType, priceRange: amount },
+        },
       });
-      console.log('Gift notification email sent');
     } catch (error) {
       console.error('Failed to send gift notification email:', error);
     }
   };
 
-  const isFormValid = () => {
-    return formData.occasion_date &&
-           selectedProduct &&
-           formData.street &&
-           formData.city &&
-           formData.state &&
-           formData.zip_code;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!isFormValid() || !selectedProduct) return;
-
-    setIsLoading(true);
-
+  const handleSubmit = async () => {
+    if (submitLock.current || missing.length) return;
+    submitLock.current = true;
+    setSubmitting(true);
     try {
-      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
-
-      if (authError || !currentUser?.id) {
-        console.error('Authentication error:', authError);
-        toast({
-          title: "Authentication Error",
-          description: "Please refresh the page and try again.",
-          variant: "destructive"
-        });
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser?.id) {
+        fail('Please sign in again and retry.');
         return;
       }
-
-      if (!recipient?.id) {
-        console.error('Recipient ID is missing or undefined');
-        toast({
-          title: "Error",
-          description: "Recipient information is incomplete. Please try again.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const totalCost = selectedProduct.price;
-      const isVIP = userProfile?.subscription_tier === 'vip';
-      const hasEnoughBalance = walletBalance >= totalCost;
-
-      // Update recipient with address
-      const { error: recipientUpdateError } = await supabase
-        .from('recipients')
-        .update({
-          street: formData.street,
-          city: formData.city,
-          state: formData.state,
-          zip_code: formData.zip_code,
-          country: formData.country,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', recipient.id)
-        .eq('user_id', currentUser.id);
-
-      if (recipientUpdateError) {
-        console.error('Error updating recipient:', recipientUpdateError);
-        throw recipientUpdateError;
-      }
+      await saveAddress(currentUser.id);
 
       if (payingForGiftId) {
-        toast({
-          title: "Address Updated",
-          description: "Now proceeding to payment...",
-        });
-
+        invalidate();
         onClose();
+        window.dispatchEvent(new CustomEvent('proceedWithPayment', { detail: { giftId: payingForGiftId, recipientId: recipient.id } }));
+        return;
+      }
+      if (!product || product.price == null) return;
 
-        window.dispatchEvent(new CustomEvent('proceedWithPayment', {
-          detail: { giftId: payingForGiftId, recipientId: recipient.id }
-        }));
-
+      // One plan per person and date, as in Thea's confirm step.
+      const { data: sameDay } = await supabase
+        .from('scheduled_gifts')
+        .select('id, status, gift_type')
+        .eq('recipient_id', recipient.id)
+        .eq('occasion_date', occasionDate)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      const duplicate = sameDay?.find((g) => !NON_BLOCKING_STATUSES.has((g.status || '').toLowerCase()));
+      if (duplicate) {
+        fail(`${first} already has ${duplicate.gift_type || 'a gift'} planned for that date.`);
         return;
       }
 
-      const defaultOccasion = getDefaultOccasionDate();
-      const occasion = defaultOccasion.occasion;
-      const occasionType = occasion.toLowerCase().replace(/\s+/g, '_');
-
-      // Create scheduled gift
-      const deliveryDate = new Date(new Date(formData.occasion_date).getTime() - 3 * 24 * 60 * 60 * 1000)
-        .toISOString().split('T')[0];
-
-      console.log('Creating scheduled gift with recipient_id:', recipient.id);
-
-      const { data: giftData, error: giftError } = await supabase
+      const deliveryDate = format(subDays(parseISO(occasionDate), 3), 'yyyy-MM-dd');
+      const { data: gift, error: giftError } = await supabase
         .from('scheduled_gifts')
         .insert({
           user_id: currentUser.id,
           recipient_id: recipient.id,
-          occasion,
-          occasion_date: formData.occasion_date,
+          occasion: occasionName,
+          occasion_date: occasionDate,
           occasion_type: occasionType,
-          gift_type: selectedProduct.title,
-          gift_variant_id: selectedProduct.id,
-          gift_image_url: selectedProduct.featured_image_url,
-          estimated_cost: totalCost,
-          price_range: `$${selectedProduct.price.toFixed(2)}`,
+          gift_type: product.name,
+          gift_variant_id: product.providerProductId || product.id,
+          gift_image_url: product.imageUrl,
+          estimated_cost: product.price,
+          price_range: money(product.price),
           delivery_date: deliveryDate,
           status: 'scheduled',
-          payment_status: isVIP && hasEnoughBalance ? 'pending' : 'unpaid'
+          payment_status: payFromWallet ? 'pending' : 'unpaid',
         })
         .select()
         .single();
-
       if (giftError) throw giftError;
 
-      // VIP users with sufficient balance: charge the gift wallet. The debit
-      // itself happens server-side in process-gift-fulfillment
-      // (manualTrigger: true), which re-reads the balance from the DB
-      // instead of trusting a client-supplied amount, verifies the gift
-      // belongs to this user, and is idempotent against double-charging.
-      // profiles.gift_wallet_balance can no longer be written directly from
-      // the client (see 20261022120000_protect_profile_privileged_columns).
-      if (isVIP && hasEnoughBalance) {
-        console.log('🎁 Calling process-gift-fulfillment for wallet payment...');
-        const { data: fulfillmentData, error: fulfillmentError } = await supabase.functions.invoke('process-gift-fulfillment', {
-          body: { scheduledGiftId: giftData.id, manualTrigger: true }
-        });
+      const markSuccess = () =>
+        sessionStorage.setItem('giftScheduledSuccess', JSON.stringify({ recipientId: recipient.id, timestamp: Date.now() }));
 
-        if (fulfillmentError || fulfillmentData?.success === false) {
-          console.error('🎁 Gift fulfillment error:', fulfillmentError || fulfillmentData?.error);
-          toast({
-            title: "Payment Failed",
-            description: fulfillmentData?.error || "Could not charge your gift wallet. Please try again.",
-            variant: "destructive"
-          });
+      if (payFromWallet) {
+        // The wallet debit and partner order happen server-side, idempotently.
+        const { data: result, error } = await supabase.functions.invoke('process-gift-fulfillment', {
+          body: { scheduledGiftId: gift.id, manualTrigger: true },
+        });
+        if (error || result?.success === false) {
+          invalidate();
+          fail(`${product.name} is saved for ${first}, but the wallet payment didn't go through. Open ${first} to retry payment.`);
           return;
         }
-
-        if (fulfillmentData?.alreadyFulfilled) {
-          console.log('🎁 Gift fulfillment: already fulfilled, skipped duplicate charge');
-          toast({
-            title: "Gift Already Scheduled",
-            description: "This gift has already been ordered.",
-          });
-        } else {
-          console.log('🎁 Gift fulfillment successful:', fulfillmentData);
-          toast({
-            title: "Gift Ordered!",
-            description: `$${totalCost.toFixed(2)} deducted. Order placed successfully!`,
-          });
-        }
-
-        await sendGiftNotificationEmail({
-          ...formData,
-          gift_type: selectedProduct.title,
-          price: selectedProduct.price
-        });
-
-        sessionStorage.setItem('giftScheduledSuccess', JSON.stringify({
-          recipientId: recipient.id,
-          timestamp: Date.now()
-        }));
-
-        queryClient.invalidateQueries({ queryKey: ['upcoming-gifts'] });
-        queryClient.invalidateQueries({ queryKey: ['user-metrics'] });
-        queryClient.invalidateQueries({ queryKey: ['recipients'] });
-        queryClient.invalidateQueries({ queryKey: ['user-profile'] });
-
+        markSuccess();
+        invalidate();
+        void notifyScheduled(product.name, product.price);
+        toast({ title: `Gift scheduled for ${first}`, description: `${money(product.price)} paid from your gift wallet.` });
         onClose();
-        setFormData({
-          occasion_date: '',
-          street: '',
-          city: '',
-          state: '',
-          zip_code: '',
-          country: 'United States'
-        });
-        setSelectedProduct(null);
-        window.location.reload();
-      } else {
-        // Non-VIP or insufficient balance: redirect to Stripe
-        const { data: paymentData, error: paymentError } = await supabase.functions.invoke('create-gift-payment', {
-          body: {
-            scheduledGiftId: giftData.id,
-            productPrice: selectedProduct.price,
-            productImage: selectedProduct.featured_image_url,
-            giftDetails: {
-              recipientName: cleanName(recipient.name),
-              occasion,
-              giftType: selectedProduct.title
-            },
-            shippingAddress: {
-              first_name: cleanName(recipient.name).split(' ')[0] || cleanName(recipient.name),
-              last_name: cleanName(recipient.name).split(' ').slice(1).join(' ') || '',
-              address1: formData.street,
-              city: formData.city,
-              province: formData.state,
-              country: formData.country,
-              zip: formData.zip_code
-            },
-            variantId: selectedProduct.id
-          }
-        });
-
-        if (paymentError) throw paymentError;
-
-        if (paymentData?.url) {
-          // Confirmation email now fires from the Stripe webhook once payment
-          // actually succeeds (see supabase/functions/stripe-webhook) — sending
-          // it here was misleading since the user hadn't paid yet.
-
-          sessionStorage.setItem('giftScheduledSuccess', JSON.stringify({
-            recipientId: recipient.id,
-            timestamp: Date.now()
-          }));
-
-          window.location.href = paymentData.url;
-
-          queryClient.invalidateQueries({ queryKey: ['upcoming-gifts'] });
-          queryClient.invalidateQueries({ queryKey: ['user-metrics'] });
-          queryClient.invalidateQueries({ queryKey: ['recipients'] });
-
-          onClose();
-          setFormData({
-            occasion_date: '',
-            street: '',
-            city: '',
-            state: '',
-            zip_code: '',
-            country: 'United States'
-          });
-          setSelectedProduct(null);
-        }
+        return;
       }
-    } catch (error: unknown) {
-      console.error('❌ Error scheduling gift:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "There was a problem scheduling your gift. Please try again.",
-        variant: "destructive"
+
+      const { data: payment, error: paymentError } = await supabase.functions.invoke('create-gift-payment', {
+        body: {
+          scheduledGiftId: gift.id,
+          productPrice: product.price,
+          productImage: product.imageUrl,
+          giftDetails: { recipientName: cleanName(recipient.name), occasion: occasionName, giftType: product.name },
+          shippingAddress: {
+            first_name: first,
+            last_name: cleanName(recipient.name).split(' ').slice(1).join(' '),
+            address1: address.street,
+            city: address.city,
+            province: address.state,
+            country: address.country,
+            zip: address.zip_code,
+          },
+          variantId: product.providerProductId || product.id,
+        },
       });
+      invalidate();
+      if (paymentError || !payment?.url) {
+        fail(`${product.name} is saved for ${first}, but checkout didn't open. Open ${first} to finish payment.`);
+        return;
+      }
+      markSuccess();
+      window.location.href = payment.url;
+    } catch (error) {
+      console.error('Error scheduling gift:', error);
+      fail(error instanceof Error ? error.message : 'Please try again.');
     } finally {
-      setIsLoading(false);
+      submitLock.current = false;
+      setSubmitting(false);
     }
   };
 
-  const handleClose = () => {
-    onClose();
-  };
+  const ordered = existingGift && (existingGift.shopify_order_id || existingGift.goody_order_id || existingGift.status === 'ordered');
+  const actionLabel = submitting
+    ? 'Scheduling…'
+    : payingForGiftId
+      ? 'Save address and pay'
+      : missing.length
+        ? `Add ${missing[0]}`
+        : payFromWallet
+          ? `Schedule · ${money(price)} from wallet`
+          : `Schedule and pay ${money(price)}`;
 
-  const walletBalance = userProfile?.gift_wallet_balance || 0;
-
-  // Vibe button mappings (user-friendly labels → enum values)
-  const vibeButtons = [
-    {
-      label: 'Home & Atmosphere',
-      vibe: 'CALM_COMFORT' as GiftVibe,
-      description: 'Soft lighting, soothing scents, cozy rituals',
-      icon: '🕯️'
-    },
-    {
-      label: 'Personal & Mindful',
-      vibe: 'ARTFUL_UNIQUE' as GiftVibe,
-      description: 'Handmade pieces, objects with a story',
-      icon: '🎨'
-    },
-    {
-      label: 'Luxe & Elegant',
-      vibe: 'REFINED_STYLISH' as GiftVibe,
-      description: 'Elegant glassware, statement pieces',
-      icon: '✨'
-    }
-  ];
-
-  if (!isRecipientValid) return null;
-
-  const occasionLabel = getDefaultOccasionDate().occasion;
+  // Steps already past for a near date happen right away rather than on a date that's gone.
+  const todayIso = format(new Date(), 'yyyy-MM-dd');
+  const when = (d: Date) => (format(d, 'yyyy-MM-dd') <= todayIso ? 'today' : format(d, 'MMM d'));
+  const timeline = occasionDate && !isPast ? (() => {
+    const d = parseISO(occasionDate);
+    return [
+      { icon: CreditCard, text: `Review ${when(subDays(d, 28))}` },
+      { icon: Package, text: `Order ${when(subDays(d, 21))}` },
+      { icon: Truck, text: `Arrives ${format(subDays(d, 3), 'yyyy-MM-dd') <= todayIso ? 'after the date' : format(subDays(d, 3), 'MMM d')}` },
+    ];
+  })() : null;
+  const tooSoon = Boolean(occasionDate) && !isPast && format(subDays(parseISO(occasionDate), 7), 'yyyy-MM-dd') < todayIso;
 
   return (
-    <Sheet open={isOpen} onOpenChange={handleClose}>
+    <Sheet open={isOpen} onOpenChange={(open) => { if (!open && !submitting) onClose(); }}>
       <SheetContent
         side="bottom"
-        className="mx-auto flex h-[94dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[28px] border-x border-t border-[#E4DCD2] bg-[#FAF8F3] p-0 lg:max-w-[600px]"
+        className="mx-auto flex h-[94dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[28px] border-x border-t p-0 lg:max-w-[600px]"
+        style={{ background: '#F7F1E6', borderColor: U.border }}
       >
-        {/* Header - Compact */}
-        <SheetHeader className="border-b border-[#E4DCD2] bg-white/70 px-5 pb-4 pt-5 text-left backdrop-blur-sm">
-          <SheetTitle className="pr-8 font-display text-xl text-[#1A1A1A]">
-            Plan a gift for {cleanName(recipient.name)}
+        <SheetHeader className="shrink-0 px-5 pb-3 pt-5 text-left">
+          <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-[#2A2520]/15" />
+          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: U.accent }}>
+            <span>{step === 'choose' ? '1 · Choose' : '2 · Review'}</span>
+          </div>
+          <SheetTitle className="pr-8 font-display text-[26px] font-normal leading-[1.1]" style={{ color: U.ink }}>
+            {payingForGiftId ? `Where should ${first}’s gift go?` : step === 'choose' ? `A gift for ${first}` : 'Review and schedule'}
           </SheetTitle>
-          <p className="text-sm text-[#1A1A1A]/60">Choose the timing, delivery details and gift. You will review payment before anything is ordered.</p>
+          <SheetDescription className="text-[13px] leading-5" style={{ color: U.textSecondary }}>
+            {step === 'choose'
+              ? savedInterests.length ? `Ranked by what ${first} loves. Nothing is ordered until you confirm.` : `Add interests to ${first} for a sharper list. Nothing is ordered until you confirm.`
+              : 'Everything in one place. Change anything before you confirm.'}
+          </SheetDescription>
         </SheetHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
-        {/* Compact Info Bar: Timeline + Cancel + Address */}
-        <div className="space-y-3 border-b border-[#E4DCD2] bg-white/40 px-5 py-3">
-          {/* Timeline - Inline */}
-          {formData.occasion_date && (() => {
-            const occasionDate = parseISO(formData.occasion_date);
-            const fundsReserved = existingGift?.wallet_reserved || existingGift?.payment_status === 'paid';
-            const orderPlaced = !!existingGift?.shopify_order_id || existingGift?.status === 'ordered';
-            const delivered = existingGift?.status === 'delivered';
-            const fundsReserveDate = subDays(occasionDate, 28);
-            const orderDate = subDays(occasionDate, 21);
-            const deliveryDate = subDays(occasionDate, 3);
-            
-            return (
-              <div className="grid grid-cols-3 gap-2 text-[11px]">
-                <div className="rounded-xl bg-white px-2.5 py-2"><CreditCard className="mb-1 h-3.5 w-3.5 text-[#C4A36F]" /><span className={fundsReserved ? 'font-medium text-emerald-700' : 'text-[#1A1A1A]/65'}>{fundsReserved ? 'Funds ready' : `Review ${format(fundsReserveDate, 'MMM d')}`}</span></div>
-                <div className="rounded-xl bg-white px-2.5 py-2"><Package className="mb-1 h-3.5 w-3.5 text-[#C4A36F]" /><span className={orderPlaced ? 'font-medium text-emerald-700' : 'text-[#1A1A1A]/65'}>{orderPlaced ? 'Ordered' : `Order ${format(orderDate, 'MMM d')}`}</span></div>
-                <div className="rounded-xl bg-white px-2.5 py-2"><Truck className="mb-1 h-3.5 w-3.5 text-[#C4A36F]" /><span className={delivered ? 'font-medium text-emerald-700' : 'text-[#1A1A1A]/65'}>{delivered ? 'Delivered' : `Arrive ${format(deliveryDate, 'MMM d')}`}</span></div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4">
+          {step === 'choose' && (
+            <>
+              {ordered && (
+                <p className="mb-3 rounded-[14px] px-3.5 py-2.5 text-[12.5px]" style={{ background: U.sageSoft, color: U.inkSoft }}>
+                  {existingGift?.gift_type || 'A gift'} is already ordered for {first}’s next occasion.
+                </p>
+              )}
+              {savedInterests.length > 0 && (
+                <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Filter by interest">
+                  {[ALL, ...savedInterests].map((value) => {
+                    const active = filter === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => setFilter(value)}
+                        className="u-press min-h-10 rounded-full border px-3.5 text-[12.5px] font-semibold"
+                        style={{ background: active ? U.ink : U.surface, color: active ? U.buttonText : '#5A5147', borderColor: active ? U.ink : U.border }}
+                      >
+                        {value === ALL ? 'All matches' : value}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" aria-busy={catalog.isFetching}>
+                {catalog.isLoading
+                  ? Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-60 animate-pulse rounded-[20px] bg-white/70" />)
+                  : products.map((item) => {
+                    const chosen = product?.id === item.id;
+                    return (
+                      <article
+                        key={item.id}
+                        className="u-catalog-card flex flex-col overflow-hidden rounded-[20px] bg-white p-2.5 shadow-[0_8px_24px_rgba(42,37,32,0.05)]"
+                        style={{ outline: chosen ? `2px solid ${U.accent}` : 'none' }}
+                      >
+                        <ProductImage src={item.imageUrl} className="aspect-square w-full rounded-[15px]" />
+                        <div className="flex flex-1 flex-col px-1 pb-1 pt-3">
+                          <h3 className="line-clamp-2 text-[13px] font-semibold leading-[1.3]" style={{ color: U.ink }}>{item.name}</h3>
+                          <p className="mt-1 truncate text-[11px]" style={{ color: '#8A7E6E' }}>{item.brand || 'Curated by Unwrapt'}</p>
+                          {item.why && <p className="mt-1.5 line-clamp-2 text-[11px] leading-4" style={{ color: '#6F6559' }}>{item.why}</p>}
+                          <p className="mt-auto pt-2 font-mono text-[12px]" style={{ color: '#5A5147' }}>{money(item.price!)}</p>
+                          <button
+                            type="button"
+                            onClick={() => pick(item)}
+                            className="u-press mt-2 min-h-10 rounded-[12px] text-[12px] font-semibold"
+                            style={{ background: U.ink, color: U.buttonText }}
+                          >
+                            {chosen ? 'Selected' : 'Select gift'}
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })}
               </div>
-            );
-          })()}
-
-          {/* Cancel notice - inline */}
-          {formData.occasion_date && !(existingGift && (!!existingGift.shopify_order_id || existingGift.status === 'ordered')) && (
-            <p className="text-xs text-amber-700">
-              Need to cancel? Contact <a href="mailto:team@unwrapt.io" className="underline font-medium">team@unwrapt.io</a> before the order is placed.
-            </p>
+              {!catalog.isLoading && catalog.isError && (
+                <div className="mt-2 rounded-[16px] px-4 py-3.5 text-center text-[13px]" style={{ background: U.accentSoft, color: U.inkSoft }}>
+                  Couldn’t load gifts right now.{' '}
+                  <button type="button" onClick={() => void catalog.refetch()} className="min-h-8 font-semibold" style={{ color: U.accent }}>Try again</button>
+                </div>
+              )}
+              {!catalog.isLoading && !catalog.isError && products.length === 0 && (
+                <div className="mt-2 rounded-[16px] px-4 py-4 text-center text-[13px] leading-5" style={{ background: U.chip, color: U.inkSoft }}>
+                  No matches for {filter === ALL ? 'these interests' : `“${filter}”`} yet.
+                  {filter !== ALL && (
+                    <button type="button" onClick={() => setFilter(ALL)} className="ml-2 min-h-8 font-semibold" style={{ color: U.accent }}>See all matches</button>
+                  )}
+                </div>
+              )}
+            </>
           )}
 
-          {existingGift && (!!existingGift.shopify_order_id || existingGift.status === 'ordered') && (
-            <p className="text-xs text-amber-700">
-              Order placed. Contact <a href="mailto:team@unwrapt.io" className="underline font-medium">team@unwrapt.io</a> for changes.
-            </p>
-          )}
-
-          {/* Address - Compact inline */}
-          {(() => {
-            const hasAddress = formData.street && formData.city && formData.state && formData.zip_code;
-            return (
-              <div className={`p-3 rounded-lg border transition-all ${
-                !hasAddress ? 'border-amber-300 bg-amber-50/80' : 'border-[#E4DCD2] bg-white/60'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <MapPin className={`w-3.5 h-3.5 ${hasAddress ? 'text-emerald-600' : 'text-amber-600'}`} />
-                    {hasAddress && !editingAddress ? (
-                      <span className="text-sm text-[#1A1A1A]/80">
-                        {[formData.street, formData.city, formData.state, formData.zip_code].filter(Boolean).join(', ')}
-                      </span>
-                    ) : (
-                      <span className="text-sm font-medium text-[#1A1A1A]">
-                        {hasAddress ? 'Shipping Address' : 'Add Shipping Address'}
-                      </span>
-                    )}
+          {step === 'review' && (
+            <div className="space-y-3">
+              {!payingForGiftId && (
+                <section className="flex items-center gap-3 rounded-[18px] bg-white p-3">
+                  {product
+                    ? <ProductImage src={product.imageUrl} className="h-16 w-16 shrink-0 rounded-[12px]" />
+                    : <div className="h-16 w-16 shrink-0 rounded-[12px]" style={{ background: U.chip }} />}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: U.muted }}>Gift</div>
+                    <div className="line-clamp-2 text-[14px] font-semibold leading-5" style={{ color: U.ink }}>{product?.name || 'No gift chosen yet'}</div>
+                    {product?.price != null && <div className="font-mono text-[12px]" style={{ color: '#5A5147' }}>{money(product.price)}</div>}
                   </div>
-                  {hasAddress && (
-                    <button
-                      type="button"
-                      onClick={() => setEditingAddress(!editingAddress)}
-                      className="text-xs font-medium text-[#C4A36F] hover:text-[#b8943f] px-2 py-0.5 rounded hover:bg-[#C4A36F]/10"
-                    >
+                  <button type="button" onClick={() => setStep('choose')} className="u-press min-h-10 shrink-0 rounded-full px-3 text-[12.5px] font-semibold" style={{ color: U.accent }}>
+                    {product ? 'Change' : 'Choose'}
+                  </button>
+                </section>
+              )}
+
+              <section className="rounded-[18px] bg-white p-3.5">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: U.muted }}>For</div>
+                <div className="text-[14px] font-semibold" style={{ color: U.ink }}>{cleanName(recipient.name)}</div>
+                {!payingForGiftId && (
+                  <div className="mt-3 space-y-1">
+                    <Label htmlFor="occasion_date" className="text-[12px] font-medium" style={{ color: U.inkSoft }}>{occasionLabel} date</Label>
+                    <Input
+                      id="occasion_date"
+                      type="date"
+                      value={occasionDate}
+                      min={format(new Date(), 'yyyy-MM-dd')}
+                      onChange={(e) => setOccasionDate(e.target.value)}
+                      className="h-11 w-full bg-white text-[14px]"
+                    />
+                    {isPast && <p className="text-[12px]" style={{ color: U.accent }}>Pick an upcoming date.</p>}
+                  </div>
+                )}
+                {timeline && !payingForGiftId && (
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
+                    {timeline.map(({ icon: Icon, text }) => (
+                      <div key={text} className="rounded-[12px] px-2.5 py-2" style={{ background: U.surface, color: U.textSecondary }}>
+                        <Icon className="mb-1 h-3.5 w-3.5" style={{ color: U.accent }} />{text}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {tooSoon && !payingForGiftId && (
+                  <p className="mt-2 text-[12px] leading-5" style={{ color: U.accent }}>
+                    That’s soon. Delivery usually takes about a week, so it may arrive a little late.
+                  </p>
+                )}
+              </section>
+
+              <section className="rounded-[18px] bg-white p-3.5" style={{ outline: hasFullAddress(address) ? 'none' : `1.5px solid ${U.accent}` }}>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <MapPin className="h-4 w-4 shrink-0" style={{ color: hasFullAddress(address) ? U.sage : U.accent }} />
+                    <span className="truncate text-[13.5px]" style={{ color: U.ink }}>
+                      {hasFullAddress(address) && !editingAddress
+                        ? [address.street, address.city, address.state, address.zip_code].join(', ')
+                        : 'Shipping address'}
+                    </span>
+                  </div>
+                  {hasFullAddress(address) && (
+                    <button type="button" onClick={() => setEditingAddress((v) => !v)} className="u-press min-h-10 shrink-0 rounded-full px-3 text-[12.5px] font-semibold" style={{ color: U.accent }}>
                       {editingAddress ? 'Done' : 'Edit'}
                     </button>
                   )}
                 </div>
-
-                {(!hasAddress || editingAddress) && (
-                  <div className="space-y-2 mt-2">
-                    {!hasAddress && (
-                      <p className="text-xs text-amber-700">A shipping address is required</p>
-                    )}
-                    <Input
-                      placeholder="Street Address *"
-                      value={formData.street}
-                      onChange={(e) => setFormData(prev => ({ ...prev, street: e.target.value }))}
-                      className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm h-9"
-                    />
+                {(editingAddress || !hasFullAddress(address)) && (
+                  <div className="mt-2 space-y-2">
+                    <Input placeholder="Street address" autoComplete="street-address" value={address.street} onChange={(e) => setAddress((a) => ({ ...a, street: e.target.value }))} className="h-11 bg-white text-[14px]" />
                     <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        placeholder="City *"
-                        value={formData.city}
-                        onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
-                        className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm h-9"
-                      />
-                      <Input
-                        placeholder="State *"
-                        value={formData.state}
-                        onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
-                        className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm h-9"
-                      />
-                      <Input
-                        placeholder="ZIP *"
-                        value={formData.zip_code}
-                        onChange={(e) => setFormData(prev => ({ ...prev, zip_code: e.target.value }))}
-                        className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm h-9"
-                      />
-                      <Select
-                        value={formData.country}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, country: value }))}
-                      >
-                        <SelectTrigger className="bg-white border-[#E4DCD2] text-[#1A1A1A] text-sm h-9">
-                          <SelectValue placeholder="Country" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white border-[#E4DCD2]">
+                      <Input placeholder="City" value={address.city} onChange={(e) => setAddress((a) => ({ ...a, city: e.target.value }))} className="h-11 bg-white text-[14px]" />
+                      <Input placeholder="State" value={address.state} onChange={(e) => setAddress((a) => ({ ...a, state: e.target.value }))} className="h-11 bg-white text-[14px]" />
+                      <Input placeholder="ZIP" inputMode="numeric" value={address.zip_code} onChange={(e) => setAddress((a) => ({ ...a, zip_code: e.target.value }))} className="h-11 bg-white text-[14px]" />
+                      <Select value={address.country} onValueChange={(country) => setAddress((a) => ({ ...a, country }))}>
+                        <SelectTrigger className="h-11 bg-white text-[14px]"><SelectValue placeholder="Country" /></SelectTrigger>
+                        <SelectContent>
                           <SelectItem value="United States">USA</SelectItem>
                           <SelectItem value="Canada">Canada</SelectItem>
                           <SelectItem value="United Kingdom">UK</SelectItem>
@@ -609,240 +507,57 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
                     </div>
                   </div>
                 )}
-              </div>
-            );
-          })()}
-        </div>
+              </section>
 
-        {/* Controls Bar: Date + Vibe */}
-        <div className="space-y-3 border-b border-[#E4DCD2] bg-white/30 px-5 py-3">
-          {/* Birthday Date */}
-          <div className="space-y-1">
-            <Label htmlFor="occasion_date" className="text-xs font-medium text-[#1A1A1A]">
-              {occasionLabel} date *
-            </Label>
-            <Input
-              id="occasion_date"
-              type="date"
-              value={formData.occasion_date}
-              onChange={(e) => setFormData(prev => ({ ...prev, occasion_date: e.target.value }))}
-              required
-              className="h-10 w-full border-[#E4DCD2] bg-white text-sm text-[#1A1A1A]"
-            />
-          </div>
-
-          {/* Gift Vibe - Horizontal Pills */}
-          <div className="space-y-1">
-            <Label className="text-xs font-medium text-[#1A1A1A]">Gift Vibe *</Label>
-            <div className="flex gap-2 flex-wrap">
-              {vibeButtons.map((vibe) => (
-                <button
-                  key={vibe.vibe}
-                  type="button"
-                  onClick={() => setSelectedVibe(vibe.vibe)}
-                  className={`px-3 py-1.5 rounded-full border-2 transition-all text-sm flex items-center gap-1.5 ${
-                    selectedVibe === vibe.vibe
-                      ? 'border-[#D2B887] bg-[#D2B887]/15 font-medium'
-                      : 'border-[#E4DCD2] bg-white hover:border-[#D2B887]/50'
-                  }`}
-                >
-                  <span>{vibe.icon}</span>
-                  <span className="text-[#1A1A1A]">{vibe.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Gift Gallery - Full Width */}
-        <div
-          className="relative bg-gradient-to-br from-[#FAF8F3] to-[#EFE7DD]/30 px-5 py-4"
-          onScroll={(e) => {
-            const el = e.currentTarget;
-            const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-            if (nearBottom && showScrollHint) setShowScrollHint(false);
-          }}
-        >
-          {/* Scroll hint overlay */}
-          {showScrollHint && filteredProducts.length > 3 && (
-            <div className="pointer-events-none sticky bottom-0 left-0 right-0 z-10 -mb-4">
-              <div className="h-16 bg-gradient-to-t from-[#FAF8F3] to-transparent flex items-end justify-center pb-2">
-                <div className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-[#E4DCD2] bg-white/90 px-3 py-1.5 text-xs text-[#1A1A1A]/70 shadow-md backdrop-blur-sm">
-                  <span>Scroll for more gifts</span>
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-[#C4A36F]">
-                    <path d="M6 2v8m0 0l3-3m-3 3L3 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-              </div>
+              {!payingForGiftId && product && (
+                <p className="px-1 text-[12px] leading-5" style={{ color: U.textSecondary }}>
+                  {payFromWallet
+                    ? `${money(price)} comes from your gift wallet (balance ${money(walletBalance)}).`
+                    : 'You’ll pay securely at checkout next.'}{' '}
+                  Need to cancel? Email <a href="mailto:team@unwrapt.io" className="underline">team@unwrapt.io</a> before it’s ordered.
+                </p>
+              )}
             </div>
           )}
-            {/* Show ordered gift prominently when order is already placed */}
-            {existingGift && (!!existingGift.shopify_order_id || existingGift.status === 'ordered') ? (
-              <div>
-                <div className="mb-3">
-                  <h3 className="font-semibold text-[#1A1A1A] flex items-center gap-2 text-sm">
-                    <Package className="w-4 h-4 text-emerald-600" />
-                    Your Selected Gift
-                  </h3>
-                </div>
-                <div className="bg-white rounded-xl overflow-hidden border-2 border-emerald-300 shadow-md max-w-sm flex">
-                  {existingGift.gift_image_url && (
-                    <div className="w-24 h-24 flex-shrink-0 overflow-hidden bg-[#FAF8F3]">
-                      <img
-                        src={existingGift.gift_image_url}
-                        alt={existingGift.gift_type || 'Selected gift'}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  )}
-                  <div className="p-3 flex-1">
-                    <h4 className="font-medium text-sm text-[#1A1A1A] mb-1">
-                      {existingGift.gift_type || 'Gift'}
-                    </h4>
-                    <div className="flex items-center gap-2">
-                      {existingGift.price_range && (
-                        <p className="text-sm font-bold text-[#1A1A1A]">{existingGift.price_range}</p>
-                      )}
-                      <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-xs">
-                        Order Placed ✓
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-            <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-sm text-[#1A1A1A] flex items-center gap-2">
-                <Heart className="w-4 h-4 text-[#D2B887]" />
-                Choose a Gift
-              </h3>
-              {filteredProducts.length > 0 && (
-                <span className="text-xs text-[#1A1A1A]/50">
-                  {filteredProducts.length} option{filteredProducts.length !== 1 ? 's' : ''} available
-                </span>
-              )}
-            </div>
-
-            {productsLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#D2B887]"></div>
-              </div>
-            ) : !selectedVibe ? (
-              <div className="flex items-center justify-center py-8">
-                <p className="text-sm text-[#1A1A1A]/50">Select a gift vibe to browse products</p>
-              </div>
-            ) : filteredProducts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 gap-2">
-                <p className="text-sm text-[#1A1A1A]/50">No products found for this vibe</p>
-                <p className="text-xs text-[#1A1A1A]/40">Total products available: {allProducts.length}</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {filteredProducts.map((product) => (
-                  <button
-                    key={product.id}
-                    type="button"
-                    onClick={() => setSelectedProduct(product)}
-                    className={`group relative bg-white rounded-lg overflow-hidden border-2 transition-all shadow-sm hover:shadow-md text-left ${
-                      selectedProduct?.id === product.id
-                        ? 'border-[#D2B887] ring-2 ring-[#D2B887]/20'
-                        : 'border-[#E4DCD2] hover:border-[#D2B887]/50'
-                    }`}
-                  >
-                    {/* Product Image - Compact */}
-                    <div className="aspect-[4/3] overflow-hidden bg-[#FAF8F3]">
-                      <img
-                        src={product.featured_image_url || ''}
-                        alt={product.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    </div>
-
-                    {/* Product Info - Compact */}
-                    <div className="p-2.5">
-                      <h4 className="font-medium text-xs text-[#1A1A1A] line-clamp-1 mb-1">
-                        {product.title}
-                      </h4>
-                      <p className="text-sm font-bold text-[#1A1A1A]">
-                        ${product.price.toFixed(2)}
-                      </p>
-                    </div>
-
-                    {/* Selected Indicator */}
-                    {selectedProduct?.id === product.id && (
-                      <div className="absolute top-2 right-2 bg-[#D2B887] text-white rounded-full p-1">
-                        <Heart className="w-3 h-3 fill-current" />
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-            </div>
-            )}
-          </div>
         </div>
 
-        {/* Sticky Bottom Summary Bar */}
-        <div className="border-t-2 border-[#E4DCD2] bg-white px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-lg">
-          <div className="space-y-3">
-            {/* Left: Selected Gift Summary */}
-            <div className="flex min-h-10 items-center gap-3">
-              {selectedProduct ? (
-                <>
-                  <img
-                    src={selectedProduct.featured_image_url || ''}
-                    alt={selectedProduct.title}
-                    className="w-12 h-12 rounded-lg object-cover border border-[#E4DCD2]"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[#1A1A1A] truncate">
-                      {selectedProduct.title}
-                    </p>
-                    <p className="text-xs text-[#1A1A1A]/60">
-                      ${selectedProduct.price.toFixed(2)}
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <div className="flex items-center gap-2 text-[#1A1A1A]/50">
-                  <Heart className="w-5 h-5" />
-                  <span className="text-sm">No gift selected</span>
-                </div>
-              )}
-            </div>
-
-            {/* Right: Action Buttons */}
+        <div className="shrink-0 border-t px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3" style={{ borderColor: U.border, background: U.surface }}>
+          {step === 'choose' ? (
             <div className="grid grid-cols-[auto_1fr] gap-2">
-              <Button
+              <button type="button" onClick={onClose} className="u-press min-h-12 rounded-[14px] border px-4 text-[14px] font-semibold" style={{ borderColor: U.borderStrong, color: U.ink }}>Cancel</button>
+              <button
                 type="button"
-                variant="outline"
-                onClick={handleClose}
-                disabled={isLoading}
-                className="h-11 border-[#E4DCD2] px-4 text-[#1A1A1A] hover:bg-[#EFE7DD]"
+                disabled={!product}
+                onClick={() => setStep('review')}
+                className="u-press min-h-12 rounded-[14px] text-[14px] font-semibold disabled:opacity-50"
+                style={{ background: U.ink, color: U.buttonText }}
               >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSubmit}
-                disabled={isLoading || !isFormValid()}
-                className="h-11 bg-[#D2B887] font-medium text-[#1A1A1A] hover:bg-[#D2B887]/90"
-              >
-                {isLoading ? (
-                  'Processing...'
-                ) : selectedProduct ? (
-                  userProfile?.subscription_tier === 'vip' && walletBalance >= selectedProduct.price ? (
-                    `Schedule Gift • $${selectedProduct.price.toFixed(2)}`
-                  ) : (
-                    `Schedule & Pay $${selectedProduct.price.toFixed(2)}`
-                  )
-                ) : (
-                  'Schedule Gift'
-                )}
-              </Button>
+                {product ? 'Review' : 'Select a gift to continue'}
+              </button>
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-[auto_1fr] gap-2">
+              <button
+                type="button"
+                onClick={() => (payingForGiftId ? onClose() : setStep('choose'))}
+                disabled={submitting}
+                className="u-press min-h-12 rounded-[14px] border px-4 text-[14px] font-semibold"
+                style={{ borderColor: U.borderStrong, color: U.ink }}
+              >
+                {payingForGiftId ? 'Cancel' : 'Back'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSubmit()}
+                disabled={submitting || missing.length > 0}
+                aria-busy={submitting}
+                className="u-press min-h-12 rounded-[14px] text-[14px] font-semibold disabled:opacity-60"
+                style={{ background: U.ink, color: U.buttonText }}
+              >
+                {actionLabel}
+              </button>
+            </div>
+          )}
         </div>
       </SheetContent>
     </Sheet>
