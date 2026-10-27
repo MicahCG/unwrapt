@@ -166,6 +166,21 @@ async function syncVipFromRevenueCat(userId: string): Promise<void> {
   }
 }
 
+/** The App Store's localized price for VIP (e.g. "$4.99"), or null on web or if unavailable. */
+export async function getVipPriceLabel(): Promise<string | null> {
+  if (!isNativeApp()) return null;
+  try {
+    await configureIap();
+    if (!purchasesConfigured) return null;
+    const Purchases = await getPurchases();
+    const { current } = await Purchases.getOfferings();
+    const pkg = current?.availablePackages?.find((p) => p.product.identifier === VIP_IAP_PRODUCT_ID) || current?.availablePackages?.[0];
+    return pkg?.product.priceString || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function restoreVipPurchases(): Promise<PurchaseResult> {
   if (!isNativeApp()) {
     return { success: false, error: 'Restore is only available in the iOS app' };

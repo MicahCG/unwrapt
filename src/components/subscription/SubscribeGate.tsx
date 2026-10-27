@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { trackProductEvent } from '@/lib/productAnalytics';
 import { MobileShell, Display, PrimaryButton, Eyebrow } from '@/components/unwrapt2/MobileShell';
 import { TheaCharacter } from '@/components/unwrapt2/TheaCharacter';
 import { U } from '@/components/unwrapt2/theme';
-import { VIP_MONTHLY_AMOUNT_LABEL } from '@/lib/stripe';
-import { purchaseVipSubscription, restoreVipPurchases } from '@/lib/iap';
+import { purchaseVipSubscription } from '@/lib/iap';
+import SubscriptionTerms, { useVipPrice } from '@/components/subscription/SubscriptionTerms';
 import { isNativeApp } from '@/lib/native';
 
 /**
@@ -18,6 +18,7 @@ const SubscribeGate: React.FC = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const native = isNativeApp();
+  const price = useVipPrice();
 
   const startCheckout = async () => {
     setLoading(true);
@@ -46,23 +47,6 @@ const SubscribeGate: React.FC = () => {
     }
   };
 
-  const handleRestore = async () => {
-    setLoading(true);
-    try {
-      const result = await restoreVipPurchases();
-      if (!result.success) throw new Error(result.error || 'Nothing to restore');
-      toast({ title: 'Purchases restored', description: 'Welcome back to VIP.' });
-      window.location.href = '/';
-    } catch (error) {
-      toast({
-        title: 'Restore failed',
-        description: error instanceof Error ? error.message : 'No active subscription found.',
-        variant: 'destructive',
-      });
-      setLoading(false);
-    }
-  };
-
   return (
     <MobileShell
       glow
@@ -74,23 +58,9 @@ const SubscribeGate: React.FC = () => {
               ? native
                 ? 'Starting purchase…'
                 : 'Opening checkout…'
-              : `Start automating · ${VIP_MONTHLY_AMOUNT_LABEL}/month`}
+              : `Start automating · ${price}/month`}
           </PrimaryButton>
-          <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-[11.5px]" style={{ color: U.muted }}>
-            <ShieldCheck size={13} aria-hidden="true" />
-            {native ? 'App Store subscription · cancel anytime' : 'Secure Stripe checkout · cancel anytime'}
-          </p>
-          {native && (
-            <button
-              type="button"
-              className="mt-2 min-h-11 w-full text-[13px] font-semibold"
-              style={{ color: U.textSecondary }}
-              disabled={loading}
-              onClick={handleRestore}
-            >
-              Restore purchases
-            </button>
-          )}
+          <SubscriptionTerms price={price} onRestored={() => { window.location.href = '/'; }} />
           <button
             type="button"
             className="mt-3 min-h-11 w-full text-[13px] font-semibold"

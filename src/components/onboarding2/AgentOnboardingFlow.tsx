@@ -20,7 +20,7 @@ import { trackProductEvent } from '@/lib/productAnalytics';
 import GachaReveal from '@/components/onboarding2/GachaReveal';
 import StrongGiftPicks from '@/components/onboarding2/StrongGiftPicks';
 import { clearSkipAgentWelcome, markTheaValueSeen } from '@/lib/funnel';
-import { VIP_MONTHLY_AMOUNT_LABEL } from '@/lib/stripe';
+import SubscriptionTerms, { useVipPrice } from '@/components/subscription/SubscriptionTerms';
 import { type GiftAskUserOffer, type GiftCatalogItem } from '@/lib/giftCatalog';
 import {
   STARTER_CATEGORIES,
@@ -466,6 +466,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const vipPrice = useVipPrice();
 
   // The welcome now lives on the sign-in screen, so signed-in setup starts at importing birthdays.
   const [screen, setScreen] = useState<Screen>('import');
@@ -1442,9 +1443,12 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         <MobileShell
           contentClassName="px-5 pt-8 pb-6"
           footer={
-            <PrimaryButton onClick={() => completeOnboarding()} disabled={completing}>
-              Start automating · {VIP_MONTHLY_AMOUNT_LABEL}/month
-            </PrimaryButton>
+            <>
+              <PrimaryButton onClick={() => completeOnboarding()} disabled={completing}>
+                Start automating · {vipPrice}/month
+              </PrimaryButton>
+              <SubscriptionTerms price={vipPrice} onRestored={() => { window.location.href = '/'; }} />
+            </>
           }
         >
           <button
