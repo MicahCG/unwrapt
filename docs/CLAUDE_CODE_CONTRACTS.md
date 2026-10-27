@@ -245,6 +245,30 @@ address for him" against real ids carried over from its own prior reply,
 instead of needing to perfectly re-call `get_recipients`/`search_gifts`
 every single turn (which it doesn't always do in practice).
 
+## Invented gift ideas when search_gifts comes up empty (found via live testing)
+
+`supabase/functions/thea-chat/index.ts`. Reported from a live session: asking
+for a narrow combination (e.g. "sports related, $50 or less") that genuinely
+has no catalog matches, then asking Thea for "general examples," produced a
+bulleted list of non-catalog, invented gift ideas ("Cozy Blanket," "Coffee
+Gift Set," "Personalized Water Bottle") - a direct violation of the hard
+"never invent products" rule. The existing hallucination guard
+(`checkRecommendationIntegrity`, originally inline, now exported for unit
+testing) only caught bold-product-name-plus-inline-price text
+(`**Name** ... $24`); this bulleted list had no per-item price, so it slid
+through untouched, and the user picking one of the fake items then hit a
+dead end ("I couldn't find any water bottles available").
+
+**Fix**: two parts, both covered by `index.test.ts`.
+- System prompt: explicit instruction that an empty `search_gifts` result
+  must lead to either a broader re-search or an honest "nothing matches
+  right now," never a fallback list of hypothetical ideas.
+- Server-side guard (defense in depth, same philosophy as the existing
+  RECOMMENDED_IDS checks): a reply with 2+ bulleted, bolded item names and no
+  `RECOMMENDED_IDS` line is now treated the same as unresolved ids - it
+  forces a genuine re-search rather than asking the model to "add ids" to
+  products that were never real.
+
 ## CC-08: legacy-catalog verification (investigation, narrow cleanup only)
 
 Investigated via a live read-only DB query plus direct code reading, per the

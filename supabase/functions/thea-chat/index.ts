@@ -116,6 +116,7 @@ Use what is already known and gather only missing essentials naturally, with at 
 - If the best live option is a substitute that needs permission, ask first instead of forcing it.
   Example: they want red wine and only white wine is live. Ask: "I don't see red wine gifts live right now. Would white wine also work?"
 - Never invent stretch connections across unrelated categories (plants are not nail polish or random kitchen tools).
+- If search_gifts returns nothing for the requested interests and budget, do not fall back to generic or hypothetical gift ideas (e.g. "a cozy blanket," "a coffee gift set," "a nice water bottle") that didn't come from an actual search_gifts result. Either call search_gifts again with a broader query still inside the budget, or tell the user plainly that nothing matches right now and ask them to adjust the budget or interest. Every gift you name, in any reply, must be a real search_gifts result from this conversation, never a category guess.
 - Only recommend items within budget.
 - Give one short, specific reason per pick, tied to the interest, relationship, or occasion. Never generic marketing language ("perfect for any occasion" is banned).
 - On lock in, confirm the exact product and price back clearly, in one line, and say it's ready to send. You do not process payment or place the order yourself.
@@ -415,6 +416,38 @@ const fetchLastTurnContext = async (
 
   if (!recommendedProducts?.length && !activeRecipient) return null;
   return { recommendedProducts, activeRecipient };
+};
+
+type RecommendationCheck = {
+  mentionedIds: string[];
+  missingMarker: boolean;
+  needsRealSearch: boolean;
+};
+
+/** Detects whether a reply's named "recommendations" are actually backed by
+ * a real search_gifts result from this turn. Three failure modes seen in
+ * practice: (a) the model forgets the RECOMMENDED_IDS line even though it
+ * named real, bolded products with prices; (b) it references ids that were
+ * never returned by search_gifts this turn; (c) it invents generic,
+ * non-catalog "example" gift ideas (e.g. "a cozy blanket," "a personalized
+ * water bottle") when search came up empty, as a bulleted list with no
+ * per-item price - which (a)'s bold+$ pattern can't catch, since there's no
+ * price to find. Unlike (a), (b) and (c) aren't real products that just
+ * need ids attached, so `needsRealSearch` routes to a genuine re-search
+ * rather than "resend with RECOMMENDED_IDS" (which would just invent ids
+ * for fake products). Exported standalone for unit testing. */
+export const checkRecommendationIntegrity = (content: string, seenProductIds: Set<string>): RecommendationCheck => {
+  const idsMatch = content.match(/RECOMMENDED_IDS:\s*(.*)$/is);
+  const mentionedIds: string[] = idsMatch
+    ? idsMatch[1].replace(/[[\]]/g, "").split(",").map((id) => id.trim().replace(/^["']|["']$/g, "")).filter(Boolean)
+    : [];
+  const looksLikeRecommendation = /\*\*[^*]+\*\*[^\n]*\$\d/.test(content);
+  const missingMarker = looksLikeRecommendation && mentionedIds.length === 0;
+  const hasUnresolvedIds = mentionedIds.some((id) => !seenProductIds.has(id));
+  const bulletItemCount = (content.match(/^\s*[•▪\-*]\s*\*\*[^*]{2,60}\*\*/gm) || []).length;
+  const looksLikeInventedList = bulletItemCount >= 2 && mentionedIds.length === 0;
+  const needsRealSearch = hasUnresolvedIds || looksLikeInventedList;
+  return { mentionedIds, missingMarker, needsRealSearch };
 };
 
 const sanitizeMessages = (input: unknown): ChatMessage[] | null => {
@@ -1271,30 +1304,17 @@ Rules:
       if (toolCalls.length === 0) {
         const content = message.content || "";
 
-        // Two distinct failure modes seen in practice, both of which leave
-        // the product cards empty despite the text naming real items:
-        // (a) the model forgets the RECOMMENDED_IDS line entirely even
-        //     though it clearly named specific bolded products with prices;
-        // (b) it references ids that were never returned by a search_gifts
-        //     call this turn (e.g. recalling names from earlier in the
-        //     conversation instead of the current results).
-        const idsMatch = content.match(/RECOMMENDED_IDS:\s*(.*)$/is);
-        const mentionedIds: string[] = idsMatch
-          ? idsMatch[1].replace(/[[\]]/g, "").split(",").map((id: string) => id.trim().replace(/^["']|["']$/g, "")).filter(Boolean)
-          : [];
-        const looksLikeRecommendation = /\*\*[^*]+\*\*[^\n]*\$\d/.test(content);
-        const missingMarker = looksLikeRecommendation && mentionedIds.length === 0;
-        const hasUnresolvedIds = mentionedIds.some((id: string) => !seenProducts.has(id));
+        const { mentionedIds, missingMarker, needsRealSearch } = checkRecommendationIntegrity(content, new Set(seenProducts.keys()));
 
-        if ((hasUnresolvedIds || missingMarker) && iteration < MAX_TOOL_ITERATIONS - 1) {
+        if ((needsRealSearch || missingMarker) && iteration < MAX_TOOL_ITERATIONS - 1) {
           conversation.push({ role: "assistant", content });
           conversation.push({
             role: "system",
-            content: missingMarker
-              ? "You named specific products but left out the required RECOMMENDED_IDS line. Resend the same recommendations, ending on a new line with RECOMMENDED_IDS: followed by the exact ids of those products from your search_gifts results."
-              : "You referenced specific products without calling search_gifts this turn, so they can't actually be shown. search_gifts is being invoked now; once you see the results, recommend only from those.",
+            content: needsRealSearch
+              ? "You listed gift ideas that aren't backed by a real search_gifts result from this conversation - either you referenced ids that were never returned, or this looks like an invented list of generic examples. Never invent generic gift ideas. search_gifts is being called now with the budget/interests already given; recommend only from its actual results, using their real titles and prices. If nothing matches even on a broader search, say so honestly instead of listing invented examples."
+              : "You named specific products but left out the required RECOMMENDED_IDS line. Resend the same recommendations, ending on a new line with RECOMMENDED_IDS: followed by the exact ids of those products from your search_gifts results.",
           });
-          if (!missingMarker) forceSearchNextCall = true;
+          if (needsRealSearch) forceSearchNextCall = true;
           continue;
         }
 

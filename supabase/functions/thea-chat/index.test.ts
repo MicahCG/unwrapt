@@ -6,6 +6,7 @@
 import { assert, assertEquals } from "https://deno.land/std@0.190.0/testing/asserts.ts";
 import {
   buildTurnContextMessage,
+  checkRecommendationIntegrity,
   nextOccasionDate,
   normalizeInterests,
   scoreInterestText,
@@ -72,4 +73,51 @@ Deno.test("buildTurnContextMessage surfaces the in-focus recipient so a write do
   assert(message?.includes("rec_1"));
   assert(message?.includes("Jordan"));
   assert(message?.includes("instead of re-calling get_recipients"));
+});
+
+Deno.test("checkRecommendationIntegrity passes a real recommendation backed by RECOMMENDED_IDS and a seen product", () => {
+  const content = [
+    "Here's a great pick:",
+    "**Coffee Beans by Methodical Coffee** - $24, perfect for a coffee lover.",
+    "RECOMMENDED_IDS: prod_123",
+  ].join("\n");
+  const result = checkRecommendationIntegrity(content, new Set(["prod_123"]));
+  assertEquals(result.mentionedIds, ["prod_123"]);
+  assertEquals(result.missingMarker, false);
+  assertEquals(result.needsRealSearch, false);
+});
+
+Deno.test("checkRecommendationIntegrity flags a real-looking product named without the required RECOMMENDED_IDS line", () => {
+  const content = "Here's a great pick:\n**Coffee Beans by Methodical Coffee** - $24, perfect for a coffee lover.";
+  const result = checkRecommendationIntegrity(content, new Set());
+  assertEquals(result.missingMarker, true);
+  assertEquals(result.needsRealSearch, false);
+});
+
+Deno.test("checkRecommendationIntegrity flags RECOMMENDED_IDS referencing an id never returned by search_gifts this turn", () => {
+  const content = "**Coffee Beans by Methodical Coffee** - $24.\nRECOMMENDED_IDS: prod_999";
+  const result = checkRecommendationIntegrity(content, new Set(["prod_123"]));
+  assertEquals(result.needsRealSearch, true);
+});
+
+Deno.test("checkRecommendationIntegrity flags an invented bulleted list of generic gift ideas with no RECOMMENDED_IDS (reproduces the live audit bug)", () => {
+  const content = [
+    "Here are some general gift ideas under $50:",
+    "",
+    "- **Cozy Blanket** - Perfect for relaxing at home.",
+    "- **Coffee Gift Set** - Great for any coffee lover.",
+    "- **Personalized Water Bottle** - Useful and stylish.",
+    "- **Succulent Planter** - A fun touch for home decor.",
+    "",
+    "Let me know if any of these resonate, or if you want to explore more options!",
+  ].join("\n");
+  const result = checkRecommendationIntegrity(content, new Set());
+  assertEquals(result.missingMarker, false);
+  assertEquals(result.needsRealSearch, true);
+});
+
+Deno.test("checkRecommendationIntegrity leaves ordinary conversational replies alone", () => {
+  const result = checkRecommendationIntegrity("What's your budget for this gift?", new Set());
+  assertEquals(result.missingMarker, false);
+  assertEquals(result.needsRealSearch, false);
 });
