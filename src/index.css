@@ -770,8 +770,8 @@
 .u-thea--exiting .u-thea__wave, .u-thea--exiting .u-thea__thumb { animation: u-thea-elbow-lower .38s cubic-bezier(.5,0,.75,0) both !important; }
 .u-thea .u-thea__rest { transform-box: fill-box; transform-origin: 50% 0%; animation: u-thea-rest-in .32s ease-out both; }
 .u-thea--sparkle .u-thea__twinkle, .u-thea--clap .u-thea__twinkle { transform-box: fill-box; transform-origin: center; animation: u-thea-sparkle .8s ease-in-out infinite; }
-.u-thea--clap .u-thea__clap-l { transform-box: view-box; transform-origin: 104px 404px; animation: u-thea-clap-l .36s ease-in-out infinite; }
-.u-thea--clap .u-thea__clap-r { transform-box: view-box; transform-origin: 278px 404px; animation: u-thea-clap-r .36s ease-in-out infinite; }
+.u-thea--clap .u-thea__clap-l { transform-box: view-box; transform-origin: 92px 420px; animation: u-thea-clap-l .36s ease-in-out infinite; }
+.u-thea--clap .u-thea__clap-r { transform-box: view-box; transform-origin: 290px 420px; animation: u-thea-clap-r .36s ease-in-out infinite; }
 .u-thea--upset .u-thea__huff { animation: u-thea-huff .6s ease-out both; }
 .u-thea--thumbsup, .u-thea--sparkle, .u-thea--clap, .u-thea--cheer { animation: u-thea-hop .45s ease-out both; }
 @keyframes u-thea-shoulder-raise { from { transform: rotate(52deg); } to { transform: none; } }
