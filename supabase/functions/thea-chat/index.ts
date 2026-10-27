@@ -907,6 +907,7 @@ const handleSelectGift = async (
   authClient: ReturnType<typeof createClient>,
   userId: string,
   args: { recipientId?: string; productId?: string; occasionDate?: string },
+  fallbackProduct?: Product | null,
 ): Promise<ToolResult> => {
   if (typeof args.recipientId !== "string" || !args.recipientId) return { ok: false, error: "recipientId is required" };
   if (typeof args.productId !== "string" || !args.productId) return { ok: false, error: "productId is required" };
@@ -933,7 +934,15 @@ const handleSelectGift = async (
     occasionLabel = recipient.birthday === occasionDate ? "Birthday" : recipient.anniversary === occasionDate ? "Anniversary" : "Special occasion";
   }
 
-  const product = await findGoodyProductById(args.productId);
+  // Falls back to the product as this conversation already knows it (from
+  // this turn's search_gifts, or carried over via CC-02's turn-context
+  // metadata) when a fresh Goody lookup doesn't find it. Observed live:
+  // Goody's /v1/products listing has returned a different set of results
+  // across calls only seconds apart within the same conversation, so a
+  // product search_gifts just returned can wrongly look "unavailable" here
+  // through no fault of the user's selection - the fallback is the same
+  // data the user was already shown, not invented.
+  const product = (await findGoodyProductById(args.productId)) ?? fallbackProduct ?? null;
   if (!product) return { ok: false, error: "That product isn't available right now - search again for current options." };
 
   // No DB uniqueness on (recipient_id, occasion_date) exists, so this can't
@@ -1007,6 +1016,7 @@ const handleConfirmScheduledGift = async (
   userId: string,
   args: { recipientId?: string; productId?: string; occasionDate?: string },
   conversationId: string | null,
+  fallbackProduct?: Product | null,
 ): Promise<ToolResult> => {
   if (typeof args.recipientId !== "string" || !args.recipientId) return { ok: false, error: "recipientId is required" };
   if (typeof args.productId !== "string" || !args.productId) return { ok: false, error: "productId is required" };
@@ -1031,8 +1041,12 @@ const handleConfirmScheduledGift = async (
     return { ok: true, alreadyScheduled: true, recordId: existing.id, saved: { gift_type: existing.gift_type, status: existing.status } };
   }
 
-  // Price/availability validated fresh right before the write, not carried over from select_gift's possibly-earlier turn.
-  const product = await findGoodyProductById(args.productId);
+  // Price/availability validated fresh right before the write when
+  // possible; falls back to this conversation's own known data (this
+  // turn's search_gifts, or CC-02's carried-over turn context) rather than
+  // failing outright when Goody's own listing doesn't surface it moments
+  // later - see the matching comment in handleSelectGift.
+  const product = (await findGoodyProductById(args.productId)) ?? fallbackProduct ?? null;
   if (!product) return { ok: false, error: "That product is no longer available - search again for current options." };
 
   const occasionType = recipient.birthday === args.occasionDate ? "birthday" : recipient.anniversary === args.occasionDate ? "anniversary" : "custom";
@@ -1325,6 +1339,20 @@ Rules:
     ];
 
     const seenProducts = new Map<string, Product>();
+    // Seed from the prior turn's carried-over recommendations (CC-02) so
+    // select_gift/confirm_scheduled_gift have a fallback product to use
+    // even when the model skips search_gifts this turn as instructed (it's
+    // meant to, for an explicit same-text selection) - these entries are
+    // missing image/description, but id/title/price is enough to serve as
+    // a fallback when a fresh Goody lookup doesn't find the product.
+    if (turnContext?.recommendedProducts) {
+      for (const p of turnContext.recommendedProducts) {
+        seenProducts.set(p.id, {
+          id: p.id, title: p.title, price: p.price, currency: "USD",
+          description: null, featured_image_url: null, product_type: null, gift_vibe: null, provider: "goody",
+        });
+      }
+    }
     // Surfaced to the frontend as top-level `writes` so it can invalidate
     // the right queries (recipients, upcoming-gifts) immediately instead of
     // parsing Thea's natural-language reply for what changed.
@@ -1404,7 +1432,9 @@ Rules:
           if (result.ok && result.recordId) lastActiveRecipient = { id: result.recordId, name: String(result.recipientName || "") };
           toolContent = result;
         } else if (toolName === "select_gift") {
-          const result = await handleSelectGift(authClient, user.id, args as Parameters<typeof handleSelectGift>[2]);
+          const productIdArg = (args as { productId?: unknown }).productId;
+          const fallbackProduct = typeof productIdArg === "string" ? seenProducts.get(productIdArg) ?? null : null;
+          const result = await handleSelectGift(authClient, user.id, args as Parameters<typeof handleSelectGift>[2], fallbackProduct);
           // reviewMarker carries a "GIFT_REVIEW: " prefix meant for the
           // model to copy into its reply text verbatim - strip it here so
           // what's persisted matches the bare "id:id:date" hasPersistedReviewMarker
@@ -1418,7 +1448,9 @@ Rules:
           }
           toolContent = result;
         } else if (toolName === "confirm_scheduled_gift") {
-          const result = await handleConfirmScheduledGift(authClient, user.id, args as Parameters<typeof handleConfirmScheduledGift>[2], conversationId);
+          const confirmProductIdArg = (args as { productId?: unknown }).productId;
+          const confirmFallbackProduct = typeof confirmProductIdArg === "string" ? seenProducts.get(confirmProductIdArg) ?? null : null;
+          const result = await handleConfirmScheduledGift(authClient, user.id, args as Parameters<typeof handleConfirmScheduledGift>[2], conversationId, confirmFallbackProduct);
           writes.push({ tool: toolName, ...result });
           toolContent = result;
         } else {

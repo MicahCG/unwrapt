@@ -303,11 +303,27 @@ error doesn't poison the cache). This makes `search_gifts`,
 `select_gift`'s validation, and `confirm_scheduled_gift`'s validation see
 the same catalog snapshot within one short conversational exchange, instead
 of each independently re-rolling Goody's own call-to-call volatility.
-Verified via live testing (re-running the exact "Packable Tote Bag" flow
-after deploy) rather than a unit test - the cache is simple module-level
-state with no pure/exported surface worth isolating, and the complex
-logic it sits next to (recommendation integrity, cross-turn context) is
-already covered in `index.test.ts`.
+**The 60s cache alone did not fix it** - retesting live still showed "isn't
+available right now." Root cause: Supabase Edge Functions can serve two
+requests moments apart on different isolates, each with its own empty
+module-level cache - there's no guarantee of hitting the same warm instance,
+so the in-memory cache couldn't be relied on to survive between the
+`search_gifts` turn and the later `select_gift` turn.
+
+**Actual fix**: `handleSelectGift` and `handleConfirmScheduledGift` now
+accept an optional `fallbackProduct`, used when a fresh Goody lookup
+doesn't find the product. The caller seeds `seenProducts` at the top of the
+request from the prior turn's carried-over `recommendedProducts` (CC-02's
+own metadata) before the tool loop runs, so a fallback is available even
+when the model correctly skips re-searching for an explicit same-text
+selection. This uses data the user was already shown and already agreed
+to - not invented - so falling back to it for the write is arguably more
+correct than failing outright over an upstream listing's own
+inconsistency. Verified via live testing (the "Packable Tote Bag" flow
+completed end to end after this fix) rather than a unit test - the
+handlers are DB-calling, non-pure functions; the complex logic around them
+(recommendation integrity, cross-turn context) is already covered in
+`index.test.ts`.
 
 ## Invented gift ideas when search_gifts comes up empty (found via live testing)
 
