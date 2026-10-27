@@ -582,7 +582,7 @@ const goodyImage = (product: GoodyProduct) =>
 /** Shared by search (ranked/filtered) and the confirm-time single-product
  * re-lookup (needs the full catalog, unranked and unfiltered, since the
  * target id might not be a top-12 match on any particular query). */
-const fetchRawGoodyProducts = async (): Promise<GoodyProduct[]> => {
+const fetchRawGoodyProductsUncached = async (): Promise<GoodyProduct[]> => {
   const environment = Deno.env.get("GOODY_API_ENV") === "production" ? "production" : "sandbox";
   const apiKey = environment === "production"
     ? Deno.env.get("GOODY_PRODUCTION_COMMERCE_API_KEY")
@@ -613,6 +613,29 @@ const fetchRawGoodyProducts = async (): Promise<GoodyProduct[]> => {
     if (batch.length < 100) break;
   }
   return raw;
+};
+
+// Goody's /v1/products listing has been observed in practice to return a
+// different set of results across calls spaced only seconds apart within
+// the same conversation (a known, previously-flagged catalog-volatility
+// gap) - without caching, a product search_gifts just showed could
+// legitimately "disappear" by the time select_gift/confirm_scheduled_gift
+// re-validates it moments later, even though nothing about the real
+// catalog changed. Module-level, per warm isolate: trades "always this
+// exact instant" for "stable within one conversational turn or two," which
+// matches how a product catalog actually changes far better than the
+// API's own call-to-call volatility does. Only a successful, non-empty
+// fetch is cached, so a transient API error doesn't poison it.
+let goodyProductsCache: { data: GoodyProduct[]; fetchedAt: number } | null = null;
+const GOODY_PRODUCTS_CACHE_TTL_MS = 60_000;
+
+const fetchRawGoodyProducts = async (): Promise<GoodyProduct[]> => {
+  if (goodyProductsCache && Date.now() - goodyProductsCache.fetchedAt < GOODY_PRODUCTS_CACHE_TTL_MS) {
+    return goodyProductsCache.data;
+  }
+  const data = await fetchRawGoodyProductsUncached();
+  if (data.length) goodyProductsCache = { data, fetchedAt: Date.now() };
+  return data;
 };
 
 const toProduct = (product: GoodyProduct & { id: string; name: string; price: number }, vibe?: string): Product => ({

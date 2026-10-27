@@ -284,6 +284,31 @@ two separate, drifted implementations of the same regex) now share this one
 function. Covered by new tests in `index.test.ts`, including a direct
 reproduction of the "Packable Tote Bag" failure.
 
+## Goody catalog volatility causing "isn't available right now" (found via live testing)
+
+After both CC-02 fixes above, retrying "Let's go with the Packable Tote
+Bag" correctly called `select_gift` this time - but got
+`"It looks like the Packable Tote Bag isn't available right now"`. This is
+the long-flagged, pre-existing known gap: Goody's `/v1/products` listing
+returns a different set of results across calls spaced only seconds apart,
+so `select_gift`'s fresh re-validation lookup (`findGoodyProductById`,
+intentionally unranked/unfiltered and uncached, to avoid writing a stale
+price) sometimes just doesn't see a product that `search_gifts` returned
+moments earlier in the same conversation - not a code defect in the
+matching logic, a genuine inconsistency in the upstream API.
+
+**Fix**: `fetchRawGoodyProducts` now caches its result for 60 seconds at the
+module level (only on a successful, non-empty fetch, so a transient API
+error doesn't poison the cache). This makes `search_gifts`,
+`select_gift`'s validation, and `confirm_scheduled_gift`'s validation see
+the same catalog snapshot within one short conversational exchange, instead
+of each independently re-rolling Goody's own call-to-call volatility.
+Verified via live testing (re-running the exact "Packable Tote Bag" flow
+after deploy) rather than a unit test - the cache is simple module-level
+state with no pure/exported surface worth isolating, and the complex
+logic it sits next to (recommendation integrity, cross-turn context) is
+already covered in `index.test.ts`.
+
 ## Invented gift ideas when search_gifts comes up empty (found via live testing)
 
 `supabase/functions/thea-chat/index.ts`. Reported from a live session: asking
