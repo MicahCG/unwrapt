@@ -259,6 +259,31 @@ in criteria (new budget, new interest, "something else," etc.) must ignore
 the list and call `search_gifts` fresh, same as before CC-02. Covered by a
 regression test in `index.test.ts`.
 
+**Second, deeper regression found via live browser testing immediately
+after**: the wording fix above didn't fully work, because the carryover
+mechanism's data source was broken. Live DB inspection
+(`conversation_messages.metadata`) showed `{}` on assistant turns that *did*
+recommend real products - `recommendedProducts` was never actually being
+persisted, so there was nothing for the next turn to read back. Root cause:
+the model frequently omits the invisible `RECOMMENDED_IDS` line even when it
+correctly names and prices a real product (a pre-existing reliability gap,
+not new), and the prior code only ever recovered ids from that line - so an
+unmarked-but-real recommendation silently persisted as "nothing
+recommended." Confirmed live: "Let's go with the Packable Tote Bag" (an
+explicit, unambiguous selection) re-listed the same products instead of
+calling `select_gift`, because the prior turn's real recommendation had
+never been persisted for this turn to carry forward.
+
+**Fix**: `resolveIdsByExactTitle` in `checkRecommendationIntegrity` now
+matches a reply's bolded phrases against real `search_gifts` result titles
+(exact, case-insensitive) as a fallback when `RECOMMENDED_IDS` is absent -
+recovering the id deterministically instead of either flagging a false
+"missing marker" retry or silently losing it. Both the in-loop integrity
+check and the final `products`/`recommendedProducts` extraction (previously
+two separate, drifted implementations of the same regex) now share this one
+function. Covered by new tests in `index.test.ts`, including a direct
+reproduction of the "Packable Tote Bag" failure.
+
 ## Invented gift ideas when search_gifts comes up empty (found via live testing)
 
 `supabase/functions/thea-chat/index.ts`. Reported from a live session: asking

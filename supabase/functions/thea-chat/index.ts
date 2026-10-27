@@ -424,25 +424,50 @@ type RecommendationCheck = {
   needsRealSearch: boolean;
 };
 
+/** Matches a reply's bolded phrases against real search_gifts result titles
+ * (exact, case-insensitive) - a deterministic fallback for when the model
+ * names a real product correctly (per its own "confirm the exact product...
+ * back clearly" instruction) but forgets the invisible RECOMMENDED_IDS line,
+ * which happens often enough in practice that relying on the marker alone
+ * left `recommendedProducts` persistence (see fetchLastTurnContext) silently
+ * empty even for genuine, real-catalog recommendations. Exact-match only
+ * (not substring) to avoid false-positiving on an unrelated bolded phrase
+ * that happens to contain a product name as a fragment. */
+const resolveIdsByExactTitle = (content: string, seenProducts: Map<string, { title: string }>): string[] => {
+  const byTitle = new Map<string, string>();
+  for (const [id, p] of seenProducts) byTitle.set(p.title.trim().toLowerCase(), id);
+  const boldMatches = content.match(/\*\*([^*]{2,80})\*\*/g) || [];
+  const resolved: string[] = [];
+  for (const raw of boldMatches) {
+    const id = byTitle.get(raw.slice(2, -2).trim().toLowerCase());
+    if (id && !resolved.includes(id)) resolved.push(id);
+  }
+  return resolved;
+};
+
 /** Detects whether a reply's named "recommendations" are actually backed by
- * a real search_gifts result from this turn. Three failure modes seen in
+ * a real search_gifts result from this turn. Failure modes seen in
  * practice: (a) the model forgets the RECOMMENDED_IDS line even though it
- * named real, bolded products with prices; (b) it references ids that were
- * never returned by search_gifts this turn; (c) it invents generic,
- * non-catalog "example" gift ideas (e.g. "a cozy blanket," "a personalized
- * water bottle") when search came up empty, as a bulleted list with no
- * per-item price - which (a)'s bold+$ pattern can't catch, since there's no
- * price to find. Unlike (a), (b) and (c) aren't real products that just
- * need ids attached, so `needsRealSearch` routes to a genuine re-search
- * rather than "resend with RECOMMENDED_IDS" (which would just invent ids
- * for fake products). Exported standalone for unit testing. */
-export const checkRecommendationIntegrity = (content: string, seenProductIds: Set<string>): RecommendationCheck => {
+ * named a real, bolded product with a price (now recovered via
+ * resolveIdsByExactTitle rather than flagged, since the bolded text matches
+ * a real result); (b) it references ids that were never returned by
+ * search_gifts this turn; (c) it invents generic, non-catalog "example"
+ * gift ideas (e.g. "a cozy blanket," "a personalized water bottle") when
+ * search came up empty, as a bulleted list with no per-item price and no
+ * title match against any real result. (b) and (c) aren't real products
+ * that just need ids attached, so `needsRealSearch` routes to a genuine
+ * re-search rather than "resend with RECOMMENDED_IDS" (which would just
+ * invent ids for fake products). Exported standalone for unit testing. */
+export const checkRecommendationIntegrity = (content: string, seenProducts: Map<string, { title: string }>): RecommendationCheck => {
   const idsMatch = content.match(/RECOMMENDED_IDS:\s*(.*)$/is);
-  const mentionedIds: string[] = idsMatch
+  const explicitIds: string[] = idsMatch
     ? idsMatch[1].replace(/[[\]]/g, "").split(",").map((id) => id.trim().replace(/^["']|["']$/g, "")).filter(Boolean)
     : [];
+  const titleResolvedIds = resolveIdsByExactTitle(content, seenProducts);
+  const mentionedIds = explicitIds.length ? explicitIds : titleResolvedIds;
   const looksLikeRecommendation = /\*\*[^*]+\*\*[^\n]*\$\d/.test(content);
-  const missingMarker = looksLikeRecommendation && mentionedIds.length === 0;
+  const missingMarker = looksLikeRecommendation && explicitIds.length === 0 && titleResolvedIds.length === 0;
+  const seenProductIds = new Set(seenProducts.keys());
   const hasUnresolvedIds = mentionedIds.some((id) => !seenProductIds.has(id));
   const bulletItemCount = (content.match(/^\s*[•▪\-*]\s*\*\*[^*]{2,60}\*\*/gm) || []).length;
   const looksLikeInventedList = bulletItemCount >= 2 && mentionedIds.length === 0;
@@ -1304,7 +1329,7 @@ Rules:
       if (toolCalls.length === 0) {
         const content = message.content || "";
 
-        const { mentionedIds, missingMarker, needsRealSearch } = checkRecommendationIntegrity(content, new Set(seenProducts.keys()));
+        const { mentionedIds, missingMarker, needsRealSearch } = checkRecommendationIntegrity(content, seenProducts);
 
         if ((needsRealSearch || missingMarker) && iteration < MAX_TOOL_ITERATIONS - 1) {
           conversation.push({ role: "assistant", content });
@@ -1392,20 +1417,16 @@ Rules:
     // Tolerant of the model omitting the brackets it was asked for (seen in
     // practice): find the marker itself rather than requiring an exact
     // "[...]" match, so a malformed marker still gets stripped from the
-    // user-facing reply instead of leaking raw.
+    // user-facing reply instead of leaking raw. Kept separate from id
+    // resolution below purely for stripping the displayed text.
     const markerMatch = finalContent.match(/RECOMMENDED_IDS:\s*(.*)$/is);
-    const recommendedIds = markerMatch
-      ? markerMatch[1]
-        .replace(/[[\]]/g, "")
-        .split(",")
-        .map((id) => id.trim().replace(/^["']|["']$/g, ""))
-        .filter(Boolean)
-      : [];
-    // The model is asked to echo this into its reply too (belt and
-    // suspenders), but persistence relies on lastReviewMarker - captured
-    // directly from select_gift's tool result above - rather than this
-    // regex match, since the model doesn't always include the line even
-    // when told to. Still stripped below on the rare chance it appears.
+    // Reuses the same title-fallback resolution as the in-loop guard, so a
+    // reply that names a real product correctly but forgets the marker
+    // (common in practice - see resolveIdsByExactTitle) still resolves to
+    // its real id here, instead of silently persisting as if nothing was
+    // recommended (which broke the CC-02 cross-turn carryover this was
+    // meant to feed).
+    const { mentionedIds: recommendedIds } = checkRecommendationIntegrity(finalContent, seenProducts);
 
     // The prompt already says never use an em dash, but that rule isn't
     // always followed, so enforce it here rather than relying on the model.

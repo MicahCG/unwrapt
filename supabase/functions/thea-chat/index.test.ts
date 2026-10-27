@@ -84,32 +84,48 @@ Deno.test("buildTurnContextMessage surfaces the in-focus recipient so a write do
   assert(message?.includes("instead of re-calling get_recipients"));
 });
 
+const seenProducts = (entries: Array<[string, string]>) =>
+  new Map(entries.map(([id, title]) => [id, { title }]));
+
 Deno.test("checkRecommendationIntegrity passes a real recommendation backed by RECOMMENDED_IDS and a seen product", () => {
   const content = [
     "Here's a great pick:",
     "**Coffee Beans by Methodical Coffee** - $24, perfect for a coffee lover.",
     "RECOMMENDED_IDS: prod_123",
   ].join("\n");
-  const result = checkRecommendationIntegrity(content, new Set(["prod_123"]));
+  const result = checkRecommendationIntegrity(content, seenProducts([["prod_123", "Coffee Beans by Methodical Coffee"]]));
   assertEquals(result.mentionedIds, ["prod_123"]);
   assertEquals(result.missingMarker, false);
   assertEquals(result.needsRealSearch, false);
 });
 
-Deno.test("checkRecommendationIntegrity flags a real-looking product named without the required RECOMMENDED_IDS line", () => {
+Deno.test("checkRecommendationIntegrity recovers via exact title match when the model forgets RECOMMENDED_IDS but names a real product correctly (regression: this silently broke CC-02's cross-turn carryover, since nothing got persisted for the next turn to read back)", () => {
   const content = "Here's a great pick:\n**Coffee Beans by Methodical Coffee** - $24, perfect for a coffee lover.";
-  const result = checkRecommendationIntegrity(content, new Set());
-  assertEquals(result.missingMarker, true);
+  const result = checkRecommendationIntegrity(content, seenProducts([["prod_123", "Coffee Beans by Methodical Coffee"]]));
+  assertEquals(result.mentionedIds, ["prod_123"]);
+  assertEquals(result.missingMarker, false);
   assertEquals(result.needsRealSearch, false);
+});
+
+Deno.test("checkRecommendationIntegrity still flags a bolded product with a price that matches no real search result by title (genuinely unresolvable, not just marker-less)", () => {
+  const content = "Here's a great pick:\n**Something Made Up** - $24, perfect for a coffee lover.";
+  const result = checkRecommendationIntegrity(content, seenProducts([["prod_123", "Coffee Beans by Methodical Coffee"]]));
+  assertEquals(result.missingMarker, true);
+});
+
+Deno.test("checkRecommendationIntegrity does not title-match an unrelated bolded phrase that merely contains a product name as a substring", () => {
+  const content = "**Coffee Beans by Methodical Coffee is out of stock** - sorry about that, no price here though.";
+  const result = checkRecommendationIntegrity(content, seenProducts([["prod_123", "Coffee Beans by Methodical Coffee"]]));
+  assertEquals(result.mentionedIds, []);
 });
 
 Deno.test("checkRecommendationIntegrity flags RECOMMENDED_IDS referencing an id never returned by search_gifts this turn", () => {
   const content = "**Coffee Beans by Methodical Coffee** - $24.\nRECOMMENDED_IDS: prod_999";
-  const result = checkRecommendationIntegrity(content, new Set(["prod_123"]));
+  const result = checkRecommendationIntegrity(content, seenProducts([["prod_123", "Coffee Beans by Methodical Coffee"]]));
   assertEquals(result.needsRealSearch, true);
 });
 
-Deno.test("checkRecommendationIntegrity flags an invented bulleted list of generic gift ideas with no RECOMMENDED_IDS (reproduces the live audit bug)", () => {
+Deno.test("checkRecommendationIntegrity flags an invented bulleted list of generic gift ideas with no RECOMMENDED_IDS and no title match (reproduces the live audit bug)", () => {
   const content = [
     "Here are some general gift ideas under $50:",
     "",
@@ -120,13 +136,20 @@ Deno.test("checkRecommendationIntegrity flags an invented bulleted list of gener
     "",
     "Let me know if any of these resonate, or if you want to explore more options!",
   ].join("\n");
-  const result = checkRecommendationIntegrity(content, new Set());
+  const result = checkRecommendationIntegrity(content, seenProducts([]));
   assertEquals(result.missingMarker, false);
   assertEquals(result.needsRealSearch, true);
 });
 
+Deno.test("checkRecommendationIntegrity recognizes an explicit, unambiguous selection of a real product by its exact bolded title (reproduces the live S06-style bug: 'Let's go with the Packable Tote Bag' re-listed instead of selecting)", () => {
+  const content = "Here are the available gifts for Jake between $25 and $50:\n\n• **Packable Tote Bag** - $25  \nPractical and perfect for everyday use.\n\nWould you like to go with the **Packable Tote Bag**?";
+  const result = checkRecommendationIntegrity(content, seenProducts([["prod_tote", "Packable Tote Bag"]]));
+  assertEquals(result.mentionedIds, ["prod_tote"]);
+  assertEquals(result.missingMarker, false);
+});
+
 Deno.test("checkRecommendationIntegrity leaves ordinary conversational replies alone", () => {
-  const result = checkRecommendationIntegrity("What's your budget for this gift?", new Set());
+  const result = checkRecommendationIntegrity("What's your budget for this gift?", seenProducts([]));
   assertEquals(result.missingMarker, false);
   assertEquals(result.needsRealSearch, false);
 });
