@@ -372,7 +372,7 @@ export const buildTurnContextMessage = (context: TurnContext | null): string | n
       .map((p) => `${p.title} (id: ${p.id}, $${p.price})`)
       .join("; ");
     parts.push(
-      `Products you just showed in your last reply: ${list}. If the user's new message names one of these by text, call select_gift directly with its id - do not call search_gifts again or re-list them.`,
+      `Products you just showed in your last reply: ${list}. If, and only if, the user's new message clearly names ONE specific one of these by text (e.g. "the coffee beans," "the bracelet"), call select_gift directly with its id instead of searching again. For anything else - a new or different budget/price range, a different interest, "something else," or any other change in criteria - ignore this list entirely and call search_gifts fresh as usual. Never force one of these old results to answer a request it doesn't actually match.`,
     );
   }
   if (!parts.length) return null;

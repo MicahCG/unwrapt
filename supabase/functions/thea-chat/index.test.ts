@@ -65,7 +65,16 @@ Deno.test("buildTurnContextMessage surfaces last-shown products so a same-text p
   });
   assert(message?.includes("prod_123"));
   assert(message?.includes("Coffee Beans by Methodical Coffee"));
-  assert(message?.includes("do not call search_gifts again"));
+  assert(message?.includes("call select_gift directly"));
+});
+
+Deno.test("buildTurnContextMessage explicitly tells the model to search again for a different request, not force-fit the carried-over list (regression: a follow-up asking for a new price range hit the MAX_TOOL_ITERATIONS fallback because the old wording read as an absolute 'never search again')", () => {
+  const message = buildTurnContextMessage({
+    recommendedProducts: [{ id: "prod_123", title: "Coffee Beans by Methodical Coffee", price: 16 }],
+  });
+  assert(message?.includes("If, and only if"));
+  assert(message?.includes("ignore this list entirely and call search_gifts fresh"));
+  assert(message?.includes("a new or different budget/price range"));
 });
 
 Deno.test("buildTurnContextMessage surfaces the in-focus recipient so a write doesn't need a redundant get_recipients call (fixes S03)", () => {

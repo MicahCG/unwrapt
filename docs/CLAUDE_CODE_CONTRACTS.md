@@ -245,6 +245,20 @@ address for him" against real ids carried over from its own prior reply,
 instead of needing to perfectly re-call `get_recipients`/`search_gifts`
 every single turn (which it doesn't always do in practice).
 
+**Regression found via live testing and fixed**: the first wording of the
+carried-over-products instruction ("do not call search_gifts again or
+re-list them") read as an absolute rule rather than one conditional on the
+user actually naming one of those products. A follow-up asking for a
+*different* price range (none of the previously-shown items fit it) left
+the model unable to satisfy the request from the old list but also
+"told not to" search again - it burned every iteration trying anyway and
+hit the `MAX_TOOL_ITERATIONS` fallback ("I'm having trouble pulling that up
+right now"). Reworded to be explicit: the carried-over list only applies
+when the user clearly names one of those specific items; any other change
+in criteria (new budget, new interest, "something else," etc.) must ignore
+the list and call `search_gifts` fresh, same as before CC-02. Covered by a
+regression test in `index.test.ts`.
+
 ## Invented gift ideas when search_gifts comes up empty (found via live testing)
 
 `supabase/functions/thea-chat/index.ts`. Reported from a live session: asking
