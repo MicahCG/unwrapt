@@ -1,5 +1,5 @@
 import { Capacitor } from '@capacitor/core';
-import { appOrigin, isNativeApp } from '@/lib/native';
+import { isNativeApp } from '@/lib/native';
 import { configureIap, identifyIapUser } from '@/lib/iap';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -65,17 +65,34 @@ async function setupDeepLinks(): Promise<void> {
 
     try {
       const parsed = new URL(url);
-      // Supabase OAuth returns tokens in hash or code in query
-      const path = `${parsed.pathname}${parsed.search}${parsed.hash}`;
-      if (parsed.hash.includes('access_token') || parsed.searchParams.has('code')) {
-        // Let supabase-js pick up the session from the URL
-        window.location.replace(`${appOrigin()}${path || '/'}`);
+      const customScheme = parsed.protocol === 'io.unwrapt.app:' || parsed.protocol === 'unwrapt:';
+      // io.unwrapt.app://auth/callback parses with host "auth" and path "/callback".
+      const path = customScheme ? `/${parsed.host}${parsed.pathname}` : parsed.pathname;
+
+      // Google sign-in: store the session inside the app. Never navigate to the https site,
+      // which would leave the bundled app and run the website in its place.
+      if (path === '/auth/callback' || (path === '/' && parsed.hash.includes('access_token'))) {
+        const hash = new URLSearchParams(parsed.hash.replace(/^#/, ''));
+        const accessToken = hash.get('access_token');
+        const refreshToken = hash.get('refresh_token');
+        const code = parsed.searchParams.get('code');
+        if (accessToken && refreshToken) {
+          const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+          if (error) throw error;
+        } else if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) throw error;
+        } else {
+          console.warn('[native] sign-in returned without a session', hash.get('error_description') || parsed.searchParams.get('error_description'));
+        }
+        window.location.replace('/');
         return;
       }
-      // In-app navigation for Universal Links into the SPA
-      const target = path && path !== '/' ? path : '/';
+
+      // Any other link (calendar callback, payment success) opens that screen inside the app.
+      const target = `${path || '/'}${parsed.search}${parsed.hash}`;
       if (window.location.pathname + window.location.search + window.location.hash !== target) {
-        window.location.assign(target.startsWith('http') ? target : target);
+        window.location.assign(target);
       }
     } catch (e) {
       console.error('[native] failed to handle deep link', e);

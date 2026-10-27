@@ -3,7 +3,7 @@ import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { ErrorHandler } from '@/utils/errorHandler';
 import { rateLimiter, RATE_LIMITS } from '@/utils/rateLimiter';
-import { appOrigin, isNativeApp } from '@/lib/native';
+import { NATIVE_AUTH_CALLBACK, isNativeApp } from '@/lib/native';
 import { openExternalAuthUrl } from '@/lib/nativeBootstrap';
 import { logoutIapUser } from '@/lib/iap';
 
@@ -148,11 +148,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log('🔧 AuthProvider: Starting Google sign in');
 
-      // Native + web: always return to app.unwrapt.io for Universal Links /
-      // custom URL scheme handoff into the Capacitor shell.
+      // The iOS app returns through its own URL scheme so sign-in lands back in the app.
       let redirectUrl: string;
       if (isNativeApp()) {
-        redirectUrl = `${appOrigin()}/`;
+        redirectUrl = NATIVE_AUTH_CALLBACK;
       } else if (window.location.hostname === 'localhost') {
         redirectUrl = `http://localhost:${window.location.port || '8080'}/`;
       } else if (window.location.hostname === 'unwrapt.io') {

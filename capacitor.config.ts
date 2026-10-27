@@ -8,6 +8,8 @@ const config: CapacitorConfig = {
   appId: 'io.unwrapt.app',
   appName: 'Unwrapt',
   webDir: 'dist',
+  // Cream behind the web view, so launch never flashes black in dark mode.
+  backgroundColor: '#EDE6D8',
   server: {
     androidScheme: 'https',
     iosScheme: 'capacitor',

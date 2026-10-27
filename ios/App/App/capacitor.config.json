@@ -2,6 +2,7 @@
 	"appId": "io.unwrapt.app",
 	"appName": "Unwrapt",
 	"webDir": "dist",
+	"backgroundColor": "#EDE6D8",
 	"server": {
 		"androidScheme": "https",
 		"iosScheme": "capacitor",
