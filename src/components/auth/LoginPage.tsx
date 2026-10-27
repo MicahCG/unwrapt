@@ -5,6 +5,11 @@ import { U } from '@/components/unwrapt2/theme';
 import { SignInCancelled, useAuth } from './AuthProvider';
 import { trackProductEvent } from '@/lib/productAnalytics';
 import { useToast } from '@/hooks/use-toast';
+import { isNativeApp } from '@/lib/native';
+
+// Web Sign in with Apple needs a Services ID and OAuth secret in Supabase; until they're set,
+// offer Apple only in the iOS app, where the native sheet needs just the bundle ID.
+const APPLE_ON_WEB = import.meta.env.VITE_APPLE_SIGNIN_WEB === 'true';
 
 const IDLE_MS = 3000;
 const WAVE_MS = 3200;
@@ -91,6 +96,8 @@ const LoginPage: React.FC = () => {
 
   const choose = (
     <div className="space-y-2">
+      {(isNativeApp() || APPLE_ON_WEB) && (
+        <>
       {/* Apple's style rules: black button, white Apple mark, same size as other sign-in options. */}
       <button
         type="button"
@@ -103,6 +110,8 @@ const LoginPage: React.FC = () => {
         <AppleMark />
         {busy === 'apple' ? 'Signing in…' : 'Continue with Apple'}
       </button>
+        </>
+      )}
       <button
         type="button"
         onClick={() => start('google')}
