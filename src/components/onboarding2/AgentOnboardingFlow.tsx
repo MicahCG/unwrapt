@@ -11,6 +11,8 @@ import { useTheaReaction } from '@/hooks/useTheaReaction';
 import { theaChatPose } from '@/lib/theaState';
 import { classifyUserReply } from '@/lib/theaReactions';
 import { withAccountPicker } from '@/lib/calendarConnection';
+import BirthdaySourcePicker from '@/components/birthdays/BirthdaySourcePicker';
+import { SOURCE_LABEL, type BirthdaySource, type FoundOccasion } from '@/lib/birthdaySources';
 import { TheaCharacter } from '@/components/unwrapt2/TheaCharacter';
 import { U, toneForIndex, initialsOf } from '@/components/unwrapt2/theme';
 import { format } from 'date-fns';
@@ -40,7 +42,7 @@ interface AgentOnboardingFlowProps {
 
 interface CalendarEvent {
   summary?: string;
-  date: string;
+  date: string | null;
   type: 'birthday' | 'anniversary';
   personName: string;
 }
@@ -256,71 +258,68 @@ function StepPips({ step, total = 4 }: { step: number; total?: number }) {
 function ImportPromptScreen({
   connecting,
   onConnect,
+  onFound,
   onAddManually,
   onUseDifferentAccount,
   notice,
 }: {
   connecting: boolean;
   onConnect: () => void;
+  /** Contacts, Apple Calendar, a file or a typed list; the parent shows the review. */
+  onFound: (occasions: FoundOccasion[], source: BirthdaySource) => void;
   onAddManually: () => void;
   onUseDifferentAccount: () => void;
-  /** What happened on the last calendar attempt, so a cancel or empty calendar is never a dead end. */
+  /** What happened on the last attempt, so a cancel or empty source is never a dead end. */
   notice: string | null;
 }) {
-  const [ctaReady, setCtaReady] = useState(false);
+  const [ready, setReady] = useState(false);
+  const reveal: React.CSSProperties = {
+    opacity: ready ? 1 : 0,
+    transform: ready ? 'translateY(0)' : 'translateY(8px)',
+    transition: 'opacity 320ms ease, transform 320ms ease',
+    pointerEvents: ready ? 'auto' : 'none',
+  };
 
   return (
     <MobileShell
-      contentClassName="px-5 pt-5 pb-4"
+      contentClassName="overflow-y-auto px-5 pt-5 pb-4"
       footer={
-        <div
-          style={{
-            opacity: ctaReady ? 1 : 0,
-            transform: ctaReady ? 'translateY(0)' : 'translateY(8px)',
-            transition: 'opacity 320ms ease, transform 320ms ease',
-            pointerEvents: ctaReady ? 'auto' : 'none',
-          }}
-        >
-          <PrimaryButton onClick={onConnect} disabled={connecting || !ctaReady}>
-            {connecting ? 'Connecting…' : notice ? 'Try Google Calendar again' : 'Connect Google Calendar'}
-          </PrimaryButton>
-          {!notice && (
-            <button
-              type="button"
-              onClick={onAddManually}
-              disabled={connecting}
-              className="u-press mt-1.5 min-h-11 w-full text-[13.5px] font-semibold disabled:opacity-50"
-              style={{ color: U.ink }}
-            >
-              Add someone myself
-            </button>
-          )}
+        <div style={reveal}>
+          <button
+            type="button"
+            onClick={onAddManually}
+            disabled={connecting}
+            className="u-press min-h-11 w-full text-[13.5px] font-semibold disabled:opacity-50"
+            style={{ color: U.ink }}
+          >
+            Add one person myself
+          </button>
           <p
-            className="mt-3 flex items-center justify-center gap-1.5 text-center"
-            style={{ color: U.muted, fontSize: 10.5, opacity: 0.55, letterSpacing: '0.02em' }}
+            className="mt-1 flex items-center justify-center gap-1.5 text-center"
+            style={{ color: U.muted, fontSize: 10.5, opacity: 0.7, letterSpacing: '0.02em' }}
           >
             <ShieldCheck size={12} aria-hidden="true" />
-            <span>Read-only · disconnect anytime</span>
+            <span>Read-only · nothing is saved until you choose who to add</span>
           </p>
         </div>
       }
     >
       <StepPips step={1} />
-      <TheaCharacter size="large" pose={notice ? 'thinking' : 'welcome'} className="u-thea-character--greeting" />
+      <TheaCharacter size="medium" pose={notice ? 'thinking' : 'welcome'} />
       <div
-        className="-mt-2 rounded-[22px] border bg-white/80 px-5 py-5 text-center"
+        className="-mt-2 shrink-0 rounded-[22px] border bg-white/80 px-5 py-4 text-center"
         style={{ borderColor: U.border }}
         aria-live="polite"
       >
-        <Display style={{ fontSize: 24, lineHeight: 1.25, fontWeight: 500 }}>
+        <Display style={{ fontSize: 23, lineHeight: 1.25, fontWeight: 500 }}>
           <TypewriterLine
-            text="Connect your calendar and I’ll find important dates for us to prioritize."
-            onComplete={() => setCtaReady(true)}
+            text="Where do you keep birthdays? I’ll find the dates worth planning for."
+            onComplete={() => setReady(true)}
           />
         </Display>
       </div>
       {notice && (
-        <div className="mx-auto mt-3 max-w-[340px] rounded-[16px] px-4 py-3 text-center text-[13px] leading-5" role="status" style={{ background: U.accentSoft, color: U.inkSoft }}>
+        <div className="mx-auto mt-3 w-full shrink-0 rounded-[16px] px-4 py-3 text-center text-[13px] leading-5" role="status" style={{ background: U.accentSoft, color: U.inkSoft }}>
           {notice}
           {/* Kept here, not only in the footer, so they're visible above mobile browser toolbars. */}
           <div className="mt-2.5 grid grid-cols-2 gap-2">
@@ -333,6 +332,14 @@ function ImportPromptScreen({
           </div>
         </div>
       )}
+      <div className="mt-3 shrink-0" style={reveal}>
+        <BirthdaySourcePicker
+          onFound={onFound}
+          onGoogle={onConnect}
+          googleBusy={connecting}
+          googleLabel={connecting ? 'Opening Google…' : undefined}
+        />
+      </div>
     </MobileShell>
   );
 }
@@ -343,7 +350,9 @@ function FoundPeopleScreen({
   selectedFirst,
   onSelect,
   onContinue,
+  sourceLabel,
 }: {
+  sourceLabel: string;
   people: Person[];
   focusingId: string | null;
   selectedFirst: string;
@@ -387,7 +396,7 @@ function FoundPeopleScreen({
               <span style={{ color: U.accent }}>
                 {people.length} {people.length === 1 ? 'person' : 'people'}
               </span>{' '}
-              in your calendar.
+              in {sourceLabel}.
             </>
           )}
         </Display>
@@ -476,6 +485,8 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   const [isConnected, setIsConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [people, setPeople] = useState<Person[]>([]);
+  const [peopleSource, setPeopleSource] = useState<BirthdaySource>('google');
+  const [scanLabel, setScanLabel] = useState('Reading your calendar…');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [focusingId, setFocusingId] = useState<string | null>(null);
 
@@ -673,7 +684,34 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     }
   };
 
+  /** Results from Contacts, Apple Calendar, a file or a typed list, shown in the same review. */
+  const handleFoundOccasions = (occasions: FoundOccasion[], source: BirthdaySource) => {
+    const grouped = groupEventsIntoPeople(occasions.map((o) => ({ personName: o.personName, date: o.date, type: o.type })));
+    void trackProductEvent('birthday_source_results', { source, people: grouped.length });
+    if (!grouped.length) {
+      setCalendarNotice(`I didn’t find birthdays or anniversaries in ${SOURCE_LABEL[source]}. Try another option, or add someone yourself.`);
+      return;
+    }
+    setCalendarNotice(null);
+    setPeopleSource(source);
+    if (source === 'typed') {
+      setPeople(grouped);
+      setScreen('found');
+      return;
+    }
+    // The same short "reading" beat as Google, for the concierge feel.
+    setScanLabel(source === 'contacts' ? 'Reading your contacts…' : 'Reading your calendar…');
+    setScanning(true);
+    window.setTimeout(() => {
+      setScanning(false);
+      setPeople(grouped);
+      setScreen('found');
+    }, 1100);
+  };
+
   const handleFindMyPeople = () => {
+    setPeopleSource('google');
+    setScanLabel('Reading your calendar…');
     if (isConnected) {
       fetchCalendarEvents();
     } else {
@@ -968,7 +1006,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           birthday: person.birthday,
           anniversary: person.anniversary,
           relationship: person.relationship,
-          notes: person.fromCalendar ? 'Imported from calendar during onboarding' : 'Added during onboarding',
+          notes: person.fromCalendar ? `Imported from ${SOURCE_LABEL[peopleSource].replace('your ', '')} during onboarding` : 'Added during onboarding',
         });
         if (error) console.error('Error creating recipient', person.name, error);
       }
@@ -1096,7 +1134,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             <div className="flex h-full flex-col items-center justify-center px-6 text-center">
               <TheaCharacter size="large" pose="thinking" />
               <Display className="mt-7 text-[27px]">
-                <TypewriterLine text="Reading your calendar…" speedMs={32} caret={false} />
+                <TypewriterLine text={scanLabel} speedMs={32} caret={false} />
               </Display>
               <p className="mt-2" style={{ fontSize: 15, color: U.subtle, maxWidth: 260, lineHeight: 1.5 }}>
                 Finding dates that matter…
@@ -1124,6 +1162,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         <ImportPromptScreen
           connecting={connecting}
           onConnect={handleFindMyPeople}
+          onFound={handleFoundOccasions}
           onAddManually={startManualAdd}
           onUseDifferentAccount={() => void connectGoogleCalendar({ chooseAccount: true })}
           notice={calendarNotice}
@@ -1141,6 +1180,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           selectedFirst={selectedFirst}
           onSelect={selectPerson}
           onContinue={focusSelectedPerson}
+          sourceLabel={SOURCE_LABEL[peopleSource]}
         />
       );
     }

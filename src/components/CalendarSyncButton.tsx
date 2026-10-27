@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Calendar, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import BirthdaySourcePicker from '@/components/birthdays/BirthdaySourcePicker';
 import { useToast } from '@/hooks/use-toast';
 import { useCalendarConnection, type CalendarCandidate, type CalendarStatus } from '@/hooks/useCalendarConnection';
 import { formatOccasionDate } from '@/lib/dateUtils';
@@ -14,24 +16,25 @@ interface CalendarSyncButtonProps {
   onAddManually?: () => void;
 }
 
-const statusCopy = (status: CalendarStatus): { tone: 'info' | 'warn'; text: string } | null => {
+const statusCopy = (status: CalendarStatus, source: string): { tone: 'info' | 'warn'; text: string } | null => {
   switch (status.kind) {
     case 'cancelled': return { tone: 'warn', text: 'You didn’t finish connecting. Nothing changed, and your people are still here.' };
     case 'expired': return { tone: 'warn', text: 'Calendar access expired. Reconnect to keep birthdays in sync.' };
     case 'failed': return { tone: 'warn', text: `Couldn’t connect Google Calendar. ${status.message}` };
-    case 'no_events': return { tone: 'info', text: 'Connected, but no birthdays or anniversaries turned up in your calendar.' };
-    case 'up_to_date': return { tone: 'info', text: 'Everyone from your calendar is already in Your people.' };
-    case 'imported': return { tone: 'info', text: `Added ${status.count} ${status.count === 1 ? 'person' : 'people'} from your calendar.` };
+    case 'no_events': return { tone: 'info', text: `No birthdays or anniversaries turned up in ${source}.` };
+    case 'up_to_date': return { tone: 'info', text: `Everyone from ${source} is already in Your people.` };
+    case 'imported': return { tone: 'info', text: `Added ${status.count} ${status.count === 1 ? 'person' : 'people'} from ${source}.` };
     default: return null;
   }
 };
 
 const CalendarImportReview: React.FC<{
+  sourceLabel: string;
   candidates: CalendarCandidate[];
   importing: boolean;
   onImport: (selected: CalendarCandidate[]) => void;
   onCancel: () => void;
-}> = ({ candidates, importing, onImport, onCancel }) => {
+}> = ({ sourceLabel, candidates, importing, onImport, onCancel }) => {
   const [chosen, setChosen] = useState(() => new Set(candidates.map((c) => c.key)));
   useEffect(() => setChosen(new Set(candidates.map((c) => c.key))), [candidates]);
   const selected = candidates.filter((c) => chosen.has(c.key));
@@ -46,7 +49,7 @@ const CalendarImportReview: React.FC<{
     <Dialog open onOpenChange={(open) => { if (!open && !importing) onCancel(); }}>
       <DialogContent className="max-h-[88dvh] w-[calc(100%-1.5rem)] max-w-md overflow-y-auto rounded-[24px] p-5">
         <DialogHeader className="text-left">
-          <DialogTitle>Found in your calendar</DialogTitle>
+          <DialogTitle>Found in {sourceLabel}</DialogTitle>
           <DialogDescription>Choose who Thea should look after. You can add details later.</DialogDescription>
         </DialogHeader>
         <ul className="mt-1 flex flex-col gap-2">
@@ -57,7 +60,7 @@ const CalendarImportReview: React.FC<{
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[14px] font-semibold text-[#2A2520]">{person.name}</span>
                   <span className="block text-[12px] text-[#7A6F62]">
-                    {[person.birthday && `Birthday · ${formatOccasionDate(person.birthday)}`, person.anniversary && `Anniversary · ${formatOccasionDate(person.anniversary)}`].filter(Boolean).join('  ·  ')}
+                    {[person.birthday && `Birthday · ${formatOccasionDate(person.birthday)}`, person.anniversary && `Anniversary · ${formatOccasionDate(person.anniversary)}`].filter(Boolean).join('  ·  ') || 'No date yet'}
                   </span>
                 </span>
               </label>
@@ -77,7 +80,8 @@ const CalendarImportReview: React.FC<{
 
 const CalendarSyncButton = ({ className, appearance = 'default', onAddManually }: CalendarSyncButtonProps) => {
   const { toast } = useToast();
-  const { isConnected, status, connect, findCandidates, importCandidates, dismiss } = useCalendarConnection();
+  const { isConnected, status, sourceLabel, connect, findCandidates, reviewFound, importCandidates, dismiss } = useCalendarConnection();
+  const [choosing, setChoosing] = useState(false);
   const busy = status.kind === 'connecting' || status.kind === 'syncing' || status.kind === 'importing';
   // An expired grant needs the consent screen again, not another sync attempt.
   const needsConnect = !isConnected || status.kind === 'expired';
@@ -107,25 +111,41 @@ const CalendarSyncButton = ({ className, appearance = 'default', onAddManually }
             ? 'Sync calendar'
             : 'Connect Google Calendar';
   const icon = busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : status.kind === 'imported' || status.kind === 'up_to_date' ? <Check className="h-3.5 w-3.5" /> : <Calendar className="h-3.5 w-3.5" />;
-  const message = statusCopy(status);
+  const message = statusCopy(status, sourceLabel);
   const review = status.kind === 'review' || status.kind === 'importing' ? (
-    <CalendarImportReview candidates={status.candidates} importing={status.kind === 'importing'} onImport={handleImport} onCancel={dismiss} />
+    <CalendarImportReview sourceLabel={sourceLabel} candidates={status.candidates} importing={status.kind === 'importing'} onImport={handleImport} onCancel={dismiss} />
   ) : null;
 
   if (appearance === 'pill') {
+    // Manual offers every birthday source, not only Google; Google statuses still show here.
+    const pillLabel = busy || status.kind === 'expired' ? label : 'Import birthdays';
     return (
       <div aria-live="polite">
         <button
           type="button"
-          onClick={handleClick}
+          onClick={() => (busy ? undefined : status.kind === 'expired' ? handleClick() : setChoosing(true))}
           disabled={busy}
           aria-busy={busy}
           className={className || 'u-press inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border px-3.5 py-2.5 text-[12.5px] font-semibold disabled:opacity-60'}
           style={{ borderColor: 'rgba(42,37,32,0.14)', background: '#F1E7D5', color: '#2A2520' }}
         >
           {icon}
-          {label}
+          {pillLabel}
         </button>
+        <Sheet open={choosing} onOpenChange={setChoosing}>
+          <SheetContent side="bottom" className="mx-auto max-h-[90dvh] w-full max-w-[440px] overflow-y-auto rounded-t-[28px] border-0 bg-[#F7F1E6] px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-5 lg:max-w-[520px]">
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[#2A2520]/15" />
+            <SheetHeader className="mb-3 text-left">
+              <SheetTitle className="font-display text-[26px] font-normal leading-tight text-[#2A2520]">Where do you keep birthdays?</SheetTitle>
+              <SheetDescription className="text-[13px] text-[#6B6256]">Read-only. You choose who to add before anything is saved.</SheetDescription>
+            </SheetHeader>
+            <BirthdaySourcePicker
+              onFound={(occasions, source) => { setChoosing(false); void reviewFound(occasions, source); }}
+              onGoogle={() => { setChoosing(false); handleClick(); }}
+              googleLabel={isConnected ? 'Sync Google Calendar' : undefined}
+            />
+          </SheetContent>
+        </Sheet>
         {message && (
           <div
             className="mt-2.5 rounded-[14px] px-3.5 py-2.5 text-[12.5px] leading-[1.45]"
@@ -136,7 +156,10 @@ const CalendarSyncButton = ({ className, appearance = 'default', onAddManually }
               {onAddManually && (status.kind === 'cancelled' || status.kind === 'failed' || status.kind === 'no_events' || status.kind === 'expired') && (
                 <button type="button" onClick={onAddManually} className="min-h-8 font-semibold text-[#B65B3C]">Add someone manually</button>
               )}
-              {(status.kind === 'failed' || status.kind === 'no_events' || status.kind === 'cancelled') && (
+              {(status.kind === 'no_events' || status.kind === 'up_to_date') && (
+                <button type="button" onClick={() => setChoosing(true)} className="min-h-8 font-semibold text-[#B65B3C]">Try another source</button>
+              )}
+              {(status.kind === 'failed' || status.kind === 'cancelled' || (status.kind === 'no_events' && sourceLabel === 'your calendar')) && (
                 <button type="button" onClick={() => void connect({ chooseAccount: true })} className="min-h-8 font-semibold text-[#B65B3C]">Use a different Google account</button>
               )}
               <button type="button" onClick={dismiss} className="min-h-8 font-semibold text-[#6B6256]">Dismiss</button>

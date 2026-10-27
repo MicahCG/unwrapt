@@ -10,6 +10,7 @@ import {
   toCalendarError,
   type CalendarResult,
 } from '@/lib/calendarConnection';
+import { SOURCE_LABEL, type BirthdaySource, type FoundOccasion } from '@/lib/birthdaySources';
 
 export type CalendarCandidate = { key: string; name: string; birthday: string | null; anniversary: string | null };
 
@@ -57,6 +58,35 @@ export function useCalendarConnection(returnTo = '/?tab=manual') {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [status, setStatus] = useState<CalendarStatus>({ kind: 'idle' });
+  // Where the people under review came from, for copy and the saved note ("your contacts").
+  const [sourceLabel, setSourceLabel] = useState(SOURCE_LABEL.google);
+
+  /** Groups found people, drops ones already saved, and opens the review (or says why not). */
+  const showReview = useCallback(async (people: Map<string, CalendarCandidate>) => {
+    if (!user) return;
+    if (people.size === 0) {
+      setStatus({ kind: 'no_events' });
+      return;
+    }
+    const { data: existing } = await supabase.from('recipients').select('name').eq('user_id', user.id);
+    const known = new Set((existing || []).map((r) => normalizeRecipientName(r.name)));
+    const candidates = [...people.values()].filter((p) => !known.has(p.key));
+    setStatus(candidates.length ? { kind: 'review', candidates } : { kind: 'up_to_date' });
+  }, [user]);
+
+  /** People from iPhone Contacts, Apple Calendar, an uploaded file or a typed list. */
+  const reviewFound = useCallback(async (occasions: FoundOccasion[], source: BirthdaySource) => {
+    setSourceLabel(SOURCE_LABEL[source]);
+    const people = new Map<string, CalendarCandidate>();
+    for (const o of occasions) {
+      const key = normalizeRecipientName(o.personName);
+      const person = people.get(key) || { key, name: o.personName, birthday: null, anniversary: null };
+      if (o.type === 'birthday') person.birthday ||= o.date;
+      else person.anniversary ||= o.date;
+      people.set(key, person);
+    }
+    await showReview(people);
+  }, [showReview]);
 
   const { data: isConnected = false, isLoading: checkingConnection } = useCalendarConnected();
 
@@ -71,6 +101,7 @@ export function useCalendarConnection(returnTo = '/?tab=manual') {
 
   const findCandidates = useCallback(async () => {
     if (!user) return;
+    setSourceLabel(SOURCE_LABEL.google);
     setStatus({ kind: 'syncing' });
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -90,15 +121,7 @@ export function useCalendarConnection(returnTo = '/?tab=manual') {
         else person.anniversary ||= dateOnly(event.date);
         people.set(key, person);
       }
-      if (people.size === 0) {
-        setStatus({ kind: 'no_events' });
-        return;
-      }
-
-      const { data: existing } = await supabase.from('recipients').select('name').eq('user_id', user.id);
-      const known = new Set((existing || []).map((r) => normalizeRecipientName(r.name)));
-      const candidates = [...people.values()].filter((p) => !known.has(p.key));
-      setStatus(candidates.length ? { kind: 'review', candidates } : { kind: 'up_to_date' });
+      await showReview(people);
     } catch (error) {
       const code = (error as { code?: string }).code;
       if (code === 'access_expired') setStatus({ kind: 'expired' });
@@ -107,7 +130,7 @@ export function useCalendarConnection(returnTo = '/?tab=manual') {
         setStatus({ kind: 'idle' });
       } else setStatus({ kind: 'failed', message: error instanceof Error ? error.message : 'Calendar sync failed.' });
     }
-  }, [user, queryClient]);
+  }, [user, queryClient, showReview]);
 
   const importCandidates = useCallback(async (selected: CalendarCandidate[]) => {
     if (!user || !selected.length) {
@@ -123,7 +146,7 @@ export function useCalendarConnection(returnTo = '/?tab=manual') {
         birthday: p.birthday,
         anniversary: p.anniversary,
         interests: [],
-        notes: 'Auto-imported from Google Calendar',
+        notes: `Imported from ${sourceLabel.replace('your ', '')}`,
       })))
       .select('id');
     if (error) {
@@ -132,7 +155,7 @@ export function useCalendarConnection(returnTo = '/?tab=manual') {
     }
     await queryClient.invalidateQueries({ queryKey: ['recipients'] });
     setStatus({ kind: 'imported', count: data?.length ?? selected.length });
-  }, [user, queryClient]);
+  }, [user, queryClient, sourceLabel]);
 
   const dismiss = useCallback(() => setStatus({ kind: 'idle' }), []);
 
@@ -159,5 +182,5 @@ export function useCalendarConnection(returnTo = '/?tab=manual') {
     }
   }, [searchParams, setSearchParams, user, queryClient, findCandidates]);
 
-  return { isConnected, checkingConnection, status, connect, findCandidates, importCandidates, dismiss };
+  return { isConnected, checkingConnection, status, sourceLabel, connect, findCandidates, reviewFound, importCandidates, dismiss };
 }
