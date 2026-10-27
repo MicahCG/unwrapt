@@ -325,6 +325,29 @@ handlers are DB-calling, non-pure functions; the complex logic around them
 (recommendation integrity, cross-turn context) is already covered in
 `index.test.ts`.
 
+**Fourth regression found via live retesting, after the fallback above was
+deployed**: "Let's go with the Packable Tote Bag" *still* re-listed the same
+six products instead of calling `select_gift` - confirmed via DB that
+`recommendedProducts` metadata was persisting correctly this time (the
+mechanics work), so this is pure model instruction-following variance:
+`buildTurnContextMessage`'s instruction is conditional ("if, and only if,
+the user's new message clearly names one of these... call select_gift"),
+and `gpt-4o-mini` doesn't reliably apply that rule even with the exact
+matching data sitting right in context.
+
+**Fix**: `matchNamedRecommendedProduct` does a server-side, deterministic
+substring match between the user's newest message and the carried-over
+products' titles. When there's exactly one unambiguous match,
+`buildDirectSelectionMessage` adds a *directive* (not conditional)
+instruction for that turn specifically - "call select_gift right now with
+productId X" - appended after the user's message (closest to the model's
+turn) rather than folded into the general system prompt. This is
+belt-and-suspenders on top of the existing conditional instruction, not a
+replacement for it: it only fires on an unambiguous single match, so an
+unclear or multi-item reference still falls through to the model's own
+judgment. Covered by tests in `index.test.ts`, including a direct
+reproduction of the exact failing message.
+
 ## Invented gift ideas when search_gifts comes up empty (found via live testing)
 
 `supabase/functions/thea-chat/index.ts`. Reported from a live session: asking

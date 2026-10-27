@@ -5,8 +5,10 @@
 // import doesn't start a live HTTP listener - see the comment there.)
 import { assert, assertEquals } from "https://deno.land/std@0.190.0/testing/asserts.ts";
 import {
+  buildDirectSelectionMessage,
   buildTurnContextMessage,
   checkRecommendationIntegrity,
+  matchNamedRecommendedProduct,
   nextOccasionDate,
   normalizeInterests,
   scoreInterestText,
@@ -152,4 +154,49 @@ Deno.test("checkRecommendationIntegrity leaves ordinary conversational replies a
   const result = checkRecommendationIntegrity("What's your budget for this gift?", seenProducts([]));
   assertEquals(result.missingMarker, false);
   assertEquals(result.needsRealSearch, false);
+});
+
+const RECOMMENDED = [
+  { id: "prod_tote", title: "Packable Tote Bag", price: 25 },
+  { id: "prod_coffee", title: "Coffee Beans by Methodical Coffee", price: 16 },
+];
+
+Deno.test("matchNamedRecommendedProduct finds an unambiguous text match (reproduces the live bug: 'Let's go with the Packable Tote Bag' still re-listed instead of selecting, even with the conditional carried-over instruction present)", () => {
+  const match = matchNamedRecommendedProduct("Let's go with the Packable Tote Bag", RECOMMENDED);
+  assertEquals(match, { id: "prod_tote", title: "Packable Tote Bag", price: 25 });
+});
+
+Deno.test("matchNamedRecommendedProduct is case-insensitive", () => {
+  const match = matchNamedRecommendedProduct("i'll take the packable tote bag please", RECOMMENDED);
+  assertEquals(match?.id, "prod_tote");
+});
+
+Deno.test("matchNamedRecommendedProduct returns null when nothing in the message matches a carried-over title", () => {
+  assertEquals(matchNamedRecommendedProduct("What else do you have?", RECOMMENDED), null);
+});
+
+Deno.test("matchNamedRecommendedProduct returns null (ambiguous) when the message names more than one carried-over product", () => {
+  assertEquals(matchNamedRecommendedProduct("Maybe the Packable Tote Bag or the Coffee Beans by Methodical Coffee", RECOMMENDED), null);
+});
+
+Deno.test("matchNamedRecommendedProduct returns null with no carried-over products", () => {
+  assertEquals(matchNamedRecommendedProduct("Let's go with the Packable Tote Bag", undefined), null);
+});
+
+Deno.test("buildDirectSelectionMessage returns null without a match", () => {
+  assertEquals(buildDirectSelectionMessage(null, { id: "rec_1", name: "Jake" }), null);
+});
+
+Deno.test("buildDirectSelectionMessage includes the recipient hint when the active recipient is known", () => {
+  const message = buildDirectSelectionMessage({ id: "prod_tote", title: "Packable Tote Bag", price: 25 }, { id: "rec_1", name: "Jake" });
+  assert(message?.includes("prod_tote"));
+  assert(message?.includes("rec_1"));
+  assert(message?.includes("Jake"));
+  assert(message?.includes("Call select_gift right now"));
+});
+
+Deno.test("buildDirectSelectionMessage omits the recipient hint when no active recipient is known yet", () => {
+  const message = buildDirectSelectionMessage({ id: "prod_tote", title: "Packable Tote Bag", price: 25 }, null);
+  assert(message?.includes("prod_tote"));
+  assert(!message?.includes("recipientId"));
 });

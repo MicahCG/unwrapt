@@ -475,6 +475,40 @@ export const checkRecommendationIntegrity = (content: string, seenProducts: Map<
   return { mentionedIds, missingMarker, needsRealSearch };
 };
 
+type NamedProductMatch = { id: string; title: string; price: number };
+
+/** When the user's newest message plausibly names one of the carried-over
+ * recommended products by text (e.g. "Let's go with the Packable Tote
+ * Bag"), buildTurnContextMessage's instruction is conditional ("if the
+ * user names one of these, call select_gift") - but relying on the model
+ * to reliably notice this on its own isn't perfect in practice: observed
+ * live, the model sometimes just re-lists the same options again instead,
+ * even with that context present. When there's exactly one unambiguous
+ * substring match, this identifies it so a directive (not conditional)
+ * instruction can be built for just this turn, which is measurably more
+ * reliable than a general rule. Exported for unit testing. */
+export const matchNamedRecommendedProduct = (
+  latestUserMessage: string,
+  recommendedProducts: Array<NamedProductMatch> | undefined,
+): NamedProductMatch | null => {
+  if (!recommendedProducts?.length || !latestUserMessage.trim()) return null;
+  const haystack = latestUserMessage.toLowerCase();
+  const matches = recommendedProducts.filter((p) => haystack.includes(p.title.toLowerCase()));
+  return matches.length === 1 ? matches[0] : null;
+};
+
+/** Builds the directive (not conditional) select_gift instruction for a
+ * turn where matchNamedRecommendedProduct found an unambiguous match.
+ * Exported for unit testing. */
+export const buildDirectSelectionMessage = (
+  match: NamedProductMatch | null,
+  activeRecipient: { id: string; name: string } | null | undefined,
+): string | null => {
+  if (!match) return null;
+  const recipientHint = activeRecipient ? ` and recipientId "${activeRecipient.id}" (${activeRecipient.name})` : "";
+  return `The user's latest message clearly names "${match.title}" (id: ${match.id}, $${match.price}) from the products you just showed. Call select_gift right now with productId "${match.id}"${recipientHint} - do not call search_gifts again and do not re-list the options.`;
+};
+
 const sanitizeMessages = (input: unknown): ChatMessage[] | null => {
   if (!Array.isArray(input) || input.length === 0 || input.length > MAX_MESSAGES) return null;
   const messages: ChatMessage[] = [];
@@ -1331,11 +1365,19 @@ Rules:
     // (see buildTurnContextMessage above for why this exists).
     const turnContext = await fetchLastTurnContext(authClient, conversationId);
     const turnContextMessage = buildTurnContextMessage(turnContext);
+    // Belt-and-suspenders on top of buildTurnContextMessage's conditional
+    // instruction: when the user's own new message unambiguously names one
+    // of the carried-over products by text, give a directive instruction
+    // for just this turn instead of relying on the model to apply the
+    // general rule reliably (see matchNamedRecommendedProduct above).
+    const namedProductMatch = matchNamedRecommendedProduct(messages[messages.length - 1]?.content ?? "", turnContext?.recommendedProducts);
+    const directSelectionMessage = buildDirectSelectionMessage(namedProductMatch, turnContext?.activeRecipient ?? null);
     const conversation: unknown[] = [
       { role: "system", content: SYSTEM_PROMPT },
       ...(contextMessage ? [{ role: "system", content: contextMessage }] : []),
       ...(turnContextMessage ? [{ role: "system", content: turnContextMessage }] : []),
       ...messages,
+      ...(directSelectionMessage ? [{ role: "system", content: directSelectionMessage }] : []),
     ];
 
     const seenProducts = new Map<string, Product>();
