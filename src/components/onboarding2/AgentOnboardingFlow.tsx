@@ -19,7 +19,7 @@ import { format } from 'date-fns';
 import { trackProductEvent } from '@/lib/productAnalytics';
 import GachaReveal from '@/components/onboarding2/GachaReveal';
 import StrongGiftPicks from '@/components/onboarding2/StrongGiftPicks';
-import { clearSkipAgentWelcome, markTheaValueSeen, shouldSkipAgentWelcome } from '@/lib/funnel';
+import { clearSkipAgentWelcome, markTheaValueSeen } from '@/lib/funnel';
 import { VIP_MONTHLY_AMOUNT_LABEL } from '@/lib/stripe';
 import { type GiftAskUserOffer, type GiftCatalogItem } from '@/lib/giftCatalog';
 import {
@@ -61,7 +61,7 @@ interface Person {
   fromCalendar: boolean;
 }
 
-type Screen = 'welcome' | 'import' | 'found' | 'addperson' | 'intel' | 'reveal' | 'subscription';
+type Screen = 'import' | 'found' | 'addperson' | 'intel' | 'reveal' | 'subscription';
 
 const FREE_TIER_LIMIT = 3;
 
@@ -467,9 +467,8 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [screen, setScreen] = useState<Screen>(() =>
-    shouldSkipAgentWelcome() || new URLSearchParams(window.location.search).has('calendar') ? 'import' : 'welcome',
-  );
+  // The welcome now lives on the sign-in screen, so signed-in setup starts at importing birthdays.
+  const [screen, setScreen] = useState<Screen>('import');
   const [scanning, setScanning] = useState(false);
   const [calendarNotice, setCalendarNotice] = useState<string | null>(() => {
     // The calendar OAuth callback returns here with ?calendar=<result>.
@@ -1094,38 +1093,6 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   }
 
   switch (screen) {
-    // ════════ WELCOME ════════
-    case 'welcome':
-      return (
-        <MobileShell
-          glow
-          contentClassName="flex flex-col justify-between overflow-y-auto px-7 pt-16 pb-4"
-          footer={
-            <div className="space-y-2">
-              <PrimaryButton onClick={() => setScreen('import')}>Get started</PrimaryButton>
-              <p className="text-center text-[12px] leading-4" style={{ color: U.muted }}>
-                Takes about two minutes
-              </p>
-            </div>
-          }
-        >
-          <div className="flex items-center justify-between">
-            <span className="font-display" style={{ fontSize: 23, letterSpacing: '-0.3px' }}>Unwrapt</span>
-            <Eyebrow>Concierge</Eyebrow>
-          </div>
-          <div className="flex flex-1 flex-col justify-center pt-4 text-center">
-            <TheaCharacter size="large" pose="welcome" bubble="Hi, I’m Thea, your gifting agent" />
-            <Display className="mt-5" style={{ fontSize: 40, lineHeight: 1.02, letterSpacing: '-0.03em' }}>
-              Never forget another<br />
-              <em style={{ fontStyle: 'italic', fontWeight: 400, color: U.accent }}>moment.</em>
-            </Display>
-            <p className="mx-auto mt-4 min-h-[48px]" style={{ fontSize: 15, lineHeight: 1.5, color: U.textSecondary, maxWidth: 300 }}>
-              <TypewriterLine text="I remember who matters, and help you handle every gift." speedMs={22} />
-            </p>
-          </div>
-        </MobileShell>
-      );
-
     // ════════ IMPORT / SCANNING ════════
     case 'import':
       if (scanning) {
