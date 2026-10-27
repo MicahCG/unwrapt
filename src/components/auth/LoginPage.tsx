@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { TheaCharacter } from '@/components/unwrapt2/TheaCharacter';
 import { MobileShell, Eyebrow, Display } from '@/components/unwrapt2/MobileShell';
 import { U } from '@/components/unwrapt2/theme';
-import { useAuth } from './AuthProvider';
+import { SignInCancelled, useAuth } from './AuthProvider';
 import { trackProductEvent } from '@/lib/productAnalytics';
 import { useToast } from '@/hooks/use-toast';
 
@@ -32,43 +32,161 @@ const GoogleMark = () => (
  * The logged-out front door and the start of onboarding in one screen: Thea's welcome with
  * Google sign-in as the main action. Signed-in new users go straight to importing birthdays.
  */
+const AppleMark = () => (
+  <svg width="17" height="20" viewBox="0 0 17 20" aria-hidden="true" fill="currentColor">
+    <path d="M14.1 10.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.7-1-2.7-4.1ZM11.6 3c.7-.9 1.2-2 1-3.2-1 .1-2.2.7-3 1.6-.6.7-1.2 1.9-1.1 3.1 1.2.1 2.3-.6 3.1-1.5Z" />
+  </svg>
+);
+
+type Mode = 'choose' | 'email' | 'code';
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const LoginPage: React.FC = () => {
-  const { signInWithGoogle, loading } = useAuth();
-  const [signingIn, setSigningIn] = useState(false);
+  const { signInWithGoogle, signInWithApple, sendEmailCode, verifyEmailCode, loading } = useAuth();
+  const [busy, setBusy] = useState<'google' | 'apple' | 'email' | null>(null);
+  const [mode, setMode] = useState<Mode>('choose');
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const handleGoogleSignIn = async () => {
-    void trackProductEvent('auth_started', { provider: 'google', placement: 'login' });
-    setSigningIn(true);
+  const run = async (method: 'google' | 'apple' | 'email', action: () => Promise<void>, onDone?: () => void) => {
+    setBusy(method);
+    setError(null);
     try {
-      await signInWithGoogle();
-    } catch (error) {
-      toast({ title: 'Couldn’t sign in', description: error instanceof Error ? error.message : 'Please try again.', variant: 'destructive' });
+      await action();
+      onDone?.();
+    } catch (err) {
+      if (err instanceof SignInCancelled) return;
+      const message = err instanceof Error ? err.message : 'Please try again.';
+      if (mode === 'choose') toast({ title: 'Couldn’t sign in', description: message, variant: 'destructive' });
+      else setError(message);
     } finally {
-      // On the web the page navigates away; in the app the sign-in sheet may be dismissed.
-      setSigningIn(false);
+      // On the web Google and Apple navigate away; in the app a sheet may simply be closed.
+      setBusy(null);
     }
   };
+
+  const start = (method: 'google' | 'apple') => {
+    void trackProductEvent('auth_started', { provider: method, placement: 'login' });
+    void run(method, method === 'google' ? signInWithGoogle : signInWithApple);
+  };
+
+  const sendCode = () => {
+    if (!EMAIL_RE.test(email.trim())) {
+      setError('Enter a valid email address.');
+      return;
+    }
+    void trackProductEvent('auth_started', { provider: 'email', placement: 'login' });
+    void run('email', () => sendEmailCode(email), () => { setCode(''); setMode('code'); });
+  };
+
+  const verify = (value = code) => {
+    if (value.trim().length < 6) return;
+    void run('email', () => verifyEmailCode(email, value));
+  };
+
+  const disabled = loading || busy !== null;
+  const secondary = 'u-press min-h-11 w-full text-[13.5px] font-semibold disabled:opacity-50';
+
+  const choose = (
+    <div className="space-y-2">
+      {/* Apple's style rules: black button, white Apple mark, same size as other sign-in options. */}
+      <button
+        type="button"
+        onClick={() => start('apple')}
+        disabled={disabled}
+        aria-busy={busy === 'apple'}
+        className="u-press flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-[14px] text-[16px] font-semibold disabled:opacity-60"
+        style={{ background: '#000', color: '#fff' }}
+      >
+        <AppleMark />
+        {busy === 'apple' ? 'Signing in…' : 'Continue with Apple'}
+      </button>
+      <button
+        type="button"
+        onClick={() => start('google')}
+        disabled={disabled}
+        aria-busy={busy === 'google'}
+        className="u-press flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-[14px] border text-[16px] font-semibold disabled:opacity-60"
+        style={{ background: '#fff', color: U.ink, borderColor: U.borderStrong }}
+      >
+        <GoogleMark />
+        {busy === 'google' ? 'Opening Google…' : 'Continue with Google'}
+      </button>
+      <button type="button" onClick={() => { setError(null); setMode('email'); }} disabled={disabled} className={secondary} style={{ color: U.ink }}>
+        Continue with email
+      </button>
+    </div>
+  );
+
+  const emailStep = (
+    <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); sendCode(); }}>
+      <label htmlFor="login-email" className="block text-[14px] font-semibold" style={{ color: U.ink }}>Your email</label>
+      <input
+        id="login-email"
+        type="email"
+        inputMode="email"
+        autoComplete="email"
+        autoFocus
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="you@example.com"
+        className="min-h-[52px] w-full rounded-[14px] border bg-white px-4 text-[16px] outline-none focus:ring-2"
+        style={{ borderColor: U.borderStrong, color: U.ink }}
+      />
+      {error && <p role="alert" className="text-[12.5px]" style={{ color: U.accent }}>{error}</p>}
+      <button type="submit" disabled={disabled} aria-busy={busy === 'email'} className="u-press min-h-[52px] w-full rounded-[14px] text-[16px] font-semibold disabled:opacity-60" style={{ background: U.ink, color: U.buttonText }}>
+        {busy === 'email' ? 'Sending…' : 'Email me a code'}
+      </button>
+      <button type="button" onClick={() => { setError(null); setMode('choose'); }} disabled={disabled} className={secondary} style={{ color: U.subtle }}>
+        Other ways to sign in
+      </button>
+    </form>
+  );
+
+  const codeStep = (
+    <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); verify(); }}>
+      <label htmlFor="login-code" className="block text-[14px] font-semibold" style={{ color: U.ink }}>
+        Enter the 6-digit code sent to {email.trim()}
+      </label>
+      <input
+        id="login-code"
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        autoFocus
+        maxLength={6}
+        value={code}
+        onChange={(e) => {
+          const next = e.target.value.replace(/\D/g, '').slice(0, 6);
+          setCode(next);
+          if (next.length === 6) verify(next);
+        }}
+        placeholder="123456"
+        className="min-h-[52px] w-full rounded-[14px] border bg-white px-4 text-center font-mono text-[22px] tracking-[0.3em] outline-none focus:ring-2"
+        style={{ borderColor: U.borderStrong, color: U.ink }}
+      />
+      {error && <p role="alert" className="text-[12.5px]" style={{ color: U.accent }}>{error}</p>}
+      <button type="submit" disabled={disabled || code.length < 6} aria-busy={busy === 'email'} className="u-press min-h-[52px] w-full rounded-[14px] text-[16px] font-semibold disabled:opacity-60" style={{ background: U.ink, color: U.buttonText }}>
+        {busy === 'email' ? 'Checking…' : 'Sign in'}
+      </button>
+      <div className="grid grid-cols-2">
+        <button type="button" onClick={sendCode} disabled={disabled} className={secondary} style={{ color: U.accent }}>Send a new code</button>
+        <button type="button" onClick={() => { setError(null); setMode('email'); }} disabled={disabled} className={secondary} style={{ color: U.subtle }}>Change email</button>
+      </div>
+    </form>
+  );
 
   return (
     <MobileShell
       glow
       contentClassName="flex flex-col justify-between overflow-y-auto px-7 pt-16 pb-4"
       footer={
-        <div className="space-y-2">
-          <button
-            type="button"
-            onClick={() => void handleGoogleSignIn()}
-            disabled={loading || signingIn}
-            aria-busy={signingIn}
-            className="u-press flex min-h-[54px] w-full items-center justify-center gap-3 rounded-[16px] text-[16px] font-semibold disabled:opacity-60"
-            style={{ background: U.ink, color: U.buttonText }}
-          >
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white"><GoogleMark /></span>
-            {signingIn ? 'Opening Google…' : 'Continue with Google'}
-          </button>
-          <p className="text-center text-[11.5px] leading-4" style={{ color: U.muted }}>
-            Google only signs you in. Takes about two minutes.
+        <div>
+          {mode === 'choose' ? choose : mode === 'email' ? emailStep : codeStep}
+          <p className="mt-1.5 text-center text-[11px] leading-4" style={{ color: U.muted }}>
+            By continuing you agree to the{' '}
+            <a href="/terms" className="underline">Terms</a> and <a href="/privacy" className="underline">Privacy Policy</a>.
           </p>
         </div>
       }

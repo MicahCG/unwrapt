@@ -29,6 +29,7 @@
 		"scheme": "Unwrapt"
 	},
 	"packageClassList": [
+		"SignInWithApple",
 		"ContactsPlugin",
 		"AppPlugin",
 		"CAPBrowserPlugin",
