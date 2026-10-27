@@ -740,9 +740,9 @@
 .u-thea--basic .u-thea__mouth { transform-origin: 0% 100%; animation: u-thea-smirk 7s ease-in-out infinite; }
 /* Raising an arm: it swings up from the shoulder while the forearm unfolds at the elbow, then waves.
    Lowering plays the same motion in reverse before the next pose takes over. */
-.u-thea .u-thea__shoulder { transform-box: view-box; transform-origin: 262px 332px; }
+.u-thea .u-thea__shoulder { transform-box: view-box; transform-origin: 272px 326px; }
 .u-thea--welcome .u-thea__shoulder, .u-thea--thumbsup .u-thea__shoulder, .u-thea--cheer .u-thea__shoulder { animation: u-thea-shoulder-raise .55s cubic-bezier(.22,.9,.32,1) both; }
-.u-thea--welcome .u-thea__wave { transform-box: view-box; transform-origin: 334px 374px; animation: u-thea-elbow-raise .55s cubic-bezier(.22,.9,.32,1) both, u-thea-wave 2.6s ease-in-out .55s infinite; }
+.u-thea--welcome .u-thea__wave { transform-box: view-box; transform-origin: 338px 354px; animation: u-thea-elbow-raise .55s cubic-bezier(.22,.9,.32,1) both, u-thea-wave 2.6s ease-in-out .55s infinite; }
 .u-thea--thinking .u-thea__head { animation-duration: 8s; }
 .u-thea--thinking .u-thea__thought circle { transform-origin: center; animation: u-thea-thought 2.4s ease-in-out infinite; }
 .u-thea--thinking .u-thea__thought circle:nth-child(2) { animation-delay: .3s; }
@@ -763,9 +763,9 @@
 .u-thea--surprised { animation: u-thea-hop .5s ease-out both; }
 .u-thea--surprised .u-thea__sparkle { transform-origin: center; animation: u-thea-sparkle 1.6s ease-in-out infinite; }
 /* Reactions to what the user just said: short, then she settles back */
-.u-thea--cheer .u-thea__wave { transform-box: view-box; transform-origin: 334px 374px; animation: u-thea-elbow-raise .5s cubic-bezier(.22,.9,.32,1) both, u-thea-wave 1.3s ease-in-out .5s infinite; }
+.u-thea--cheer .u-thea__wave { transform-box: view-box; transform-origin: 338px 354px; animation: u-thea-elbow-raise .5s cubic-bezier(.22,.9,.32,1) both, u-thea-wave 1.3s ease-in-out .5s infinite; }
 .u-thea--cheer .u-thea__wave--late { animation-delay: 0s, -.15s; }
-.u-thea--thumbsup .u-thea__thumb { transform-box: view-box; transform-origin: 334px 374px; animation: u-thea-elbow-raise .5s cubic-bezier(.22,.9,.32,1) both, u-thea-thumb .7s ease-out .5s both; }
+.u-thea--thumbsup .u-thea__thumb { transform-box: view-box; transform-origin: 338px 354px; animation: u-thea-elbow-raise .5s cubic-bezier(.22,.9,.32,1) both, u-thea-thumb .7s ease-out .5s both; }
 .u-thea--exiting .u-thea__shoulder { animation: u-thea-shoulder-lower .38s cubic-bezier(.5,0,.75,0) both !important; }
 .u-thea--exiting .u-thea__wave, .u-thea--exiting .u-thea__thumb { animation: u-thea-elbow-lower .38s cubic-bezier(.5,0,.75,0) both !important; }
 .u-thea .u-thea__rest { transform-box: fill-box; transform-origin: 50% 0%; animation: u-thea-rest-in .32s ease-out both; }

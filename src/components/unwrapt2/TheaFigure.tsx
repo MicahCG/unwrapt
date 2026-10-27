@@ -67,25 +67,32 @@ const Sleeve: React.FC<{ d: string; width: number }> = ({ d, width }) => (
   </>
 );
 
-// Poses that lift her right arm (cheer lifts both). The upper arm is drawn behind her torso so
-// it grows out of the shoulder; the forearm and hand are drawn in front.
+// Poses that lift her right arm (cheer lifts both). A raised arm is painted in the sweater's own
+// gradient with no outline, so the shoulder flows into it like part of the body; only a crease
+// marks the underarm and elbow. Joints: shoulder (272, 326), elbow (338, 352).
 const RAISES_ARM: FigurePose[] = ['welcome', 'thumbsup', 'cheer'];
 const MIRROR = 'translate(382 0) scale(-1 1)';
 
-/** Shoulder to elbow, starting inside the torso so no seam shows where it joins. */
-const UpperArm: React.FC = () => (
+const RaisedSleeve: React.FC<{ d: string; width: number; fill: string }> = ({ d, width, fill }) => (
+  <path d={d} stroke={fill} strokeWidth={width} strokeLinecap="round" fill="none" />
+);
+
+/** Shoulder to elbow, merging into the top of the sweater. */
+const UpperArm: React.FC<{ fill: string }> = ({ fill }) => (
   <g className="u-thea__shoulder">
-    <Sleeve d="M246 332 Q306 336 334 374" width={38} />
+    <RaisedSleeve d="M262 330 Q306 336 338 352" width={40} fill={fill} />
+    <path d="M300 358 Q318 364 330 372" stroke="#ead2b2" strokeWidth="4.5" strokeLinecap="round" fill="none" />
   </g>
 );
 
 /** Elbow to an open waving hand. */
-const WavingForearm: React.FC<{ className?: string }> = ({ className }) => (
+const WavingForearm: React.FC<{ className?: string; fill: string }> = ({ className, fill }) => (
   <g className="u-thea__shoulder">
     <g className={className}>
-      <Sleeve d="M334 374 Q334 330 326 292" width={34} />
-      <circle cx="325" cy="272" r="23" fill="#eaa27a" />
-      <path d="M310 256 Q307 244 315 239 M322 250 Q322 238 330 236 M334 254 Q338 244 345 246" stroke="#eaa27a" strokeWidth="9.5" strokeLinecap="round" fill="none" />
+      <RaisedSleeve d="M338 356 Q342 322 336 292" width={36} fill={fill} />
+      <path d="M322 352 Q328 344 330 336" stroke="#ead2b2" strokeWidth="4" strokeLinecap="round" fill="none" />
+      <circle cx="335" cy="272" r="22" fill="#eaa27a" />
+      <path d="M320 257 Q317 245 325 240 M332 251 Q332 239 340 237 M344 255 Q348 245 355 247" stroke="#eaa27a" strokeWidth="9.5" strokeLinecap="round" fill="none" />
     </g>
   </g>
 );
@@ -117,6 +124,10 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
           <stop offset="0" stopColor="#83492d" /><stop offset="1" stopColor="#6c3820" />
         </linearGradient>
         <linearGradient id={id('sweater')} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#fbeedb" /><stop offset="1" stopColor="#f6e2c6" />
+        </linearGradient>
+        {/* Same colors as the sweater in page space, so raised sleeves match the body exactly. */}
+        <linearGradient id={id('sleeve')} gradientUnits="userSpaceOnUse" x1="0" y1="300" x2="0" y2="472">
           <stop offset="0" stopColor="#fbeedb" /><stop offset="1" stopColor="#f6e2c6" />
         </linearGradient>
         <linearGradient id={id('lens')} x1="0" y1="0" x2="0" y2="1">
@@ -155,10 +166,6 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
           stroke="#5f2f1b" strokeWidth="5" strokeLinecap="round" fill="none" opacity=".7"
         />
 
-        {/* Raised upper arms sit behind the torso */}
-        {RAISES_ARM.includes(pose) && <UpperArm />}
-        {pose === 'cheer' && <g transform={MIRROR}><UpperArm /></g>}
-
         {/* Sweater and resting hands */}
         <path d="M130 300 L252 300 Q276 302 288 318 Q306 344 330 432 Q340 470 312 472 L70 472 Q42 470 52 432 Q76 344 94 318 Q106 302 130 300 Z" fill={url('sweater')} />
         <g stroke="#ead2b2" strokeWidth="4.5" strokeLinecap="round" fill="none">
@@ -169,6 +176,9 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
           {restingLeft && <circle className="u-thea__rest" cx="155" cy="434" r="27" />}
           {restingRight && <circle className="u-thea__rest" cx="227" cy="434" r="27" />}
         </g>
+
+        {RAISES_ARM.includes(pose) && <UpperArm fill={url('sleeve')} />}
+        {pose === 'cheer' && <g transform={MIRROR}><UpperArm fill={url('sleeve')} /></g>}
 
         {/* Neck and turtleneck: the top dips to show her neck, the bottom folds onto the sweater */}
         <rect x="164" y="258" width="54" height="40" fill="#d4826a" />
@@ -288,7 +298,7 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
           <circle cx="110" cy="72" r="1.8" fill="#eadbd0" /><circle cx="272" cy="72" r="1.8" fill="#eadbd0" />
         </g>
 
-        {pose === 'welcome' && <WavingForearm className="u-thea__wave" />}
+        {pose === 'welcome' && <WavingForearm className="u-thea__wave" fill={url('sleeve')} />}
 
         {pose === 'thinking' && (
           <>
@@ -336,10 +346,11 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
         {pose === 'thumbsup' && (
           <g className="u-thea__shoulder">
             <g className="u-thea__thumb">
-              <Sleeve d="M334 374 Q334 336 326 304" width={34} />
-              <rect x="308" y="268" width="36" height="34" rx="13" fill="#eaa27a" />
-              <path d="M314 280 H336 M314 290 H336" stroke="#d98a63" strokeWidth="3" strokeLinecap="round" />
-              <path d="M318 270 Q314 248 326 242" stroke="#eaa27a" strokeWidth="12" strokeLinecap="round" fill="none" />
+              <RaisedSleeve d="M338 356 Q342 326 337 302" width={36} fill={url('sleeve')} />
+              <path d="M322 352 Q328 344 330 336" stroke="#ead2b2" strokeWidth="4" strokeLinecap="round" fill="none" />
+              <rect x="318" y="266" width="36" height="34" rx="13" fill="#eaa27a" />
+              <path d="M324 278 H346 M324 288 H346" stroke="#d98a63" strokeWidth="3" strokeLinecap="round" />
+              <path d="M328 268 Q324 246 336 240" stroke="#eaa27a" strokeWidth="12" strokeLinecap="round" fill="none" />
             </g>
           </g>
         )}
@@ -366,8 +377,8 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
 
         {pose === 'cheer' && (
           <>
-            <WavingForearm className="u-thea__wave" />
-            <g transform={MIRROR}><WavingForearm className="u-thea__wave u-thea__wave--late" /></g>
+            <WavingForearm className="u-thea__wave" fill={url('sleeve')} />
+            <g transform={MIRROR}><WavingForearm className="u-thea__wave u-thea__wave--late" fill={url('sleeve')} /></g>
           </>
         )}
 
