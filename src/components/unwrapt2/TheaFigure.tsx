@@ -73,6 +73,15 @@ const Sleeve: React.FC<{ d: string; width: number }> = ({ d, width }) => (
 const RAISES_ARM: FigurePose[] = ['welcome', 'thumbsup', 'cheer'];
 const MIRROR = 'translate(382 0) scale(-1 1)';
 
+// Her resting torso is wide because it includes both arms at her sides. When an arm is raised,
+// that side narrows to her real waist so there's space under the arm.
+const TORSO_RIGHT_RESTING = 'Q276 302 288 318 Q306 344 330 432 Q340 470 312 472';
+const TORSO_RIGHT_RAISED = 'Q274 302 282 320 Q285 338 277 354 Q268 382 270 422 Q272 456 286 472';
+const TORSO_LEFT_RESTING = 'Q42 470 52 432 Q76 344 94 318 Q106 302 130 300';
+const TORSO_LEFT_RAISED = 'Q110 470 112 422 Q114 382 105 354 Q97 338 100 320 Q108 302 130 300';
+const torso = (rightUp: boolean, leftUp: boolean) =>
+  `M130 300 L252 300 ${rightUp ? TORSO_RIGHT_RAISED : TORSO_RIGHT_RESTING} L${leftUp ? 96 : 70} 472 ${leftUp ? TORSO_LEFT_RAISED : TORSO_LEFT_RESTING} Z`;
+
 const RaisedSleeve: React.FC<{ d: string; width: number; fill: string }> = ({ d, width, fill }) => (
   <path d={d} stroke={fill} strokeWidth={width} strokeLinecap="round" fill="none" />
 );
@@ -167,7 +176,7 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
         />
 
         {/* Sweater and resting hands */}
-        <path d="M130 300 L252 300 Q276 302 288 318 Q306 344 330 432 Q340 470 312 472 L70 472 Q42 470 52 432 Q76 344 94 318 Q106 302 130 300 Z" fill={url('sweater')} />
+        <path d={torso(RAISES_ARM.includes(pose), pose === 'cheer')} fill={url('sweater')} />
         <g stroke="#ead2b2" strokeWidth="4.5" strokeLinecap="round" fill="none">
           {restingLeft && <path className="u-thea__rest" d="M124 378 Q120 400 118 420 M96 424 Q120 418 142 422" />}
           {restingRight && <path className="u-thea__rest" d="M258 378 Q262 400 264 420 M240 422 Q262 418 286 424" />}
