@@ -63,7 +63,11 @@
 		<string>http</string>
 	</array>
 	<key>NSCalendarsUsageDescription</key>
-	<string>Unwrapt finds birthdays and anniversaries from your Google Calendar so Thea can watch the moments that matter.</string>
+	<string>Unwrapt reads birthday and anniversary events from your calendar so Thea can plan gifts in time. You choose who to add, and nothing in your calendar is changed.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Unwrapt reads birthday and anniversary events from your calendar so Thea can plan gifts in time. You choose who to add, and nothing in your calendar is changed.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Unwrapt reads names and birthdays from your contacts so Thea can remind you and plan gifts. You choose who to add, and your contacts are never changed or shared.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Unwrapt may use photos when you attach a gift idea or profile image.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>

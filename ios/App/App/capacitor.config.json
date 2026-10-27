@@ -28,11 +28,13 @@
 		"scheme": "Unwrapt"
 	},
 	"packageClassList": [
+		"ContactsPlugin",
 		"AppPlugin",
 		"CAPBrowserPlugin",
 		"KeyboardPlugin",
 		"SplashScreenPlugin",
 		"StatusBarPlugin",
+		"CapacitorCalendarPlugin",
 		"PurchasesPlugin"
 	]
 }

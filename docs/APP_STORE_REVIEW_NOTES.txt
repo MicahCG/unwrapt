@@ -1,7 +1,7 @@
 Unwrapt — App Review Notes
 
 WHAT THE APP DOES
-Unwrapt is a personal gifting assistant. Users add the people they care about, optionally connect Google Calendar to import birthdays and anniversaries, and subscribe to VIP so Thea (our agent) can watch occasions and recommend gifts.
+Unwrapt is a personal gifting assistant. Users add the people they care about, optionally import birthdays and anniversaries from iPhone Contacts, Apple Calendar, Google Calendar or a typed list, and subscribe to VIP so Thea (our agent) can watch occasions and recommend gifts.
 
 DEMO LOGIN
 Sign in with Google using the reviewer account we provide in App Store Connect Notes (or request via App Review reply). After sign-in, complete or skip onboarding as needed. VIP can be purchased with a Sandbox Apple ID.
@@ -17,7 +17,7 @@ PHYSICAL GOODS
 When ordering/shipping a physical gift, payment uses Stripe. That charge is for a physical product, not digital content. VIP access itself is IAP-only inside the iOS app.
 
 CALENDAR
-Optional. Connect Google Calendar to import birthdays/anniversaries. We request calendar-related access only for that purpose.
+Optional. On the "Where do you keep birthdays?" step, a user can import from iPhone Contacts (Contacts permission), Apple Calendar (calendar full access, read-only use), Google Calendar (OAuth), or type a list. Device data is read on the phone; nothing is saved until the user picks people in the review. Each permission is requested only when the user taps that option.
 
 ACCOUNT DELETION
 Settings → Account includes a delete-account request flow.
