@@ -59,11 +59,14 @@ const NO_CHEEK_LIFT: FigurePose[] = ['surprised', 'clap', 'upset', 'oops'];
 const star = (cx: number, cy: number, r: number) =>
   `M${cx} ${cy - r} Q${cx} ${cy} ${cx + r} ${cy} Q${cx} ${cy} ${cx} ${cy + r} Q${cx} ${cy} ${cx - r} ${cy} Q${cx} ${cy} ${cx} ${cy - r} Z`;
 
-/** One arm segment: a cream sleeve with a soft outline so it reads against the sweater. */
-const Sleeve: React.FC<{ d: string; width: number }> = ({ d, width }) => (
+/**
+ * A forearm in the sweater's own color with no outline, so it joins the upper arm in one
+ * continuous shape; `crease` is the fold line that shows it against her body.
+ */
+const Sleeve: React.FC<{ d: string; width: number; fill: string; crease?: string }> = ({ d, width, fill, crease }) => (
   <>
-    <path d={d} stroke="#e6cfab" strokeWidth={width + 6} strokeLinecap="round" fill="none" />
-    <path d={d} stroke="#f6e4c9" strokeWidth={width} strokeLinecap="round" fill="none" />
+    <path d={d} stroke={fill} strokeWidth={width} strokeLinecap="round" fill="none" />
+    {crease && <path d={crease} stroke="#ead2b2" strokeWidth="4.5" strokeLinecap="round" fill="none" />}
   </>
 );
 
@@ -185,13 +188,13 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
         </>}
         {restingLeft && (
           <g className="u-thea__rest">
-            <Sleeve d="M92 424 Q118 442 142 438" width={32} />
+            <Sleeve d="M92 424 Q118 442 142 438" width={32} fill={url('sleeve')} crease="M107 408 Q118 422 136 422" />
             <circle cx="155" cy="434" r="25" fill="#eaa27a" />
           </g>
         )}
         {restingRight && (
           <g className="u-thea__rest">
-            <Sleeve d="M290 424 Q264 442 240 438" width={32} />
+            <Sleeve d="M290 424 Q264 442 240 438" width={32} fill={url('sleeve')} crease="M275 408 Q264 422 246 422" />
             <circle cx="227" cy="434" r="25" fill="#eaa27a" />
           </g>
         )}
@@ -321,7 +324,7 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
 
         {pose === 'thinking' && (
           <>
-            <Sleeve d="M92 422 Q116 370 154 306" width={36} />
+            <Sleeve d="M92 422 Q116 370 154 306" width={36} fill={url('sleeve')} crease="M112 416 Q132 374 164 320" />
             <circle cx="164" cy="286" r="23" fill="#eaa27a" />
             <path d="M176 270 Q184 262 180 254" stroke="#eaa27a" strokeWidth="10" strokeLinecap="round" fill="none" />
             <g className="u-thea__thought" fill="#fffaf2" stroke="#e3cba6" strokeWidth="3">
@@ -338,8 +341,8 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
             <rect x="184" y="362" width="14" height="102" fill="#e7b13b" />
             <path d="M191 362 Q170 334 160 348 Q154 362 191 362 Z M191 362 Q212 334 222 348 Q228 362 191 362 Z" fill="#e7b13b" />
             <circle cx="191" cy="361" r="6" fill="#d39a2a" />
-            <Sleeve d="M92 424 Q108 432 122 428" width={32} />
-            <Sleeve d="M290 424 Q274 432 260 428" width={32} />
+            <Sleeve d="M92 424 Q108 432 122 428" width={32} fill={url('sleeve')} />
+            <Sleeve d="M290 424 Q274 432 260 428" width={32} fill={url('sleeve')} />
             <circle cx="132" cy="424" r="25" fill="#eaa27a" />
             <circle cx="250" cy="424" r="25" fill="#eaa27a" />
           </g>
@@ -382,11 +385,11 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
         {pose === 'clap' && (
           <>
             <g className="u-thea__clap-l">
-              <Sleeve d="M92 420 Q132 412 172 398" width={32} />
+              <Sleeve d="M92 420 Q132 412 172 398" width={32} fill={url('sleeve')} crease="M104 406 Q132 398 162 386" />
               <ellipse cx="181" cy="390" rx="17" ry="24" fill="#eaa27a" transform="rotate(-12 181 390)" />
             </g>
             <g className="u-thea__clap-r">
-              <Sleeve d="M290 420 Q250 412 210 398" width={32} />
+              <Sleeve d="M290 420 Q250 412 210 398" width={32} fill={url('sleeve')} crease="M278 406 Q250 398 220 386" />
               <ellipse cx="201" cy="390" rx="17" ry="24" fill="#eaa27a" transform="rotate(12 201 390)" />
             </g>
             <path className="u-thea__twinkle" d="M152 376 L140 368 M150 396 H136 M230 376 L242 368 M232 396 H246" stroke="#e7b13b" strokeWidth="4.5" strokeLinecap="round" />
@@ -402,10 +405,10 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
 
         {pose === 'upset' && (
           <g className="u-thea__huff">
-            <Sleeve d="M92 420 Q170 422 236 398" width={34} />
+            <Sleeve d="M92 420 Q170 422 236 398" width={34} fill={url('sleeve')} crease="M104 405 Q168 406 226 384" />
             <circle cx="242" cy="396" r="17" fill="#eaa27a" />
             <circle cx="140" cy="398" r="17" fill="#eaa27a" />
-            <Sleeve d="M290 420 Q212 424 146 400" width={34} />
+            <Sleeve d="M290 420 Q212 424 146 400" width={34} fill={url('sleeve')} crease="M278 404 Q212 408 156 386 M278 437 Q212 441 150 416" />
             <path d="M318 112 q10 10 0 20 M334 102 q-10 10 0 20 M306 128 q10 -10 20 0 M306 142 q10 10 20 0" stroke="#d0533a" strokeWidth="5" strokeLinecap="round" fill="none" />
           </g>
         )}
