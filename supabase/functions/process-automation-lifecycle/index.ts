@@ -22,6 +22,12 @@ const fetchGoodyProduct = async (productId: string): Promise<GoodyProductLookup 
   return (payload.data || []).find((p) => p.id === productId) || null;
 };
 
+// Guarded (see thea-chat/index.ts for the same pattern) so a test file can
+// import this module for its exported handlers without also starting a
+// live HTTP listener. import.meta.main is true only when Deno runs this
+// file as the entry point, which is how the Supabase Dashboard function
+// editor invokes it - production behavior is unchanged.
+if (import.meta.main) {
 serve(async (req) => {
   try {
     console.log("🤖 Starting automation lifecycle processing");
@@ -118,6 +124,7 @@ serve(async (req) => {
     );
   }
 });
+}
 
 
 async function processGiftStage(supabaseClient: any, gift: any, recipient: any, today: Date) {
@@ -222,7 +229,7 @@ async function processGiftStage(supabaseClient: any, gift: any, recipient: any, 
   }
 }
 
-async function handleFundReservation(supabaseClient: any, gift: any, recipient: any) {
+export async function handleFundReservation(supabaseClient: any, gift: any, recipient: any) {
   console.log("    💰 STAGE 1: Fund Reservation");
 
   try {

@@ -218,3 +218,344 @@ step/modal the user was on when they started connecting. Building distinct
 UI for each state above, and preserving/resuming the originating context
 instead of a hard redirect, is frontend work - intentionally not touched
 here.
+
+## CC-02: cross-turn selection context (fixes audit screenshots S03 and S06)
+
+`supabase/functions/thea-chat/index.ts`. Investigation (tracing every
+frontend caller - `TheaAgent.tsx`, `TheaHomeTab.tsx`, `AgentOnboardingFlow.tsx`)
+confirmed none of them resend tool-call history; `thea-chat` only ever sees
+plain `{role, content}` display text each request. That's the direct cause
+of two audit findings:
+- **S03** ("address requested, then update refused"): `update_recipient`
+  requires a real `recipientId`. If the model doesn't re-call
+  `get_recipients` in the same turn it writes, the id it has isn't real and
+  the write is refused.
+- **S06** ("explicit gift choice triggers another list"): the model has no
+  memory of the productIds from its own last `search_gifts` call, so naming
+  a product by text in a later turn gives it nothing to resolve against
+  `select_gift`.
+
+**Fix**: the same `conversation_messages.metadata` jsonb column already used
+for `reviewMarker` (CC-04) now also persists, per assistant turn:
+`recommendedProducts: [{id, title, price}]` (when that turn named specific
+products) and `activeRecipient: {id, name}` (when that turn's tool calls
+resolved exactly one recipient - a single `get_recipients` match, or a
+successful `update_recipient`/`create_recipient`/`select_gift` write).
+Each new request reads the **previous** turn's persisted context
+(`fetchLastTurnContext`) and injects it as an additional system message
+(`buildTurnContextMessage`, exported for unit testing) alongside the
+existing dashboard-briefing context. This is purely additive - no new
+request/response field for the frontend, no migration needed.
+
+Net effect: the model can resolve "do the coffee beans" or "save that
+address for him" against real ids carried over from its own prior reply,
+instead of needing to perfectly re-call `get_recipients`/`search_gifts`
+every single turn (which it doesn't always do in practice).
+
+**Regression found via live testing and fixed**: the first wording of the
+carried-over-products instruction ("do not call search_gifts again or
+re-list them") read as an absolute rule rather than one conditional on the
+user actually naming one of those products. A follow-up asking for a
+*different* price range (none of the previously-shown items fit it) left
+the model unable to satisfy the request from the old list but also
+"told not to" search again - it burned every iteration trying anyway and
+hit the `MAX_TOOL_ITERATIONS` fallback ("I'm having trouble pulling that up
+right now"). Reworded to be explicit: the carried-over list only applies
+when the user clearly names one of those specific items; any other change
+in criteria (new budget, new interest, "something else," etc.) must ignore
+the list and call `search_gifts` fresh, same as before CC-02. Covered by a
+regression test in `index.test.ts`.
+
+**Second, deeper regression found via live browser testing immediately
+after**: the wording fix above didn't fully work, because the carryover
+mechanism's data source was broken. Live DB inspection
+(`conversation_messages.metadata`) showed `{}` on assistant turns that *did*
+recommend real products - `recommendedProducts` was never actually being
+persisted, so there was nothing for the next turn to read back. Root cause:
+the model frequently omits the invisible `RECOMMENDED_IDS` line even when it
+correctly names and prices a real product (a pre-existing reliability gap,
+not new), and the prior code only ever recovered ids from that line - so an
+unmarked-but-real recommendation silently persisted as "nothing
+recommended." Confirmed live: "Let's go with the Packable Tote Bag" (an
+explicit, unambiguous selection) re-listed the same products instead of
+calling `select_gift`, because the prior turn's real recommendation had
+never been persisted for this turn to carry forward.
+
+**Fix**: `resolveIdsByExactTitle` in `checkRecommendationIntegrity` now
+matches a reply's bolded phrases against real `search_gifts` result titles
+(exact, case-insensitive) as a fallback when `RECOMMENDED_IDS` is absent -
+recovering the id deterministically instead of either flagging a false
+"missing marker" retry or silently losing it. Both the in-loop integrity
+check and the final `products`/`recommendedProducts` extraction (previously
+two separate, drifted implementations of the same regex) now share this one
+function. Covered by new tests in `index.test.ts`, including a direct
+reproduction of the "Packable Tote Bag" failure.
+
+## Goody catalog volatility causing "isn't available right now" (found via live testing)
+
+After both CC-02 fixes above, retrying "Let's go with the Packable Tote
+Bag" correctly called `select_gift` this time - but got
+`"It looks like the Packable Tote Bag isn't available right now"`. This is
+the long-flagged, pre-existing known gap: Goody's `/v1/products` listing
+returns a different set of results across calls spaced only seconds apart,
+so `select_gift`'s fresh re-validation lookup (`findGoodyProductById`,
+intentionally unranked/unfiltered and uncached, to avoid writing a stale
+price) sometimes just doesn't see a product that `search_gifts` returned
+moments earlier in the same conversation - not a code defect in the
+matching logic, a genuine inconsistency in the upstream API.
+
+**Fix**: `fetchRawGoodyProducts` now caches its result for 60 seconds at the
+module level (only on a successful, non-empty fetch, so a transient API
+error doesn't poison the cache). This makes `search_gifts`,
+`select_gift`'s validation, and `confirm_scheduled_gift`'s validation see
+the same catalog snapshot within one short conversational exchange, instead
+of each independently re-rolling Goody's own call-to-call volatility.
+**The 60s cache alone did not fix it** - retesting live still showed "isn't
+available right now." Root cause: Supabase Edge Functions can serve two
+requests moments apart on different isolates, each with its own empty
+module-level cache - there's no guarantee of hitting the same warm instance,
+so the in-memory cache couldn't be relied on to survive between the
+`search_gifts` turn and the later `select_gift` turn.
+
+**Actual fix**: `handleSelectGift` and `handleConfirmScheduledGift` now
+accept an optional `fallbackProduct`, used when a fresh Goody lookup
+doesn't find the product. The caller seeds `seenProducts` at the top of the
+request from the prior turn's carried-over `recommendedProducts` (CC-02's
+own metadata) before the tool loop runs, so a fallback is available even
+when the model correctly skips re-searching for an explicit same-text
+selection. This uses data the user was already shown and already agreed
+to - not invented - so falling back to it for the write is arguably more
+correct than failing outright over an upstream listing's own
+inconsistency. Verified via live testing (the "Packable Tote Bag" flow
+completed end to end after this fix) rather than a unit test - the
+handlers are DB-calling, non-pure functions; the complex logic around them
+(recommendation integrity, cross-turn context) is already covered in
+`index.test.ts`.
+
+**Fourth regression found via live retesting, after the fallback above was
+deployed**: "Let's go with the Packable Tote Bag" *still* re-listed the same
+six products instead of calling `select_gift` - confirmed via DB that
+`recommendedProducts` metadata was persisting correctly this time (the
+mechanics work), so this is pure model instruction-following variance:
+`buildTurnContextMessage`'s instruction is conditional ("if, and only if,
+the user's new message clearly names one of these... call select_gift"),
+and `gpt-4o-mini` doesn't reliably apply that rule even with the exact
+matching data sitting right in context.
+
+**Fix**: `matchNamedRecommendedProduct` does a server-side, deterministic
+substring match between the user's newest message and the carried-over
+products' titles. When there's exactly one unambiguous match,
+`buildDirectSelectionMessage` adds a *directive* (not conditional)
+instruction for that turn specifically - "call select_gift right now with
+productId X" - appended after the user's message (closest to the model's
+turn) rather than folded into the general system prompt. This is
+belt-and-suspenders on top of the existing conditional instruction, not a
+replacement for it: it only fires on an unambiguous single match, so an
+unclear or multi-item reference still falls through to the model's own
+judgment. Covered by tests in `index.test.ts`, including a direct
+reproduction of the exact failing message.
+
+## Review step claiming a completed action before confirmation (found via live testing)
+
+After the directive-selection fix above worked (select_gift finally fired
+correctly), the review message itself read: *"I've scheduled the Packable
+Tote Bag for Jake's birthday..."* followed by *"Please confirm if you'd
+like to proceed with this gift!"* - directly contradictory. Confirmed via
+DB that nothing was actually written (`scheduled_gifts` had no new row,
+only `reviewMarker` metadata, same as any other correct review), so this
+was a wording-only bug: the model used past-tense/completed-action language
+for a step that is explicitly "a review, not a save." This is exactly the
+kind of invented completed action the system prompt's hard boundaries
+already forbid, but the review-specific instruction didn't say so
+explicitly.
+
+**Fix**: strengthened the review-presentation instruction (prompt-only, no
+code/logic change) to require future/conditional phrasing ("I'll
+schedule...", "Ready to send...") and explicitly forbid past-tense/
+completed-action phrasing ("I've scheduled...", "Done!") until after the
+user confirms and `confirm_scheduled_gift` actually runs.
+
+## Past-dated occasion slipping through, and a stale reviewMarker leaking across tool calls (found via live testing)
+
+Testing the confirm step found two compounding bugs, both in
+`supabase/functions/thea-chat/index.ts`, surfaced by the same turn:
+
+1. **Past-date loophole in `handleSelectGift`**: a confirmed-live recipient
+   (`Jake`) has `birthday = "2023-10-28"` - a real recipient's birthday
+   field always carries their actual, historical birth year. The model
+   passed that raw stored value straight through as `occasionDate` instead
+   of omitting it to get the correctly-computed next occurrence. The
+   existing past-date guard exempted an exact match to the stored
+   birthday/anniversary field from rejection (meant for a different case),
+   which let a three-years-in-the-past date sail through as a "known
+   occasion." **Fix**: the past-date check is now unconditional; if the
+   explicit date is in the past *and* exactly matches the stored
+   birthday/anniversary (i.e. the model clearly meant "their birthday" but
+   passed the raw field), it's auto-corrected to the properly-computed next
+   occurrence instead of either erroring or silently scheduling the past
+   date.
+2. **Stale `reviewMarker` leaking into persistence**: in the same turn,
+   `select_gift` ran (producing a review for the Packable Tote Bag,
+   internally using the bad date above) and `search_gifts` *also* ran, and
+   the model's actual final reply presented the search list, not the
+   review - but the review's marker was still captured into
+   `conversation_messages.metadata` regardless, since the old code
+   persisted whatever `select_gift` last returned, with no check against
+   what the final reply actually showed. This is a real integrity gap:
+   `confirm_scheduled_gift`'s whole safety mechanism depends on the
+   persisted marker meaning "the user was actually shown this review."
+   **Fix**: `shouldPersistReviewMarker` only keeps the marker when the
+   final reply either echoes the literal `GIFT_REVIEW` text or names the
+   reviewed product by its exact title (same title-fallback resolution as
+   `recommendedProducts`) - otherwise it's dropped. Covered by tests in
+   `index.test.ts`, including a direct reproduction of this exact turn.
+
+## Tapped product cards also re-searched instead of selecting (found via live testing)
+
+Also confirmed live: the frontend's "Select gift" button *does* exist and
+*does* work (contrary to an earlier assumption recorded in this doc -
+correcting that here) - tapping it sends a synthesized user message
+embedding the exact product id, e.g. *"I'd like the Coffee Beans by
+Methodical Coffee (product 0884fcbe-720f-4119-ba3a-472ebdf7da66)."* This
+is the single most reliable selection signal possible - the frontend, not
+the model, produced the id - yet the model still ignored it and ran a
+fresh `search_gifts` instead of calling `select_gift`. The turn-context
+carryover fixes above didn't help here because the prior turn (an
+availability error) hadn't carried forward any `recommendedProducts` to
+match against.
+
+**Fix**: `extractTappedProductId` parses this exact `(product <uuid>)`
+format directly out of the user's newest message, independent of carried-
+over turn context (so it works even for a product tapped from a list shown
+earlier in the very same reply). When found, `buildTappedSelectionMessage`
+adds a directive "call select_gift right now" instruction. Covered by tests
+in `index.test.ts`, including a direct reproduction of the tapped message.
+
+**Takeaway for Cursor**: the product-card tap handler is real and already
+sends a parseable, id-bearing message - CC-04's "tap a card" contract is
+satisfied end to end once this fix is deployed. The earlier note in this
+doc claiming `TheaAgent.tsx`'s cards have no `onClick` should be treated as
+superseded by this live observation, not relied on.
+
+## Explicit confirmation still not calling confirm_scheduled_gift (found via live testing - the most severe one)
+
+After the tap-to-select fix above worked (a real review was shown, with
+correct future-tense wording), replying "Yes, confirm it" - about as
+unambiguous as a confirmation gets - still produced *another*
+`select_gift`-style reply ("I've scheduled the Coffee Beans...") instead of
+actually calling `confirm_scheduled_gift`. Confirmed via DB: no new
+`scheduled_gifts` row was created; the "I've scheduled" claim was false
+again, despite the review-wording fix from earlier (that fix addressed the
+review step's own wording, not this separate failure to call the right
+tool at all). This is the most severe compliance gap found this session -
+it directly blocks the product's core function even when the user does
+everything right.
+
+**Fix**: same deterministic-directive pattern as the selection fixes above.
+`fetchLastTurnContext` now also parses the prior turn's `reviewMarker` into
+a structured `pendingReview` (`recipientId`/`productId`/`occasionDate`).
+`looksLikeConfirmation` does a loose, intentionally permissive keyword match
+on the user's newest message ("yes," "confirm," "do it," "sounds good,"
+etc.) - safe to be permissive here specifically because it only matters
+when `pendingReview` is also non-null, i.e. the immediately prior turn
+specifically ended by presenting a review and asking to confirm, so a short
+affirmative reply is overwhelmingly likely responding to exactly that. When
+both are true, `buildConfirmDirectiveMessage` forces
+`confirm_scheduled_gift` with the exact persisted ids/date, explicitly
+forbidding another `select_gift` call. Covered by tests in
+`index.test.ts`, including a direct reproduction of "Yes, confirm it."
+
+## Invented gift ideas when search_gifts comes up empty (found via live testing)
+
+`supabase/functions/thea-chat/index.ts`. Reported from a live session: asking
+for a narrow combination (e.g. "sports related, $50 or less") that genuinely
+has no catalog matches, then asking Thea for "general examples," produced a
+bulleted list of non-catalog, invented gift ideas ("Cozy Blanket," "Coffee
+Gift Set," "Personalized Water Bottle") - a direct violation of the hard
+"never invent products" rule. The existing hallucination guard
+(`checkRecommendationIntegrity`, originally inline, now exported for unit
+testing) only caught bold-product-name-plus-inline-price text
+(`**Name** ... $24`); this bulleted list had no per-item price, so it slid
+through untouched, and the user picking one of the fake items then hit a
+dead end ("I couldn't find any water bottles available").
+
+**Fix**: two parts, both covered by `index.test.ts`.
+- System prompt: explicit instruction that an empty `search_gifts` result
+  must lead to either a broader re-search or an honest "nothing matches
+  right now," never a fallback list of hypothetical ideas.
+- Server-side guard (defense in depth, same philosophy as the existing
+  RECOMMENDED_IDS checks): a reply with 2+ bulleted, bolded item names and no
+  `RECOMMENDED_IDS` line is now treated the same as unresolved ids - it
+  forces a genuine re-search rather than asking the model to "add ids" to
+  products that were never real.
+
+## CC-08: legacy-catalog verification (investigation, narrow cleanup only)
+
+Investigated via a live read-only DB query plus direct code reading, per the
+brief's "report evidence before cleanup" instruction.
+
+- **Confirmed dead, deleted**: `src/lib/giftDefaults.ts` (unimported
+  anywhere, hardcoded ~13 legacy `gid://shopify/...` ids),
+  `src/components/ShopifySetupGuide.tsx`, `src/components/ShopifyOrderStatus.tsx`
+  (both fully unreferenced outside their own file).
+- **Confirmed live data issue, not fixed here**: 2 production recipients
+  (same VIP user) still hold a pre-migration `gid://shopify/ProductVariant/...`
+  in `default_gift_variant_id`. Traced the consequence all the way through
+  `process-automation-lifecycle/index.ts`: `handleFundReservation` already
+  catches its own errors and logs an `"error"` automation_logs row per
+  recipient - it does **not** abort other recipients or the batch (locked in
+  by `process-automation-lifecycle/index.test.ts`). So this is a contained,
+  silent per-recipient failure (that recipient's automation just never
+  funds), not a system-wide risk. Left as-is, flagged for a product decision
+  (clear the stale default vs. pick a live replacement) rather than silently
+  rewritten.
+- **Confirmed dormant, not removed**: `fulfillment_orders`/`fulfillment_options`
+  tables are actively coded against (`fulfillment-router/index.ts`,
+  `GiftHistory.tsx`) but hold 0 rows in production - not the live order path
+  today. No code change; worth a product conversation about whether to
+  finish wiring it up or retire it later.
+- Historical `scheduled_gifts`/`shopify_order_id` values (6 rows) were left
+  untouched - they're fulfilled history, not something to "fix."
+
+## CC-05: catalog relevance - existing contract (no change made)
+
+Both `thea-chat`'s `search_gifts` tool and the `gift-catalog` edge function
+already rank/filter by stated interests rather than plain substring
+matching: `thea-chat` scores against a per-interest keyword list with
+word-boundary matching and a false-friend scrub (e.g. "coffee table" doesn't
+match "coffee" - see `scoreInterestText`/`scrubFalseFriends`, covered by
+`index.test.ts`); `gift-catalog` goes further with an LLM curation pass that
+returns `why`/`fit: "exact" | "adjacent"` per pick and an `askUser` array for
+substitutes that need permission (red wine requested, only white wine live,
+etc). Both return a verified image URL or `null`, never a fabricated one.
+Reviewed this pass and found no reproduced failure beyond S06 above (fixed
+under CC-02) - no ranking behavior was changed.
+
+## Frontend gaps confirmed this pass (not implemented here - Cursor's job)
+
+- ~~`TheaAgent.tsx`'s product cards render with no `onClick`/handler~~ -
+  **superseded, see "Tapped product cards" section below**: live testing
+  found a working "Select gift" button that sends a parseable, id-bearing
+  message. This earlier note was wrong (or the UI has since changed); the
+  tap-to-select path is real and now has a backend fix to go with it.
+- No caller reads the top-level `writes` array from a chat response to
+  invalidate `recipients`/gift queries - the write-acknowledgement contract
+  from CC-01/03/04 has no frontend consumer yet.
+- `action: "history"` (CC-03's chat-restore-on-mount contract) is still
+  unused by any frontend caller - unchanged known gap from before.
+
+## Running the regression tests
+
+Edge functions run on Deno, which has a built-in test runner - no new
+dependency needed. Each `index.ts` guards its `Deno.serve`/`serve(...)` call
+behind `if (import.meta.main)` so a test file can import it for its exported
+helpers without starting a live listener (production behavior - the
+Supabase Dashboard function editor running the file as the entry point - is
+unchanged).
+
+```
+deno test --allow-env supabase/functions/thea-chat/index.test.ts
+deno test --allow-env supabase/functions/process-automation-lifecycle/index.test.ts
+```
+
+No CI wiring - not requested by the brief.
