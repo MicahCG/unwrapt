@@ -70,7 +70,8 @@ interface Person {
 
 type Screen = 'import' | 'found' | 'addperson' | 'intel' | 'reveal' | 'subscription';
 
-const FREE_TIER_LIMIT = 3;
+/** Max people on the found-people picker so Continue stays on-screen on typical phones. */
+const ONBOARDING_PEOPLE_PICKER_LIMIT = 3;
 
 const REL_OPTIONS = ['Friend', 'Family', 'Partner', 'Colleague', 'Mentor'];
 
@@ -107,9 +108,11 @@ function groupEventsIntoPeople(events: CalendarEvent[]): Person[] {
       if (event.type === 'anniversary' && !p.anniversary) p.anniversary = event.date;
     }
   });
+  // Soonest occasions first; cap the list so the Continue CTA fits on mobile.
   // Choose the first person by default so this step always has one clear focus.
   return Array.from(map.values())
     .sort((a, b) => nextOccasionTime(a.primaryDate) - nextOccasionTime(b.primaryDate))
+    .slice(0, ONBOARDING_PEOPLE_PICKER_LIMIT)
     .map((p, i) => ({ ...p, selected: i === 0 }));
 }
 
@@ -371,7 +374,7 @@ function FoundPeopleScreen({
 
   return (
     <MobileShell
-      contentClassName="px-5 pt-5 pb-4"
+      contentClassName="overflow-y-auto px-5 pt-5 pb-4"
       footer={
         <div
           style={{
@@ -436,7 +439,7 @@ function FoundPeopleScreen({
             disabled={!!focusingId}
             role="radio"
             aria-checked={p.selected}
-            className="flex w-full cursor-pointer items-center gap-3.5 text-left"
+            className="flex w-full shrink-0 cursor-pointer items-center gap-3.5 text-left"
             style={{
               padding: '13px 14px', borderRadius: 18, background: U.surface, border: `1px solid ${U.border}`,
               transform: focusingId ? (p.id === focusingId ? 'scale(1.045)' : 'scale(.91)') : 'scale(1)',
