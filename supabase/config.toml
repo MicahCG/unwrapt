@@ -72,7 +72,11 @@ verify_jwt = false
 [functions.thea-chat]
 verify_jwt = false
 # Thea's personality and judgment, read at startup.
-static_files = ["./functions/thea-chat/THEA_GUIDE.md"]
+static_files = [
+  "./functions/thea-chat/THEA_GUIDE.md",
+  "./functions/thea-chat/THEA_GUIDE_CHAT.md",
+  "./functions/thea-chat/THEA_GUIDE_ONBOARDING.md",
+]
 
 # Muse connector API — custom API key auth; Meta review uses X-Unwrapt-Review-User.
 [functions.muse-api]

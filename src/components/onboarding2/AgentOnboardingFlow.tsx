@@ -865,19 +865,18 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       if (request !== intelRequest.current) return;
       if (error || !data?.success || typeof data.reply !== 'string') throw new Error('Thea unavailable');
 
-      let merged = nextSignals;
       const learned: string[] = Array.isArray(data.interests)
         ? data.interests.filter((v: unknown): v is string => typeof v === 'string' && v.trim().length > 0 && v.length <= 80)
         : [];
+      // Thea's reading of the person ("Funny gifts", "Spa & relaxation") replaces the raw
+      // sentence, which would make a poor catalog search, and a detour adds nothing.
+      let merged = nextSignals.filter((signal) => signal.interest.toLowerCase() !== typed.interest.toLowerCase());
       if (learned.length) {
-        // Thea's reading of the person ("Funny gifts", "Spa & relaxation") replaces the raw
-        // sentence, which would make a poor catalog search.
-        merged = nextSignals.filter((signal) => signal.interest.toLowerCase() !== typed.interest.toLowerCase());
         for (const label of learned) {
           merged = upsertSignal(merged, {
             category: categoryContext,
             interest: label.trim(),
-            details: typed.details,
+            details: null,
             confidence: data.ready === true ? 'high' : 'low',
           });
         }
@@ -888,10 +887,8 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           index === 0 ? { ...signal, confidence: 'high' as const } : signal,
         );
       }
-      if (merged !== nextSignals) {
-        setIntelSignals(merged);
-        syncPersonInterests(personId, merged);
-      }
+      setIntelSignals(merged);
+      syncPersonInterests(personId, merged);
 
       const chips = Array.isArray(data.followUps)
         ? data.followUps
