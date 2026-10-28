@@ -5,7 +5,6 @@ import React, { useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import {
   PerspectiveCamera,
-  Environment,
   ContactShadows,
   Float,
 } from '@react-three/drei';
@@ -226,7 +225,7 @@ function PremiumScene({ mousePosition }: { mousePosition: MousePosition }) {
         color="#8B7355"
       />
 
-      <Environment preset="apartment" />
+      {/* Local lights only — avoid drei Environment HDR (blocked by CSP). */}
       <fog attach="fog" args={['#F5EFE6', 8, 15]} />
     </>
   );

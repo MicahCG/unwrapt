@@ -27,7 +27,6 @@ const Index = () => {
     }
 
     // Unauthenticated visitors go straight to login on the app.
-    // The story intro lives on unwrapt.io before the marketing landing.
     if (!user && !loading) {
       setShowLoginPage(true);
     }
