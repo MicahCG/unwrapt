@@ -358,7 +358,7 @@ const Dashboard = () => {
       {/* Phones and tablets switch between Thea and Manual with tabs. From 1024px both sit side by
           side, each with its own single scroll area, so desktop uses its width instead of a phone column. */}
       <MobileShell
-        maxWidthClassName="max-w-[440px] md:max-w-[680px] lg:max-w-[1180px]"
+        maxWidthClassName="max-w-[440px] md:max-w-[680px] lg:max-w-[1180px] xl:max-w-[1400px]"
         contentClassName={`flex min-h-0 flex-col px-5 pt-10 pb-2 md:px-8 lg:overflow-hidden lg:pb-6 ${activeTab === 'thea' ? 'overflow-hidden' : 'overflow-y-auto'}`}
         footerClassName="lg:hidden"
         footer={
@@ -411,7 +411,7 @@ const Dashboard = () => {
           />
         </div>
 
-        <div className="min-h-0 flex-1 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(360px,440px)] lg:gap-6">
+        <div className="min-h-0 flex-1 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(360px,480px)] lg:gap-6">
           {/* Both tabs stay mounted so switching never loses Thea's conversation or Manual's place. */}
           <div className={`${activeTab === 'thea' ? 'h-full' : 'hidden'} lg:block lg:h-full lg:min-h-0`}>
             <TheaHomeTab
