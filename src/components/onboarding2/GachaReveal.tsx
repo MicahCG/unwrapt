@@ -39,6 +39,51 @@ const SILHOUETTES = [
   { label: 'candle', path: 'M34 12c2 4 2 8 0 10 M30 22h20v42c0 4-4 6-10 6s-10-2-10-6V22z' },
 ];
 
+const COVERFLOW_SLOTS = 3;
+
+function uniqueProductsById(products: GiftCatalogItem[]): GiftCatalogItem[] {
+  const seen = new Set<string>();
+  const out: GiftCatalogItem[] = [];
+  for (const product of products) {
+    if (seen.has(product.id)) continue;
+    seen.add(product.id);
+    out.push(product);
+  }
+  return out;
+}
+
+/**
+ * Coverflow window over the product pool.
+ * Never pads by repeating the same product id — 1 match → 1 card, 2 → 2, etc.
+ * While the pool is empty (loading), keep three null placeholders for silhouettes.
+ */
+function getVisibleSlots(
+  uniquePool: GiftCatalogItem[],
+  spinIndex: number,
+): (GiftCatalogItem | null)[] {
+  if (!uniquePool.length) return [null, null, null];
+  if (uniquePool.length <= COVERFLOW_SLOTS) return uniquePool;
+  return Array.from({ length: COVERFLOW_SLOTS }, (_, offset) =>
+    uniquePool[(spinIndex + offset) % uniquePool.length],
+  );
+}
+
+function slotVisuals(slotCount: number, index: number) {
+  if (slotCount === 1) {
+    return { scale: 1.04, opacity: 0.95, size: 128, focused: true };
+  }
+  if (slotCount === 2) {
+    return { scale: 1, opacity: 0.88, size: 104, focused: true };
+  }
+  const focused = index === 1;
+  return {
+    scale: focused ? 1.06 : 0.9,
+    opacity: focused ? 0.92 : 0.45,
+    size: focused ? 112 : 84,
+    focused,
+  };
+}
+
 const GachaReveal: React.FC<GachaRevealProps> = ({
   recipientFirstName,
   interests,
@@ -56,17 +101,26 @@ const GachaReveal: React.FC<GachaRevealProps> = ({
   });
 
   const pool = useMemo(() => data?.products || [], [data]);
+  const uniquePool = useMemo(() => uniqueProductsById(pool), [pool]);
   const picks = useMemo(() => pool.slice(0, 2), [pool]);
   const unmatched = useMemo(() => data?.unmatchedInterests || [], [data]);
   const askUser = useMemo(() => data?.askUser || [], [data]);
+  const visibleSlots = useMemo(
+    () => getVisibleSlots(uniquePool, spinIndex),
+    [uniquePool, spinIndex],
+  );
+  const slotCount = visibleSlots.length;
+  // Only spin the coverflow window when there are more unique items than slots.
+  const canSpinCoverflow = uniquePool.length > COVERFLOW_SLOTS;
 
-  // Keep gift cards cycling while we hunt.
+  // Keep gift cards cycling while we hunt (skip when it would only reshuffle duplicates).
   useEffect(() => {
+    if (!canSpinCoverflow) return;
     const spin = window.setInterval(() => {
       setSpinIndex((i) => i + 1);
     }, 480);
     return () => window.clearInterval(spin);
-  }, []);
+  }, [canSpinCoverflow]);
 
   useEffect(() => {
     const sil = window.setInterval(() => {
@@ -90,11 +144,6 @@ const GachaReveal: React.FC<GachaRevealProps> = ({
     return () => window.clearTimeout(t);
   }, [isLoading, isError, picks, unmatched, askUser, onDone]);
 
-  const visibleSlots = [0, 1, 2].map((offset) => {
-    if (!pool.length) return null;
-    return pool[(spinIndex + offset) % pool.length];
-  });
-
   const occasionBit = occasionLabel ? ` ${occasionLabel}` : '';
   const huntingLine = unmatched.length
     ? `Looking hard for ${unmatched.map((i) => i.toLowerCase()).join(' / ')} alongside ${interests.filter((i) => !unmatched.includes(i)).map((i) => i.toLowerCase()).join(', ') || 'the rest'}…`
@@ -115,14 +164,15 @@ const GachaReveal: React.FC<GachaRevealProps> = ({
       <div className="relative mt-8 w-full max-w-[320px]" aria-hidden="true">
         {/* Soft shadow outlines behind the cards */}
         <div className="pointer-events-none absolute inset-x-0 top-2 flex items-end justify-center gap-4 opacity-40">
-          {[0, 1, 2].map((slot) => {
+          {visibleSlots.map((_, slot) => {
             const sil = SILHOUETTES[(silhouetteIndex + slot) % SILHOUETTES.length];
-            const size = slot === 1 ? 100 : 76;
+            const { size: cardSize, focused } = slotVisuals(slotCount, slot);
+            const size = Math.max(72, cardSize - 12);
             return (
               <motion.div
                 key={`sil-${slot}-${sil.label}`}
                 initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: slot === 1 ? 0.55 : 0.28, y: 0 }}
+                animate={{ opacity: focused ? 0.55 : 0.28, y: 0 }}
                 transition={{ duration: 0.45 }}
                 style={{
                   width: size,
@@ -153,13 +203,11 @@ const GachaReveal: React.FC<GachaRevealProps> = ({
 
         <div className="relative z-10 flex items-end justify-center gap-3 pt-1">
           {visibleSlots.map((product, i) => {
-            const scale = i === 1 ? 1.06 : 0.9;
-            const opacity = i === 1 ? 0.92 : 0.45;
-            const size = i === 1 ? 112 : 84;
+            const { scale, opacity, size, focused } = slotVisuals(slotCount, i);
             const sil = SILHOUETTES[(silhouetteIndex + i + 2) % SILHOUETTES.length];
             return (
               <motion.div
-                key={product ? `${product.id}-${i}-${spinIndex}` : `ph-${i}-${silhouetteIndex}`}
+                key={product ? `${product.id}-${i}` : `ph-${i}-${silhouetteIndex}`}
                 layout
                 initial={{ opacity: 0, y: 12, scale: scale * 0.94 }}
                 animate={{ opacity, y: 0, scale }}
@@ -171,7 +219,7 @@ const GachaReveal: React.FC<GachaRevealProps> = ({
                   borderRadius: 16,
                   border: `1px solid ${U.border}`,
                   background: U.surface,
-                  boxShadow: i === 1
+                  boxShadow: focused
                     ? '0 14px 32px rgba(42, 37, 32, 0.14)'
                     : '0 8px 18px rgba(42, 37, 32, 0.08)',
                 }}
@@ -181,7 +229,7 @@ const GachaReveal: React.FC<GachaRevealProps> = ({
                     src={product.imageUrl}
                     alt=""
                     className="h-full w-full object-cover"
-                    style={{ filter: i === 1 ? 'none' : 'grayscale(0.35)' }}
+                    style={{ filter: focused ? 'none' : 'grayscale(0.35)' }}
                   />
                 ) : (
                   <div className="flex h-full w-full flex-col items-center justify-center gap-1.5" style={{ background: U.chip }}>
