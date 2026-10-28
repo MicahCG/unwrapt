@@ -348,6 +348,26 @@ unclear or multi-item reference still falls through to the model's own
 judgment. Covered by tests in `index.test.ts`, including a direct
 reproduction of the exact failing message.
 
+## Review step claiming a completed action before confirmation (found via live testing)
+
+After the directive-selection fix above worked (select_gift finally fired
+correctly), the review message itself read: *"I've scheduled the Packable
+Tote Bag for Jake's birthday..."* followed by *"Please confirm if you'd
+like to proceed with this gift!"* - directly contradictory. Confirmed via
+DB that nothing was actually written (`scheduled_gifts` had no new row,
+only `reviewMarker` metadata, same as any other correct review), so this
+was a wording-only bug: the model used past-tense/completed-action language
+for a step that is explicitly "a review, not a save." This is exactly the
+kind of invented completed action the system prompt's hard boundaries
+already forbid, but the review-specific instruction didn't say so
+explicitly.
+
+**Fix**: strengthened the review-presentation instruction (prompt-only, no
+code/logic change) to require future/conditional phrasing ("I'll
+schedule...", "Ready to send...") and explicitly forbid past-tense/
+completed-action phrasing ("I've scheduled...", "Done!") until after the
+user confirms and `confirm_scheduled_gift` actually runs.
+
 ## Invented gift ideas when search_gifts comes up empty (found via live testing)
 
 `supabase/functions/thea-chat/index.ts`. Reported from a live session: asking
