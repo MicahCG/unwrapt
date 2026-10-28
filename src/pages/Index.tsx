@@ -8,6 +8,7 @@ import Dashboard from '@/components/Dashboard';
 import SubscribeGate from '@/components/subscription/SubscribeGate';
 import { markSkipAgentWelcome } from '@/lib/funnel';
 import { isPaidVip } from '@/lib/stripe';
+import { loadOnboardingProgress, shouldResumeOnboarding } from '@/lib/onboardingProgress';
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -32,35 +33,37 @@ const Index = () => {
     }
   }, [user, loading]);
 
-  // Recipients = onboarding progress; VIP = paid access to the product.
+  // Recipients + onboarding_step = progress; VIP = paid access to the product.
   const { data: access, isLoading: checkingAccess } = useQuery({
     queryKey: ['app-access', user?.id],
     queryFn: async () => {
       if (!user?.id) {
-        return { hasRecipients: false, isPaid: false };
+        return { hasRecipients: false, isPaid: false, resumeOnboarding: false };
       }
 
       // Dev fake user keeps full access for local testing.
       if (process.env.NODE_ENV === 'development' && user.id === '00000000-0000-0000-0000-000000000001') {
-        return { hasRecipients: true, isPaid: true };
+        return { hasRecipients: true, isPaid: true, resumeOnboarding: false };
       }
 
-      const [{ data: recipients, error: recipientsError }, { data: profile, error: profileError }] =
-        await Promise.all([
-          supabase.from('recipients').select('id').eq('user_id', user.id).limit(1),
-          supabase
-            .from('profiles')
-            .select('subscription_tier, subscription_status')
-            .eq('id', user.id)
-            .maybeSingle(),
-        ]);
+      const [{ data: profile, error: profileError }, progress] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('subscription_tier, subscription_status')
+          .eq('id', user.id)
+          .maybeSingle(),
+        loadOnboardingProgress(user.id),
+      ]);
 
-      if (recipientsError) console.error('Error checking recipients:', recipientsError);
       if (profileError) console.error('Error checking profile:', profileError);
 
+      const hasRecipients = progress.recipients.length > 0;
+
       return {
-        hasRecipients: (recipients?.length || 0) > 0,
+        hasRecipients,
         isPaid: isPaidVip(profile),
+        // Mid-flow drafts (intel/reveal) resume setup; subscription/done → paywall.
+        resumeOnboarding: hasRecipients && shouldResumeOnboarding(progress.step),
       };
     },
     enabled: !!user?.id,
@@ -82,8 +85,8 @@ const Index = () => {
       return <Dashboard />;
     }
 
-    // Finished setup but unpaid: hard paywall (no inbox bypass).
-    if (access?.hasRecipients) {
+    // Finished gift-proof / checkout path but unpaid: hard paywall (no inbox bypass).
+    if (access?.hasRecipients && !access.resumeOnboarding) {
       return <SubscribeGate />;
     }
 
