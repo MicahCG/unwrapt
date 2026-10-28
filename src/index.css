@@ -741,7 +741,7 @@
 /* Raising an arm: it swings up from the shoulder while the forearm unfolds at the elbow, then waves.
    Lowering plays the same motion in reverse before the next pose takes over. */
 .u-thea .u-thea__shoulder { transform-box: view-box; transform-origin: 272px 326px; }
-.u-thea--welcome .u-thea__shoulder, .u-thea--thumbsup .u-thea__shoulder, .u-thea--cheer .u-thea__shoulder { animation: u-thea-shoulder-raise .55s cubic-bezier(.22,.9,.32,1) both; }
+.u-thea--welcome .u-thea__shoulder, .u-thea--thumbsup .u-thea__shoulder, .u-thea--toss .u-thea__shoulder, .u-thea--magnify .u-thea__shoulder { animation: u-thea-shoulder-raise .55s cubic-bezier(.22,.9,.32,1) both; }
 .u-thea--welcome .u-thea__wave { transform-box: view-box; transform-origin: 338px 354px; animation: u-thea-elbow-raise .55s cubic-bezier(.22,.9,.32,1) both, u-thea-wave 2.6s ease-in-out .55s infinite; }
 .u-thea--thinking .u-thea__head { animation-duration: 8s; }
 .u-thea--thinking .u-thea__thought circle { transform-origin: center; animation: u-thea-thought 2.4s ease-in-out infinite; }
@@ -763,11 +763,18 @@
 .u-thea--surprised { animation: u-thea-hop .5s ease-out both; }
 .u-thea--surprised .u-thea__sparkle { transform-origin: center; animation: u-thea-sparkle 1.6s ease-in-out infinite; }
 /* Reactions to what the user just said: short, then she settles back */
-.u-thea--cheer .u-thea__wave { transform-box: view-box; transform-origin: 338px 354px; animation: u-thea-elbow-raise .5s cubic-bezier(.22,.9,.32,1) both, u-thea-wave 1.3s ease-in-out .5s infinite; }
-.u-thea--cheer .u-thea__wave--late { animation-delay: 0s, -.15s; }
+.u-thea .u-thea__forearm { transform-box: view-box; transform-origin: 338px 354px; animation: u-thea-elbow-raise .5s cubic-bezier(.22,.9,.32,1) both; }
+/* Toss: the gift flies up spinning and lands back in her palm, which dips on the catch */
+.u-thea--toss .u-thea__toss { transform-box: fill-box; transform-origin: center; animation: u-thea-toss .85s cubic-bezier(.33,.7,.45,1) .45s 2 both; }
+.u-thea--toss .u-thea__palm { transform-box: fill-box; transform-origin: center; animation: u-thea-catch .85s ease-out .45s 2 both; }
+/* Magnify: the glass sways side to side as she inspects */
+.u-thea--magnify .u-thea__lens { transform-box: view-box; transform-origin: 336px 296px; animation: u-thea-peer 1.6s ease-in-out .5s infinite; }
+@keyframes u-thea-toss { 0%, 100% { transform: none; } 45% { transform: translateY(-78px) rotate(200deg); } 88% { transform: translateY(0) rotate(360deg); } }
+@keyframes u-thea-catch { 0%, 82%, 100% { transform: none; } 90% { transform: translateY(5px); } }
+@keyframes u-thea-peer { 0%, 100% { transform: rotate(0deg); } 30% { transform: rotate(-7deg) translateY(-2px); } 65% { transform: rotate(5deg); } }
 .u-thea--thumbsup .u-thea__thumb { transform-box: view-box; transform-origin: 338px 354px; animation: u-thea-elbow-raise .5s cubic-bezier(.22,.9,.32,1) both, u-thea-thumb .7s ease-out .5s both; }
 .u-thea--exiting .u-thea__shoulder { animation: u-thea-shoulder-lower .38s cubic-bezier(.5,0,.75,0) both !important; }
-.u-thea--exiting .u-thea__wave, .u-thea--exiting .u-thea__thumb { animation: u-thea-elbow-lower .38s cubic-bezier(.5,0,.75,0) both !important; }
+.u-thea--exiting .u-thea__wave, .u-thea--exiting .u-thea__thumb, .u-thea--exiting .u-thea__forearm { animation: u-thea-elbow-lower .38s cubic-bezier(.5,0,.75,0) both !important; }
 .u-thea .u-thea__rest { transform-box: fill-box; transform-origin: 50% 0%; animation: u-thea-rest-in .32s ease-out both; }
 .u-thea--sparkle .u-thea__twinkle, .u-thea--clap .u-thea__twinkle { transform-box: fill-box; transform-origin: center; animation: u-thea-sparkle .8s ease-in-out infinite; }
 .u-thea--clap .u-thea__clap-l { transform-box: view-box; transform-origin: 92px 420px; animation: u-thea-clap-l .36s ease-in-out infinite; }
@@ -782,7 +789,7 @@
 @keyframes u-thea-giggle { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(-3deg) translateY(-2px); } 75% { transform: rotate(2deg) translateY(1px); } }
 @keyframes u-thea-chuckle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 @keyframes u-thea-ha { 0% { opacity: 0; transform: translateY(8px) scale(.6); } 20% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-10px); } }
-.u-thea--thumbsup, .u-thea--sparkle, .u-thea--clap, .u-thea--cheer { animation: u-thea-hop .45s ease-out both; }
+.u-thea--thumbsup, .u-thea--sparkle, .u-thea--clap, .u-thea--toss { animation: u-thea-hop .45s ease-out both; }
 @keyframes u-thea-shoulder-raise { from { transform: rotate(52deg); } to { transform: none; } }
 @keyframes u-thea-elbow-raise { from { transform: rotate(140deg); } to { transform: none; } }
 @keyframes u-thea-shoulder-lower { from { transform: none; } to { transform: rotate(52deg); opacity: 0; } }

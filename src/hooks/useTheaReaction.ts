@@ -3,7 +3,8 @@ import type { TheaReaction } from '@/components/unwrapt2/TheaFigure';
 import { classifyUserReply, pickPositiveReaction } from '@/lib/theaReactions';
 
 const REACTION_MS = 1800;
-const LAUGH_MS = 2400;
+// Reactions that raise her arm first need longer to play out.
+const LONGER_MS: Partial<Record<TheaReaction, number>> = { laugh: 2400, toss: 2400, magnify: 2200 };
 
 /**
  * Thea's response to what the user just said. Call `reactTo(text)` right after the user
@@ -23,7 +24,7 @@ export function useTheaReaction() {
     // Clear first so the same reaction twice in a row still restarts its animation.
     setReaction(null);
     window.requestAnimationFrame(() => setReaction(next));
-    timer.current = window.setTimeout(() => setReaction(null), next === 'laugh' ? LAUGH_MS : REACTION_MS);
+    timer.current = window.setTimeout(() => setReaction(null), LONGER_MS[next] ?? REACTION_MS);
   }, []);
 
   const reactTo = useCallback((text: string) => {

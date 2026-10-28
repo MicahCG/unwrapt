@@ -20,7 +20,7 @@ interface TheaCharacterProps {
 }
 
 // Poses with a raised arm lower it before the next pose appears, instead of snapping.
-const LOWERS_ARM = new Set(['welcome', 'thumbsup', 'cheer']);
+const LOWERS_ARM = new Set(['welcome', 'thumbsup', 'toss', 'magnify']);
 const LOWER_MS = 380;
 
 const prefersReducedMotion = () =>

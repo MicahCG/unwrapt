@@ -5,8 +5,8 @@ import React, { useId } from 'react';
  * curious (asking a clarifying question), gift (success), surprised, oops (error/recovery).
  */
 export type TheaPose = 'basic' | 'welcome' | 'listening' | 'thinking' | 'curious' | 'gift' | 'surprised' | 'oops';
-/** Short reactions to something the user just said: four positive, a laugh for jokes, one upset. */
-export type TheaReaction = 'thumbsup' | 'sparkle' | 'clap' | 'cheer' | 'laugh' | 'upset';
+/** Short reactions to something the user just said: five positive, a laugh for jokes, one upset. */
+export type TheaReaction = 'thumbsup' | 'sparkle' | 'clap' | 'toss' | 'magnify' | 'laugh' | 'upset';
 type FigurePose = TheaPose | TheaReaction;
 
 interface TheaFigureProps {
@@ -34,25 +34,26 @@ const CHAIN: [number, number, number][] = [
 const BROW_L: Record<FigurePose, string> = {
   basic: '', welcome: 'translate(0 -4)', thinking: 'translate(0 1)', gift: 'translate(0 -3)', surprised: 'translate(0 -10) rotate(-4 150 152)',
   listening: 'translate(0 -3)', curious: 'translate(0 2)', oops: 'translate(2 -4) rotate(-12 150 152)',
-  thumbsup: 'translate(0 -4)', sparkle: 'translate(0 -6)', clap: 'translate(0 -5)', cheer: 'translate(0 -6)', laugh: 'translate(0 -8) rotate(-6 150 152)', upset: 'translate(3 6) rotate(13 150 152)',
+  thumbsup: 'translate(0 -4)', sparkle: 'translate(0 -6)', clap: 'translate(0 -5)', toss: 'translate(0 -6)', magnify: 'translate(0 2)', laugh: 'translate(0 -8) rotate(-6 150 152)', upset: 'translate(3 6) rotate(13 150 152)',
 };
 const BROW_R: Record<FigurePose, string> = {
   basic: '', welcome: 'translate(0 -4)', thinking: 'translate(0 -8) rotate(-4 232 152)', gift: 'translate(0 -3)', surprised: 'translate(0 -10) rotate(4 232 152)',
   listening: 'translate(0 -3)', curious: 'translate(0 -11) rotate(-6 232 152)', oops: 'translate(-2 -4) rotate(12 232 152)',
-  thumbsup: 'translate(0 -4)', sparkle: 'translate(0 -6)', clap: 'translate(0 -5)', cheer: 'translate(0 -6)', laugh: 'translate(0 -8) rotate(6 232 152)', upset: 'translate(-3 6) rotate(-13 232 152)',
+  thumbsup: 'translate(0 -4)', sparkle: 'translate(0 -6)', clap: 'translate(0 -5)', toss: 'translate(0 -6)', magnify: 'translate(0 -11) rotate(-6 232 152)', laugh: 'translate(0 -8) rotate(6 232 152)', upset: 'translate(-3 6) rotate(-13 232 152)',
 };
 // Thinking glances up and away, listening looks down at what you're typing, curious looks
 // back at you sideways; surprised shrinks the irises so more white shows.
 const IRIS_SHIFT: Partial<Record<FigurePose, string>> = {
   thinking: 'translate(5 -5)', listening: 'translate(-2 5)', curious: 'translate(4 -1)', oops: 'translate(-3 2)',
+  toss: 'translate(4 -6)', magnify: 'translate(5 0)',
 };
 const iris = (pose: FigurePose, cx: number) =>
   pose === 'surprised' ? `translate(${cx} 192) scale(.85) translate(${-cx} -192)` : IRIS_SHIFT[pose];
 const EYE_SCALE: Record<FigurePose, number> = {
   basic: 1.04, welcome: 1.04, thinking: 1.04, gift: 1.04, surprised: 1.12, listening: 1.06, curious: 1.04, oops: 1.08,
-  thumbsup: 1.04, sparkle: 1.08, clap: 1.04, cheer: 1.04, laugh: 1.04, upset: 1.0,
+  thumbsup: 1.04, sparkle: 1.08, clap: 1.04, toss: 1.06, magnify: 1.04, laugh: 1.04, upset: 1.0,
 };
-const OPEN_SMILE: FigurePose[] = ['welcome', 'sparkle', 'clap', 'cheer'];
+const OPEN_SMILE: FigurePose[] = ['welcome', 'sparkle', 'clap', 'toss'];
 const NO_CHEEK_LIFT: FigurePose[] = ['surprised', 'clap', 'laugh', 'upset', 'oops'];
 
 /** Four-point twinkle star centered on (cx, cy). */
@@ -70,11 +71,10 @@ const Sleeve: React.FC<{ d: string; width: number; fill: string; crease?: string
   </>
 );
 
-// Poses that lift her right arm (cheer lifts both). A raised arm is painted in the sweater's own
+// Poses that lift her right arm. A raised arm is painted in the sweater's own
 // gradient with no outline, so the shoulder flows into it like part of the body; only a crease
 // marks the underarm and elbow. Joints: shoulder (272, 326), elbow (338, 352).
-const RAISES_ARM: FigurePose[] = ['welcome', 'thumbsup', 'cheer'];
-const MIRROR = 'translate(382 0) scale(-1 1)';
+const RAISES_ARM: FigurePose[] = ['welcome', 'thumbsup', 'toss', 'magnify'];
 
 // One body for every pose: a torso with a waist. Arms are drawn separately, so poses only move
 // arms. Upper arms hang at her sides in the sweater's own color (a crease marks the inner edge);
@@ -107,6 +107,17 @@ const WavingForearm: React.FC<{ className?: string; fill: string }> = ({ classNa
   </g>
 );
 
+/** Elbow up to a hand at (336, 290); what she holds is drawn on top. */
+const RaisedForearm: React.FC<{ fill: string; children: React.ReactNode }> = ({ fill, children }) => (
+  <g className="u-thea__shoulder">
+    <g className="u-thea__forearm">
+      <RaisedSleeve d="M338 356 Q342 326 337 302" width={36} fill={fill} />
+      <path d="M322 352 Q328 344 330 336" stroke="#ead2b2" strokeWidth="4" strokeLinecap="round" fill="none" />
+      {children}
+    </g>
+  </g>
+);
+
 /**
  * Thea, drawn as layered SVG (approved benchmark v1 in Design/Thea Concepts).
  * Eyes, brows, cheeks, mouth, head and body are separate groups so CSS can animate them,
@@ -117,7 +128,7 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
   const uid = useId().replace(/:/g, '');
   const id = (name: string) => `${uid}-${name}`;
   const url = (name: string) => `url(#${id(name)})`;
-  const restingLeft = ['basic', 'welcome', 'listening', 'curious', 'oops', 'surprised', 'thumbsup', 'sparkle', 'laugh'].includes(pose);
+  const restingLeft = ['basic', 'welcome', 'listening', 'curious', 'oops', 'surprised', 'thumbsup', 'sparkle', 'toss', 'magnify', 'laugh'].includes(pose);
   const restingRight = ['basic', 'listening', 'curious', 'oops', 'thinking', 'surprised', 'sparkle', 'laugh'].includes(pose);
   const eyesClosed = pose === 'clap' || pose === 'laugh';
 
@@ -178,10 +189,8 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
 
         {/* Sweater and resting hands */}
         <path d={TORSO} fill={url('sweater')} />
-        {pose !== 'cheer' && <>
-          <RaisedSleeve d={HANGING_ARM.left} width={40} fill={url('sleeve')} />
-          <path d={ARM_CREASE.left} stroke="#ead2b2" strokeWidth="4.5" strokeLinecap="round" fill="none" />
-        </>}
+        <RaisedSleeve d={HANGING_ARM.left} width={40} fill={url('sleeve')} />
+        <path d={ARM_CREASE.left} stroke="#ead2b2" strokeWidth="4.5" strokeLinecap="round" fill="none" />
         {!RAISES_ARM.includes(pose) && <>
           <RaisedSleeve d={HANGING_ARM.right} width={40} fill={url('sleeve')} />
           <path d={ARM_CREASE.right} stroke="#ead2b2" strokeWidth="4.5" strokeLinecap="round" fill="none" />
@@ -200,7 +209,6 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
         )}
 
         {RAISES_ARM.includes(pose) && <UpperArm fill={url('sleeve')} />}
-        {pose === 'cheer' && <g transform={MIRROR}><UpperArm fill={url('sleeve')} /></g>}
 
         {/* Neck and turtleneck: the top dips to show her neck, the bottom folds onto the sweater */}
         <rect x="164" y="258" width="54" height="40" fill="#d4826a" />
@@ -295,7 +303,7 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
           <ellipse cx="254" cy="230" rx="14" ry="8" fill="#e7866f" opacity=".22" />
           <ellipse cx="191" cy="217" rx="10.5" ry="7" fill="#cd7c5d" />
           {(pose === 'basic' || pose === 'listening') && <path className="u-thea__mouth" d="M172 241 Q197 247 219 228" stroke="#b9603f" strokeWidth="4.2" strokeLinecap="round" fill="none" />}
-          {pose === 'curious' && <path d="M178 244 Q194 246 208 236" stroke="#b9603f" strokeWidth="4.2" strokeLinecap="round" fill="none" />}
+          {(pose === 'curious' || pose === 'magnify') && <path d="M178 244 Q194 246 208 236" stroke="#b9603f" strokeWidth="4.2" strokeLinecap="round" fill="none" />}
           {pose === 'oops' && <path d="M172 245 Q179 238 186 244 Q193 250 200 244 Q207 238 213 244" stroke="#b9603f" strokeWidth="4.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />}
           {OPEN_SMILE.includes(pose) && <>
             <path d="M168 233 Q191 237 216 231 Q212 257 191 258 Q171 257 168 233 Z" fill="#8f3523" />
@@ -414,11 +422,33 @@ export const TheaFigure: React.FC<TheaFigureProps> = ({ framing = 'full', pose =
           </>
         )}
 
-        {pose === 'cheer' && (
-          <>
-            <WavingForearm className="u-thea__wave" fill={url('sleeve')} />
-            <g transform={MIRROR}><WavingForearm className="u-thea__wave u-thea__wave--late" fill={url('sleeve')} /></g>
-          </>
+        {pose === 'toss' && (
+          <RaisedForearm fill={url('sleeve')}>
+            {/* Palm up, flicking a little gift into the air and catching it */}
+            <g className="u-thea__toss">
+              <rect x="317" y="236" width="38" height="30" rx="5" fill="#b65b3c" />
+              <rect x="313" y="229" width="46" height="12" rx="4" fill="#c86b4a" />
+              <rect x="333" y="229" width="6" height="37" fill="#e7b13b" />
+              <path d="M336 229 Q324 214 318 222 Q315 230 336 229 Z M336 229 Q348 214 354 222 Q357 230 336 229 Z" fill="#e7b13b" />
+            </g>
+            <g className="u-thea__palm">
+              <ellipse cx="336" cy="288" rx="22" ry="14" fill="#eaa27a" />
+              <path d="M316 284 Q312 274 318 270" stroke="#eaa27a" strokeWidth="9" strokeLinecap="round" fill="none" />
+            </g>
+          </RaisedForearm>
+        )}
+
+        {pose === 'magnify' && (
+          <RaisedForearm fill={url('sleeve')}>
+            {/* Holding a magnifying glass up beside her face, sleuthing for the perfect gift */}
+            <g className="u-thea__lens">
+              <path d="M336 296 L326 250" stroke="#7d4228" strokeWidth="10" strokeLinecap="round" />
+              <circle cx="320" cy="222" r="30" fill="#eef8fc" fillOpacity=".88" stroke="#4a2414" strokeWidth="7" />
+              <path d="M304 210 Q308 200 318 197" stroke="#fff" strokeWidth="5" strokeLinecap="round" fill="none" opacity=".9" />
+            </g>
+            <circle cx="336" cy="292" r="17" fill="#eaa27a" />
+            <path d="M322 284 Q330 278 340 280" stroke="#d98a63" strokeWidth="3" strokeLinecap="round" fill="none" />
+          </RaisedForearm>
         )}
 
         {pose === 'upset' && (

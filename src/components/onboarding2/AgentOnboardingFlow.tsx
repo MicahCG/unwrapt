@@ -899,7 +899,8 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
 
       const reply = data.reply.replace(/\s*[\u2014\u2013]\s*/g, ', ').trim();
       if (request !== intelRequest.current) return;
-      if (data.tone === 'funny') playReaction('laugh');
+      if (data.tone === 'rude') playReaction('upset');
+      else if (data.tone === 'funny' && !isRude) playReaction('laugh');
       setIntelMessages((m) => [...m, { from: 'thea', text: reply }]);
     } catch {
       if (request !== intelRequest.current) return;
