@@ -5,11 +5,13 @@
 // import doesn't start a live HTTP listener - see the comment there.)
 import { assert, assertEquals } from "https://deno.land/std@0.190.0/testing/asserts.ts";
 import {
+  buildConfirmDirectiveMessage,
   buildDirectSelectionMessage,
   buildTappedSelectionMessage,
   buildTurnContextMessage,
   checkRecommendationIntegrity,
   extractTappedProductId,
+  looksLikeConfirmation,
   matchNamedRecommendedProduct,
   nextOccasionDate,
   normalizeInterests,
@@ -242,4 +244,34 @@ Deno.test("buildTappedSelectionMessage is directive and includes the recipient h
   assert(message?.includes("0884fcbe-720f-4119-ba3a-472ebdf7da66"));
   assert(message?.includes("rec_1"));
   assert(message?.includes("Call select_gift right now"));
+});
+
+const PENDING_REVIEW = { recipientId: "rec_1", productId: "prod_coffee", occasionDate: "2026-10-28" };
+
+Deno.test("looksLikeConfirmation recognizes an explicit confirmation (reproduces the live bug: 'Yes, confirm it' still produced another select_gift call and a falsely-worded 'I've scheduled...' reply instead of actually confirming)", () => {
+  assert(looksLikeConfirmation("Yes, confirm it"));
+  assert(looksLikeConfirmation("do it"));
+  assert(looksLikeConfirmation("sounds good"));
+  assert(looksLikeConfirmation("yep, go ahead"));
+});
+
+Deno.test("looksLikeConfirmation returns false for an unrelated message", () => {
+  assertEquals(looksLikeConfirmation("What's the price again?"), false);
+});
+
+Deno.test("buildConfirmDirectiveMessage returns null without a pending review", () => {
+  assertEquals(buildConfirmDirectiveMessage(undefined, true), null);
+});
+
+Deno.test("buildConfirmDirectiveMessage returns null when the message doesn't look like a confirmation, even with a pending review", () => {
+  assertEquals(buildConfirmDirectiveMessage(PENDING_REVIEW, false), null);
+});
+
+Deno.test("buildConfirmDirectiveMessage is directive and carries all three review fields", () => {
+  const message = buildConfirmDirectiveMessage(PENDING_REVIEW, true);
+  assert(message?.includes("rec_1"));
+  assert(message?.includes("prod_coffee"));
+  assert(message?.includes("2026-10-28"));
+  assert(message?.includes("Call confirm_scheduled_gift right now"));
+  assert(message?.includes("do not call select_gift again"));
 });

@@ -430,6 +430,34 @@ satisfied end to end once this fix is deployed. The earlier note in this
 doc claiming `TheaAgent.tsx`'s cards have no `onClick` should be treated as
 superseded by this live observation, not relied on.
 
+## Explicit confirmation still not calling confirm_scheduled_gift (found via live testing - the most severe one)
+
+After the tap-to-select fix above worked (a real review was shown, with
+correct future-tense wording), replying "Yes, confirm it" - about as
+unambiguous as a confirmation gets - still produced *another*
+`select_gift`-style reply ("I've scheduled the Coffee Beans...") instead of
+actually calling `confirm_scheduled_gift`. Confirmed via DB: no new
+`scheduled_gifts` row was created; the "I've scheduled" claim was false
+again, despite the review-wording fix from earlier (that fix addressed the
+review step's own wording, not this separate failure to call the right
+tool at all). This is the most severe compliance gap found this session -
+it directly blocks the product's core function even when the user does
+everything right.
+
+**Fix**: same deterministic-directive pattern as the selection fixes above.
+`fetchLastTurnContext` now also parses the prior turn's `reviewMarker` into
+a structured `pendingReview` (`recipientId`/`productId`/`occasionDate`).
+`looksLikeConfirmation` does a loose, intentionally permissive keyword match
+on the user's newest message ("yes," "confirm," "do it," "sounds good,"
+etc.) - safe to be permissive here specifically because it only matters
+when `pendingReview` is also non-null, i.e. the immediately prior turn
+specifically ended by presenting a review and asking to confirm, so a short
+affirmative reply is overwhelmingly likely responding to exactly that. When
+both are true, `buildConfirmDirectiveMessage` forces
+`confirm_scheduled_gift` with the exact persisted ids/date, explicitly
+forbidding another `select_gift` call. Covered by tests in
+`index.test.ts`, including a direct reproduction of "Yes, confirm it."
+
 ## Invented gift ideas when search_gifts comes up empty (found via live testing)
 
 `supabase/functions/thea-chat/index.ts`. Reported from a live session: asking
