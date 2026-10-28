@@ -403,6 +403,33 @@ Testing the confirm step found two compounding bugs, both in
    `recommendedProducts`) - otherwise it's dropped. Covered by tests in
    `index.test.ts`, including a direct reproduction of this exact turn.
 
+## Tapped product cards also re-searched instead of selecting (found via live testing)
+
+Also confirmed live: the frontend's "Select gift" button *does* exist and
+*does* work (contrary to an earlier assumption recorded in this doc -
+correcting that here) - tapping it sends a synthesized user message
+embedding the exact product id, e.g. *"I'd like the Coffee Beans by
+Methodical Coffee (product 0884fcbe-720f-4119-ba3a-472ebdf7da66)."* This
+is the single most reliable selection signal possible - the frontend, not
+the model, produced the id - yet the model still ignored it and ran a
+fresh `search_gifts` instead of calling `select_gift`. The turn-context
+carryover fixes above didn't help here because the prior turn (an
+availability error) hadn't carried forward any `recommendedProducts` to
+match against.
+
+**Fix**: `extractTappedProductId` parses this exact `(product <uuid>)`
+format directly out of the user's newest message, independent of carried-
+over turn context (so it works even for a product tapped from a list shown
+earlier in the very same reply). When found, `buildTappedSelectionMessage`
+adds a directive "call select_gift right now" instruction. Covered by tests
+in `index.test.ts`, including a direct reproduction of the tapped message.
+
+**Takeaway for Cursor**: the product-card tap handler is real and already
+sends a parseable, id-bearing message - CC-04's "tap a card" contract is
+satisfied end to end once this fix is deployed. The earlier note in this
+doc claiming `TheaAgent.tsx`'s cards have no `onClick` should be treated as
+superseded by this live observation, not relied on.
+
 ## Invented gift ideas when search_gifts comes up empty (found via live testing)
 
 `supabase/functions/thea-chat/index.ts`. Reported from a live session: asking
@@ -471,9 +498,11 @@ under CC-02) - no ranking behavior was changed.
 
 ## Frontend gaps confirmed this pass (not implemented here - Cursor's job)
 
-- `TheaAgent.tsx`'s product cards render with **no `onClick`/handler at
-  all** - tapping a card does nothing today. CC-04's "tap a card to select
-  it" path has no frontend entry point yet.
+- ~~`TheaAgent.tsx`'s product cards render with no `onClick`/handler~~ -
+  **superseded, see "Tapped product cards" section below**: live testing
+  found a working "Select gift" button that sends a parseable, id-bearing
+  message. This earlier note was wrong (or the UI has since changed); the
+  tap-to-select path is real and now has a backend fix to go with it.
 - No caller reads the top-level `writes` array from a chat response to
   invalidate `recipients`/gift queries - the write-acknowledgement contract
   from CC-01/03/04 has no frontend consumer yet.

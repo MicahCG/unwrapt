@@ -6,8 +6,10 @@
 import { assert, assertEquals } from "https://deno.land/std@0.190.0/testing/asserts.ts";
 import {
   buildDirectSelectionMessage,
+  buildTappedSelectionMessage,
   buildTurnContextMessage,
   checkRecommendationIntegrity,
+  extractTappedProductId,
   matchNamedRecommendedProduct,
   nextOccasionDate,
   normalizeInterests,
@@ -220,4 +222,24 @@ Deno.test("shouldPersistReviewMarker is false (reproduces the live stale-marker 
   const marker = "rec_1:prod_tote:2026-11-01";
   const finalReply = "Here are the available gifts under $50 for Jake:\n\n• **Sterling Silver Birth Flower Bolo Bracelet** - $13\n• **Set of 3 Pickleballs** - $15";
   assertEquals(shouldPersistReviewMarker(marker, finalReply, ["prod_bracelet", "prod_pickleballs"]), false);
+});
+
+Deno.test("extractTappedProductId parses the frontend's tap-to-select message format (reproduces the live bug: tapping 'Select gift' still re-searched instead of calling select_gift with the embedded id)", () => {
+  const message = "I'd like the Coffee Beans by Methodical Coffee (product 0884fcbe-720f-4119-ba3a-472ebdf7da66).";
+  assertEquals(extractTappedProductId(message), "0884fcbe-720f-4119-ba3a-472ebdf7da66");
+});
+
+Deno.test("extractTappedProductId returns null for an ordinary typed message", () => {
+  assertEquals(extractTappedProductId("Let's go with the Packable Tote Bag"), null);
+});
+
+Deno.test("buildTappedSelectionMessage returns null without a tapped id", () => {
+  assertEquals(buildTappedSelectionMessage(null, { id: "rec_1", name: "Jake" }), null);
+});
+
+Deno.test("buildTappedSelectionMessage is directive and includes the recipient hint when known", () => {
+  const message = buildTappedSelectionMessage("0884fcbe-720f-4119-ba3a-472ebdf7da66", { id: "rec_1", name: "Jake" });
+  assert(message?.includes("0884fcbe-720f-4119-ba3a-472ebdf7da66"));
+  assert(message?.includes("rec_1"));
+  assert(message?.includes("Call select_gift right now"));
 });

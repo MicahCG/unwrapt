@@ -509,6 +509,33 @@ export const buildDirectSelectionMessage = (
   return `The user's latest message clearly names "${match.title}" (id: ${match.id}, $${match.price}) from the products you just showed. Call select_gift right now with productId "${match.id}"${recipientHint} - do not call search_gifts again and do not re-list the options.`;
 };
 
+/** The frontend's tap-to-select product card sends a synthesized user
+ * message embedding the exact product id in parens, e.g. "I'd like the
+ * Coffee Beans by Methodical Coffee (product 0884fcbe-...)." This is the
+ * single most reliable selection signal there is - the frontend, not the
+ * model, produced it - yet even this didn't reliably trigger select_gift in
+ * practice (observed live: the model re-searched instead of using the id
+ * right in front of it). Parsed independently of matchNamedRecommendedProduct
+ * so it works even when the tapped product isn't in the carried-over turn
+ * context (e.g. the user tapped a card from a search result shown earlier
+ * in the same reply, not carried over from a prior turn). Exported for unit
+ * testing. */
+export const extractTappedProductId = (message: string): string | null => {
+  const match = message.match(/\(product\s+([0-9a-fA-F-]{8,})\)/);
+  return match ? match[1] : null;
+};
+
+/** Builds the directive instruction for extractTappedProductId's result.
+ * Exported for unit testing. */
+export const buildTappedSelectionMessage = (
+  productId: string | null,
+  activeRecipient: { id: string; name: string } | null | undefined,
+): string | null => {
+  if (!productId) return null;
+  const recipientHint = activeRecipient ? ` and recipientId "${activeRecipient.id}" (${activeRecipient.name})` : "";
+  return `The user's latest message is a tapped product card embedding id "${productId}". Call select_gift right now with productId "${productId}"${recipientHint} - do not call search_gifts, do not ask a clarifying question, do not re-list anything.`;
+};
+
 /** Guards against persisting a stale reviewMarker: select_gift may have run
  * earlier in a turn's tool loop, but the model can still end up presenting
  * something unrelated as its actual final reply (observed live: it also
@@ -1401,14 +1428,22 @@ Rules:
     // of the carried-over products by text, give a directive instruction
     // for just this turn instead of relying on the model to apply the
     // general rule reliably (see matchNamedRecommendedProduct above).
-    const namedProductMatch = matchNamedRecommendedProduct(messages[messages.length - 1]?.content ?? "", turnContext?.recommendedProducts);
+    const latestUserMessageContent = messages[messages.length - 1]?.content ?? "";
+    const namedProductMatch = matchNamedRecommendedProduct(latestUserMessageContent, turnContext?.recommendedProducts);
     const directSelectionMessage = buildDirectSelectionMessage(namedProductMatch, turnContext?.activeRecipient ?? null);
+    // Stronger, independent signal for the frontend's tap-to-select path
+    // (see extractTappedProductId) - parsed from the message itself, not
+    // the carried-over turn context, so it fires even for a product tapped
+    // from a list shown earlier in this very reply.
+    const tappedProductId = extractTappedProductId(latestUserMessageContent);
+    const tappedSelectionMessage = buildTappedSelectionMessage(tappedProductId, turnContext?.activeRecipient ?? null);
     const conversation: unknown[] = [
       { role: "system", content: SYSTEM_PROMPT },
       ...(contextMessage ? [{ role: "system", content: contextMessage }] : []),
       ...(turnContextMessage ? [{ role: "system", content: turnContextMessage }] : []),
       ...messages,
       ...(directSelectionMessage ? [{ role: "system", content: directSelectionMessage }] : []),
+      ...(tappedSelectionMessage ? [{ role: "system", content: tappedSelectionMessage }] : []),
     ];
 
     const seenProducts = new Map<string, Product>();
