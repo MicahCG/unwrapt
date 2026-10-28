@@ -509,6 +509,26 @@ export const buildDirectSelectionMessage = (
   return `The user's latest message clearly names "${match.title}" (id: ${match.id}, $${match.price}) from the products you just showed. Call select_gift right now with productId "${match.id}"${recipientHint} - do not call search_gifts again and do not re-list the options.`;
 };
 
+/** Guards against persisting a stale reviewMarker: select_gift may have run
+ * earlier in a turn's tool loop, but the model can still end up presenting
+ * something unrelated as its actual final reply (observed live: it also
+ * called search_gifts in the same turn and chose to show that list
+ * instead, while the select_gift result sat unused) - that stale marker
+ * must never later be confirmable for a review the user was never shown.
+ * Only true if the final reply actually reflects that review: either the
+ * model echoed the literal marker as instructed, or it named the reviewed
+ * product by its exact title (the same title-fallback resolution feeding
+ * recommendedIds). Exported for unit testing. */
+export const shouldPersistReviewMarker = (
+  reviewMarker: string | null,
+  finalContent: string,
+  recommendedIds: string[],
+): boolean => {
+  if (!reviewMarker) return false;
+  const reviewedProductId = reviewMarker.split(":")[1] ?? null;
+  return /GIFT_REVIEW/i.test(finalContent) || Boolean(reviewedProductId && recommendedIds.includes(reviewedProductId));
+};
+
 const sanitizeMessages = (input: unknown): ChatMessage[] | null => {
   if (!Array.isArray(input) || input.length === 0 || input.length > MAX_MESSAGES) return null;
   const messages: ChatMessage[] = [];
@@ -956,15 +976,26 @@ const handleSelectGift = async (
     if (!computed) return { ok: false, error: "No occasion date known for this recipient - ask the user for one (YYYY-MM-DD)." };
     occasionDate = computed.date;
     occasionLabel = computed.occasion;
-  } else {
-    // An explicit date that isn't the recipient's known birthday/anniversary
-    // and is already in the past is almost certainly the model inventing a
-    // date rather than a deliberate "just because" gift - reject it instead
-    // of silently scheduling something dated in the past.
-    const isKnownOccasion = recipient.birthday === occasionDate || recipient.anniversary === occasionDate;
-    if (!isKnownOccasion && occasionDate < new Date().toISOString().split("T")[0]) {
+  } else if (occasionDate < new Date().toISOString().split("T")[0]) {
+    // A past date is never a legitimate occasion to schedule for - a
+    // recipient's stored birthday/anniversary always carries their real,
+    // historical year (confirmed live: a real recipient's birthday field
+    // was literally "2023-10-28"), so exempting an exact match from this
+    // check (the previous logic) let the model pass that raw value
+    // straight through as a 3-years-in-the-past occasionDate instead of
+    // omitting it to get the correctly-computed next occurrence below.
+    // When that's exactly what happened, recover automatically (the next
+    // occurrence is clearly what was meant) rather than erroring.
+    const isKnownButStaleOccasion = recipient.birthday === occasionDate || recipient.anniversary === occasionDate;
+    if (isKnownButStaleOccasion) {
+      const computed = nextOccasionDate(recipient.birthday, recipient.anniversary);
+      if (!computed) return { ok: false, error: "No occasion date known for this recipient - ask the user for one (YYYY-MM-DD)." };
+      occasionDate = computed.date;
+      occasionLabel = computed.occasion;
+    } else {
       return { ok: false, error: "That occasion date is in the past - omit occasionDate to use the recipient's next birthday/anniversary, or ask the user for the correct date." };
     }
+  } else {
     occasionLabel = recipient.birthday === occasionDate ? "Birthday" : recipient.anniversary === occasionDate ? "Anniversary" : "Special occasion";
   }
 
@@ -1536,6 +1567,8 @@ Rules:
       ? recommendedIds.map((id) => seenProducts.get(id)).filter((p): p is Product => Boolean(p))
       : [];
 
+    const confirmedReviewMarker = shouldPersistReviewMarker(lastReviewMarker, finalContent, recommendedIds) ? lastReviewMarker : null;
+
     // Persist this turn: the user's newest message (always the last entry
     // in the client-sent `messages`, since both TheaHomeTab and TheaAgent
     // append it before sending) plus Thea's reply.
@@ -1545,7 +1578,7 @@ Rules:
       {
         role: "assistant",
         content: reply,
-        reviewMarker: lastReviewMarker,
+        reviewMarker: confirmedReviewMarker,
         recommendedProducts: products.length ? products.map((p) => ({ id: p.id, title: p.title, price: p.price })) : undefined,
         activeRecipient: lastActiveRecipient,
       },

@@ -12,6 +12,7 @@ import {
   nextOccasionDate,
   normalizeInterests,
   scoreInterestText,
+  shouldPersistReviewMarker,
   scrubFalseFriends,
 } from "./index.ts";
 
@@ -199,4 +200,24 @@ Deno.test("buildDirectSelectionMessage omits the recipient hint when no active r
   const message = buildDirectSelectionMessage({ id: "prod_tote", title: "Packable Tote Bag", price: 25 }, null);
   assert(message?.includes("prod_tote"));
   assert(!message?.includes("recipientId"));
+});
+
+Deno.test("shouldPersistReviewMarker returns false with no marker", () => {
+  assertEquals(shouldPersistReviewMarker(null, "anything", []), false);
+});
+
+Deno.test("shouldPersistReviewMarker is true when the final reply echoes the literal GIFT_REVIEW marker", () => {
+  const marker = "rec_1:prod_tote:2026-11-01";
+  assertEquals(shouldPersistReviewMarker(marker, "I'll schedule this. GIFT_REVIEW: rec_1:prod_tote:2026-11-01", []), true);
+});
+
+Deno.test("shouldPersistReviewMarker is true when the reviewed product is title-matched in the final reply even without the literal marker", () => {
+  const marker = "rec_1:prod_tote:2026-11-01";
+  assertEquals(shouldPersistReviewMarker(marker, "I'll schedule the Packable Tote Bag for Jake's birthday.", ["prod_tote"]), true);
+});
+
+Deno.test("shouldPersistReviewMarker is false (reproduces the live stale-marker bug) when select_gift ran earlier in the turn but the final reply is an unrelated list - e.g. the model also called search_gifts and presented that instead", () => {
+  const marker = "rec_1:prod_tote:2026-11-01";
+  const finalReply = "Here are the available gifts under $50 for Jake:\n\n• **Sterling Silver Birth Flower Bolo Bracelet** - $13\n• **Set of 3 Pickleballs** - $15";
+  assertEquals(shouldPersistReviewMarker(marker, finalReply, ["prod_bracelet", "prod_pickleballs"]), false);
 });

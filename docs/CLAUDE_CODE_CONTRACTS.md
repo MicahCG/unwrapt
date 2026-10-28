@@ -368,6 +368,41 @@ schedule...", "Ready to send...") and explicitly forbid past-tense/
 completed-action phrasing ("I've scheduled...", "Done!") until after the
 user confirms and `confirm_scheduled_gift` actually runs.
 
+## Past-dated occasion slipping through, and a stale reviewMarker leaking across tool calls (found via live testing)
+
+Testing the confirm step found two compounding bugs, both in
+`supabase/functions/thea-chat/index.ts`, surfaced by the same turn:
+
+1. **Past-date loophole in `handleSelectGift`**: a confirmed-live recipient
+   (`Jake`) has `birthday = "2023-10-28"` - a real recipient's birthday
+   field always carries their actual, historical birth year. The model
+   passed that raw stored value straight through as `occasionDate` instead
+   of omitting it to get the correctly-computed next occurrence. The
+   existing past-date guard exempted an exact match to the stored
+   birthday/anniversary field from rejection (meant for a different case),
+   which let a three-years-in-the-past date sail through as a "known
+   occasion." **Fix**: the past-date check is now unconditional; if the
+   explicit date is in the past *and* exactly matches the stored
+   birthday/anniversary (i.e. the model clearly meant "their birthday" but
+   passed the raw field), it's auto-corrected to the properly-computed next
+   occurrence instead of either erroring or silently scheduling the past
+   date.
+2. **Stale `reviewMarker` leaking into persistence**: in the same turn,
+   `select_gift` ran (producing a review for the Packable Tote Bag,
+   internally using the bad date above) and `search_gifts` *also* ran, and
+   the model's actual final reply presented the search list, not the
+   review - but the review's marker was still captured into
+   `conversation_messages.metadata` regardless, since the old code
+   persisted whatever `select_gift` last returned, with no check against
+   what the final reply actually showed. This is a real integrity gap:
+   `confirm_scheduled_gift`'s whole safety mechanism depends on the
+   persisted marker meaning "the user was actually shown this review."
+   **Fix**: `shouldPersistReviewMarker` only keeps the marker when the
+   final reply either echoes the literal `GIFT_REVIEW` text or names the
+   reviewed product by its exact title (same title-fallback resolution as
+   `recommendedProducts`) - otherwise it's dropped. Covered by tests in
+   `index.test.ts`, including a direct reproduction of this exact turn.
+
 ## Invented gift ideas when search_gifts comes up empty (found via live testing)
 
 `supabase/functions/thea-chat/index.ts`. Reported from a live session: asking
