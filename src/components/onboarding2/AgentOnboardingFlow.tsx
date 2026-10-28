@@ -33,6 +33,14 @@ import {
   signalFromText,
   upsertSignal,
 } from '@/lib/interestDiscovery';
+import {
+  loadOnboardingProgress,
+  personFieldsFromRecipient,
+  setOnboardingStep,
+  shouldResumeOnboarding,
+  upsertDraftRecipient,
+  type OnboardingStep,
+} from '@/lib/onboardingProgress';
 
 interface AgentOnboardingFlowProps {
   /** Called once recipients are created so the parent can show the dashboard. */
@@ -469,6 +477,8 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
 
   // The welcome now lives on the sign-in screen, so signed-in setup starts at importing birthdays.
   const [screen, setScreen] = useState<Screen>('import');
+  /** False until we know whether to resume mid-flow or cold-start calendar import. */
+  const [bootstrapped, setBootstrapped] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [calendarNotice, setCalendarNotice] = useState<string | null>(() => {
     // The calendar OAuth callback returns here with ?calendar=<result>.
@@ -543,24 +553,118 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     });
   }, [screen, activePerson]);
 
-  // ── Calendar integration (faithful to the original CalendarStep logic) ──────
+  /** Persist a draft recipient + onboarding_step so relaunch can resume. */
+  const persistDraftProgress = useCallback(
+    async (person: Person, step: OnboardingStep) => {
+      if (!user?.id) return person;
+      const recipientId = await upsertDraftRecipient(user.id, {
+        name: person.name,
+        relationship: person.relationship,
+        birthday: person.birthday,
+        anniversary: person.anniversary,
+        interests: person.interests || [],
+        fromCalendar: person.fromCalendar,
+        sourceLabel: SOURCE_LABEL[peopleSource].replace('your ', ''),
+      });
+      await setOnboardingStep(user.id, step);
+      if (!recipientId || recipientId === person.id) return person;
+      // Swap temp cal-/manual- ids for the durable recipients.id.
+      setPeople((prev) =>
+        prev.map((p) => (p.id === person.id ? { ...p, id: recipientId } : p)),
+      );
+      setActiveId((current) => (current === person.id ? recipientId : current));
+      return { ...person, id: recipientId };
+    },
+    [user?.id, peopleSource],
+  );
+
+  // Resume mid-flow from recipients + profiles.onboarding_step; only auto-scan
+  // calendar when there is no durable progress (avoids "Reading your calendar…" rewind).
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
     (async () => {
       try {
-        const { data: integrations, error } = await supabase.rpc('get_my_calendar_integration');
-        if (error || cancelled) return;
-        if (integrations && integrations.length > 0) {
-          const integration = integrations[0];
-          if (integration.is_connected && !integration.is_expired) {
-            setIsConnected(true);
-            // If we land back here connected (e.g. after OAuth), pull events.
-            await fetchCalendarEvents(true);
+        const progress = await loadOnboardingProgress(user.id);
+        if (cancelled) return;
+
+        let connected = false;
+        try {
+          const { data: integrations, error } = await supabase.rpc('get_my_calendar_integration');
+          if (!error && integrations && integrations.length > 0) {
+            const integration = integrations[0];
+            connected = Boolean(integration.is_connected && !integration.is_expired);
           }
+        } catch (e) {
+          console.error('Calendar integration check failed:', e);
+        }
+        if (cancelled) return;
+        setIsConnected(connected);
+
+        const canResume =
+          shouldResumeOnboarding(progress.step) && progress.recipients.length > 0;
+
+        if (canResume) {
+          const restored = progress.recipients.map((row, index) => {
+            const fields = personFieldsFromRecipient(row, index);
+            return { ...fields, tone: toneForIndex(index) } as Person;
+          });
+          // Keep the first person focused (draft upsert usually stores one active pick).
+          restored.forEach((p, i) => {
+            p.selected = i === 0;
+          });
+          setPeople(restored);
+          setPeopleSource('google');
+          const focus = restored[0];
+          setActiveId(focus.id);
+
+          if (progress.step === 'reveal' && (focus.interests?.length || 0) > 0) {
+            const seeded: InterestSignal[] = focus.interests.map((interest) =>
+              isStarterCategory(interest)
+                ? signalFromCategory(interest)
+                : signalFromText(interest, null),
+            );
+            setIntelSignals(seeded);
+            setIntelMessages([
+              {
+                from: 'thea',
+                text: `Welcome back — I've still got what ${firstNameOf(focus.name)} is into. Finding gift ideas again.`,
+              },
+            ]);
+            setScreen('reveal');
+          } else {
+            const first = firstNameOf(focus.name);
+            const seeded: InterestSignal[] = (focus.interests || []).map((interest) =>
+              isStarterCategory(interest)
+                ? signalFromCategory(interest)
+                : signalFromText(interest, null),
+            );
+            setIntelSignals(seeded);
+            setIntelMessages([
+              {
+                from: 'thea',
+                text:
+                  seeded.length > 0
+                    ? `Welcome back. Here's what I remember about ${first} — want to add more, or see gift ideas?`
+                    : `Welcome back. What's ${first} into? Tap a starting point, or tell me in your own words.`,
+              },
+            ]);
+            setScreen('intel');
+          }
+          setBootstrapped(true);
+          return;
+        }
+
+        // Fresh setup (or OAuth return): pull events only when nothing durable exists yet.
+        const calendarResult = new URLSearchParams(window.location.search).get('calendar');
+        const oauthReturn = calendarResult === 'connected';
+        if (connected && progress.recipients.length === 0 && (oauthReturn || !progress.step || progress.step === 'import')) {
+          await fetchCalendarEvents(true);
         }
       } catch (e) {
-        console.error('Calendar integration check failed:', e);
+        console.error('Onboarding bootstrap failed:', e);
+      } finally {
+        if (!cancelled) setBootstrapped(true);
       }
     })();
     return () => {
@@ -759,7 +863,22 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   // ── Intel chat ────────────────────────────────────────────────────────────────
   const syncPersonInterests = (personId: string, signals: InterestSignal[]) => {
     const labels = searchLabelsFromSignals(signals);
-    setPeople((prev) => prev.map((p) => (p.id === personId ? { ...p, interests: labels } : p)));
+    setPeople((prev) => {
+      const next = prev.map((p) => (p.id === personId ? { ...p, interests: labels } : p));
+      const person = next.find((p) => p.id === personId);
+      if (person && user?.id) {
+        void upsertDraftRecipient(user.id, {
+          name: person.name,
+          relationship: person.relationship,
+          birthday: person.birthday,
+          anniversary: person.anniversary,
+          interests: labels,
+          fromCalendar: person.fromCalendar,
+          sourceLabel: SOURCE_LABEL[peopleSource].replace('your ', ''),
+        });
+      }
+      return next;
+    });
   };
 
   const enterIntel = (id?: string, personOverride?: Person) => {
@@ -769,9 +888,13 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       return;
     }
     const person = personOverride || people.find((p) => p.id === target);
-    const first = firstNameOf(person?.name || '');
+    if (!person) {
+      startManualAdd();
+      return;
+    }
+    const first = firstNameOf(person.name);
     setActiveId(target);
-    const seeded: InterestSignal[] = (person?.interests || []).map((interest) =>
+    const seeded: InterestSignal[] = (person.interests || []).map((interest) =>
       isStarterCategory(interest)
         ? signalFromCategory(interest)
         : signalFromText(interest, null),
@@ -791,6 +914,8 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       },
     ]);
     setScreen('intel');
+    // Durable draft as soon as a person is chosen — prevents calendar cold-start on relaunch.
+    void persistDraftProgress(person, 'intel');
   };
 
   const sendIntelMessage = async (text: string, selectedInterest?: string) => {
@@ -935,10 +1060,12 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
 
   const startReveal = () => {
     if (!intelFacts.length || !activePerson) return;
+    const withInterests = { ...activePerson, interests: intelFacts };
     setPeople((prev) =>
-      prev.map((p) => (p.id === activePerson.id ? { ...p, interests: intelFacts } : p)),
+      prev.map((p) => (p.id === activePerson.id ? withInterests : p)),
     );
     setScreen('reveal');
+    void persistDraftProgress(withInterests, 'reveal');
   };
 
   const finishReveal = useCallback((
@@ -950,7 +1077,11 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     setUnmatchedRevealInterests(unmatched);
     setRevealAskUser(askUser);
     setScreen('subscription');
-  }, []);
+    if (user?.id) {
+      // Gift proof complete → next launch lands on SubscribeGate (paywall home).
+      void setOnboardingStep(user.id, 'subscription');
+    }
+  }, [user?.id]);
 
   const occasionPhrase = (person: Person | null) => {
     if (!person?.primaryType) return null;
@@ -1000,7 +1131,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         if (error) console.error('Error creating recipient', person.name, error);
       }
 
-      // Silent defaults. Budget/autopilot UI comes later (gift config / VIP).
+      // Silent defaults + mark setup done so relaunch hits SubscribeGate, not calendar.
       try {
         await supabase
           .from('profiles')
@@ -1008,10 +1139,12 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             default_gift_budget_min: DEFAULT_BUDGET.lo,
             default_gift_budget_max: DEFAULT_BUDGET.hi,
             autopilot_level: DEFAULT_AUTOPILOT,
+            onboarding_step: 'done',
           } as never)
           .eq('id', user.id);
       } catch {
         /* preference columns may not exist yet  -  non-fatal */
+        await setOnboardingStep(user.id, 'done');
       }
 
       try {
@@ -1066,16 +1199,22 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   };
 
   // ── Loading / completing splash ───────────────────────────────────────────────
-  if (completing) {
+  if (!bootstrapped || completing) {
     return (
       <MobileShell glow animate={false}>
         <div className="flex h-full flex-col items-center justify-center text-center">
           <TheaCharacter size="large" speaking={false} pose="thinking" />
           <Display className="mt-7 text-[27px]">
-            {startingCheckout ? 'Opening secure checkout…' : 'Setting up your concierge…'}
+            {!bootstrapped
+              ? 'Picking up where you left off…'
+              : startingCheckout
+                ? 'Opening secure checkout…'
+                : 'Setting up your concierge…'}
           </Display>
           <p className="mt-2 text-[15px]" style={{ color: U.subtle }}>
-            Saving your people and getting Thea ready.
+            {!bootstrapped
+              ? 'Checking your saved progress.'
+              : 'Saving your people and getting Thea ready.'}
           </p>
         </div>
       </MobileShell>
