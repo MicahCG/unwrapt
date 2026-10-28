@@ -495,6 +495,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   const [followUpChips, setFollowUpChips] = useState<string[]>([]);
   const [pendingCategory, setPendingCategory] = useState<string | null>(null);
   const [intelInput, setIntelInput] = useState('');
+  const [intelComposerFocused, setIntelComposerFocused] = useState(false);
   const { reaction: theaReaction, reactTo, play: playReaction } = useTheaReaction();
   const [intelSending, setIntelSending] = useState(false);
   const [revealPicks, setRevealPicks] = useState<GiftCatalogItem[]>([]);
@@ -779,6 +780,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     setFollowUpChips([]);
     setPendingCategory(null);
     setIntelInput('');
+    setIntelComposerFocused(false);
     setRevealPicks([]);
     setUnmatchedRevealInterests([]);
     setRevealAskUser([]);
@@ -1215,9 +1217,12 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       const first = firstNameOf(activePerson?.name || '');
       const starterChips = STARTER_CATEGORIES.filter(
         (t) => !intelSignals.some((s) => s.category?.toLowerCase() === t.toLowerCase() || s.interest.toLowerCase() === t.toLowerCase()),
-      );
-      const showStarterChips = intelSignals.length === 0;
-      const showNarrowChips = !showStarterChips && !discoveryReady && followUpChips.length > 0;
+      ).slice(0, 3);
+      const narrowChips = followUpChips.slice(0, 3);
+      // Pills hide while the composer is focused so the keyboard has room; they return on blur (still capped at 3).
+      const showStarterChips = !intelComposerFocused && intelSignals.length === 0;
+      const showNarrowChips =
+        !intelComposerFocused && intelSignals.length > 0 && !discoveryReady && narrowChips.length > 0;
       const canReveal = discoveryReady && !intelSending && intelFacts.length > 0;
       return (
         <MobileShell contentClassName="flex flex-col px-0 pt-0" animate>
@@ -1313,7 +1318,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
 
               {showNarrowChips && (
                 <div className="mb-3 flex flex-wrap gap-2">
-                  {followUpChips.map((c) => (
+                  {narrowChips.map((c) => (
                     <button
                       type="button"
                       key={c}
@@ -1348,13 +1353,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
               )}
 
               <div
-                className="flex items-center gap-2.5"
-                style={{
-                  padding: '7px 7px 7px 18px',
-                  borderRadius: 24,
-                  background: U.surface,
-                  border: `1px solid rgba(42,37,32,0.1)`,
-                }}
+                className={`u-intel-composer flex items-center gap-2.5${intelComposerFocused ? ' u-intel-composer--focused' : ''}`}
               >
                 <input
                   value={intelInput}
@@ -1367,8 +1366,9 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
                         ? `Tell me more about ${first}…`
                         : `Or tell me about ${first}…`
                   }
-                  className="flex-1"
-                  style={{ border: 'none', background: 'transparent', fontSize: 14.5, color: U.ink }}
+                  className="u-intel-composer__input flex-1"
+                  onFocus={() => setIntelComposerFocused(true)}
+                  onBlur={() => setIntelComposerFocused(false)}
                   onChange={(event) => setIntelInput(event.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
