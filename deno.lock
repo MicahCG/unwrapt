@@ -66,10 +66,18 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
+        "npm:@capacitor-community/apple-sign-in@7.1.0",
+        "npm:@capacitor-community/contacts@7.2.0",
         "npm:@capacitor/android@^7.4.3",
+        "npm:@capacitor/app@^7.1.2",
+        "npm:@capacitor/browser@^7.0.5",
         "npm:@capacitor/cli@^7.4.3",
         "npm:@capacitor/core@^7.4.3",
         "npm:@capacitor/ios@^7.4.3",
+        "npm:@capacitor/keyboard@^7.0.6",
+        "npm:@capacitor/splash-screen@^7.0.5",
+        "npm:@capacitor/status-bar@^7.0.6",
+        "npm:@ebarooni/capacitor-calendar@7.2.0",
         "npm:@eslint/js@^9.9.0",
         "npm:@hookform/resolvers@^3.9.0",
         "npm:@radix-ui/react-accordion@^1.2.0",
@@ -102,6 +110,7 @@
         "npm:@radix-ui/react-tooltip@^1.1.4",
         "npm:@react-three/drei@^9.122.0",
         "npm:@react-three/fiber@^8.18.0",
+        "npm:@revenuecat/purchases-capacitor@^10.4.0",
         "npm:@supabase/supabase-js@^2.49.8",
         "npm:@tailwindcss/typography@~0.5.15",
         "npm:@tanstack/react-query@^5.56.2",
