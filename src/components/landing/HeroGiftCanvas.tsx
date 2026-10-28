@@ -2,7 +2,6 @@ import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import {
   ContactShadows,
-  Environment,
   Float,
   PerspectiveCamera,
 } from "@react-three/drei";
@@ -212,7 +211,7 @@ function Scene({
         far={4}
         color="#8B7355"
       />
-      <Environment preset="apartment" />
+      {/* No drei Environment preset — CSP blocks remote HDR fetches on unwrapt.io */}
     </>
   );
 }
@@ -225,6 +224,37 @@ export type HeroGiftCanvasProps = {
   /** Force static poster (mobile / reduced motion) */
   forcePoster?: boolean;
 };
+
+class CanvasErrorBoundary extends React.Component<
+  { fallback: React.ReactNode; children: React.ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    if (this.state.failed) return this.props.fallback;
+    return this.props.children;
+  }
+}
+
+const PosterFallback: React.FC<{
+  className?: string;
+  revealProgress?: number;
+}> = ({ className = "", revealProgress = 0 }) => (
+  <div className={`relative overflow-hidden ${className}`}>
+    <img
+      src={giftPoster}
+      alt=""
+      aria-hidden="true"
+      className="h-full w-full object-contain object-center scale-[1.05]"
+      style={{
+        transform: `translateY(${revealProgress * -8}%) scale(${1 + revealProgress * 0.04})`,
+      }}
+    />
+  </div>
+);
 
 const HeroGiftCanvas: React.FC<HeroGiftCanvasProps> = ({
   className = "",
@@ -265,53 +295,41 @@ const HeroGiftCanvas: React.FC<HeroGiftCanvasProps> = ({
   }, []);
 
   if (usePoster) {
-    return (
-      <div className={`relative overflow-hidden ${className}`}>
-        <img
-          src={giftPoster}
-          alt=""
-          aria-hidden="true"
-          className="h-full w-full object-contain object-center scale-[1.05]"
-          style={{
-            transform: `translateY(${revealProgress * -8}%) scale(${1 + revealProgress * 0.04})`,
-          }}
-        />
-      </div>
-    );
+    return <PosterFallback className={className} revealProgress={revealProgress} />;
   }
 
   return (
-    <div
-      className={`relative ${className}`}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={() => setMousePosition({ x: 0.5, y: 0.5 })}
+    <CanvasErrorBoundary
+      fallback={<PosterFallback className={className} revealProgress={revealProgress} />}
     >
-      <Suspense
-        fallback={
-          <img
-            src={giftPoster}
-            alt=""
-            aria-hidden="true"
-            className="h-full w-full object-contain"
-          />
-        }
+      <div
+        className={`relative ${className}`}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => setMousePosition({ x: 0.5, y: 0.5 })}
       >
-        <Canvas
-          shadows
-          dpr={dpr}
-          gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
-          frameloop={active ? "always" : "demand"}
-          style={{ background: "transparent" }}
-          camera={{ position: [0, 0.55, 5.2], fov: 42 }}
+        <Suspense
+          fallback={<PosterFallback className="h-full w-full" revealProgress={revealProgress} />}
         >
-          <Scene
-            mousePosition={mousePosition}
-            revealProgress={revealProgress}
-            reducedMotion={reducedMotion}
-          />
-        </Canvas>
-      </Suspense>
-    </div>
+          <Canvas
+            shadows
+            dpr={dpr}
+            gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+            frameloop={active ? "always" : "demand"}
+            style={{ background: "transparent" }}
+            camera={{ position: [0, 0.55, 5.2], fov: 42 }}
+            onCreated={({ gl }) => {
+              gl.setClearColor(0x000000, 0);
+            }}
+          >
+            <Scene
+              mousePosition={mousePosition}
+              revealProgress={revealProgress}
+              reducedMotion={reducedMotion}
+            />
+          </Canvas>
+        </Suspense>
+      </div>
+    </CanvasErrorBoundary>
   );
 };
 
