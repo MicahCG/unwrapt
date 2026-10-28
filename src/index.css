@@ -110,6 +110,12 @@
   html {
     min-height: 100%;
     background: hsl(var(--cream));
+    /* Belt-and-suspenders against any stray wide element (a portaled Radix
+       dialog/sheet/popover renders straight onto document.body, outside any
+       component's own overflow-hidden wrapper) making the whole page wider
+       than the viewport - on mobile that shows up as being able to pinch-
+       zoom/pan past the intended edge instead of the layout just clipping. */
+    overflow-x: hidden;
   }
 
   body {
@@ -119,6 +125,7 @@
     -webkit-font-smoothing: antialiased;
     min-height: 100%;
     background: hsl(var(--cream));
+    overflow-x: hidden;
   }
 
   /* Ensure viewport always shows the warm app background */
