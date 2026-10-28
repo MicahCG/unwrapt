@@ -1,0 +1,42 @@
+{
+	"appId": "io.unwrapt.app",
+	"appName": "Unwrapt",
+	"webDir": "dist",
+	"backgroundColor": "#EDE6D8",
+	"server": {
+		"androidScheme": "https",
+		"iosScheme": "capacitor",
+		"hostname": "app.unwrapt.io"
+	},
+	"plugins": {
+		"SplashScreen": {
+			"launchShowDuration": 1200,
+			"backgroundColor": "#EDE6D8",
+			"showSpinner": false
+		},
+		"StatusBar": {
+			"style": "DARK",
+			"backgroundColor": "#EDE6D8"
+		},
+		"Keyboard": {
+			"resize": "body",
+			"resizeOnFullScreen": true
+		}
+	},
+	"ios": {
+		"contentInset": "automatic",
+		"preferredContentMode": "mobile",
+		"scheme": "Unwrapt"
+	},
+	"packageClassList": [
+		"SignInWithApple",
+		"ContactsPlugin",
+		"AppPlugin",
+		"CAPBrowserPlugin",
+		"KeyboardPlugin",
+		"SplashScreenPlugin",
+		"StatusBarPlugin",
+		"CapacitorCalendarPlugin",
+		"PurchasesPlugin"
+	]
+}

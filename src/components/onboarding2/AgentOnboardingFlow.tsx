@@ -7,14 +7,20 @@ import { useToast } from '@/hooks/use-toast';
 import { normalizeRecipientName } from '@/lib/dateUtils';
 import { MobileShell, Eyebrow, PrimaryButton, Display } from '@/components/unwrapt2/MobileShell';
 import { PersonAvatar } from '@/components/unwrapt2/TheaAvatar';
+import { useTheaReaction } from '@/hooks/useTheaReaction';
+import { theaChatPose } from '@/lib/theaState';
+import { classifyUserReply } from '@/lib/theaReactions';
+import { withAccountPicker } from '@/lib/calendarConnection';
+import BirthdaySourcePicker from '@/components/birthdays/BirthdaySourcePicker';
+import { SOURCE_LABEL, type BirthdaySource, type FoundOccasion } from '@/lib/birthdaySources';
 import { TheaCharacter } from '@/components/unwrapt2/TheaCharacter';
 import { U, toneForIndex, initialsOf } from '@/components/unwrapt2/theme';
 import { format } from 'date-fns';
 import { trackProductEvent } from '@/lib/productAnalytics';
 import GachaReveal from '@/components/onboarding2/GachaReveal';
 import StrongGiftPicks from '@/components/onboarding2/StrongGiftPicks';
-import { clearSkipAgentWelcome, markTheaValueSeen, shouldSkipAgentWelcome } from '@/lib/funnel';
-import { VIP_MONTHLY_AMOUNT_LABEL, VIP_MONTHLY_PRICE_ID } from '@/lib/stripe';
+import { clearSkipAgentWelcome, markTheaValueSeen } from '@/lib/funnel';
+import SubscriptionTerms, { useVipPrice } from '@/components/subscription/SubscriptionTerms';
 import { type GiftAskUserOffer, type GiftCatalogItem } from '@/lib/giftCatalog';
 import {
   STARTER_CATEGORIES,
@@ -36,7 +42,7 @@ interface AgentOnboardingFlowProps {
 
 interface CalendarEvent {
   summary?: string;
-  date: string;
+  date: string | null;
   type: 'birthday' | 'anniversary';
   personName: string;
 }
@@ -55,7 +61,7 @@ interface Person {
   fromCalendar: boolean;
 }
 
-type Screen = 'welcome' | 'import' | 'found' | 'addperson' | 'intel' | 'reveal' | 'subscription';
+type Screen = 'import' | 'found' | 'addperson' | 'intel' | 'reveal' | 'subscription';
 
 const FREE_TIER_LIMIT = 3;
 
@@ -252,50 +258,87 @@ function StepPips({ step, total = 4 }: { step: number; total?: number }) {
 function ImportPromptScreen({
   connecting,
   onConnect,
+  onFound,
+  onAddManually,
+  onUseDifferentAccount,
+  notice,
 }: {
   connecting: boolean;
   onConnect: () => void;
+  /** Contacts, Apple Calendar, a file or a typed list; the parent shows the review. */
+  onFound: (occasions: FoundOccasion[], source: BirthdaySource) => void;
+  onAddManually: () => void;
+  onUseDifferentAccount: () => void;
+  /** What happened on the last attempt, so a cancel or empty source is never a dead end. */
+  notice: string | null;
 }) {
-  const [ctaReady, setCtaReady] = useState(false);
+  const [ready, setReady] = useState(false);
+  const reveal: React.CSSProperties = {
+    opacity: ready ? 1 : 0,
+    transform: ready ? 'translateY(0)' : 'translateY(8px)',
+    transition: 'opacity 320ms ease, transform 320ms ease',
+    pointerEvents: ready ? 'auto' : 'none',
+  };
 
   return (
     <MobileShell
-      contentClassName="px-5 pt-5 pb-4"
+      contentClassName="overflow-y-auto px-5 pt-5 pb-4"
       footer={
-        <div
-          style={{
-            opacity: ctaReady ? 1 : 0,
-            transform: ctaReady ? 'translateY(0)' : 'translateY(8px)',
-            transition: 'opacity 320ms ease, transform 320ms ease',
-            pointerEvents: ctaReady ? 'auto' : 'none',
-          }}
-        >
-          <PrimaryButton onClick={onConnect} disabled={connecting || !ctaReady}>
-            {connecting ? 'Connecting…' : 'Connect Google Calendar'}
-          </PrimaryButton>
+        <div style={reveal}>
+          <button
+            type="button"
+            onClick={onAddManually}
+            disabled={connecting}
+            className="u-press min-h-11 w-full text-[13.5px] font-semibold disabled:opacity-50"
+            style={{ color: U.ink }}
+          >
+            Add one person myself
+          </button>
           <p
-            className="mt-3 flex items-center justify-center gap-1.5 text-center"
-            style={{ color: U.muted, fontSize: 10.5, opacity: 0.55, letterSpacing: '0.02em' }}
+            className="mt-1 flex items-center justify-center gap-1.5 text-center"
+            style={{ color: U.muted, fontSize: 10.5, opacity: 0.7, letterSpacing: '0.02em' }}
           >
             <ShieldCheck size={12} aria-hidden="true" />
-            <span>Read-only · disconnect anytime</span>
+            <span>Read-only · nothing is saved until you choose who to add</span>
           </p>
         </div>
       }
     >
       <StepPips step={1} />
-      <TheaCharacter size="large" animated className="u-thea-character--greeting" />
+      <TheaCharacter size="medium" pose={notice ? 'thinking' : 'welcome'} />
       <div
-        className="-mt-2 rounded-[22px] border bg-white/80 px-5 py-5 text-center"
+        className="-mt-2 shrink-0 rounded-[22px] border bg-white/80 px-5 py-4 text-center"
         style={{ borderColor: U.border }}
         aria-live="polite"
       >
-        <Display style={{ fontSize: 24, lineHeight: 1.25, fontWeight: 500 }}>
+        <Display style={{ fontSize: 23, lineHeight: 1.25, fontWeight: 500 }}>
           <TypewriterLine
-            text="Connect your calendar and I’ll find important dates for us to prioritize."
-            onComplete={() => setCtaReady(true)}
+            text="Where do you keep birthdays? I’ll find the dates worth planning for."
+            onComplete={() => setReady(true)}
           />
         </Display>
+      </div>
+      {notice && (
+        <div className="mx-auto mt-3 w-full shrink-0 rounded-[16px] px-4 py-3 text-center text-[13px] leading-5" role="status" style={{ background: U.accentSoft, color: U.inkSoft }}>
+          {notice}
+          {/* Kept here, not only in the footer, so they're visible above mobile browser toolbars. */}
+          <div className="mt-2.5 grid grid-cols-2 gap-2">
+            <button type="button" onClick={onAddManually} disabled={connecting} className="u-press min-h-11 rounded-[12px] px-2 text-[12.5px] font-semibold disabled:opacity-50" style={{ background: U.ink, color: U.buttonText }}>
+              Add someone myself
+            </button>
+            <button type="button" onClick={onUseDifferentAccount} disabled={connecting} className="u-press min-h-11 rounded-[12px] border px-2 text-[12.5px] font-semibold disabled:opacity-50" style={{ borderColor: 'rgba(42,37,32,0.18)', color: U.ink, background: U.surface }}>
+              Use a different Google account
+            </button>
+          </div>
+        </div>
+      )}
+      <div className="mt-3 shrink-0" style={reveal}>
+        <BirthdaySourcePicker
+          onFound={onFound}
+          onGoogle={onConnect}
+          googleBusy={connecting}
+          googleLabel={connecting ? 'Opening Google…' : undefined}
+        />
       </div>
     </MobileShell>
   );
@@ -307,7 +350,9 @@ function FoundPeopleScreen({
   selectedFirst,
   onSelect,
   onContinue,
+  sourceLabel,
 }: {
+  sourceLabel: string;
   people: Person[];
   focusingId: string | null;
   selectedFirst: string;
@@ -336,35 +381,42 @@ function FoundPeopleScreen({
       }
     >
       <StepPips step={2} />
-      <TheaCharacter size="medium" gesture="Present" activity="clipboard" />
-      <div className="-mt-2 mb-4 rounded-[22px] border bg-white/80 px-5 py-4 text-center" style={{ borderColor: U.border }} aria-live="polite">
-        <Display style={{ fontSize: 27, lineHeight: 1.15 }}>
+      <TheaCharacter size="medium" pose="basic" />
+      <div
+        className="-mt-2 mb-4 w-full shrink-0 rounded-[22px] border bg-white px-5 py-4 text-center"
+        style={{ borderColor: U.border }}
+        aria-live="polite"
+      >
+        <Display style={{ fontSize: 24, lineHeight: 1.25, fontWeight: 500 }}>
           {focusingId ? (
             `Let’s start with ${selectedFirst}.`
           ) : (
-            <HoldThenType
-              hold={
-                <>
-                  I found{' '}
-                  <span style={{ color: U.accent }}>
-                    {people.length} {people.length === 1 ? 'person' : 'people'}
-                  </span>{' '}
-                  in your calendar.
-                </>
-              }
-              next="choose one person to get started"
-              onComplete={() => setListReady(true)}
-            />
+            <>
+              I found{' '}
+              <span style={{ color: U.accent }}>
+                {people.length} {people.length === 1 ? 'person' : 'people'}
+              </span>{' '}
+              in {sourceLabel}.
+            </>
           )}
         </Display>
+        {!focusingId && (
+          <p className="mt-2 min-h-[22px] text-[14.5px] leading-5" style={{ color: U.textSecondary }}>
+            <TypewriterLine
+              text="Choose one person to get started."
+              speedMs={22}
+              onComplete={() => setListReady(true)}
+            />
+          </p>
+        )}
       </div>
       <div
-        className="flex flex-col gap-2.5"
+        className="flex w-full flex-col gap-2.5"
         role="radiogroup"
         aria-label="Choose one person to start with"
         style={{
-          opacity: listReady || focusingId ? 1 : 0,
-          transform: listReady || focusingId ? 'translateY(0)' : 'translateY(10px)',
+          opacity: listReady || focusingId ? 1 : 0.35,
+          transform: listReady || focusingId ? 'translateY(0)' : 'translateY(6px)',
           transition: 'opacity 380ms ease, transform 380ms ease',
           pointerEvents: listReady || focusingId ? 'auto' : 'none',
         }}
@@ -414,12 +466,27 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const vipPrice = useVipPrice();
 
-  const [screen, setScreen] = useState<Screen>(() => (shouldSkipAgentWelcome() ? 'import' : 'welcome'));
+  // The welcome now lives on the sign-in screen, so signed-in setup starts at importing birthdays.
+  const [screen, setScreen] = useState<Screen>('import');
   const [scanning, setScanning] = useState(false);
+  const [calendarNotice, setCalendarNotice] = useState<string | null>(() => {
+    // The calendar OAuth callback returns here with ?calendar=<result>.
+    const result = new URLSearchParams(window.location.search).get('calendar');
+    if (!result || result === 'connected') return null;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('calendar');
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    if (result === 'cancelled') return 'No problem, nothing was connected. Try again, or add someone yourself.';
+    if (result === 'expired') return 'That Google sign-in expired before it finished. Try once more.';
+    return 'Google didn’t finish connecting. Try again, or add someone yourself.';
+  });
   const [isConnected, setIsConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [people, setPeople] = useState<Person[]>([]);
+  const [peopleSource, setPeopleSource] = useState<BirthdaySource>('google');
+  const [scanLabel, setScanLabel] = useState('Reading your calendar…');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [focusingId, setFocusingId] = useState<string | null>(null);
 
@@ -429,6 +496,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   const [followUpChips, setFollowUpChips] = useState<string[]>([]);
   const [pendingCategory, setPendingCategory] = useState<string | null>(null);
   const [intelInput, setIntelInput] = useState('');
+  const { reaction: theaReaction, reactTo } = useTheaReaction();
   const [intelSending, setIntelSending] = useState(false);
   const [revealPicks, setRevealPicks] = useState<GiftCatalogItem[]>([]);
   const [unmatchedRevealInterests, setUnmatchedRevealInterests] = useState<string[]>([]);
@@ -501,7 +569,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  const connectGoogleCalendar = async () => {
+  const connectGoogleCalendar = async ({ chooseAccount = false }: { chooseAccount?: boolean } = {}) => {
     if (!user) {
       toast({
         title: 'Sign in required',
@@ -512,11 +580,14 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     }
 
     setConnecting(true);
-    const redirectUri = `${window.location.origin}/auth/calendar/callback`;
+    const { appOrigin, isNativeApp } = await import('@/lib/native');
+    const { openExternalAuthUrl } = await import('@/lib/nativeBootstrap');
+    const redirectUri = `${appOrigin()}/auth/calendar/callback`;
 
     try {
       try {
         sessionStorage.setItem('unwrapt_calendar_redirect_uri', redirectUri);
+        sessionStorage.setItem('unwrapt_calendar_return_to', '/onboarding');
       } catch {
         /* ignore */
       }
@@ -564,8 +635,13 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         throw new Error('No authorization URL returned. Please try again.');
       }
 
-      // Full navigation — keep connecting=true until the page unloads.
-      window.location.assign(authUrl);
+      const destination = chooseAccount ? withAccountPicker(authUrl) : authUrl;
+      if (isNativeApp()) {
+        await openExternalAuthUrl(destination);
+        setConnecting(false);
+      } else {
+        window.location.assign(destination);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to connect calendar';
       toast({ title: 'Connection failed', description: message, variant: 'destructive' });
@@ -598,20 +674,44 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           setPeople(grouped);
           setScreen('found');
         } else {
-          toast({
-            title: 'No events found',
-            description: "I couldn't find birthdays or anniversaries yet. Make sure they’re on your Google Calendar, then try again.",
-          });
+          setCalendarNotice('Your calendar is connected, but I didn’t find birthdays or anniversaries yet. Add someone yourself and I’ll take it from there.');
         }
       }, 1400);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to fetch calendar events';
-      toast({ title: 'Fetch failed', description: message, variant: 'destructive' });
+      console.error('Calendar fetch failed', error);
+      setCalendarNotice('I couldn’t read your calendar just now. Try again, or add someone yourself.');
       setScanning(false);
     }
   };
 
+  /** Results from Contacts, Apple Calendar, a file or a typed list, shown in the same review. */
+  const handleFoundOccasions = (occasions: FoundOccasion[], source: BirthdaySource) => {
+    const grouped = groupEventsIntoPeople(occasions.map((o) => ({ personName: o.personName, date: o.date, type: o.type })));
+    void trackProductEvent('birthday_source_results', { source, people: grouped.length });
+    if (!grouped.length) {
+      setCalendarNotice(`I didn’t find birthdays or anniversaries in ${SOURCE_LABEL[source]}. Try another option, or add someone yourself.`);
+      return;
+    }
+    setCalendarNotice(null);
+    setPeopleSource(source);
+    if (source === 'typed') {
+      setPeople(grouped);
+      setScreen('found');
+      return;
+    }
+    // The same short "reading" beat as Google, for the concierge feel.
+    setScanLabel(source === 'contacts' ? 'Reading your contacts…' : 'Reading your calendar…');
+    setScanning(true);
+    window.setTimeout(() => {
+      setScanning(false);
+      setPeople(grouped);
+      setScreen('found');
+    }, 1100);
+  };
+
   const handleFindMyPeople = () => {
+    setPeopleSource('google');
+    setScanLabel('Reading your calendar…');
     if (isConnected) {
       fetchCalendarEvents();
     } else {
@@ -710,9 +810,14 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     const request = ++intelRequest.current;
     const isCategoryPick = Boolean(selectedInterest && isStarterCategory(selectedInterest));
     const categoryContext = pendingCategory;
+    // Thea reacts to the answer itself, before her reply arrives.
+    reactTo(message);
+    const isRude = classifyUserReply(message) === 'negative';
 
     let nextSignals = intelSignals;
-    if (selectedInterest) {
+    if (isRude) {
+      // A rude message is not an interest; keep what we already learned.
+    } else if (selectedInterest) {
       if (isCategoryPick) {
         nextSignals = upsertSignal(intelSignals, signalFromCategory(selectedInterest));
         setPendingCategory(selectedInterest);
@@ -901,7 +1006,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           birthday: person.birthday,
           anniversary: person.anniversary,
           relationship: person.relationship,
-          notes: person.fromCalendar ? 'Imported from calendar during onboarding' : 'Added during onboarding',
+          notes: person.fromCalendar ? `Imported from ${SOURCE_LABEL[peopleSource].replace('your ', '')} during onboarding` : 'Added during onboarding',
         });
         if (error) console.error('Error creating recipient', person.name, error);
       }
@@ -942,12 +1047,21 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         people_count: selectedPeople.length,
       });
 
-      const response = await supabase.functions.invoke('create-subscription-checkout', {
-        body: { priceId: VIP_MONTHLY_PRICE_ID, planType: 'vip_monthly' },
-      });
-      if (response.error) throw response.error;
-      if (!response.data?.url) throw new Error('No checkout URL returned');
-      window.location.href = response.data.url;
+      const { purchaseVipSubscription } = await import('@/lib/iap');
+      const result = await purchaseVipSubscription();
+      if (result.cancelled) {
+        setCompleting(false);
+        setStartingCheckout(false);
+        await onComplete();
+        return;
+      }
+      if (!result.success) throw new Error(result.error || 'Checkout failed');
+      if (result.checkoutUrl) {
+        window.location.href = result.checkoutUrl;
+        return;
+      }
+      // Native IAP — VIP granted; leave onboarding
+      window.location.href = '/';
     } catch (error) {
       console.error('Error completing onboarding:', error);
       toast({
@@ -967,7 +1081,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     return (
       <MobileShell glow animate={false}>
         <div className="flex h-full flex-col items-center justify-center text-center">
-          <TheaCharacter size="large" speaking={false} gesture="Listen" />
+          <TheaCharacter size="large" speaking={false} pose="thinking" />
           <Display className="mt-7 text-[27px]">
             {startingCheckout ? 'Opening secure checkout…' : 'Setting up your concierge…'}
           </Display>
@@ -980,42 +1094,15 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   }
 
   switch (screen) {
-    // ════════ WELCOME ════════
-    case 'welcome':
-      return (
-        <MobileShell
-          glow
-          contentClassName="px-7 pt-16 pb-4 flex flex-col justify-between"
-          footer={
-            <PrimaryButton onClick={() => setScreen('import')}>Get started</PrimaryButton>
-          }
-        >
-          <div className="flex items-center justify-between">
-            <span className="font-display" style={{ fontSize: 23, letterSpacing: '-0.3px' }}>Unwrapt</span>
-            <Eyebrow>Concierge</Eyebrow>
-          </div>
-          <div className="flex flex-1 flex-col justify-center pt-4 text-center">
-            <TheaCharacter size="large" bubble="Hi, I’m Thea, your gifting agent" />
-            <Display className="mt-5" style={{ fontSize: 40, lineHeight: 1.02, letterSpacing: '-0.03em' }}>
-              Never forget another<br />
-              <em style={{ fontStyle: 'italic', fontWeight: 400, color: U.accent }}>moment.</em>
-            </Display>
-            <p className="mx-auto mt-4 min-h-[48px]" style={{ fontSize: 15, lineHeight: 1.5, color: U.textSecondary, maxWidth: 300 }}>
-              <TypewriterLine text="I remember who matters, and help you handle every gift." speedMs={22} />
-            </p>
-          </div>
-        </MobileShell>
-      );
-
     // ════════ IMPORT / SCANNING ════════
     case 'import':
       if (scanning) {
         return (
           <MobileShell animate={false}>
             <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-              <TheaCharacter size="large" gesture="Listen" activity="calendar" />
+              <TheaCharacter size="large" pose="thinking" />
               <Display className="mt-7 text-[27px]">
-                <TypewriterLine text="Reading your calendar…" speedMs={32} caret={false} />
+                <TypewriterLine text={scanLabel} speedMs={32} caret={false} />
               </Display>
               <p className="mt-2" style={{ fontSize: 15, color: U.subtle, maxWidth: 260, lineHeight: 1.5 }}>
                 Finding dates that matter…
@@ -1043,6 +1130,10 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         <ImportPromptScreen
           connecting={connecting}
           onConnect={handleFindMyPeople}
+          onFound={handleFoundOccasions}
+          onAddManually={startManualAdd}
+          onUseDifferentAccount={() => void connectGoogleCalendar({ chooseAccount: true })}
+          notice={calendarNotice}
         />
       );
 
@@ -1057,6 +1148,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           selectedFirst={selectedFirst}
           onSelect={selectPerson}
           onContinue={focusSelectedPerson}
+          sourceLabel={SOURCE_LABEL[peopleSource]}
         />
       );
     }
@@ -1081,7 +1173,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
               <Eyebrow>Thea</Eyebrow>
             </div>
           </div>
-          <TheaCharacter size="compact" gesture="Listen" />
+          <TheaCharacter size="compact" pose="basic" />
           <p className="font-display mb-4 mt-4" style={{ fontSize: 20, lineHeight: 1.3 }}>Who would you like me to look after?</p>
           <div className="mb-5 flex items-center gap-3.5" style={{ padding: 14, borderRadius: 18, background: U.chip }}>
             <PersonAvatar initials={npInitials} tone={U.accent} size={48} />
@@ -1160,8 +1252,8 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
               <TheaCharacter
                 size="compact"
                 className="mx-auto u-thea-character--chat"
-                activity="chat"
-                gesture={intelSignals.length ? 'Present' : 'Listen'}
+                reaction={theaReaction}
+                pose={theaChatPose({ sending: intelSending, typing: intelInput.trim().length > 0 })}
               />
               <div className="-mt-1">
                 <div style={{ fontWeight: 600, fontSize: 15.5 }}>Getting to know {first}</div>
@@ -1351,9 +1443,12 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         <MobileShell
           contentClassName="px-5 pt-8 pb-6"
           footer={
-            <PrimaryButton onClick={() => completeOnboarding()} disabled={completing}>
-              Start automating · {VIP_MONTHLY_AMOUNT_LABEL}/month
-            </PrimaryButton>
+            <>
+              <PrimaryButton onClick={() => completeOnboarding()} disabled={completing}>
+                Start automating · {vipPrice}/month
+              </PrimaryButton>
+              <SubscriptionTerms price={vipPrice} onRestored={() => { window.location.href = '/'; }} />
+            </>
           }
         >
           <button
@@ -1367,7 +1462,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           </button>
 
           <StepPips step={4} />
-          <TheaCharacter size="compact" gesture="Present" />
+          <TheaCharacter size="compact" pose="gift" />
           <Display className="mt-3 text-[28px] leading-tight">{headline}</Display>
           <p className="mt-2 text-[14px] leading-5" style={{ color: U.textSecondary }}>
             Based on {interests.map((i) => i.toLowerCase()).join(', ') || 'what you shared'}. Thea watches the date and asks before anything is bought.

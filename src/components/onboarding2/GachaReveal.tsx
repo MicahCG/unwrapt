@@ -102,7 +102,7 @@ const GachaReveal: React.FC<GachaRevealProps> = ({
 
   return (
     <MobileShell glow animate={false} contentClassName="px-6 flex flex-col items-center justify-center text-center">
-      <TheaCharacter size="large" gesture="Listen" activity="clipboard" />
+      <TheaCharacter size="large" pose={isLoading ? 'thinking' : picks.length ? 'surprised' : 'basic'} />
       <Display className="mt-6 text-[26px] leading-snug">
         Finding gifts for {recipientFirstName}
         {occasionBit}…

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { trackProductEvent } from '@/lib/productAnalytics';
 import { MobileShell, Display, PrimaryButton, Eyebrow } from '@/components/unwrapt2/MobileShell';
 import { TheaCharacter } from '@/components/unwrapt2/TheaCharacter';
 import { U } from '@/components/unwrapt2/theme';
-import { VIP_MONTHLY_AMOUNT_LABEL, VIP_MONTHLY_PRICE_ID } from '@/lib/stripe';
+import { purchaseVipSubscription } from '@/lib/iap';
+import SubscriptionTerms, { useVipPrice } from '@/components/subscription/SubscriptionTerms';
+import { isNativeApp } from '@/lib/native';
 
 /**
  * Hard paywall for users who finished onboarding but have not subscribed.
@@ -15,22 +17,30 @@ import { VIP_MONTHLY_AMOUNT_LABEL, VIP_MONTHLY_PRICE_ID } from '@/lib/stripe';
 const SubscribeGate: React.FC = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const native = isNativeApp();
+  const price = useVipPrice();
 
   const startCheckout = async () => {
     setLoading(true);
     try {
-      void trackProductEvent('subscribe_gate_checkout_started', {});
-      const response = await supabase.functions.invoke('create-subscription-checkout', {
-        body: { priceId: VIP_MONTHLY_PRICE_ID, planType: 'vip_monthly' },
-      });
-      if (response.error) throw response.error;
-      if (!response.data?.url) throw new Error('No checkout URL returned');
-      window.location.href = response.data.url;
+      void trackProductEvent('subscribe_gate_checkout_started', { platform: native ? 'ios' : 'web' });
+      const result = await purchaseVipSubscription();
+      if (result.cancelled) {
+        setLoading(false);
+        return;
+      }
+      if (!result.success) throw new Error(result.error || 'Checkout failed');
+      if (result.checkoutUrl) {
+        window.location.href = result.checkoutUrl;
+        return;
+      }
+      // Native IAP succeeded — reload so RequirePaid sees VIP
+      window.location.href = '/';
     } catch (error) {
       console.error('SubscribeGate checkout failed:', error);
       toast({
-        title: 'Couldn’t open checkout',
-        description: 'Please try again in a moment.',
+        title: native ? 'Couldn’t complete purchase' : 'Couldn’t open checkout',
+        description: error instanceof Error ? error.message : 'Please try again in a moment.',
         variant: 'destructive',
       });
       setLoading(false);
@@ -44,12 +54,13 @@ const SubscribeGate: React.FC = () => {
       footer={
         <>
           <PrimaryButton onClick={startCheckout} disabled={loading}>
-            {loading ? 'Opening checkout…' : `Start automating · ${VIP_MONTHLY_AMOUNT_LABEL}/month`}
+            {loading
+              ? native
+                ? 'Starting purchase…'
+                : 'Opening checkout…'
+              : `Start automating · ${price}/month`}
           </PrimaryButton>
-          <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-[11.5px]" style={{ color: U.muted }}>
-            <ShieldCheck size={13} aria-hidden="true" />
-            Secure Stripe checkout · cancel anytime
-          </p>
+          <SubscriptionTerms price={price} onRestored={() => { window.location.href = '/'; }} />
           <button
             type="button"
             className="mt-3 min-h-11 w-full text-[13px] font-semibold"
@@ -65,7 +76,7 @@ const SubscribeGate: React.FC = () => {
       }
     >
       <Eyebrow className="text-center">Membership required</Eyebrow>
-      <TheaCharacter size="large" gesture="Present" />
+      <TheaCharacter size="large" pose="gift" />
       <Display className="mt-4 text-center text-[30px] leading-tight">
         Unlock Thea to keep going.
       </Display>

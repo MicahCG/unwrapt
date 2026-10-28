@@ -111,10 +111,10 @@ const OnboardingIntro: React.FC<OnboardingIntroProps> = ({ onComplete }) => {
           <button
             type="button"
             onClick={finish}
-            className="mt-8 mb-4 px-8 py-3 rounded-full font-medium text-lg text-white transition-all duration-300 hover:scale-[1.02] flex items-center gap-2 mx-auto"
+            className="mx-auto mt-8 mb-4 flex items-center gap-2 rounded-full px-8 py-3.5 text-lg font-semibold text-white transition-all duration-300 hover:scale-[1.02]"
             style={{
-              backgroundColor: "#D4AF7A",
-              boxShadow: "0 4px 14px rgba(212, 175, 122, 0.25)",
+              backgroundColor: "#2A2520",
+              boxShadow: "0 10px 24px rgba(42, 37, 32, 0.22)",
             }}
           >
             Continue

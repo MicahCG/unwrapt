@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Gift, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { getGiftRecommendations, type GiftCatalogItem } from '@/lib/giftCatalog';
+import { ProductImage } from '@/components/dashboard/TheaChatCards';
 import { U } from '@/components/unwrapt2/theme';
 import { useThea } from '@/hooks/useThea';
 
@@ -11,29 +12,41 @@ interface CatalogPreviewSheetProps {
   onOpenChange: (open: boolean) => void;
   recipientName?: string;
   interests?: string[];
+  /** Opens the review for the chosen gift (Manual with a person, Thea without). */
+  onSelect: (product: GiftCatalogItem) => void;
 }
 
-const placeholders: GiftCatalogItem[] = [
-  { id: 'placeholder-1', name: 'A thoughtful everyday upgrade', brand: 'Curated placeholder', description: 'A polished, useful gift chosen around their interests.', imageUrl: null, price: 48, currency: 'USD', provider: 'unwrapt', providerProductId: null },
-  { id: 'placeholder-2', name: 'A small luxury for their routine', brand: 'Curated placeholder', description: 'Something they would enjoy but might not buy for themselves.', imageUrl: null, price: 72, currency: 'USD', provider: 'unwrapt', providerProductId: null },
-  { id: 'placeholder-3', name: 'An experience worth remembering', brand: 'Curated placeholder', description: 'A flexible option with room for a personal note.', imageUrl: null, price: 95, currency: 'USD', provider: 'unwrapt', providerProductId: null },
-];
+const ALL = '__all__';
+
+const price = (product: GiftCatalogItem) =>
+  product.price == null
+    ? 'Price at review'
+    : new Intl.NumberFormat('en-US', { style: 'currency', currency: product.currency, maximumFractionDigits: 0 }).format(product.price);
 
 const CatalogPreviewSheet: React.FC<CatalogPreviewSheetProps> = ({
   open,
   onOpenChange,
   recipientName,
   interests = [],
+  onSelect,
 }) => {
   const { openThea } = useThea();
-  const { data, isLoading } = useQuery({
-    queryKey: ['catalog-preview', [...interests].sort().join('|')],
-    queryFn: () => getGiftRecommendations(interests, 6),
+  const saved = interests.slice(0, 3);
+  const [filter, setFilter] = useState<string>(ALL);
+  useEffect(() => {
+    if (open) setFilter(ALL);
+  }, [open, recipientName]);
+
+  const requested = filter === ALL ? saved : [filter];
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
+    queryKey: ['catalog-preview', [...requested].sort().join('|')],
+    queryFn: () => getGiftRecommendations(requested, 6),
     enabled: open,
     staleTime: 10 * 60 * 1000,
     retry: 1,
   });
-  const products = data?.products.length ? data.products : placeholders;
+  const products = data?.products || [];
+  const first = recipientName?.split(' ')[0];
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -41,48 +54,78 @@ const CatalogPreviewSheet: React.FC<CatalogPreviewSheetProps> = ({
         <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-[#2A2520]/15" />
         <SheetHeader className="text-left">
           <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#B65B3C]">
-            <Sparkles className="h-3.5 w-3.5" /> Catalog preview
+            <Sparkles className="h-3.5 w-3.5" /> Catalog
           </div>
           <SheetTitle className="font-display text-[30px] font-normal leading-[1.05] text-[#2A2520]">
-            {recipientName ? `Ideas for ${recipientName.split(' ')[0]}` : 'Explore the collection'}
+            {first ? `Ideas for ${first}` : 'Explore the collection'}
           </SheetTitle>
           <SheetDescription className="max-w-sm text-sm leading-6 text-[#6F6559]">
-            {interests.length
-              ? `Guided by ${interests.slice(0, 3).join(', ')}. Prices and availability are illustrative until the Goody catalog is activated.`
-              : 'A lightweight preview of the kinds of gifts Thea can curate. Live Goody inventory will replace placeholders after activation.'}
+            {saved.length ? `Ranked by what ${first || 'they'} love. Pick one to review it before anything is ordered.` : 'Add interests to a person for a sharper list, or ask Thea to narrow it down.'}
           </SheetDescription>
         </SheetHeader>
-        <button onClick={() => openThea({ surface: 'catalog', recipientName })} className="u-touch-card mt-4 flex w-full items-center justify-center gap-2 rounded-[16px] bg-[#2A2520] px-4 py-3 text-[13px] font-semibold text-[#F4ECDD]"><Sparkles className="h-4 w-4" /> Ask Thea to narrow it down</button>
 
-        <div className="mt-6 grid grid-cols-2 gap-3">
+        {saved.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Filter by interest">
+            {[ALL, ...saved].map((value) => {
+              const active = filter === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setFilter(value)}
+                  className="u-press min-h-10 rounded-full border px-3.5 text-[12.5px] font-semibold"
+                  style={{ background: active ? U.ink : U.surface, color: active ? U.buttonText : '#5A5147', borderColor: active ? U.ink : U.border }}
+                >
+                  {value === ALL ? 'All matches' : value}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="mt-5 grid grid-cols-2 gap-3" aria-busy={isLoading || isFetching}>
           {isLoading
-            ? Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-56 animate-pulse rounded-[20px] bg-white/70" />)
-            : products.map((product, index) => (
-              <article key={`${product.provider}-${product.id}`} className="u-catalog-card overflow-hidden rounded-[20px] bg-white p-2.5 shadow-[0_8px_24px_rgba(42,37,32,0.05)]">
-                <div className="relative aspect-square overflow-hidden rounded-[15px]" style={{ background: index % 2 ? '#E9E1D1' : '#EFE7DA' }}>
-                  {product.imageUrl ? (
-                    <img src={product.imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
-                  ) : (
-                    <div className="flex h-full items-center justify-center">
-                      <Gift className="h-7 w-7 text-[#B65B3C]/55" />
-                    </div>
-                  )}
-                  <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-1 text-[9px] font-semibold uppercase tracking-wide text-[#6F6559]">
-                    {product.provider === 'goody' ? 'Live' : 'Preview'}
-                  </span>
-                </div>
-                <div className="px-1 pb-1 pt-3">
+            ? Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-60 animate-pulse rounded-[20px] bg-white/70" />)
+            : products.map((product) => (
+              <article key={`${product.provider}-${product.id}`} className="u-catalog-card flex flex-col overflow-hidden rounded-[20px] bg-white p-2.5 shadow-[0_8px_24px_rgba(42,37,32,0.05)]">
+                <ProductImage src={product.imageUrl} className="aspect-square w-full rounded-[15px]" />
+                <div className="flex flex-1 flex-col px-1 pb-1 pt-3">
                   <h3 className="line-clamp-2 text-[13px] font-semibold leading-[1.3] text-[#2A2520]">{product.name}</h3>
                   <p className="mt-1 truncate text-[11px] text-[#8A7E6E]">{product.brand || 'Curated by Unwrapt'}</p>
-                  <p className="mt-2 font-mono text-[12px] text-[#5A5147]">
-                    {product.price == null ? 'Price pending' : new Intl.NumberFormat('en-US', { style: 'currency', currency: product.currency, maximumFractionDigits: 0 }).format(product.price)}
-                  </p>
+                  {product.why && <p className="mt-1.5 line-clamp-2 text-[11px] leading-4 text-[#6F6559]">{product.why}</p>}
+                  <p className="mt-auto pt-2 font-mono text-[12px] text-[#5A5147]">{price(product)}</p>
+                  <button
+                    type="button"
+                    onClick={() => onSelect(product)}
+                    className="u-press mt-2 min-h-10 rounded-[12px] text-[12px] font-semibold"
+                    style={{ background: U.ink, color: U.buttonText }}
+                  >
+                    Select gift
+                  </button>
                 </div>
               </article>
             ))}
         </div>
+
+        {!isLoading && isError && (
+          <div className="mt-2 rounded-[16px] px-4 py-3.5 text-center text-[13px]" style={{ background: U.accentSoft, color: U.inkSoft }}>
+            Couldn’t load gifts right now.{' '}
+            <button type="button" onClick={() => void refetch()} className="min-h-8 font-semibold" style={{ color: U.accent }}>Try again</button>
+          </div>
+        )}
+        {!isLoading && !isError && products.length === 0 && (
+          <div className="mt-2 rounded-[16px] px-4 py-4 text-center text-[13px] leading-5" style={{ background: U.chip, color: U.inkSoft }}>
+            No matches for {filter === ALL ? 'these interests' : `“${filter}”`} yet.
+            <div className="mt-2 flex justify-center gap-4">
+              {filter !== ALL && <button type="button" onClick={() => setFilter(ALL)} className="min-h-8 font-semibold" style={{ color: U.accent }}>See all matches</button>}
+              <button type="button" onClick={() => openThea({ surface: 'catalog', recipientName })} className="min-h-8 font-semibold" style={{ color: U.accent }}>Ask Thea</button>
+            </div>
+          </div>
+        )}
+
         <p className="mt-5 text-center text-[11px] leading-5" style={{ color: U.muted }}>
-          Preview only. Nothing is purchased until you review the gift and total.
+          Nothing is purchased until you review the gift and confirm.
         </p>
       </SheetContent>
     </Sheet>

@@ -1,17 +1,38 @@
-
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { ErrorHandler } from '@/utils/errorHandler';
 import { rateLimiter, RATE_LIMITS } from '@/utils/rateLimiter';
+import { NATIVE_AUTH_CALLBACK, isNativeApp } from '@/lib/native';
+import { openExternalAuthUrl } from '@/lib/nativeBootstrap';
+import { logoutIapUser } from '@/lib/iap';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
+  /** Native Apple sheet in the iOS app, Apple's web sign-in elsewhere. */
+  signInWithApple: () => Promise<void>;
+  /** Emails a 6-digit sign-in code (it also works as a link if the template sends one). */
+  sendEmailCode: (email: string) => Promise<void>;
+  verifyEmailCode: (email: string, code: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
+
+/** The user closed a sign-in sheet; not an error worth showing. */
+export class SignInCancelled extends Error {}
+
+const sha256Hex = async (text: string) => {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+};
+
+/** Where a web sign-in should come back to. */
+const webRedirectUrl = () => {
+  if (window.location.hostname === 'localhost') return `http://localhost:${window.location.port || '8080'}/`;
+  if (window.location.hostname === 'unwrapt.io') return 'https://app.unwrapt.io/';
+  return `${window.location.origin}/`;
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -130,58 +151,129 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, [user, loading]);
 
+  const checkRateLimit = (method: string) => {
+    if (isRateLimited) {
+      throw new Error('Please wait a moment before signing in again. Too many authentication attempts.');
+    }
+    const rateLimitKey = `${method}-signin-${window.location.hostname}`;
+    if (!rateLimiter.isAllowed(rateLimitKey, RATE_LIMITS.AUTH_ATTEMPTS)) {
+      const resetTime = rateLimiter.getResetTime(rateLimitKey, RATE_LIMITS.AUTH_ATTEMPTS);
+      const waitTime = Math.ceil((resetTime - Date.now()) / 1000 / 60);
+      throw new Error(`Too many sign-in attempts. Please wait ${waitTime} minutes.`);
+    }
+  };
+
+  const noteRateLimit = (error: { message?: string; status?: number }) => {
+    if (error.message?.includes('rate limit') || error.status === 429) {
+      setIsRateLimited(true);
+      setTimeout(() => setIsRateLimited(false), 60000);
+      throw new Error('Too many authentication attempts. Please wait a minute and try again.');
+    }
+  };
+
   const signInWithGoogle = async () => {
     try {
-      // Check if currently rate limited
-      if (isRateLimited) {
-        throw new Error('Please wait a moment before signing in again. Too many authentication attempts.');
-      }
-      
-      // Rate limiting check
-      const rateLimitKey = `google-signin-${window.location.hostname}`;
-      if (!rateLimiter.isAllowed(rateLimitKey, RATE_LIMITS.AUTH_ATTEMPTS)) {
-        const resetTime = rateLimiter.getResetTime(rateLimitKey, RATE_LIMITS.AUTH_ATTEMPTS);
-        const waitTime = Math.ceil((resetTime - Date.now()) / 1000 / 60);
-        throw new Error(`Too many sign-in attempts. Please wait ${waitTime} minutes.`);
-      }
-
+      checkRateLimit('google');
       console.log('🔧 AuthProvider: Starting Google sign in');
 
-      // Determine redirect URL based on environment
-      let redirectUrl: string;
-      if (window.location.hostname === 'localhost') {
-        // Development: redirect to localhost
-        redirectUrl = `http://localhost:${window.location.port || '8080'}/`;
-      } else if (window.location.hostname === 'unwrapt.io') {
-        // Marketing site: redirect to app subdomain
-        redirectUrl = 'https://app.unwrapt.io/';
-      } else {
-        // App subdomain or other: redirect to same origin
-        redirectUrl = `${window.location.origin}/`;
-      }
+      // The iOS app returns through its own URL scheme so sign-in lands back in the app.
+      const redirectUrl = isNativeApp() ? NATIVE_AUTH_CALLBACK : webRedirectUrl();
 
       console.log('🔧 AuthProvider: OAuth redirect URL:', redirectUrl);
 
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
+          skipBrowserRedirect: isNativeApp(),
         },
       });
-      
+
       if (error) {
         console.error('🔧 AuthProvider: Error signing in with Google:', error);
-        // Check for rate limit error
-        if (error.message?.includes('rate limit') || error.status === 429) {
-          setIsRateLimited(true);
-          setTimeout(() => setIsRateLimited(false), 60000);
-          throw new Error('Too many authentication attempts. Please wait a minute and try again.');
-        }
+        noteRateLimit(error);
         throw error;
+      }
+
+      if (isNativeApp() && data?.url) {
+        await openExternalAuthUrl(data.url);
       }
     } catch (error: any) {
       const friendlyMessage = ErrorHandler.handleAuthError(error, user?.id);
       throw new Error(friendlyMessage);
+    }
+  };
+
+  const signInWithApple = async () => {
+    try {
+      checkRateLimit('apple');
+      if (!isNativeApp()) {
+        const { error } = await supabase.auth.signInWithOAuth({ provider: 'apple', options: { redirectTo: webRedirectUrl() } });
+        if (error) {
+          noteRateLimit(error);
+          throw error;
+        }
+        return;
+      }
+
+      // Native sheet: Apple signs a hashed nonce into the identity token, and Supabase checks
+      // it against the raw one, so the token can't be replayed.
+      const rawNonce = `${crypto.randomUUID()}${crypto.randomUUID()}`;
+      const { SignInWithApple } = await import('@capacitor-community/apple-sign-in');
+      let response;
+      try {
+        ({ response } = await SignInWithApple.authorize({
+          clientId: 'io.unwrapt.app',
+          redirectURI: 'https://app.unwrapt.io',
+          scopes: 'email name',
+          nonce: await sha256Hex(rawNonce),
+        }));
+      } catch (error) {
+        // Apple reports a dismissed sheet as AuthorizationError 1001.
+        if (/1001|cancel/i.test(String((error as Error)?.message || error))) throw new SignInCancelled();
+        throw error;
+      }
+      const { error } = await supabase.auth.signInWithIdToken({ provider: 'apple', token: response.identityToken, nonce: rawNonce });
+      if (error) {
+        noteRateLimit(error);
+        throw error;
+      }
+      // Apple shares the name only on the very first sign-in, so keep it.
+      const fullName = [response.givenName, response.familyName].filter(Boolean).join(' ');
+      if (fullName) await supabase.auth.updateUser({ data: { full_name: fullName } });
+    } catch (error: unknown) {
+      if (error instanceof SignInCancelled) throw error;
+      console.error('🔧 AuthProvider: Error signing in with Apple:', error);
+      throw new Error(ErrorHandler.handleAuthError(error, user?.id));
+    }
+  };
+
+  const sendEmailCode = async (email: string) => {
+    try {
+      checkRateLimit('email');
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: {
+          shouldCreateUser: true,
+          // If the email carries a link instead of a code, it still lands in the right place.
+          emailRedirectTo: isNativeApp() ? NATIVE_AUTH_CALLBACK : webRedirectUrl(),
+        },
+      });
+      if (error) {
+        noteRateLimit(error);
+        throw error;
+      }
+    } catch (error: unknown) {
+      console.error('🔧 AuthProvider: Error sending email code:', error);
+      throw new Error(ErrorHandler.handleAuthError(error, user?.id));
+    }
+  };
+
+  const verifyEmailCode = async (email: string, code: string) => {
+    const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: 'email' });
+    if (error) {
+      console.error('🔧 AuthProvider: Email code rejected:', error);
+      throw new Error(/expired|invalid/i.test(error.message) ? 'That code didn’t work. Check it, or send a new one.' : ErrorHandler.handleAuthError(error, user?.id));
     }
   };
 
@@ -206,6 +298,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('🔧 AuthProvider: Could not clear local session storage:', storageError);
     }
     setUser(null);
+    void logoutIapUser();
 
     // Don't await the network round trip (it's what was causing Sign out to
     // appear to do nothing until the user also hit "Done" - the call can
@@ -227,6 +320,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user,
     loading,
     signInWithGoogle,
+    signInWithApple,
+    sendEmailCode,
+    verifyEmailCode,
     signOut,
   };
 

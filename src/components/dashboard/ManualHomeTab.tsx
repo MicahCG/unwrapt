@@ -4,6 +4,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { PersonAvatar } from '@/components/unwrapt2/TheaAvatar';
 import { Eyebrow, PrimaryButton, Display } from '@/components/unwrapt2/MobileShell';
 import GiftStatusBadge from '@/components/GiftStatusBadge';
+import CalendarSyncButton from '@/components/CalendarSyncButton';
 import { U, toneForIndex, initialsOf } from '@/components/unwrapt2/theme';
 import { cleanName } from '@/lib/utils';
 import { formatOccasionDate, getDaysUntil, getNextOccurrence } from '@/lib/dateUtils';
@@ -12,13 +13,10 @@ import { buildDashboardBriefing } from '@/lib/dashboardBriefing';
 
 interface ManualHomeTabProps {
   recipients: RecipientRecord[];
-  tier: 'free' | 'vip';
-  walletBalance?: number | null;
   autopilotThreshold?: number;
   onOpenRecipient: (recipient: RecipientRecord) => void;
   onAddRecipient: () => void;
   onBrowseCatalog: () => void;
-  onAddFunds: () => void;
 }
 
 const sameDay = (a: Date, b: Date) =>
@@ -26,13 +24,10 @@ const sameDay = (a: Date, b: Date) =>
 
 const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
   recipients,
-  tier,
-  walletBalance,
   autopilotThreshold,
   onOpenRecipient,
   onAddRecipient,
   onBrowseCatalog,
-  onAddFunds,
 }) => {
   const navigate = useNavigate();
   const today = useMemo(() => {
@@ -43,6 +38,12 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
   const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const briefing = useMemo(() => buildDashboardBriefing(recipients, autopilotThreshold), [recipients, autopilotThreshold]);
+  // The one thing to do next for each person, shown on their card.
+  const nextTask = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const item of briefing.needsInfo) if (!map.has(item.recipientId)) map.set(item.recipientId, item.label);
+    return map;
+  }, [briefing]);
 
   const occasionDays = useMemo(() => {
     const map = new Map<string, { recipient: RecipientRecord; label: string }[]>();
@@ -85,7 +86,8 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
   }, [recipients, selectedDay, occasionDays]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto pb-2">
+    // Children keep their natural height; only this column scrolls (never squashed rows).
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto pb-2 [&>*]:shrink-0">
       <div className="flex items-start justify-between gap-3">
         <div>
           <Eyebrow className="mb-0.5">Manual view</Eyebrow>
@@ -97,7 +99,7 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
           <button
             type="button"
             onClick={onBrowseCatalog}
-            className="rounded-full border px-3 py-2 text-[11.5px] font-semibold"
+            className="u-press min-h-10 rounded-full border px-3.5 text-[12px] font-semibold"
             style={{ borderColor: U.border, color: '#5A5147', background: U.surface }}
           >
             Catalog
@@ -105,7 +107,7 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
           <button
             type="button"
             onClick={() => navigate('/gift-history')}
-            className="rounded-full border px-3 py-2 text-[11.5px] font-semibold"
+            className="u-press min-h-10 rounded-full border px-3.5 text-[12px] font-semibold"
             style={{ borderColor: U.border, color: '#5A5147', background: U.surface }}
           >
             History
@@ -224,6 +226,12 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
             Clear day filter
           </button>
         )}
+        <div className="mt-3 border-t pt-3" style={{ borderColor: U.border }}>
+          <CalendarSyncButton appearance="pill" onAddManually={onAddRecipient} />
+          <p className="mt-2 text-center text-[11.5px] leading-4" style={{ color: U.muted }}>
+            Read-only. Thea only looks for birthdays and anniversaries, and you choose who to add.
+          </p>
+        </div>
       </section>
 
       {/* Recipients */}
@@ -248,7 +256,7 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
                 ? 'No occasions on this day. Clear the filter or pick another date.'
                 : 'Add someone you care about and Thea will watch the moments that matter.'}
             </p>
-            <div className="mt-4">
+            <div className="mt-4 flex flex-col gap-2.5">
               <PrimaryButton onClick={selectedDay ? () => setSelectedDay(null) : onAddRecipient}>
                 {selectedDay ? 'Clear filter' : 'Add someone'}
               </PrimaryButton>
@@ -298,6 +306,11 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
                         ) : (
                           <div className="text-[12.5px]" style={{ color: U.muted }}>No date set</div>
                         )}
+                        {nextTask.get(recipient.id) && (
+                          <div className="mt-0.5 truncate text-[12px] font-semibold" style={{ color: U.accent }}>
+                            Next: {nextTask.get(recipient.id)}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
@@ -336,19 +349,6 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
         )}
       </section>
 
-      {tier === 'vip' && walletBalance != null && (
-        <button
-          type="button"
-          onClick={onAddFunds}
-          className="flex items-center justify-between rounded-[16px] px-4 py-3.5"
-          style={{ background: U.chip }}
-        >
-          <span className="text-[13px]" style={{ color: '#5A5147' }}>Gift wallet</span>
-          <span className="font-mono text-[14px] font-medium">
-            ${walletBalance.toFixed(2)} · Add funds
-          </span>
-        </button>
-      )}
     </div>
   );
 };

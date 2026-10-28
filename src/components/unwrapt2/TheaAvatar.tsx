@@ -1,13 +1,16 @@
 import React from 'react';
 import { U } from './theme';
+import { TheaFigure, type TheaPose } from './TheaFigure';
 
 interface TheaAvatarProps {
   size?: number;
   pulse?: boolean;
+  pose?: TheaPose;
   className?: string;
 }
 
-export const TheaAvatar: React.FC<TheaAvatarProps> = ({ size = 34, pulse = false, className }) => (
+/** Thea's head and shoulders in a disc, used wherever she speaks in a list or chat. */
+export const TheaAvatar: React.FC<TheaAvatarProps> = ({ size = 34, pulse = false, pose = 'basic', className }) => (
   <div
     aria-hidden="true"
     className={`${pulse ? 'animate-u-pulse-disc' : ''} ${className || ''}`}
@@ -15,16 +18,13 @@ export const TheaAvatar: React.FC<TheaAvatarProps> = ({ size = 34, pulse = false
       width: size,
       height: size,
       borderRadius: '50%',
-      background: U.accent,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
+      background: U.accentSoft,
+      boxShadow: `inset 0 0 0 1px ${U.border}`,
+      overflow: 'hidden',
       flexShrink: 0,
     }}
   >
-    <span style={{ fontFamily: "'Newsreader', Georgia, serif", fontStyle: 'italic', fontSize: Math.round(size * 0.53), color: U.cream, lineHeight: 1 }}>
-      T
-    </span>
+    <TheaFigure framing="portrait" pose={pose} style={{ width: '100%', height: '100%' }} />
   </div>
 );
 

@@ -136,16 +136,31 @@ const Settings = () => {
     }
   };
 
+  const [deleting, setDeleting] = useState(false);
   const handleDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-account', { method: 'POST' });
+      if (error || !data?.success) throw error || new Error(data?.error || 'Deletion failed');
+      toast({ title: 'Your account has been deleted', description: 'We’re sorry to see you go.' });
+      await signOut();
+      return;
+    } catch (error) {
+      console.error('Self-service account deletion failed:', error);
+    }
+    // Fall back to a request the team completes, and only say so if it was actually sent.
     try {
       const { error } = await supabase.functions.invoke('send-account-deletion-request', {
         body: { userId: user?.id, userEmail: user?.email || email, userName: fullName || user?.user_metadata?.full_name || '' },
       });
       if (error) throw error;
+      toast({ title: 'Deletion requested', description: 'Your account and data will be deleted within 24 hours.' });
     } catch (error) {
       console.error('Error requesting account deletion:', error);
+      toast({ title: 'Couldn’t delete your account', description: 'Please try again, or email team@unwrapt.io and we’ll delete it for you.', variant: 'destructive' });
+    } finally {
+      setDeleting(false);
     }
-    toast({ title: "We've received your request", description: "Your account will be deleted within 24 hours. We're sorry to see you go." });
   };
 
   const budgetLabel = `$${budget.lo} - $${budget.hi}`;
@@ -299,13 +314,14 @@ const Settings = () => {
             <AlertDialogHeader>
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete your account and remove all your data.
+                This permanently deletes your account, your people, and your gift history. It can’t be undone.
+                {' '}If you subscribed through the App Store, also cancel in iPhone Settings › Apple ID › Subscriptions so you aren’t billed again.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteAccount} className="bg-accent text-accent-foreground hover:opacity-90">
-                Delete account
+              <AlertDialogAction onClick={handleDeleteAccount} disabled={deleting} className="bg-accent text-accent-foreground hover:opacity-90">
+                {deleting ? 'Deleting…' : 'Delete account'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

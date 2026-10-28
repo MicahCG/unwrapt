@@ -1519,6 +1519,9 @@ Rules:
     // whatever the prior turn already had, so a turn that makes no
     // recipient-identifying tool call doesn't lose focus.
     let lastActiveRecipient: { id: string; name: string } | null = turnContext?.activeRecipient ?? null;
+    // The structured review from this turn's select_gift, returned so the app can show a
+    // review card with a confirm action instead of relying on Thea's wording.
+    let lastReview: unknown = null;
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
       const completion = await callOpenAI(openaiApiKey, conversation, forceSearchNextCall);
@@ -1590,6 +1593,7 @@ Rules:
           // model to copy into its reply text verbatim - strip it here so
           // what's persisted matches the bare "id:id:date" hasPersistedReviewMarker
           // looks up, same as the old text-regex extraction did.
+          lastReview = result.ok && "review" in result ? result.review : null;
           lastReviewMarker = typeof result.reviewMarker === "string"
             ? result.reviewMarker.replace(/^GIFT_REVIEW:\s*/i, "")
             : null;
@@ -1662,7 +1666,7 @@ Rules:
       },
     ]);
 
-    return json({ success: true, reply, products, writes });
+    return json({ success: true, reply, products, writes, review: lastReview });
   } catch (error) {
     console.error("thea-chat failed", error);
     return json({

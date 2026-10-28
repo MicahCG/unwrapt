@@ -3,6 +3,9 @@ import { CalendarDays, ChevronRight, Gift, Heart, Send, Settings, Sparkles, User
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { TheaAvatar } from '@/components/unwrapt2/TheaAvatar';
+import { TheaCharacter } from '@/components/unwrapt2/TheaCharacter';
+import { useTheaReaction } from '@/hooks/useTheaReaction';
+import { theaChatPose } from '@/lib/theaState';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { trackProductEvent } from '@/lib/productAnalytics';
 import { TheaContextValue, type TheaContext } from '@/hooks/useThea';
@@ -125,6 +128,8 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatProducts, setChatProducts] = useState<ThreadProduct[]>([]);
   const [sending, setSending] = useState(false);
+  const [chatFailed, setChatFailed] = useState(false);
+  const { reaction, reactTo } = useTheaReaction();
   const [hasGiftVisuals, setHasGiftVisuals] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeDismissed, setUpgradeDismissed] = useState(() => isTheaUpgradeDismissed());
@@ -225,6 +230,7 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setMatchedIntent(null);
     setChatMessages([]);
     setChatProducts([]);
+    setChatFailed(false);
     setHasGiftVisuals(false);
     setUpgradeDismissed(isTheaUpgradeDismissed());
     setOpen(true);
@@ -261,9 +267,11 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     stickToBottomRef.current = true;
     const nextMessages: ChatMessage[] = [...chatMessages, { role: 'user', content: text }];
+    reactTo(text);
     setChatMessages(nextMessages);
     setQuestion('');
     setSending(true);
+    setChatFailed(false);
     void trackProductEvent('thea_llm_message_sent', {
       surface: context.surface || 'global',
       turn: nextMessages.filter((m) => m.role === 'user').length,
@@ -285,6 +293,7 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (err) {
       console.error('Thea chat failed', err);
+      setChatFailed(true);
       setChatMessages([
         ...nextMessages,
         {
@@ -352,7 +361,18 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
           <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-[#2A2520]/15" />
           <SheetHeader className="text-left">
             <div className="flex items-center gap-3">
-              <TheaAvatar size={48} />
+              <TheaCharacter
+                size="compact"
+                pose={theaChatPose({
+                  sending,
+                  failed: chatFailed,
+                  typing: question.trim().length > 0,
+                  lastReply: chatProducts.length ? null : chatMessages[chatMessages.length - 1]?.role === 'assistant' ? chatMessages[chatMessages.length - 1].content : null,
+                })}
+                reaction={reaction}
+                speaking={false}
+                className="u-thea-character--chat !mx-0 !w-auto shrink-0"
+              />
               <div>
                 <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#B65B3C]">Your gifting agent</div>
                 <SheetTitle className="font-display text-[28px] font-normal text-[#2A2520]">Ask Thea</SheetTitle>
@@ -393,7 +413,7 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 )}
                 {sending && (
                   <div className="flex items-start gap-2">
-                    <TheaAvatar size={24} />
+                    <TheaAvatar size={24} pose="thinking" />
                     <div className="rounded-[16px] rounded-tl-[4px] border border-[#D9CDBD] bg-white px-3.5 py-2.5 text-[13.5px] text-[#9A8E7C]">
                       Thinking…
                     </div>

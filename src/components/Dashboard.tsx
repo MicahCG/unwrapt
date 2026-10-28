@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQuery } from '@tanstack/react-query';
@@ -14,14 +14,16 @@ import { VIPWelcomeModal } from '@/components/onboarding/VIPWelcomeModal';
 import { MobileShell } from '@/components/unwrapt2/MobileShell';
 import { TheaAvatar } from '@/components/unwrapt2/TheaAvatar';
 import { ApprovalScreen } from '@/components/unwrapt2/ApprovalScreen';
-import { U, initialsOf } from '@/components/unwrapt2/theme';
+import { U } from '@/components/unwrapt2/theme';
 import RecipientDetailSheet from '@/components/RecipientDetailSheet';
 import CatalogPreviewSheet from '@/components/CatalogPreviewSheet';
 import { type RecipientRecord, type GiftRecord } from '@/lib/giftStatus';
 import { findResumableGift, resumeGiftPayment, hasCompleteShippingAddress } from '@/lib/giftPayment';
 import TheaHomeTab from '@/components/dashboard/TheaHomeTab';
 import ManualHomeTab from '@/components/dashboard/ManualHomeTab';
+import AccountMenu from '@/components/dashboard/AccountMenu';
 import { AUTOPILOT_THRESHOLDS, type BriefingItem } from '@/lib/dashboardBriefing';
+import type { GiftCatalogItem } from '@/lib/giftCatalog';
 
 type DashboardTab = 'thea' | 'manual';
 
@@ -36,7 +38,9 @@ const Dashboard = () => {
   const [showScheduleGift, setShowScheduleGift] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState(null);
   const [resumingGiftId, setResumingGiftId] = useState<string | null>(null);
-  const [recipientDetail, setRecipientDetail] = useState<RecipientRecord | null>(null);
+  const [scheduleProduct, setScheduleProduct] = useState<GiftCatalogItem | null>(null);
+  // Held by id so the open sheet always shows the latest saved data.
+  const [recipientDetailId, setRecipientDetailId] = useState<string | null>(null);
   const [catalogRecipient, setCatalogRecipient] = useState<RecipientRecord | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
   const [showAddFunds, setShowAddFunds] = useState(false);
@@ -45,6 +49,7 @@ const Dashboard = () => {
   const [showEditRecipient, setShowEditRecipient] = useState(false);
   const [editingRecipient, setEditingRecipient] = useState<any>(null);
   const [approval, setApproval] = useState<{ gift: any; recipient: any } | null>(null);
+  const [theaQueue, setTheaQueue] = useState<{ id: number; text: string } | null>(null);
 
   const tabParam = searchParams.get('tab');
   const activeTab: DashboardTab = tabParam === 'manual' ? 'manual' : 'thea';
@@ -95,7 +100,7 @@ const Dashboard = () => {
     setPreviousTier(currentTier);
   }, [userProfile?.subscription_tier, previousTier]);
 
-  const { data: recipients = [] } = useQuery({
+  const { data: recipients = [], isSuccess: recipientsLoaded } = useQuery({
     queryKey: ['recipients', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -141,15 +146,22 @@ const Dashboard = () => {
     enabled: !!user?.id,
   });
 
+  // The daily overview plays once, when the dashboard first loads. Adding a person later in the
+  // session must not bring an intro-style screen back over the user's work (UX-06).
+  const opportunitiesChecked = useRef(false);
   useEffect(() => {
+    if (!recipientsLoaded || opportunitiesChecked.current) return;
+    opportunitiesChecked.current = true;
     if (!recipients.length) return;
     const today = new Date().toDateString();
-    const opportunitiesShownDate = localStorage.getItem('opportunitiesShownDate');
-    if (opportunitiesShownDate !== today) {
-      setShowMonthlyOpportunities(true);
+    try {
+      if (localStorage.getItem('opportunitiesShownDate') === today) return;
       localStorage.setItem('opportunitiesShownDate', today);
+    } catch {
+      return;
     }
-  }, [recipients.length]);
+    setShowMonthlyOpportunities(true);
+  }, [recipientsLoaded, recipients.length]);
 
   useEffect(() => {
     const action = searchParams.get('action');
@@ -205,18 +217,19 @@ const Dashboard = () => {
   };
 
   const handleScheduleGift = (recipient: RecipientRecord) => {
-    setRecipientDetail(null);
+    setRecipientDetailId(null);
     const resumable = findResumableGift(recipient);
     if (resumable) {
       void resumeOrCollectAddress(resumable, recipient);
       return;
     }
     setSelectedRecipient(recipient);
+    setScheduleProduct(null);
     setShowScheduleGift(true);
   };
 
   const handleResumeGift = (gift: GiftRecord, recipient: RecipientRecord) => {
-    setRecipientDetail(null);
+    setRecipientDetailId(null);
     void resumeOrCollectAddress(gift, recipient);
   };
 
@@ -251,7 +264,7 @@ const Dashboard = () => {
   }, []);
 
   const handleOpenRecipient = (recipient: RecipientRecord) => {
-    setRecipientDetail(recipient);
+    setRecipientDetailId(recipient.id);
   };
 
   const handleOpenRecipientById = (recipientId: string, intent?: BriefingItem['action']) => {
@@ -276,26 +289,41 @@ const Dashboard = () => {
       }
     }
 
-    if (intent === 'address' || intent === 'interests') {
-      setActiveTab('manual');
-      if (intent === 'address') {
-        setEditingRecipient(recipient);
-        setShowEditRecipient(true);
-        return;
-      }
+    if (intent === 'address') {
+      // The edit form opens over whichever tab is active, so Thea's conversation stays put.
+      setEditingRecipient(recipient);
+      setShowEditRecipient(true);
+      return;
     }
+    if (intent === 'interests') setActiveTab('manual');
 
-    setRecipientDetail(recipient);
+    setRecipientDetailId(recipient.id);
   };
 
   const handleBrowseCatalog = (recipient?: RecipientRecord) => {
-    setRecipientDetail(null);
+    setRecipientDetailId(null);
     setCatalogRecipient(recipient || null);
     setShowCatalog(true);
   };
 
+  // A gift picked for a known person opens Manual's review with that gift; otherwise Thea
+  // works out who it's for and builds the review in chat.
+  const handleCatalogSelect = (product: GiftCatalogItem) => {
+    setShowCatalog(false);
+    if (catalogRecipient) {
+      setSelectedRecipient(catalogRecipient);
+      setScheduleProduct(product);
+      setResumingGiftId(null);
+      setShowScheduleGift(true);
+      return;
+    }
+    setActiveTab('thea');
+    const forWhom = catalogRecipient ? ` for ${catalogRecipient.name}` : '';
+    setTheaQueue({ id: Date.now(), text: `I'd like the ${product.name} (product ${product.id})${forWhom}.` });
+  };
+
   const handleEditRecipient = (recipient: RecipientRecord) => {
-    setRecipientDetail(null);
+    setRecipientDetailId(null);
     setEditingRecipient(recipient);
     setShowEditRecipient(true);
   };
@@ -305,6 +333,10 @@ const Dashboard = () => {
   const planLabel = tier === 'vip' ? 'VIP' : (userProfile?.trial_ends_at ? 'Free trial' : 'Free');
 
   const typedRecipients = recipients as RecipientRecord[];
+  const recipientDetail = useMemo(
+    () => typedRecipients.find((r) => r.id === recipientDetailId) || null,
+    [typedRecipients, recipientDetailId],
+  );
   const autopilotThreshold = AUTOPILOT_THRESHOLDS[(userProfile as any)?.autopilot_level] ?? AUTOPILOT_THRESHOLDS.ask100;
 
   return (
@@ -323,8 +355,12 @@ const Dashboard = () => {
         />
       )}
 
+      {/* Phones and tablets switch between Thea and Manual with tabs. From 1024px both sit side by
+          side, each with its own single scroll area, so desktop uses its width instead of a phone column. */}
       <MobileShell
-        contentClassName={`flex min-h-0 flex-col px-5 pt-10 pb-2 ${activeTab === 'thea' ? 'overflow-hidden' : 'overflow-y-auto'}`}
+        maxWidthClassName="max-w-[440px] md:max-w-[680px] lg:max-w-[1180px]"
+        contentClassName={`flex min-h-0 flex-col px-5 pt-10 pb-2 md:px-8 lg:overflow-hidden lg:pb-6 ${activeTab === 'thea' ? 'overflow-hidden' : 'overflow-y-auto'}`}
+        footerClassName="lg:hidden"
         footer={
           <nav
             aria-label="Dashboard tabs"
@@ -364,38 +400,39 @@ const Dashboard = () => {
           <div className="font-mono text-[9px] uppercase tracking-[1px]" style={{ color: U.accent, border: '1px solid rgba(182,91,60,0.4)', padding: '3px 7px', borderRadius: 8 }}>
             {planLabel}
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/settings')}
-            className="flex cursor-pointer items-center justify-center"
-            style={{ width: 34, height: 34, borderRadius: '50%', background: '#E5DBC6', fontFamily: "'Newsreader', serif", fontStyle: 'italic', fontSize: 15, color: '#5A5147' }}
-            aria-label="Open settings"
-          >
-            {initialsOf(displayName).charAt(0)}
-          </button>
+          <AccountMenu
+            displayName={displayName}
+            planLabel={planLabel}
+            tier={tier}
+            walletBalance={userProfile?.gift_wallet_balance}
+            autopilotThreshold={autopilotThreshold}
+            onAddFunds={() => setShowAddFunds(true)}
+            onOpenSettings={() => navigate('/settings')}
+          />
         </div>
 
-        <div className="min-h-0 flex-1">
-          {activeTab === 'thea' ? (
+        <div className="min-h-0 flex-1 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(360px,440px)] lg:gap-6">
+          {/* Both tabs stay mounted so switching never loses Thea's conversation or Manual's place. */}
+          <div className={`${activeTab === 'thea' ? 'h-full' : 'hidden'} lg:block lg:h-full lg:min-h-0`}>
             <TheaHomeTab
               displayName={displayName}
               recipients={typedRecipients}
               autopilotThreshold={autopilotThreshold}
               onOpenRecipient={handleOpenRecipientById}
               onSwitchToManual={() => setActiveTab('manual')}
+              queuedMessage={theaQueue}
+              recipientsLoaded={recipientsLoaded}
             />
-          ) : (
+          </div>
+          <div className={`${activeTab === 'manual' ? 'h-full' : 'hidden'} lg:block lg:h-full lg:min-h-0 lg:rounded-[24px] lg:border lg:border-[rgba(42,37,32,0.09)] lg:bg-[rgba(250,246,238,0.6)] lg:px-5 lg:pt-5`}>
             <ManualHomeTab
               recipients={typedRecipients}
               autopilotThreshold={autopilotThreshold}
-              tier={tier}
-              walletBalance={userProfile?.gift_wallet_balance}
               onOpenRecipient={handleOpenRecipient}
               onAddRecipient={() => setShowAddRecipient(true)}
               onBrowseCatalog={() => handleBrowseCatalog()}
-              onAddFunds={() => setShowAddFunds(true)}
             />
-          )}
+          </div>
         </div>
       </MobileShell>
 
@@ -405,15 +442,16 @@ const Dashboard = () => {
       {showScheduleGift && selectedRecipient && (
         <ScheduleGiftModal
           isOpen={showScheduleGift}
-          onClose={() => { setShowScheduleGift(false); setResumingGiftId(null); }}
+          onClose={() => { setShowScheduleGift(false); setResumingGiftId(null); setScheduleProduct(null); }}
           recipient={selectedRecipient}
           payingForGiftId={resumingGiftId}
+          initialProduct={scheduleProduct}
         />
       )}
       <RecipientDetailSheet
         recipient={recipientDetail}
         open={Boolean(recipientDetail)}
-        onOpenChange={(open) => { if (!open) setRecipientDetail(null); }}
+        onOpenChange={(open) => { if (!open) setRecipientDetailId(null); }}
         onSchedule={handleScheduleGift}
         onResumeGift={handleResumeGift}
         onEdit={handleEditRecipient}
@@ -424,6 +462,7 @@ const Dashboard = () => {
         onOpenChange={setShowCatalog}
         recipientName={catalogRecipient?.name}
         interests={catalogRecipient?.interests || []}
+        onSelect={handleCatalogSelect}
       />
       {showAddFunds && userProfile && (
         <AddFundsModal isOpen={showAddFunds} onClose={() => setShowAddFunds(false)} currentBalance={userProfile.gift_wallet_balance || 0} />
