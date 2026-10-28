@@ -214,6 +214,7 @@ const planCatalogSearch = async (interests: string[]): Promise<SearchPlan> => {
 Rules:
 - search_terms: concrete words/phrases likely to appear in product titles or descriptions. Be generous so we do not miss stock across a large catalog.
 - Include the exact interest and close family terms (example: succulents → plant, planter, botanical, houseplant, cactus, terrarium, garden).
+- Interests can be gift directions rather than hobbies (example: "Funny gifts" → funny, novelty, mug, socks, card game; "Spa & relaxation" → spa, bath, candle, robe, face mask). Expand them into the products such a shelf would hold.
 - For substitutes that need a human OK if exact stock is missing, put them in adjacent_interests (example: red wine → white wine, rose, sparkling wine).
 - Do not invent unrelated categories (plants should not become beauty or kitchen tools).
 - 8 to 20 search_terms. 0 to 5 adjacent_interests.`,

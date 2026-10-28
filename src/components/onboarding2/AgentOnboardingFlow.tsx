@@ -26,7 +26,6 @@ import {
   STARTER_CATEGORIES,
   CATEGORY_FOLLOWUPS,
   type InterestSignal,
-  discoveryReadyCopy,
   isDiscoveryReady,
   isStarterCategory,
   searchLabelsFromSignals,
@@ -305,7 +304,7 @@ function ImportPromptScreen({
       }
     >
       <StepPips step={1} />
-      <TheaCharacter size="medium" pose={notice ? 'thinking' : 'welcome'} />
+      <TheaCharacter size="medium" pose={notice ? 'thinking' : 'basic'} />
       <div
         className="-mt-2 shrink-0 rounded-[22px] border bg-white/80 px-5 py-4 text-center"
         style={{ borderColor: U.border }}
@@ -496,7 +495,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   const [followUpChips, setFollowUpChips] = useState<string[]>([]);
   const [pendingCategory, setPendingCategory] = useState<string | null>(null);
   const [intelInput, setIntelInput] = useState('');
-  const { reaction: theaReaction, reactTo } = useTheaReaction();
+  const { reaction: theaReaction, reactTo, play: playReaction } = useTheaReaction();
   const [intelSending, setIntelSending] = useState(false);
   const [revealPicks, setRevealPicks] = useState<GiftCatalogItem[]>([]);
   const [unmatchedRevealInterests, setUnmatchedRevealInterests] = useState<string[]>([]);
@@ -792,16 +791,6 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     setScreen('intel');
   };
 
-  const readyReply = (first: string, signals: InterestSignal[]) => {
-    if (!isDiscoveryReady(signals)) {
-      const list = searchLabelsFromSignals(signals).map((f) => f.toLowerCase()).join(', ');
-      return list
-        ? `Love that: ${list}. Tell me a bit more about what ${first} is into.`
-        : `Tell me a bit more about what ${first} is into.`;
-    }
-    return discoveryReadyCopy(first, signals);
-  };
-
   const sendIntelMessage = async (text: string, selectedInterest?: string) => {
     const message = text.trim().slice(0, 2000);
     if (!activePerson || !message || intelSending) return;
@@ -814,6 +803,8 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     reactTo(message);
     const isRude = classifyUserReply(message) === 'negative';
 
+    // What the user typed, kept only until Thea reads it into gift directions.
+    const typed = signalFromText(message, categoryContext);
     let nextSignals = intelSignals;
     if (isRude) {
       // A rude message is not an interest; keep what we already learned.
@@ -830,7 +821,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         setFollowUpChips([]);
       }
     } else {
-      nextSignals = upsertSignal(intelSignals, signalFromText(message, categoryContext));
+      nextSignals = upsertSignal(intelSignals, typed);
       setPendingCategory(null);
       setFollowUpChips([]);
     }
@@ -857,17 +848,6 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       return;
     }
 
-    // Specific chip follow-ups stay snappy on-client.
-    if (selectedInterest && !isCategoryPick) {
-      void (async () => {
-        const reply = readyReply(first, nextSignals);
-        if (request !== intelRequest.current) return;
-        setIntelMessages((m) => [...m, { from: 'thea', text: reply }]);
-        setIntelSending(false);
-      })();
-      return;
-    }
-
     try {
       const { data, error } = await supabase.functions.invoke('thea-chat', {
         body: {
@@ -886,12 +866,20 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       if (error || !data?.success || typeof data.reply !== 'string') throw new Error('Thea unavailable');
 
       let merged = nextSignals;
-      if (Array.isArray(data.interests) && data.interests.length) {
-        const learned = data.interests.filter(
-          (v: unknown): v is string => typeof v === 'string' && v.trim().length > 0 && v.length <= 80,
-        );
+      const learned: string[] = Array.isArray(data.interests)
+        ? data.interests.filter((v: unknown): v is string => typeof v === 'string' && v.trim().length > 0 && v.length <= 80)
+        : [];
+      if (learned.length) {
+        // Thea's reading of the person ("Funny gifts", "Spa & relaxation") replaces the raw
+        // sentence, which would make a poor catalog search.
+        merged = nextSignals.filter((signal) => signal.interest.toLowerCase() !== typed.interest.toLowerCase());
         for (const label of learned) {
-          merged = upsertSignal(merged, signalFromText(label, categoryContext));
+          merged = upsertSignal(merged, {
+            category: categoryContext,
+            interest: label.trim(),
+            details: typed.details,
+            confidence: data.ready === true ? 'high' : 'low',
+          });
         }
       }
       // Trust Thea when she says the signal is strong enough.
@@ -905,18 +893,16 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         syncPersonInterests(personId, merged);
       }
 
-      if (Array.isArray(data.followUps)) {
-        const chips = data.followUps
+      const chips = Array.isArray(data.followUps)
+        ? data.followUps
           .filter((v: unknown): v is string => typeof v === 'string' && v.trim().length > 0 && v.length <= 40)
-          .slice(0, 6);
-        if (chips.length && !isDiscoveryReady(merged)) setFollowUpChips(chips);
-        else if (isDiscoveryReady(merged)) setFollowUpChips([]);
-      }
+          .slice(0, 6)
+        : [];
+      setFollowUpChips(data.ready === true ? [] : chips);
 
-      const reply = isDiscoveryReady(merged)
-        ? readyReply(first, merged)
-        : data.reply.replace(/\s*[\u2014\u2013]\s*/g, ', ').trim();
+      const reply = data.reply.replace(/\s*[\u2014\u2013]\s*/g, ', ').trim();
       if (request !== intelRequest.current) return;
+      if (data.tone === 'funny') playReaction('laugh');
       setIntelMessages((m) => [...m, { from: 'thea', text: reply }]);
     } catch {
       if (request !== intelRequest.current) return;
@@ -926,7 +912,10 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         setIntelSignals(fallback);
         syncPersonInterests(personId, fallback);
       }
-      const reply = readyReply(first, fallback.length ? fallback : [signalFromText(message, null)]);
+      // Thea is unreachable: acknowledge without echoing their words back as a list.
+      const reply = isDiscoveryReady(fallback)
+        ? `Got it, that helps me picture ${first}. Tap below when you want to see ideas.`
+        : `Got it. What else does ${first} love?`;
       if (request !== intelRequest.current) return;
       setIntelMessages((m) => [...m, { from: 'thea', text: reply }]);
     } finally {

@@ -773,6 +773,15 @@
 .u-thea--clap .u-thea__clap-l { transform-box: view-box; transform-origin: 92px 420px; animation: u-thea-clap-l .36s ease-in-out infinite; }
 .u-thea--clap .u-thea__clap-r { transform-box: view-box; transform-origin: 290px 420px; animation: u-thea-clap-r .36s ease-in-out infinite; }
 .u-thea--upset .u-thea__huff { animation: u-thea-huff .6s ease-out both; }
+/* Laugh: head and shoulders shake with the giggle, tears of joy pop, a couple of "ha"s float up */
+.u-thea--laugh .u-thea__head { animation: u-thea-giggle .3s ease-in-out 7; }
+.u-thea--laugh .u-thea__breath { animation: u-thea-chuckle .3s ease-in-out 7; }
+.u-thea--laugh .u-thea__tears { transform-box: fill-box; transform-origin: 50% 0%; animation: u-thea-pop .35s ease-out .2s both; }
+.u-thea--laugh .u-thea__ha text { transform-box: fill-box; transform-origin: center; animation: u-thea-ha 1.4s ease-out both; }
+.u-thea--laugh .u-thea__ha text:nth-child(2) { animation-delay: .35s; }
+@keyframes u-thea-giggle { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(-3deg) translateY(-2px); } 75% { transform: rotate(2deg) translateY(1px); } }
+@keyframes u-thea-chuckle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes u-thea-ha { 0% { opacity: 0; transform: translateY(8px) scale(.6); } 20% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-10px); } }
 .u-thea--thumbsup, .u-thea--sparkle, .u-thea--clap, .u-thea--cheer { animation: u-thea-hop .45s ease-out both; }
 @keyframes u-thea-shoulder-raise { from { transform: rotate(52deg); } to { transform: none; } }
 @keyframes u-thea-elbow-raise { from { transform: rotate(140deg); } to { transform: none; } }

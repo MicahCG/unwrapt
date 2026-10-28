@@ -71,6 +71,8 @@ verify_jwt = false
 # OpenAI key stays server-side. Manually auth-checked inside; gated to an email allowlist for testing.
 [functions.thea-chat]
 verify_jwt = false
+# Thea's personality and judgment, read at startup.
+static_files = ["./functions/thea-chat/THEA_GUIDE.md"]
 
 # Muse connector API — custom API key auth; Meta review uses X-Unwrapt-Review-User.
 [functions.muse-api]

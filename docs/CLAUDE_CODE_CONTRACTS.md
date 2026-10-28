@@ -554,7 +554,7 @@ Supabase Dashboard function editor running the file as the entry point - is
 unchanged).
 
 ```
-deno test --allow-env supabase/functions/thea-chat/index.test.ts
+deno test --allow-env --allow-read supabase/functions/thea-chat/index.test.ts
 deno test --allow-env supabase/functions/process-automation-lifecycle/index.test.ts
 ```
 

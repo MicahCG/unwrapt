@@ -210,14 +210,3 @@ export function signalFromText(
     confidence: estimateConfidence(cleaned, details),
   };
 }
-
-export function discoveryReadyCopy(firstName: string, signals: InterestSignal[]): string {
-  const labels = searchLabelsFromSignals(signals)
-    .map((l) => l.toLowerCase())
-    .slice(0, 3)
-    .join(', ');
-  if (labels) {
-    return `Okay, I think I've got a good read on ${firstName}. ${labels} gives me enough to find gifts that actually fit.`;
-  }
-  return `Okay, I think I've got a good read on ${firstName}. I've got enough to start finding gifts that fit.`;
-}

@@ -1,6 +1,6 @@
 import type { TheaReaction } from '@/components/unwrapt2/TheaFigure';
 
-export type ReplyTone = 'positive' | 'negative' | 'neutral';
+export type ReplyTone = 'positive' | 'negative' | 'neutral' | 'funny';
 
 // Rude or mean messages aimed at Thea (or just hostile). Kept to words that are almost never
 // part of a genuine answer about someone, so "she hates cooking" stays a normal answer.
@@ -8,12 +8,16 @@ const RUDE = /\b(stupid|idiot|idiotic|dumb|moron|useless|worthless|pathetic|anno
 // Non-answers: no reaction, Thea just carries on.
 const NON_ANSWER = /^(idk|i don'?t know|dunno|not sure|no|nope|nah|skip|pass|n\/a|none|nothing|whatever|ok|okay|k|hmm+|\?+)[\s.!?]*$/i;
 
+// Messages that announce their own joke. Subtler humor is spotted by Thea's reply instead.
+const LAUGHING = /\b(lol+|lmf?ao+|haha[ha]*|hehe[he]*|rofl)\b|😂|🤣|😆|😹/i;
+
 /** How the user's latest message should land with Thea. Any real answer counts as progress. */
 export function classifyUserReply(text: string): ReplyTone {
   const trimmed = text.trim();
   if (!trimmed) return 'neutral';
   if (RUDE.test(trimmed)) return 'negative';
   if (NON_ANSWER.test(trimmed)) return 'neutral';
+  if (LAUGHING.test(trimmed)) return 'funny';
   return 'positive';
 }
 

@@ -1,6 +1,6 @@
 // Regression tests for the CC-02 cross-turn context fix and the pure
 // catalog-matching helpers. Run with:
-//   deno test --allow-env supabase/functions/thea-chat/index.test.ts
+//   deno test --allow-env --allow-read supabase/functions/thea-chat/index.test.ts
 // (index.ts guards its Deno.serve call behind `import.meta.main` so this
 // import doesn't start a live HTTP listener - see the comment there.)
 import { assert, assertEquals } from "https://deno.land/std@0.190.0/testing/asserts.ts";
