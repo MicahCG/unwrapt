@@ -24,6 +24,7 @@ import ManualHomeTab from '@/components/dashboard/ManualHomeTab';
 import AccountMenu from '@/components/dashboard/AccountMenu';
 import { AUTOPILOT_THRESHOLDS, type BriefingItem } from '@/lib/dashboardBriefing';
 import type { GiftCatalogItem } from '@/lib/giftCatalog';
+import { useVisualViewport } from '@/hooks/useVisualViewport';
 
 type DashboardTab = 'thea' | 'manual';
 
@@ -50,9 +51,38 @@ const Dashboard = () => {
   const [editingRecipient, setEditingRecipient] = useState<any>(null);
   const [approval, setApproval] = useState<{ gift: any; recipient: any } | null>(null);
   const [theaQueue, setTheaQueue] = useState<{ id: number; text: string } | null>(null);
+  const [composerFocused, setComposerFocused] = useState(false);
+  // Match MobileShell's `lg:hidden` tab bar — phones/tablets, not the side-by-side desktop layout.
+  const [compactChrome, setCompactChrome] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches,
+  );
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 1023px)');
+    const sync = () => setCompactChrome(mql.matches);
+    sync();
+    mql.addEventListener('change', sync);
+    return () => mql.removeEventListener('change', sync);
+  }, []);
 
   const tabParam = searchParams.get('tab');
   const activeTab: DashboardTab = tabParam === 'manual' ? 'manual' : 'thea';
+  // Only pin to the visual viewport while Thea's composer is focused under the tab-bar
+  // layout — that's when the software keyboard otherwise zooms/shifts the shell.
+  const pinToKeyboard = compactChrome && activeTab === 'thea' && composerFocused;
+  const viewport = useVisualViewport(pinToKeyboard);
+
+  useEffect(() => {
+    if (activeTab !== 'thea') setComposerFocused(false);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (!pinToKeyboard) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [pinToKeyboard]);
 
   const setActiveTab = useCallback((tab: DashboardTab) => {
     setSearchParams((prev) => {
@@ -359,9 +389,25 @@ const Dashboard = () => {
           side, each with its own single scroll area, so desktop uses its width instead of a phone column. */}
       <MobileShell
         maxWidthClassName="max-w-[440px] md:max-w-[680px] lg:max-w-[1180px] xl:max-w-[1400px]"
-        contentClassName={`flex min-h-0 flex-col px-5 pt-10 pb-2 md:px-8 lg:overflow-hidden lg:pb-6 ${activeTab === 'thea' ? 'overflow-hidden' : 'overflow-y-auto'}`}
+        contentClassName={`flex min-h-0 flex-col px-5 pb-2 md:px-8 lg:overflow-hidden lg:pb-6 ${
+          pinToKeyboard ? 'overflow-hidden pt-3' : 'pt-10'
+        } ${activeTab === 'thea' ? 'overflow-hidden' : 'overflow-y-auto'}`}
         footerClassName="lg:hidden"
+        canvasClassName={pinToKeyboard ? '!min-h-0' : ''}
+        canvasStyle={
+          pinToKeyboard && viewport.height
+            ? {
+                height: viewport.height,
+                maxHeight: viewport.height,
+                minHeight: viewport.height,
+                transform: viewport.offsetTop ? `translateY(${viewport.offsetTop}px)` : undefined,
+              }
+            : undefined
+        }
         footer={
+          // Hide Thea/Manual while typing — the keyboard needs that space, and a modern
+          // agent composer shouldn't compete with a tab bar.
+          pinToKeyboard ? undefined : (
           <nav
             aria-label="Dashboard tabs"
             className="grid grid-cols-2 items-center gap-1.5 rounded-[22px] border p-1.5 shadow-[0_12px_30px_rgba(42,37,32,0.08)] backdrop-blur"
@@ -394,9 +440,10 @@ const Dashboard = () => {
               Manual
             </button>
           </nav>
+          )
         }
       >
-        <div className="mb-3 flex shrink-0 items-center justify-between">
+        <div className={`mb-3 flex shrink-0 items-center justify-between ${pinToKeyboard ? 'hidden' : ''}`}>
           <div className="font-mono text-[9px] uppercase tracking-[1px]" style={{ color: U.accent, border: '1px solid rgba(182,91,60,0.4)', padding: '3px 7px', borderRadius: 8 }}>
             {planLabel}
           </div>
@@ -422,6 +469,7 @@ const Dashboard = () => {
               onSwitchToManual={() => setActiveTab('manual')}
               queuedMessage={theaQueue}
               recipientsLoaded={recipientsLoaded}
+              onComposerFocusChange={setComposerFocused}
             />
           </div>
           <div className={`${activeTab === 'manual' ? 'h-full' : 'hidden'} lg:block lg:h-full lg:min-h-0 lg:rounded-[24px] lg:border lg:border-[rgba(42,37,32,0.09)] lg:bg-[rgba(250,246,238,0.6)] lg:px-5 lg:pt-5`}>

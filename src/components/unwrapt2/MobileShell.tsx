@@ -19,6 +19,13 @@ interface MobileShellProps {
   maxWidthClassName?: string;
   /** Extra classes for the footer area, e.g. `lg:hidden` when desktop shows its content inline. */
   footerClassName?: string;
+  /**
+   * Override the phone canvas box (e.g. pin height to visualViewport while the
+   * software keyboard is open). Merged after the warm background style.
+   */
+  canvasStyle?: React.CSSProperties;
+  /** Extra classes on the phone canvas, e.g. dropping min-h-screen while keyboard-sized. */
+  canvasClassName?: string;
 }
 
 /**
@@ -36,6 +43,8 @@ export const MobileShell: React.FC<MobileShellProps> = ({
   animate = true,
   maxWidthClassName = 'max-w-[440px] lg:max-w-[600px]',
   footerClassName = '',
+  canvasStyle,
+  canvasClassName = '',
 }) => (
   <div
     style={{ background: U.bg }}
@@ -57,10 +66,11 @@ export const MobileShell: React.FC<MobileShellProps> = ({
     <div
       className={`relative z-10 flex h-[100dvh] min-h-screen w-full flex-col overflow-hidden ${maxWidthClassName} ${
         animate ? 'animate-u-fadeUp' : ''
-      }`}
+      } ${canvasClassName}`}
       style={{
         color: U.ink,
         background: glow ? `${U.bgGradient}, ${U.bg}` : U.bg,
+        ...canvasStyle,
       }}
     >
       <div
