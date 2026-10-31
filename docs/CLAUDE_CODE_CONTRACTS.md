@@ -465,6 +465,31 @@ both are true, `buildConfirmDirectiveMessage` forces
 forbidding another `select_gift` call. Covered by tests in
 `index.test.ts`, including a direct reproduction of "Yes, confirm it."
 
+## Directive instructions still weren't reliable enough - made selection/confirm deterministic
+
+After the guide-based system prompt rewrite landed (separate PR), re-testing the same
+"tap a card, then confirm" flow found the directive-instruction approach above still
+wasn't reliable: tapping "Select gift" produced a plausible-looking review reply with
+*no* `reviewMarker` persisted (meaning `select_gift` was never actually called - the
+model just narrated a review from context), and the follow-up "Yes, confirm it"
+produced another ungrounded narration instead of calling `confirm_scheduled_gift`. No
+DB write happened either time, despite the replies reading as if something had.
+
+This is the same class of problem as every fix in this section - a strongly-worded
+system message is still something the model can choose not to follow - and after
+several rounds of stronger wording, that approach has hit diminishing returns.
+
+**Fix**: when the signal is unambiguous (a tapped product id via `extractTappedProductId`
+with a known active recipient, or an explicit confirmation via `looksLikeConfirmation`
+with a persisted `pendingReview`), the server now calls `handleSelectGift` /
+`handleConfirmScheduledGift` directly, before the model is ever asked to decide
+whether to call them. The real result is injected into the conversation as a synthetic
+tool-call/tool-result exchange, so the model's only job for that turn is phrasing the
+already-true outcome, not deciding whether the action happened. This removes the
+failure mode entirely for the two cases where there was never any real ambiguity to
+begin with; the model still drives tool calls normally for everything else (free-text
+selection without a tapped id, searching, recipient edits, etc).
+
 ## Invented gift ideas when search_gifts comes up empty (found via live testing)
 
 `supabase/functions/thea-chat/index.ts`. Reported from a live session: asking

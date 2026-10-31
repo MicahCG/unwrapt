@@ -1471,15 +1471,6 @@ Use the whole conversation, not just the last message. Return JSON only:
     // falsely-worded "I've scheduled..." reply along with it) - force it
     // deterministically rather than relying on the model's own judgment.
     const confirmDirectiveMessage = buildConfirmDirectiveMessage(turnContext?.pendingReview, looksLikeConfirmation(latestUserMessageContent));
-    const conversation: unknown[] = [
-      { role: "system", content: SYSTEM_PROMPT },
-      ...(contextMessage ? [{ role: "system", content: contextMessage }] : []),
-      ...(turnContextMessage ? [{ role: "system", content: turnContextMessage }] : []),
-      ...messages,
-      ...(directSelectionMessage ? [{ role: "system", content: directSelectionMessage }] : []),
-      ...(tappedSelectionMessage ? [{ role: "system", content: tappedSelectionMessage }] : []),
-      ...(confirmDirectiveMessage ? [{ role: "system", content: confirmDirectiveMessage }] : []),
-    ];
 
     const seenProducts = new Map<string, Product>();
     // Seed from the prior turn's carried-over recommendations (CC-02) so
@@ -1496,6 +1487,49 @@ Use the whole conversation, not just the last message. Return JSON only:
         });
       }
     }
+
+    // Deterministic execution for the two unambiguous signals above
+    // (tapped product id, explicit confirmation of a pending review),
+    // bypassing reliance on the model to decide to call the right tool.
+    // Observed repeatedly in live testing: even with a directive system
+    // message spelling out exactly which tool to call and with which
+    // arguments, the model sometimes still doesn't call it - re-listing
+    // products, or narrating a plausible-looking review/confirmation
+    // without ever invoking select_gift/confirm_scheduled_gift, so nothing
+    // is actually validated or persisted even though the reply claims
+    // otherwise. When the signal is this unambiguous there's no judgment
+    // call left for the model to make, so the server just performs the
+    // action directly and gives the model the real result to phrase,
+    // via a synthetic tool-call/tool-result exchange injected into the
+    // conversation below - the model still decides HOW to say it, never
+    // WHETHER the action happened.
+    let preAppliedCall: { name: "select_gift" | "confirm_scheduled_gift"; args: Record<string, unknown>; result: ToolResult } | null = null;
+    if (tappedProductId && turnContext?.activeRecipient?.id) {
+      const result = await handleSelectGift(
+        authClient, user.id,
+        { recipientId: turnContext.activeRecipient.id, productId: tappedProductId },
+        seenProducts.get(tappedProductId) ?? null,
+      );
+      preAppliedCall = { name: "select_gift", args: { recipientId: turnContext.activeRecipient.id, productId: tappedProductId }, result };
+    } else if (looksLikeConfirmation(latestUserMessageContent) && turnContext?.pendingReview) {
+      const { recipientId, productId, occasionDate } = turnContext.pendingReview;
+      const result = await handleConfirmScheduledGift(
+        authClient, user.id, { recipientId, productId, occasionDate }, conversationId,
+        seenProducts.get(productId) ?? null,
+      );
+      preAppliedCall = { name: "confirm_scheduled_gift", args: { recipientId, productId, occasionDate }, result };
+    }
+
+    const conversation: unknown[] = [
+      { role: "system", content: SYSTEM_PROMPT },
+      ...(contextMessage ? [{ role: "system", content: contextMessage }] : []),
+      ...(turnContextMessage ? [{ role: "system", content: turnContextMessage }] : []),
+      ...messages,
+      ...(directSelectionMessage ? [{ role: "system", content: directSelectionMessage }] : []),
+      ...(tappedSelectionMessage ? [{ role: "system", content: tappedSelectionMessage }] : []),
+      ...(confirmDirectiveMessage ? [{ role: "system", content: confirmDirectiveMessage }] : []),
+    ];
+
     // Surfaced to the frontend as top-level `writes` so it can invalidate
     // the right queries (recipients, upcoming-gifts) immediately instead of
     // parsing Thea's natural-language reply for what changed.
@@ -1514,6 +1548,31 @@ Use the whole conversation, not just the last message. Return JSON only:
     // The structured review from this turn's select_gift, returned so the app can show a
     // review card with a confirm action instead of relying on Thea's wording.
     let lastReview: unknown = null;
+
+    if (preAppliedCall) {
+      const syntheticToolCallId = `server_${preAppliedCall.name}_${Date.now()}`;
+      conversation.push({
+        role: "assistant",
+        content: null,
+        tool_calls: [{
+          id: syntheticToolCallId,
+          type: "function",
+          function: { name: preAppliedCall.name, arguments: JSON.stringify(preAppliedCall.args) },
+        }],
+      });
+      conversation.push({ role: "tool", tool_call_id: syntheticToolCallId, content: JSON.stringify(preAppliedCall.result) });
+
+      if (preAppliedCall.name === "select_gift") {
+        lastReview = preAppliedCall.result.ok && "review" in preAppliedCall.result ? preAppliedCall.result.review : null;
+        lastReviewMarker = typeof preAppliedCall.result.reviewMarker === "string"
+          ? preAppliedCall.result.reviewMarker.replace(/^GIFT_REVIEW:\s*/i, "")
+          : null;
+        const review = preAppliedCall.result.review as { recipientId?: string; recipientName?: string } | undefined;
+        if (review?.recipientId && review?.recipientName) lastActiveRecipient = { id: review.recipientId, name: review.recipientName };
+      } else {
+        writes.push({ tool: preAppliedCall.name, ...preAppliedCall.result });
+      }
+    }
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
       const completion = await callOpenAI(openaiApiKey, conversation, forceSearchNextCall);
