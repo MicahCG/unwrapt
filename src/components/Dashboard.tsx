@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import MonthlyOpportunitiesOverlay from '@/components/MonthlyOpportunitiesOverlay';
 import GiftScheduledSuccess from '@/components/GiftScheduledSuccess';
 import { toast } from '@/hooks/use-toast';
 import AddRecipientModal from '@/components/AddRecipientModal';
@@ -32,7 +31,6 @@ const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [showMonthlyOpportunities, setShowMonthlyOpportunities] = useState(false);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [successRecipient, setSuccessRecipient] = useState(null);
   const [showAddRecipient, setShowAddRecipient] = useState(false);
@@ -176,23 +174,6 @@ const Dashboard = () => {
     enabled: !!user?.id,
   });
 
-  // The daily overview plays once, when the dashboard first loads. Adding a person later in the
-  // session must not bring an intro-style screen back over the user's work (UX-06).
-  const opportunitiesChecked = useRef(false);
-  useEffect(() => {
-    if (!recipientsLoaded || opportunitiesChecked.current) return;
-    opportunitiesChecked.current = true;
-    if (!recipients.length) return;
-    const today = new Date().toDateString();
-    try {
-      if (localStorage.getItem('opportunitiesShownDate') === today) return;
-      localStorage.setItem('opportunitiesShownDate', today);
-    } catch {
-      return;
-    }
-    setShowMonthlyOpportunities(true);
-  }, [recipientsLoaded, recipients.length]);
-
   useEffect(() => {
     const action = searchParams.get('action');
     if (action === 'add-person') {
@@ -213,13 +194,12 @@ const Dashboard = () => {
   }, [searchParams, setSearchParams, setActiveTab]);
 
   useEffect(() => {
-    if (recentGift && !showMonthlyOpportunities) {
+    if (recentGift) {
       setSuccessRecipient(recentGift);
       setShowSuccessAnimation(true);
     }
-  }, [recentGift, showMonthlyOpportunities]);
+  }, [recentGift]);
 
-  const handleMonthlyOpportunitiesComplete = () => setShowMonthlyOpportunities(false);
   const handleSuccessComplete = () => {
     setShowSuccessAnimation(false);
     setSuccessRecipient(null);
@@ -371,7 +351,6 @@ const Dashboard = () => {
 
   return (
     <>
-      {showMonthlyOpportunities && <MonthlyOpportunitiesOverlay onComplete={handleMonthlyOpportunitiesComplete} />}
       {successRecipient && (
         <GiftScheduledSuccess recipient={successRecipient} onComplete={handleSuccessComplete} isVisible={showSuccessAnimation} />
       )}

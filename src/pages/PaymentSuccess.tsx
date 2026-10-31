@@ -2,12 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Gift, AlertCircle, ArrowRight, RefreshCw, Wallet, Crown } from 'lucide-react';
+import { CheckCircle, Gift, AlertCircle, ArrowRight, RefreshCw, Wallet } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import ConfettiAnimation from '@/components/ConfettiAnimation';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { MobileShell, Display, PrimaryButton } from '@/components/unwrapt2/MobileShell';
+import { TheaCharacter } from '@/components/unwrapt2/TheaCharacter';
+import { U } from '@/components/unwrapt2/theme';
+import { peekPendingGiftResume } from '@/lib/postSubscribeResume';
 
 type PaymentType = 'subscription' | 'wallet' | 'gift' | 'unknown';
 
@@ -242,6 +246,14 @@ const PaymentSuccess = () => {
       localStorage.removeItem('onboardingPaymentFlow');
     }
 
+    // Design / QA preview: skip Stripe polling and show the success handoff.
+    if (searchParams.get('preview') === '1' && (paymentType === 'subscription' || paymentType === 'unknown')) {
+      setIsVerifying(false);
+      setVerificationComplete(true);
+      setShowConfetti(true);
+      return;
+    }
+
     const processVerification = async () => {
       // Wait for paymentType to be determined from URL params
       if (paymentType === 'unknown') {
@@ -285,9 +297,102 @@ const PaymentSuccess = () => {
     processVerification();
   }, [searchParams, user?.id, paymentType]);
 
-  const handleGoToDashboard = () => {
+  const handleContinueWithThea = () => {
+    // Skip obsolete welcome-back / monthly-chances overlays on this handoff.
+    try {
+      localStorage.setItem('opportunitiesShownDate', new Date().toDateString());
+    } catch {
+      /* ignore */
+    }
+    navigate('/?resume=gifts', { replace: true });
+  };
+
+  const handleGoHome = () => {
     navigate('/', { replace: true });
   };
+
+  const pendingResume = peekPendingGiftResume();
+  const resumeFirst = pendingResume?.recipientName?.trim().split(/\s+/)[0];
+
+  // On-brand VIP success — Thea celebrating, warm ivory/espresso, resume gift chat.
+  if (paymentType === 'subscription' || paymentType === 'unknown') {
+    return (
+      <>
+        <ConfettiAnimation isActive={showConfetti} duration={6000} startDelay={0} />
+        <MobileShell glow contentClassName="px-6 pt-12 pb-6 flex flex-col items-center text-center">
+          {isVerifying ? (
+            <>
+              <TheaCharacter size="large" pose="thinking" speaking={false} />
+              <Display className="mt-6 text-[28px] leading-tight">Confirming your membership…</Display>
+              <p className="mt-3 max-w-[300px] text-[15px] leading-6" style={{ color: U.textSecondary }}>
+                One moment while we unlock Thea.
+              </p>
+              <RefreshCw className="mt-8 h-6 w-6 animate-spin" style={{ color: U.accent }} aria-hidden="true" />
+            </>
+          ) : (
+            <>
+              <div className="u-vip-celebrate">
+                <TheaCharacter size="large" pose="gift" speaking reaction="clap" bubble="You’re in!" />
+              </div>
+              <p
+                className="mt-5 text-[11px] font-semibold uppercase tracking-[0.18em]"
+                style={{ color: U.accent }}
+              >
+                Payment successful
+              </p>
+              <Display className="mt-2 text-[32px] leading-tight">Welcome to VIP</Display>
+              <p className="mt-3 max-w-[340px] text-[15px] leading-6" style={{ color: U.textSecondary }}>
+                {resumeFirst
+                  ? `Thea saved the gift ideas for ${resumeFirst}. Jump back in and keep planning together.`
+                  : 'Thea is ready — continue chatting and she’ll pick up right where you left off.'}
+              </p>
+
+              <div
+                className="mt-7 w-full max-w-[360px] rounded-[20px] px-4 py-3.5 text-left"
+                style={{ background: U.surface, border: `1px solid ${U.border}` }}
+              >
+                <p className="text-[12px] font-semibold" style={{ color: U.ink }}>With VIP you get</p>
+                <ul className="mt-2 space-y-1.5 text-[13px]" style={{ color: U.inkSoft }}>
+                  {['Unlimited people in Thea’s care', 'Gift ideas timed to their occasions', 'You approve before anything is bought'].map((line) => (
+                    <li key={line} className="flex items-start gap-2">
+                      <CheckCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: U.sage }} aria-hidden="true" />
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="mt-auto w-full max-w-[360px] pt-8">
+                <PrimaryButton onClick={handleContinueWithThea} disabled={isVerifying}>
+                  Continue chatting with Thea
+                </PrimaryButton>
+              </div>
+            </>
+          )}
+          <style>{`
+            .u-vip-celebrate .u-thea-character__glow {
+              animation: u-vip-glow 2.4s ease-in-out infinite;
+            }
+            .u-vip-celebrate .u-thea-character__figure {
+              animation: u-vip-bob 2.8s ease-in-out infinite;
+            }
+            @keyframes u-vip-glow {
+              0%, 100% { opacity: 0.55; transform: scale(1); }
+              50% { opacity: 0.95; transform: scale(1.08); }
+            }
+            @keyframes u-vip-bob {
+              0%, 100% { transform: translateY(0); }
+              50% { transform: translateY(-6px); }
+            }
+            @media (prefers-reduced-motion: reduce) {
+              .u-vip-celebrate .u-thea-character__glow,
+              .u-vip-celebrate .u-thea-character__figure { animation: none; }
+            }
+          `}</style>
+        </MobileShell>
+      </>
+    );
+  }
 
   const getContent = () => {
     switch (paymentType) {
@@ -301,7 +406,7 @@ const PaymentSuccess = () => {
             'Funds never expire',
             'Set up auto-reload to stay topped up',
           ],
-          buttonText: 'Go to Dashboard',
+          buttonText: 'Back to Thea',
         };
       case 'gift':
         return {
@@ -315,18 +420,13 @@ const PaymentSuccess = () => {
           ],
           buttonText: 'View My Gifts',
         };
-      case 'subscription':
       default:
         return {
-          icon: <Crown className="h-10 w-10 text-emerald-600" />,
-          title: 'Welcome to VIP!',
-          description: 'Your VIP subscription is now active. Enjoy unlimited recipients, gift automation, and more!',
-          benefits: [
-            'Unlimited recipients',
-            'Gift automation & scheduling',
-            'Gift wallet with auto-reload',
-          ],
-          buttonText: 'Go to Dashboard',
+          icon: <Gift className="h-10 w-10 text-emerald-600" />,
+          title: 'Payment received',
+          description: 'You’re all set.',
+          benefits: [],
+          buttonText: 'Continue chatting with Thea',
         };
     }
   };
@@ -338,14 +438,13 @@ const PaymentSuccess = () => {
     <>
       <ConfettiAnimation isActive={showConfetti} duration={6000} startDelay={0} />
       
-      <div className="min-h-screen bg-[#FAF9F7] flex items-center justify-center p-4">
-        <Card className="w-full max-w-md bg-white border border-[#E8E4DE] shadow-lg">
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: U.bg }}>
+        <Card className="w-full max-w-md border shadow-lg" style={{ background: U.surface, borderColor: U.border }}>
           <CardHeader className="text-center pb-2 pt-8">
-            {/* Status Icon */}
             <div className="flex justify-center mb-6">
               {isVerifying ? (
-                <div className="w-20 h-20 rounded-full bg-[#F5F3F0] flex items-center justify-center">
-                  <RefreshCw className="h-10 w-10 text-[#8B7355] animate-spin" />
+                <div className="w-20 h-20 rounded-full flex items-center justify-center" style={{ background: U.chip }}>
+                  <RefreshCw className="h-10 w-10 animate-spin" style={{ color: U.accent }} />
                 </div>
               ) : verificationComplete ? (
                 <div className="w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center">
@@ -358,8 +457,7 @@ const PaymentSuccess = () => {
               )}
             </div>
             
-            {/* Title */}
-            <CardTitle className="text-2xl font-display text-[#1A1A1A]">
+            <CardTitle className="text-2xl font-display" style={{ color: U.ink }}>
               {isVerifying 
                 ? 'Verifying Payment...' 
                 : verificationComplete 
@@ -370,8 +468,7 @@ const PaymentSuccess = () => {
           </CardHeader>
           
           <CardContent className="space-y-6 text-center px-6 pb-8">
-            {/* Description */}
-            <p className="text-[#1A1A1A]/70 leading-relaxed">
+            <p className="leading-relaxed" style={{ color: 'rgba(42,37,32,0.7)' }}>
               {isVerifying
                 ? 'Please wait while we confirm your payment...'
                 : verificationComplete
@@ -380,14 +477,13 @@ const PaymentSuccess = () => {
               }
             </p>
             
-            {/* Benefits - only show on success */}
-            {verificationComplete && (
-              <div className="bg-[#F5F3F0] rounded-lg p-4 space-y-2 text-left">
-                <p className="text-sm font-medium text-[#1A1A1A] mb-3">
-                  {paymentType === 'wallet' ? 'Your wallet:' : paymentType === 'gift' ? 'What\'s next:' : 'Your VIP benefits:'}
+            {verificationComplete && content.benefits.length > 0 && (
+              <div className="rounded-lg p-4 space-y-2 text-left" style={{ background: U.chip }}>
+                <p className="text-sm font-medium mb-3" style={{ color: U.ink }}>
+                  {paymentType === 'wallet' ? 'Your wallet:' : 'What\'s next:'}
                 </p>
                 {content.benefits.map((benefit, index) => (
-                  <div key={index} className="flex items-center gap-2 text-sm text-[#1A1A1A]/80">
+                  <div key={index} className="flex items-center gap-2 text-sm" style={{ color: 'rgba(42,37,32,0.8)' }}>
                     <CheckCircle className="h-4 w-4 text-emerald-600 flex-shrink-0" />
                     <span>{benefit}</span>
                   </div>
@@ -395,7 +491,6 @@ const PaymentSuccess = () => {
               </div>
             )}
 
-            {/* Error details - only show when verification failed */}
             {!isVerifying && !verificationComplete && !hasSessionId && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left">
                 <p className="text-xs text-blue-800">
@@ -405,12 +500,12 @@ const PaymentSuccess = () => {
               </div>
             )}
 
-            {/* Action Buttons */}
             <div className="space-y-3 pt-2">
               <Button 
                 size="lg" 
-                className="w-full h-12 bg-[#1A1A1A] hover:bg-[#2A2A2A] text-white"
-                onClick={handleGoToDashboard}
+                className="w-full h-12"
+                style={{ background: U.ink, color: U.buttonText }}
+                onClick={paymentType === 'gift' ? handleGoHome : handleContinueWithThea}
                 disabled={isVerifying}
               >
                 <Gift className="w-4 h-4 mr-2" />
