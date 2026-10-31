@@ -15,6 +15,7 @@ import {
   matchNamedRecommendedProduct,
   nextOccasionDate,
   normalizeInterests,
+  resolvePresentUi,
   scoreInterestText,
   shouldPersistReviewMarker,
   scrubFalseFriends,
@@ -274,4 +275,25 @@ Deno.test("buildConfirmDirectiveMessage is directive and carries all three revie
   assert(message?.includes("2026-10-28"));
   assert(message?.includes("Call confirm_scheduled_gift right now"));
   assert(message?.includes("do not call select_gift again"));
+});
+
+Deno.test("resolvePresentUi accepts calendar_connect and add_recipient without a recipient lookup", () => {
+  assertEquals(resolvePresentUi({ module: "calendar_connect" }, null), { ok: true, ui: { module: "calendar_connect" } });
+  assertEquals(resolvePresentUi({ module: "add_recipient", focus: "birthday" }, null), {
+    ok: true,
+    ui: { module: "add_recipient", focus: "birthday" },
+  });
+});
+
+Deno.test("resolvePresentUi requires an owned recipient for edit_recipient", () => {
+  assertEquals(resolvePresentUi({ module: "edit_recipient", recipientId: "missing" }, null).ok, false);
+  assertEquals(
+    resolvePresentUi({ module: "edit_recipient", recipientId: "rec_1", focus: "address" }, { id: "rec_1", name: "Aunty Andrea" }),
+    { ok: true, ui: { module: "edit_recipient", recipientId: "rec_1", recipientName: "Aunty Andrea", focus: "address" } },
+  );
+});
+
+Deno.test("resolvePresentUi rejects unknown modules and bogus focus values", () => {
+  assertEquals(resolvePresentUi({ module: "wallet" }, null).ok, false);
+  assertEquals(resolvePresentUi({ module: "add_recipient", focus: "ssn" }, null), { ok: true, ui: { module: "add_recipient" } });
 });
