@@ -68,6 +68,20 @@ const Dashboard = () => {
   // layout — that's when the software keyboard otherwise zooms/shifts the shell.
   const pinToKeyboard = compactChrome && activeTab === 'thea' && composerFocused;
   const viewport = useVisualViewport(pinToKeyboard);
+  // Only force the canvas to an explicit pixel height/offset when there's an
+  // actual mismatch left to correct for. On a browser where the keyboard
+  // already natively resizes the layout viewport (interactive-widget=
+  // resizes-content, which index.html sets - supported from iOS 17.4),
+  // `100dvh` already shrinks the canvas correctly on its own, and
+  // visualViewport.height/offsetTop should read back as (near) the same
+  // value with ~0 inset left over - forcing an explicit height anyway risks
+  // fighting that native resize instead of matching it, and was the likely
+  // cause of a reported live gap between the composer and the keyboard that
+  // a correctly-measured viewport height did not reproduce in testing.
+  // `keyboardInset > 0` is exactly the classic pre-resizes-content signal
+  // (layout viewport stayed full height while the visual viewport shrank),
+  // which is when this manual fix is actually needed.
+  const needsManualKeyboardFix = pinToKeyboard && (viewport.keyboardInset > 24 || viewport.offsetTop > 0);
 
   useEffect(() => {
     if (activeTab !== 'thea') setComposerFocused(false);
@@ -372,9 +386,9 @@ const Dashboard = () => {
           pinToKeyboard ? 'overflow-hidden pt-3' : 'pt-10'
         } ${activeTab === 'thea' ? 'overflow-hidden' : 'overflow-y-auto'}`}
         footerClassName="lg:hidden"
-        canvasClassName={pinToKeyboard ? '!min-h-0' : ''}
+        canvasClassName={needsManualKeyboardFix ? '!min-h-0' : ''}
         canvasStyle={
-          pinToKeyboard && viewport.height
+          needsManualKeyboardFix && viewport.height
             ? {
                 height: viewport.height,
                 maxHeight: viewport.height,
