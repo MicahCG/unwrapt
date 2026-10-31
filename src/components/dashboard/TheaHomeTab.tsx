@@ -87,6 +87,8 @@ interface TheaHomeTabProps {
   queuedMessage?: { id: number; text: string } | null;
   /** False until the recipients query has loaded, so the greeting isn't written for an empty list. */
   recipientsLoaded?: boolean;
+  /** Lets the dashboard hide the Thea/Manual tab bar and pin to the visual viewport while typing. */
+  onComposerFocusChange?: (focused: boolean) => void;
 }
 
 const STATUS_LINE: Partial<Record<TheaPose, string>> = {
@@ -104,6 +106,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   onSwitchToManual,
   queuedMessage,
   recipientsLoaded = true,
+  onComposerFocusChange,
 }) => {
   const queryClient = useQueryClient();
   const briefing = useMemo(() => buildDashboardBriefing(recipients, autopilotThreshold), [recipients, autopilotThreshold]);
@@ -115,6 +118,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   const [history, setHistory] = useState<HistoryState>('loading');
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [composerFocused, setComposerFocused] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [reviewStates, setReviewStates] = useState<Record<string, ReviewState>>({});
   const [celebrating, setCelebrating] = useState(false);
@@ -122,6 +126,17 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   const seeded = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const celebrateTimer = useRef<number>();
+  const blurTimer = useRef<number>();
+
+  const setFocused = useCallback((focused: boolean) => {
+    setComposerFocused(focused);
+    onComposerFocusChange?.(focused);
+  }, [onComposerFocusChange]);
+
+  useEffect(() => () => {
+    window.clearTimeout(blurTimer.current);
+    onComposerFocusChange?.(false);
+  }, [onComposerFocusChange]);
 
   // Resume the saved conversation for this account; a new one starts from the briefing.
   const loadHistory = useCallback(async () => {
@@ -279,23 +294,32 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   const latestReviewIndex = messages.reduce((latest, m, i) => (m.review ? i : latest), -1);
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 items-center gap-3 border-b px-1 pb-3" style={{ borderColor: 'rgba(42,37,32,0.08)' }}>
-        <TheaCharacter size="compact" pose={pose} reaction={reaction} speaking={false} className="u-thea-character--chat" />
-        <div className="min-w-0 text-left">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: U.accent }}>
-            Your gifting agent
-          </div>
-          <div className="font-display text-[22px] leading-tight" style={{ color: U.ink }}>
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
+      <div
+        className={`flex shrink-0 items-center border-b px-1 ${composerFocused ? 'gap-2.5 py-2' : 'gap-3 pb-3'}`}
+        style={{ borderColor: 'rgba(42,37,32,0.08)' }}
+      >
+        {composerFocused ? (
+          <TheaAvatar size={40} pose={pose} />
+        ) : (
+          <TheaCharacter size="compact" pose={pose} reaction={reaction} speaking={false} className="u-thea-character--chat" />
+        )}
+        <div className="min-w-0 flex-1 text-left">
+          {!composerFocused && (
+            <div className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: U.accent }}>
+              Your gifting agent
+            </div>
+          )}
+          <div className={`font-display leading-tight ${composerFocused ? 'text-[18px]' : 'text-[22px]'}`} style={{ color: U.ink }}>
             Thea
           </div>
-          <div className="text-[11.5px]" style={{ color: U.muted }} aria-live="polite">
+          <div className="truncate text-[11.5px]" style={{ color: U.muted }} aria-live="polite">
             {STATUS_LINE[pose] || 'Here when you need me'}
           </div>
         </div>
       </div>
 
-      <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto py-4 pr-1" aria-live="polite">
+      <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto py-4 pr-1" aria-live="polite">
         {history === 'loading' && (
           <p className="text-center text-[12.5px]" style={{ color: U.muted }}>Loading your conversation…</p>
         )}
@@ -373,7 +397,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
         )}
       </div>
 
-      {messages.length <= 2 && (chips.length > 0 || !calendarConnected) && (
+      {!composerFocused && messages.length <= 2 && (chips.length > 0 || !calendarConnected) && (
         <div className="mb-3 flex flex-wrap gap-2">
           {chips.map((chip) => (
             <button
@@ -412,22 +436,39 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
           event.preventDefault();
           void send(input);
         }}
-        className="shrink-0 rounded-[22px] border p-2"
-        style={{ background: U.surface, borderColor: U.border }}
+        className={`u-thea-composer shrink-0${composerFocused ? ' u-thea-composer--focused' : ''}`}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-end gap-2">
           <input
             value={input}
             onChange={(event) => setInput(event.target.value)}
+            onFocus={() => {
+              window.clearTimeout(blurTimer.current);
+              setFocused(true);
+            }}
+            onBlur={() => {
+              // Delay so tapping Send still counts as an in-composer interaction
+              // before we restore the tab bar.
+              window.clearTimeout(blurTimer.current);
+              blurTimer.current = window.setTimeout(() => setFocused(false), 120);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                void send(input);
+              }
+            }}
             placeholder="Ask Thea about gifts, people, or what's next…"
             aria-label="Message Thea"
-            className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-[14px] outline-none"
-            style={{ color: U.ink }}
+            enterKeyHint="send"
+            autoComplete="off"
+            autoCorrect="on"
+            className="u-thea-composer__input min-w-0 flex-1"
           />
           <button
             type="submit"
             disabled={!input.trim() || sending}
-            className="u-press flex h-11 w-11 items-center justify-center rounded-full disabled:opacity-35"
+            className="u-press flex h-11 w-11 shrink-0 items-center justify-center rounded-full disabled:opacity-35"
             style={{ background: U.accent, color: '#fff' }}
             aria-label="Send to Thea"
           >
