@@ -19,6 +19,8 @@ import {
   looksLikeCalendarConnectIntent,
   shouldForceCalendarConnectUi,
   buildCalendarConnectDirectiveMessage,
+  buildAccountRosterFromRows,
+  formatAccountRosterSection,
   scoreInterestText,
   shouldPersistReviewMarker,
   scrubFalseFriends,
@@ -305,7 +307,16 @@ Deno.test("looksLikeCalendarConnectIntent catches connect / import asks", () => 
   assert(looksLikeCalendarConnectIntent("can i connect my calendar and add more"));
   assert(looksLikeCalendarConnectIntent("sync Google Calendar"));
   assert(looksLikeCalendarConnectIntent("import birthdays from google"));
+  assert(looksLikeCalendarConnectIntent("reconnect my calendar"));
   assertEquals(looksLikeCalendarConnectIntent("what's a good gift for mom?"), false);
+});
+
+Deno.test("looksLikeCalendarConnectIntent ignores count/list questions about the calendar", () => {
+  assertEquals(looksLikeCalendarConnectIntent("how many ppl are in my calendar"), false);
+  assertEquals(looksLikeCalendarConnectIntent("how many people are in my calendar"), false);
+  assertEquals(looksLikeCalendarConnectIntent("who's on my calendar"), false);
+  assertEquals(looksLikeCalendarConnectIntent("who is in my calendar"), false);
+  assertEquals(looksLikeCalendarConnectIntent("what people are on my calendar"), false);
 });
 
 Deno.test("shouldForceCalendarConnectUi forces on intent, refusal, and short follow-ups", () => {
@@ -319,9 +330,32 @@ Deno.test("shouldForceCalendarConnectUi forces on intent, refusal, and short fol
     shouldForceCalendarConnectUi("connect calendar", [], "", [{ module: "calendar_connect" }]),
     false,
   );
+  assertEquals(shouldForceCalendarConnectUi("how many ppl are in my calendar", [], "", []), false);
 });
 
 Deno.test("buildCalendarConnectDirectiveMessage is present only when forced", () => {
   assertEquals(buildCalendarConnectDirectiveMessage(false), null);
   assert(buildCalendarConnectDirectiveMessage(true)?.includes('present_ui'));
+});
+
+Deno.test("formatAccountRosterSection lists saved people and connected calendar guidance", () => {
+  const roster = buildAccountRosterFromRows(
+    [
+      { name: "Aunty Andrea", birthday: "1960-05-01", notes: "Imported from Google Calendar" },
+      { name: "Jordan", anniversary: "2019-06-12", notes: null },
+    ],
+    true,
+  );
+  const section = formatAccountRosterSection(roster);
+  assert(section?.includes("Saved people (2)"));
+  assert(section?.includes("Aunty Andrea"));
+  assert(section?.includes("from calendar"));
+  assert(section?.includes("Google Calendar is connected"));
+  assert(section?.includes("do not open calendar_connect"));
+});
+
+Deno.test("formatAccountRosterSection notes when calendar is disconnected", () => {
+  const section = formatAccountRosterSection(buildAccountRosterFromRows([], false));
+  assert(section?.includes("Saved people: none yet"));
+  assert(section?.includes("not connected"));
 });

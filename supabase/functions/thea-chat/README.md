@@ -21,5 +21,6 @@ npx supabase functions deploy thea-chat
 
 Notes:
 - The onboarding chat (`mode: "onboarding"`) is open to any signed-in user; the main chat requires VIP.
+- Calendar: onboarding samples ~3 people for the picker; VIP / dashboard Thea imports the full set of birthdays/anniversaries the product supports. `looksLikeCalendarConnectIntent` must not match mere calendar mentions (counts/lists) — those answer from the live saved-people roster in account context.
 - Gift picks come from the `gift-catalog` function, which turns Thea's gift directions (e.g. "Funny gifts") into catalog searches.
 - Generated replies can't be fully covered by tests. Review her voice in real conversations after changing the guide.

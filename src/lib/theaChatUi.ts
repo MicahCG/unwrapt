@@ -1,12 +1,16 @@
 import type { ChatUiModule } from '@/components/dashboard/TheaChatCards';
 
-/** User is asking to connect/sync a calendar or import birthdays from one. */
+/**
+ * User is asking to connect/sync/import a calendar — not merely mentioning one.
+ * "How many people are in my calendar?" must NOT match; that is answered from
+ * saved recipients. Keep in sync with supabase/functions/thea-chat/index.ts.
+ */
 export const looksLikeCalendarConnectIntent = (message: string): boolean => {
   const t = message.trim().toLowerCase();
   if (!t) return false;
-  if (/\b(google\s*)?calendar\b/.test(t)) return true;
-  if (/\b(connect|sync|link|import).{0,48}\b(calendar|google|birthdays?|anniversar(?:y|ies))\b/.test(t)) return true;
+  if (/\b(connect|reconnect|sync|link|import).{0,48}\b(calendar|google|birthdays?|anniversar(?:y|ies))\b/.test(t)) return true;
   if (/\b(birthdays?|anniversar(?:y|ies)).{0,48}\b(import|sync|connect|from|google)\b/.test(t)) return true;
+  if (/\b(google\s+calendar)\b/.test(t) && /\b(connect|reconnect|sync|link|import|add)\b/.test(t)) return true;
   return false;
 };
 

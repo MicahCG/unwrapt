@@ -71,7 +71,11 @@ interface Person {
 
 type Screen = 'import' | 'found' | 'addperson' | 'intel' | 'reveal' | 'subscription';
 
-/** Max people on the found-people picker so Continue stays on-screen on typical phones. */
+/**
+ * Onboarding-only sample size so Continue stays on-screen on typical phones.
+ * VIP / dashboard calendar import (CalendarSyncButton / useCalendarConnection)
+ * is intentionally uncapped — do not reuse this limit there.
+ */
 const ONBOARDING_PEOPLE_PICKER_LIMIT = 3;
 
 const REL_OPTIONS = ['Friend', 'Family', 'Partner', 'Colleague', 'Mentor'];

@@ -30,6 +30,7 @@ const statusCopy = (status: CalendarStatus, source: string): { tone: 'info' | 'w
   }
 };
 
+/** VIP / dashboard review: every candidate, no onboarding 3-person sample. */
 const CalendarImportReview: React.FC<{
   sourceLabel: string;
   candidates: CalendarCandidate[];
@@ -37,6 +38,7 @@ const CalendarImportReview: React.FC<{
   onImport: (selected: CalendarCandidate[]) => void;
   onCancel: () => void;
 }> = ({ sourceLabel, candidates, importing, onImport, onCancel }) => {
+  // Pre-select everyone found — full calendar sync, not the onboarding sample.
   const [chosen, setChosen] = useState(() => new Set(candidates.map((c) => c.key)));
   useEffect(() => setChosen(new Set(candidates.map((c) => c.key))), [candidates]);
   const selected = candidates.filter((c) => chosen.has(c.key));
@@ -52,7 +54,9 @@ const CalendarImportReview: React.FC<{
       <DialogContent className="max-h-[88dvh] w-[calc(100%-1.5rem)] max-w-md overflow-y-auto rounded-[24px] p-5">
         <DialogHeader className="text-left">
           <DialogTitle>Found in {sourceLabel}</DialogTitle>
-          <DialogDescription>Choose who Thea should look after. You can add details later.</DialogDescription>
+          <DialogDescription>
+            {candidates.length} {candidates.length === 1 ? 'person' : 'people'} with birthdays or anniversaries. Choose who Thea should look after — you can add details later.
+          </DialogDescription>
         </DialogHeader>
         <ul className="mt-1 flex flex-col gap-2">
           {candidates.map((person) => (

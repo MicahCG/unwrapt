@@ -195,7 +195,7 @@ export const CalendarConnectCard: React.FC<{ onAddManually: () => void }> = ({ o
       <Calendar className="h-3.5 w-3.5" aria-hidden="true" /> Calendar
     </p>
     <p className="mt-1.5 text-[14px] font-semibold leading-5 text-[#2A2520]">Import birthdays &amp; anniversaries</p>
-    <p className="mt-1 text-[12.5px] leading-5 text-[#5A5147]">Connect Google Calendar or another source. You choose who to add before anything is saved.</p>
+    <p className="mt-1 text-[12.5px] leading-5 text-[#5A5147]">Connect Google Calendar or another source. We pull every birthday and anniversary we find — you choose who to add before anything is saved.</p>
     <div className="mt-3">
       <CalendarSyncButton appearance="pill" returnTo="/?tab=thea" onAddManually={onAddManually} />
     </div>

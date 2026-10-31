@@ -49,9 +49,11 @@ export function useCalendarConnected() {
 let oauthReturnHandled = false;
 
 /**
- * Google Calendar connection for the dashboard: connect, read the OAuth result the callback
- * sends back (`?calendar=`), find birthday/anniversary candidates, and import only the ones
- * the user approves. Every state is explicit so the UI never has to guess.
+ * Google Calendar connection for the VIP / dashboard: connect, read the OAuth result the
+ * callback sends back (`?calendar=`), find ALL birthday/anniversary candidates the product
+ * supports (no onboarding 3-person cap), and import only the ones the user approves.
+ * Every state is explicit so the UI never has to guess. Approved people are inserted into
+ * `recipients` and the recipients query is invalidated so Thea sees them on the next turn.
  */
 export function useCalendarConnection(returnTo = '/?tab=manual') {
   const { user } = useAuth();
@@ -153,7 +155,9 @@ export function useCalendarConnection(returnTo = '/?tab=manual') {
       setStatus({ kind: 'review', candidates: selected });
       throw error;
     }
+    // Prefix-match so both ['recipients'] and ['recipients', userId] refetch.
     await queryClient.invalidateQueries({ queryKey: ['recipients'] });
+    await queryClient.invalidateQueries({ queryKey: ['calendar-connection', user.id] });
     setStatus({ kind: 'imported', count: data?.length ?? selected.length });
   }, [user, queryClient, sourceLabel]);
 
