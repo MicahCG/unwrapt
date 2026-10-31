@@ -341,6 +341,50 @@ export const resolvePresentUi = (
   return { ok: false, error: "module must be calendar_connect, add_recipient, or edit_recipient." };
 };
 
+/** Explicit calendar-connect / import-birthday asks. Exported for unit tests. */
+export const looksLikeCalendarConnectIntent = (message: string): boolean => {
+  const t = message.trim().toLowerCase();
+  if (!t) return false;
+  if (/\b(google\s*)?calendar\b/.test(t)) return true;
+  if (/\b(connect|sync|link|import).{0,48}\b(calendar|google|birthdays?|anniversar(?:y|ies))\b/.test(t)) return true;
+  if (/\b(birthdays?|anniversar(?:y|ies)).{0,48}\b(import|sync|connect|from|google)\b/.test(t)) return true;
+  return false;
+};
+
+const looksLikeCalendarConnectFollowUp = (message: string): boolean => {
+  const t = message.trim().toLowerCase();
+  if (!t || t.length > 80) return false;
+  return /^(try again|again|please|come on|really\??|h+m+|are you sure\??|no way\??|still\??|yes|yeah|yep)$/i.test(t)
+    || /\b(are you sure|no way|try again|still can'?t|please (try|do|connect))\b/i.test(t);
+};
+
+const replyRefusesCalendar = (text: string): boolean =>
+  /can'?t (connect( to)?|access|link|sync).{0,24}calendars?/i.test(text)
+  || /i('m| am) sure!?\s*i can'?t.{0,40}calendars?/i.test(text);
+
+/** True when this turn should force calendar_connect into `ui`, even if the model forgot present_ui. */
+export const shouldForceCalendarConnectUi = (
+  latestUserMessage: string,
+  recentMessages: Array<{ role?: string; content?: string }>,
+  modelReply: string,
+  alreadyPresented: ChatUiModule[],
+): boolean => {
+  if (alreadyPresented.some((m) => m.module === "calendar_connect")) return false;
+  if (looksLikeCalendarConnectIntent(latestUserMessage)) return true;
+  if (replyRefusesCalendar(modelReply)) return true;
+  const threadMentionsCalendar = recentMessages.slice(-10).some((m) =>
+    typeof m.content === "string" && (looksLikeCalendarConnectIntent(m.content) || replyRefusesCalendar(m.content)));
+  return looksLikeCalendarConnectFollowUp(latestUserMessage) && threadMentionsCalendar;
+};
+
+export const buildCalendarConnectDirectiveMessage = (force: boolean): string | null => {
+  if (!force) return null;
+  return 'The user wants to connect a calendar or import birthdays. Call present_ui with module "calendar_connect" right now. Never say you cannot connect calendars. Reply with one short helpful line about the connect module you are opening.';
+};
+
+const CALENDAR_CONNECT_FALLBACK_REPLY =
+  "Here's the calendar connect module. Tap connect to link Google Calendar (or another birthday source), and you choose who to add.";
+
 /** Mirrors src/lib/stripe.ts isPaidVip - keep both in sync. */
 const isPaidVip = (profile: { subscription_tier?: string | null; subscription_status?: string | null } | null) => {
   if (!profile || profile.subscription_tier !== "vip") return false;
@@ -1546,6 +1590,18 @@ Use the whole conversation, not just the last message. Return JSON only:
     // falsely-worded "I've scheduled..." reply along with it) - force it
     // deterministically rather than relying on the model's own judgment.
     const confirmDirectiveMessage = buildConfirmDirectiveMessage(turnContext?.pendingReview, looksLikeConfirmation(latestUserMessageContent));
+    // Calendar connect must not depend on the model alone: poisoned history
+    // from pre-present_ui refusals still produces "I can't connect calendars"
+    // even with the updated system prompt. Detect intent (and short follow-ups
+    // after a calendar refusal) and force present_ui both as a directive and
+    // as a post-turn ui[] inject below.
+    const forceCalendarConnect = shouldForceCalendarConnectUi(
+      latestUserMessageContent,
+      messages as Array<{ role?: string; content?: string }>,
+      "",
+      [],
+    );
+    const calendarConnectDirectiveMessage = buildCalendarConnectDirectiveMessage(forceCalendarConnect);
 
     const seenProducts = new Map<string, Product>();
     // Seed from the prior turn's carried-over recommendations (CC-02) so
@@ -1603,6 +1659,7 @@ Use the whole conversation, not just the last message. Return JSON only:
       ...(directSelectionMessage ? [{ role: "system", content: directSelectionMessage }] : []),
       ...(tappedSelectionMessage ? [{ role: "system", content: tappedSelectionMessage }] : []),
       ...(confirmDirectiveMessage ? [{ role: "system", content: confirmDirectiveMessage }] : []),
+      ...(calendarConnectDirectiveMessage ? [{ role: "system", content: calendarConnectDirectiveMessage }] : []),
     ];
 
     // Surfaced to the frontend as top-level `writes` so it can invalidate
@@ -1784,10 +1841,22 @@ Use the whole conversation, not just the last message. Return JSON only:
 
     // The prompt already says never use an em dash, but that rule isn't
     // always followed, so enforce it here rather than relying on the model.
-    const reply = (markerMatch ? finalContent.slice(0, markerMatch.index) : finalContent)
+    let reply = (markerMatch ? finalContent.slice(0, markerMatch.index) : finalContent)
       .replace(/GIFT_REVIEW:\s*\S+/gi, "")
       .replace(/\s*[\u2014\u2013]\s*/g, ", ")
       .trim();
+
+    // Deterministic calendar module: if intent/follow-up/refusal says connect,
+    // always return calendar_connect even when the model skipped present_ui.
+    if (shouldForceCalendarConnectUi(
+      latestUserMessageContent,
+      messages as Array<{ role?: string; content?: string }>,
+      reply,
+      presentedUi,
+    )) {
+      presentedUi.push({ module: "calendar_connect" });
+      if (replyRefusesCalendar(reply) || !reply) reply = CALENDAR_CONNECT_FALLBACK_REPLY;
+    }
 
     const products = recommendedIds.length > 0
       ? recommendedIds.map((id) => seenProducts.get(id)).filter((p): p is Product => Boolean(p))

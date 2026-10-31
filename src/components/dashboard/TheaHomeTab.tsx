@@ -28,6 +28,7 @@ import { useCalendarConnected } from '@/hooks/useCalendarConnection';
 import { startCalendarConnect } from '@/lib/calendarConnection';
 import { cleanTheaText, renderTheaText } from '@/lib/theaText';
 import { theaChatPose } from '@/lib/theaState';
+import { ensureCalendarConnectUi } from '@/lib/theaChatUi';
 import type { TheaPose } from '@/components/unwrapt2/TheaFigure';
 import {
   buildGiftResumeMessage,
@@ -291,12 +292,20 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
         await queryClient.invalidateQueries({ queryKey: ['recipients'] });
       }
       if (writes.some((w) => w.ok && w.tool === 'confirm_scheduled_gift')) celebrate();
-      const ui = (Array.isArray(data.ui) ? data.ui : []) as ChatUiModule[];
+      // Client safety net: if the edge function is stale or the model refuses
+      // calendar connect after a poisoned history, still surface the module.
+      const ensured = ensureCalendarConnectUi(
+        trimmed,
+        nextMessages,
+        cleanTheaText(data.reply),
+        (Array.isArray(data.ui) ? data.ui : []) as ChatUiModule[],
+      );
+      const ui = ensured.ui;
       setMessages([
         ...nextMessages,
         {
           role: 'assistant',
-          content: cleanTheaText(data.reply),
+          content: ensured.reply,
           products: (data.products || []) as ChatProduct[],
           review: (data.review || null) as GiftReview | null,
           ui: ui.length ? ui : undefined,
