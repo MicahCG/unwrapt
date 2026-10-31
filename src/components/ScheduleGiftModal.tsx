@@ -490,11 +490,14 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
                 </div>
                 {(editingAddress || !hasFullAddress(address)) && (
                   <div className="mt-2 space-y-2">
-                    <Input placeholder="Street address" autoComplete="street-address" value={address.street} onChange={(e) => setAddress((a) => ({ ...a, street: e.target.value }))} className="h-11 bg-white text-[14px]" />
+                    {/* No text-[14px] override here: iOS Safari zooms the whole page in when
+                        focusing a text input under 16px, then leaves the user to zoom back
+                        out manually - the shared Input's default text-base (16px) is safe. */}
+                    <Input placeholder="Street address" autoComplete="street-address" value={address.street} onChange={(e) => setAddress((a) => ({ ...a, street: e.target.value }))} className="h-11 bg-white" />
                     <div className="grid grid-cols-2 gap-2">
-                      <Input placeholder="City" value={address.city} onChange={(e) => setAddress((a) => ({ ...a, city: e.target.value }))} className="h-11 bg-white text-[14px]" />
-                      <Input placeholder="State" value={address.state} onChange={(e) => setAddress((a) => ({ ...a, state: e.target.value }))} className="h-11 bg-white text-[14px]" />
-                      <Input placeholder="ZIP" inputMode="numeric" value={address.zip_code} onChange={(e) => setAddress((a) => ({ ...a, zip_code: e.target.value }))} className="h-11 bg-white text-[14px]" />
+                      <Input placeholder="City" value={address.city} onChange={(e) => setAddress((a) => ({ ...a, city: e.target.value }))} className="h-11 bg-white" />
+                      <Input placeholder="State" value={address.state} onChange={(e) => setAddress((a) => ({ ...a, state: e.target.value }))} className="h-11 bg-white" />
+                      <Input placeholder="ZIP" inputMode="numeric" value={address.zip_code} onChange={(e) => setAddress((a) => ({ ...a, zip_code: e.target.value }))} className="h-11 bg-white" />
                       <Select value={address.country} onValueChange={(country) => setAddress((a) => ({ ...a, country }))}>
                         <SelectTrigger className="h-11 bg-white text-[14px]"><SelectValue placeholder="Country" /></SelectTrigger>
                         <SelectContent>

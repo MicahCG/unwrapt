@@ -507,7 +507,11 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     : 'Tell Thea what you need…'
                 }
                 disabled={sending}
-                className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-[14px] text-[#2A2520] outline-none placeholder:text-[#9A8E7C] disabled:opacity-60"
+                // iOS Safari zooms the whole page in on focus for any text
+                // input under 16px, then leaves the user to zoom back out
+                // manually - keep this at 16px (same fix already applied to
+                // TheaHomeTab's composer via .u-thea-composer__input).
+                className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-[16px] text-[#2A2520] outline-none placeholder:text-[#9A8E7C] disabled:opacity-60"
               />
               <button
                 type="submit"
