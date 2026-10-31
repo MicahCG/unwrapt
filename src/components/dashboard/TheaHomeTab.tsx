@@ -147,18 +147,98 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   const seeded = useRef(false);
   const giftResumeApplied = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const chatContentRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLFormElement>(null);
+  /** Stay glued to the newest message unless the user scrolls up to read history. */
+  const stickToBottomRef = useRef(true);
   const celebrateTimer = useRef<number>();
   const blurTimer = useRef<number>();
+  const [listPadBottom, setListPadBottom] = useState(20);
 
   const setFocused = useCallback((focused: boolean) => {
     setComposerFocused(focused);
     onComposerFocusChange?.(focused);
   }, [onComposerFocusChange]);
 
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior });
+  }, []);
+
   useEffect(() => () => {
     window.clearTimeout(blurTimer.current);
     onComposerFocusChange?.(false);
   }, [onComposerFocusChange]);
+
+  // Track near-bottom; re-pin when content grows (typewriter) or the list shrinks (keyboard).
+  useEffect(() => {
+    const scrollEl = scrollRef.current;
+    const contentEl = chatContentRef.current;
+    if (!scrollEl || !contentEl) return;
+
+    const NEAR_BOTTOM_PX = 80;
+    const handleScroll = () => {
+      stickToBottomRef.current =
+        scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < NEAR_BOTTOM_PX;
+    };
+    scrollEl.addEventListener('scroll', handleScroll, { passive: true });
+
+    const pinIfSticky = () => {
+      if (stickToBottomRef.current) scrollEl.scrollTop = scrollEl.scrollHeight;
+    };
+    const observer = new ResizeObserver(pinIfSticky);
+    observer.observe(contentEl);
+    observer.observe(scrollEl);
+
+    return () => {
+      scrollEl.removeEventListener('scroll', handleScroll);
+      observer.disconnect();
+    };
+  }, []);
+
+  // Clearance under the last bubble so it doesn't sit flush against the composer rim.
+  // Composer is a flex sibling (not an overlay); pad is breathing room, not a keyboard spacer —
+  // visualViewport pinning in Dashboard already shrinks the shell above the keyboard.
+  useEffect(() => {
+    const composer = composerRef.current;
+    if (!composer) return;
+    const syncPad = () => {
+      const next = Math.max(28, Math.round(composer.getBoundingClientRect().height * 0.45));
+      setListPadBottom(next);
+    };
+    syncPad();
+    const ro = new ResizeObserver(syncPad);
+    ro.observe(composer);
+    return () => ro.disconnect();
+  }, []);
+
+  // Composer focus / keyboard open: always jump to the latest message.
+  useEffect(() => {
+    if (!composerFocused) return;
+    stickToBottomRef.current = true;
+    const pin = () => {
+      if (stickToBottomRef.current) scrollToBottom('auto');
+    };
+    pin();
+    const raf = requestAnimationFrame(pin);
+    // iOS keyboard + chrome collapse settle over a couple frames.
+    const t1 = window.setTimeout(pin, 50);
+    const t2 = window.setTimeout(pin, 280);
+
+    const vv = window.visualViewport;
+    const onViewport = () => pin();
+    vv?.addEventListener('resize', onViewport);
+    vv?.addEventListener('scroll', onViewport);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      vv?.removeEventListener('resize', onViewport);
+      vv?.removeEventListener('scroll', onViewport);
+    };
+  }, [composerFocused, scrollToBottom]);
 
   const giftResumeMessage = (resume: PendingGiftResume): ChatMessage => ({
     role: 'assistant',
@@ -245,9 +325,11 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     });
   }, [history, recipientsLoaded, seed, briefing, messages.length]);
 
+  // New turns / typing indicator: stay pinned only when already near the bottom (or forced by send/focus).
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages, sending]);
+    if (!stickToBottomRef.current) return;
+    scrollToBottom('smooth');
+  }, [messages, sending, scrollToBottom]);
 
   useEffect(() => () => window.clearTimeout(celebrateTimer.current), []);
 
@@ -261,6 +343,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   const send = async (text: string, base: ChatMessage[] = messages): Promise<WriteResult[] | null> => {
     const trimmed = text.trim();
     if (!trimmed || sending) return null;
+    stickToBottomRef.current = true;
     const nextMessages: ChatMessage[] = [...base, { role: 'user', content: trimmed }];
     setMessages(nextMessages);
     setInput('');
@@ -405,89 +488,100 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
         </div>
       </div>
 
-      <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto py-4 pr-1" aria-live="polite">
-        {history === 'loading' && (
-          <p className="text-center text-[12.5px]" style={{ color: U.muted }}>Loading your conversation…</p>
-        )}
-        {history === 'error' && (
-          <div className="rounded-[14px] px-3.5 py-2.5 text-[12.5px]" style={{ background: U.accentSoft, color: U.inkSoft }}>
-            Couldn’t load your earlier conversation.{' '}
-            <button type="button" onClick={() => void loadHistory()} className="min-h-8 font-semibold" style={{ color: U.accent }}>
-              Try again
-            </button>
-          </div>
-        )}
-        {messages.map((message, index) =>
-          message.role === 'user' ? (
-            <div key={index} className="flex flex-col items-end">
-              <div
-                className="max-w-[85%] rounded-[18px] rounded-tr-[6px] px-3.5 py-2.5 text-[14px] leading-5"
-                style={{ background: U.ink, color: U.buttonText, opacity: message.failed ? 0.6 : 1 }}
-              >
-                {message.content}
-              </div>
-              {message.failed && (
-                <p className="mt-1 text-[12px]" style={{ color: U.accent }}>
-                  Didn’t send.{' '}
-                  <button type="button" onClick={() => retry(index)} disabled={sending} className="min-h-8 font-semibold underline-offset-2 hover:underline">
-                    Retry
-                  </button>
-                </p>
-              )}
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto pt-4 pr-1"
+        style={{ scrollPaddingBottom: listPadBottom }}
+        aria-live="polite"
+      >
+        <div
+          ref={chatContentRef}
+          className="space-y-3"
+          style={{ paddingBottom: listPadBottom }}
+        >
+          {history === 'loading' && (
+            <p className="text-center text-[12.5px]" style={{ color: U.muted }}>Loading your conversation…</p>
+          )}
+          {history === 'error' && (
+            <div className="rounded-[14px] px-3.5 py-2.5 text-[12.5px]" style={{ background: U.accentSoft, color: U.inkSoft }}>
+              Couldn’t load your earlier conversation.{' '}
+              <button type="button" onClick={() => void loadHistory()} className="min-h-8 font-semibold" style={{ color: U.accent }}>
+                Try again
+              </button>
             </div>
-          ) : (
-            <div key={index} className="flex items-start gap-2">
-              <TheaAvatar size={26} />
-              <div className="min-w-0 max-w-[88%] flex-1">
+          )}
+          {messages.map((message, index) =>
+            message.role === 'user' ? (
+              <div key={index} className="flex flex-col items-end">
                 <div
-                  className="inline-block rounded-[18px] rounded-tl-[6px] border px-3.5 py-2.5 text-[14px] leading-5"
-                  style={{ background: U.surface, borderColor: U.border, color: U.ink }}
+                  className="max-w-[85%] rounded-[18px] rounded-tr-[6px] px-3.5 py-2.5 text-[14px] leading-5"
+                  style={{ background: U.ink, color: U.buttonText, opacity: message.failed ? 0.6 : 1 }}
                 >
-                  {index === messages.length - 1 && !sending ? (
-                    <TypewriterText text={message.content} />
-                  ) : (
-                    <span>{renderTheaText(message.content)}</span>
+                  {message.content}
+                </div>
+                {message.failed && (
+                  <p className="mt-1 text-[12px]" style={{ color: U.accent }}>
+                    Didn’t send.{' '}
+                    <button type="button" onClick={() => retry(index)} disabled={sending} className="min-h-8 font-semibold underline-offset-2 hover:underline">
+                      Retry
+                    </button>
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div key={index} className="flex items-start gap-2">
+                <TheaAvatar size={26} />
+                <div className="min-w-0 max-w-[88%] flex-1">
+                  <div
+                    className="inline-block rounded-[18px] rounded-tl-[6px] border px-3.5 py-2.5 text-[14px] leading-5"
+                    style={{ background: U.surface, borderColor: U.border, color: U.ink }}
+                  >
+                    {index === messages.length - 1 && !sending ? (
+                      <TypewriterText text={message.content} />
+                    ) : (
+                      <span>{renderTheaText(message.content)}</span>
+                    )}
+                  </div>
+                  {message.unsaved && (
+                    <p className="mt-1 text-[12px]" style={{ color: U.accent }}>Something here didn’t save, so nothing changed.</p>
+                  )}
+                  {message.products && message.products.length > 0 && (
+                    <ProductCards products={message.products} selectedId={selectedProductId} disabled={sending} onSelect={selectProduct} />
+                  )}
+                  {message.review && (
+                    <ReviewCard
+                      review={message.review}
+                      state={reviewStates[reviewKey(message.review)] || 'pending'}
+                      disabled={sending || index !== latestReviewIndex}
+                      onConfirm={() => void confirmReview(message.review!)}
+                      onChange={() => void send('Let’s look at other options.')}
+                      onAddAddress={() => onOpenRecipient(message.review!.recipientId, 'address')}
+                      onViewPlan={() => onOpenRecipient(message.review!.recipientId, 'open')}
+                    />
+                  )}
+                  {message.ui && message.ui.length > 0 && (
+                    <ChatUiModules
+                      modules={message.ui}
+                      onAddRecipient={onAddRecipient}
+                      onEditRecipient={onEditRecipient}
+                    />
                   )}
                 </div>
-                {message.unsaved && (
-                  <p className="mt-1 text-[12px]" style={{ color: U.accent }}>Something here didn’t save, so nothing changed.</p>
-                )}
-                {message.products && message.products.length > 0 && (
-                  <ProductCards products={message.products} selectedId={selectedProductId} disabled={sending} onSelect={selectProduct} />
-                )}
-                {message.review && (
-                  <ReviewCard
-                    review={message.review}
-                    state={reviewStates[reviewKey(message.review)] || 'pending'}
-                    disabled={sending || index !== latestReviewIndex}
-                    onConfirm={() => void confirmReview(message.review!)}
-                    onChange={() => void send('Let’s look at other options.')}
-                    onAddAddress={() => onOpenRecipient(message.review!.recipientId, 'address')}
-                    onViewPlan={() => onOpenRecipient(message.review!.recipientId, 'open')}
-                  />
-                )}
-                {message.ui && message.ui.length > 0 && (
-                  <ChatUiModules
-                    modules={message.ui}
-                    onAddRecipient={onAddRecipient}
-                    onEditRecipient={onEditRecipient}
-                  />
-                )}
+              </div>
+            ),
+          )}
+          {sending && (
+            <div className="flex items-start gap-2">
+              <TheaAvatar size={26} pose="thinking" />
+              <div
+                className="rounded-[18px] rounded-tl-[6px] border px-3.5 py-2.5 text-[13.5px]"
+                style={{ background: U.surface, borderColor: U.border, color: U.subtle }}
+              >
+                Thinking…
               </div>
             </div>
-          ),
-        )}
-        {sending && (
-          <div className="flex items-start gap-2">
-            <TheaAvatar size={26} pose="thinking" />
-            <div
-              className="rounded-[18px] rounded-tl-[6px] border px-3.5 py-2.5 text-[13.5px]"
-              style={{ background: U.surface, borderColor: U.border, color: U.subtle }}
-            >
-              Thinking…
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {!composerFocused && messages.length <= 2 && (chips.length > 0 || !calendarConnected) && (
@@ -525,6 +619,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
       )}
 
       <form
+        ref={composerRef}
         onSubmit={(event) => {
           event.preventDefault();
           void send(input);
