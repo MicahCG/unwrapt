@@ -9,6 +9,9 @@ import { U } from '@/components/unwrapt2/theme';
 import { purchaseVipSubscription } from '@/lib/iap';
 import SubscriptionTerms, { useVipPrice } from '@/components/subscription/SubscriptionTerms';
 import { isNativeApp } from '@/lib/native';
+import { getGiftRecommendations } from '@/lib/giftCatalog';
+import { peekPendingGiftResume, savePendingGiftResume } from '@/lib/postSubscribeResume';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 /**
  * Hard paywall for users who finished onboarding but have not subscribed.
@@ -16,13 +19,43 @@ import { isNativeApp } from '@/lib/native';
  */
 const SubscribeGate: React.FC = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const native = isNativeApp();
   const price = useVipPrice();
 
+  /** Ensure gift cards from the pre-pay reveal survive checkout even if localStorage was cleared. */
+  const ensureGiftResumeCached = async () => {
+    if (peekPendingGiftResume() || !user?.id) return;
+    try {
+      const { data: recipients } = await supabase
+        .from('recipients')
+        .select('id, name, birthday, anniversary, interests')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(1);
+      const focus = recipients?.[0];
+      if (!focus?.interests?.length) return;
+      const result = await getGiftRecommendations(focus.interests, 4);
+      if (!result.products.length) return;
+      const occasionLabel = focus.birthday ? 'birthday' : focus.anniversary ? 'anniversary' : null;
+      savePendingGiftResume({
+        recipientName: focus.name,
+        recipientId: focus.id,
+        occasionLabel,
+        interests: focus.interests,
+        products: result.products,
+      });
+    } catch (error) {
+      console.error('SubscribeGate: could not cache gift resume', error);
+    }
+  };
+
   const startCheckout = async () => {
     setLoading(true);
     try {
+      await ensureGiftResumeCached();
+      localStorage.setItem('onboardingPaymentFlow', 'true');
       void trackProductEvent('subscribe_gate_checkout_started', { platform: native ? 'ios' : 'web' });
       const result = await purchaseVipSubscription();
       if (result.cancelled) {
@@ -34,8 +67,8 @@ const SubscribeGate: React.FC = () => {
         window.location.href = result.checkoutUrl;
         return;
       }
-      // Native IAP succeeded — reload so RequirePaid sees VIP
-      window.location.href = '/';
+      // Native IAP succeeded — show VIP success handoff, then resume Thea with gifts.
+      window.location.href = '/payment/success?type=subscription';
     } catch (error) {
       console.error('SubscribeGate checkout failed:', error);
       toast({
@@ -60,7 +93,7 @@ const SubscribeGate: React.FC = () => {
                 : 'Opening checkout…'
               : `Start automating · ${price}/month`}
           </PrimaryButton>
-          <SubscriptionTerms price={price} onRestored={() => { window.location.href = '/'; }} />
+          <SubscriptionTerms price={price} onRestored={() => { window.location.href = '/payment/success?type=subscription'; }} />
           <button
             type="button"
             className="mt-3 min-h-11 w-full text-[13px] font-semibold"

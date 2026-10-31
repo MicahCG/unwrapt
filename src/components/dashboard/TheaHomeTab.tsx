@@ -29,6 +29,11 @@ import { startCalendarConnect } from '@/lib/calendarConnection';
 import { cleanTheaText, renderTheaText } from '@/lib/theaText';
 import { theaChatPose } from '@/lib/theaState';
 import type { TheaPose } from '@/components/unwrapt2/TheaFigure';
+import {
+  buildGiftResumeMessage,
+  consumePendingGiftResume,
+  type PendingGiftResume,
+} from '@/lib/postSubscribeResume';
 
 type WriteResult = { tool: string; ok: boolean; recordId?: string; error?: string };
 
@@ -139,6 +144,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   const [celebrating, setCelebrating] = useState(false);
   const { reaction, reactTo } = useTheaReaction();
   const seeded = useRef(false);
+  const giftResumeApplied = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const celebrateTimer = useRef<number>();
   const blurTimer = useRef<number>();
@@ -152,6 +158,12 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     window.clearTimeout(blurTimer.current);
     onComposerFocusChange?.(false);
   }, [onComposerFocusChange]);
+
+  const giftResumeMessage = (resume: PendingGiftResume): ChatMessage => ({
+    role: 'assistant',
+    content: buildGiftResumeMessage(resume),
+    products: resume.products,
+  });
 
   // Resume the saved conversation for this account; a new one starts from the briefing.
   const loadHistory = useCallback(async () => {
@@ -174,8 +186,51 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     void loadHistory();
   }, [loadHistory]);
 
-  // With no saved conversation, open with the briefing once. Adding or editing a person later
-  // must not replay the greeting; the quick chips below already reflect the latest list.
+  // Prefer pre-subscribe gift options over the generic status briefing after VIP checkout.
+  useEffect(() => {
+    if (history === 'loading' || !recipientsLoaded || giftResumeApplied.current) return;
+
+    const wantsResume =
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('resume') === 'gifts';
+
+    const pending = consumePendingGiftResume();
+    if (!pending?.products?.length) {
+      // Still clear the resume query so a later briefing seed can run normally.
+      if (wantsResume) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('resume');
+        window.history.replaceState({}, '', url.pathname + url.search);
+      }
+      return;
+    }
+
+    giftResumeApplied.current = true;
+    seeded.current = true;
+    setMessages((current) => {
+      const alreadyHasProducts = current.some((m) => (m.products?.length || 0) > 0);
+      if (alreadyHasProducts) return current;
+      // Drop a lone status briefing so the gift reveal is the first thing they see.
+      const withoutBriefing =
+        current.length === 1 && current[0].role === 'assistant' && !current[0].products
+          ? []
+          : current;
+      return [...withoutBriefing, giftResumeMessage(pending)];
+    });
+    void trackProductEvent('dashboard_thea_gift_resume_shown', {
+      recipient: pending.recipientName,
+      product_count: pending.products.length,
+      from_query: wantsResume,
+    });
+    if (wantsResume) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('resume');
+      window.history.replaceState({}, '', url.pathname + url.search);
+    }
+  }, [history, recipientsLoaded, messages.length]);
+
+  // With no saved conversation (and no gift resume), open with the briefing once.
+  // Adding or editing a person later must not replay the greeting.
   useEffect(() => {
     if (history === 'loading' || !recipientsLoaded || seeded.current) return;
     seeded.current = true;

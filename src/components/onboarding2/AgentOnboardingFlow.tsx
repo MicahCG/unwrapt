@@ -41,6 +41,7 @@ import {
   upsertDraftRecipient,
   type OnboardingStep,
 } from '@/lib/onboardingProgress';
+import { savePendingGiftResume } from '@/lib/postSubscribeResume';
 
 interface AgentOnboardingFlowProps {
   /** Called once recipients are created so the parent can show the dashboard. */
@@ -1071,6 +1072,13 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     void persistDraftProgress(withInterests, 'reveal');
   };
 
+  const occasionPhrase = (person: Person | null) => {
+    if (!person?.primaryType) return null;
+    if (person.primaryType === 'birthday') return 'birthday';
+    if (person.primaryType === 'anniversary') return 'anniversary';
+    return null;
+  };
+
   const finishReveal = useCallback((
     picks: GiftCatalogItem[],
     unmatched: string[] = [],
@@ -1080,18 +1088,25 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     setUnmatchedRevealInterests(unmatched);
     setRevealAskUser(askUser);
     setScreen('subscription');
+    if (activePerson) {
+      // Survive Stripe redirect so VIP success can restore these gift cards in Thea.
+      const durableId =
+        activePerson.id?.startsWith('cal-') || activePerson.id?.startsWith('manual-')
+          ? null
+          : activePerson.id;
+      savePendingGiftResume({
+        recipientName: activePerson.name,
+        recipientId: durableId,
+        occasionLabel: occasionPhrase(activePerson),
+        interests: activePerson.interests.length ? activePerson.interests : intelFacts,
+        products: picks,
+      });
+    }
     if (user?.id) {
       // Gift proof complete → next launch lands on SubscribeGate (paywall home).
       void setOnboardingStep(user.id, 'subscription');
     }
-  }, [user?.id]);
-
-  const occasionPhrase = (person: Person | null) => {
-    if (!person?.primaryType) return null;
-    if (person.primaryType === 'birthday') return 'birthday';
-    if (person.primaryType === 'anniversary') return 'anniversary';
-    return null;
-  };
+  }, [user?.id, activePerson, intelFacts]);
 
   // ── Completion: save people, then Stripe checkout only (no free dashboard bypass) ─
   const completeOnboarding = async () => {
@@ -1159,6 +1174,25 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       clearSkipAgentWelcome();
       markTheaValueSeen();
 
+      // Refresh durable recipient id + gift cards right before Stripe leaves this origin.
+      if (activePerson && revealPicks.length > 0) {
+        const { data: savedRecipients } = await supabase
+          .from('recipients')
+          .select('id, name')
+          .eq('user_id', user.id);
+        const match = (savedRecipients || []).find(
+          (row) => normalizeRecipientName(row.name) === normalizeRecipientName(activePerson.name),
+        );
+        savePendingGiftResume({
+          recipientName: activePerson.name,
+          recipientId: match?.id || null,
+          occasionLabel: occasionPhrase(activePerson),
+          interests: activePerson.interests.length ? activePerson.interests : intelFacts,
+          products: revealPicks,
+        });
+      }
+      localStorage.setItem('onboardingPaymentFlow', 'true');
+
       await queryClient.invalidateQueries({ queryKey: ['app-access', user.id] });
       await queryClient.invalidateQueries({ queryKey: ['recipients', user.id] });
       await queryClient.invalidateQueries({ queryKey: ['user-metrics', user.id] });
@@ -1185,8 +1219,8 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
         window.location.href = result.checkoutUrl;
         return;
       }
-      // Native IAP — VIP granted; leave onboarding
-      window.location.href = '/';
+      // Native IAP — VIP granted; land on success handoff then Thea with gifts.
+      window.location.href = '/payment/success?type=subscription';
     } catch (error) {
       console.error('Error completing onboarding:', error);
       toast({
