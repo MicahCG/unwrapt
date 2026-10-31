@@ -16,6 +16,9 @@ import {
   nextOccasionDate,
   normalizeInterests,
   resolvePresentUi,
+  looksLikeCalendarConnectIntent,
+  shouldForceCalendarConnectUi,
+  buildCalendarConnectDirectiveMessage,
   scoreInterestText,
   shouldPersistReviewMarker,
   scrubFalseFriends,
@@ -296,4 +299,29 @@ Deno.test("resolvePresentUi requires an owned recipient for edit_recipient", () 
 Deno.test("resolvePresentUi rejects unknown modules and bogus focus values", () => {
   assertEquals(resolvePresentUi({ module: "wallet" }, null).ok, false);
   assertEquals(resolvePresentUi({ module: "add_recipient", focus: "ssn" }, null), { ok: true, ui: { module: "add_recipient" } });
+});
+
+Deno.test("looksLikeCalendarConnectIntent catches connect / import asks", () => {
+  assert(looksLikeCalendarConnectIntent("can i connect my calendar and add more"));
+  assert(looksLikeCalendarConnectIntent("sync Google Calendar"));
+  assert(looksLikeCalendarConnectIntent("import birthdays from google"));
+  assertEquals(looksLikeCalendarConnectIntent("what's a good gift for mom?"), false);
+});
+
+Deno.test("shouldForceCalendarConnectUi forces on intent, refusal, and short follow-ups", () => {
+  assert(shouldForceCalendarConnectUi("connect my calendar", [], "", []));
+  assert(shouldForceCalendarConnectUi("are you sure?", [
+    { role: "user", content: "connect calendar" },
+    { role: "assistant", content: "I can't connect to calendars." },
+  ], "", []));
+  assert(shouldForceCalendarConnectUi("hmm", [], "I'm sure! I can't access calendars or connect them.", []));
+  assertEquals(
+    shouldForceCalendarConnectUi("connect calendar", [], "", [{ module: "calendar_connect" }]),
+    false,
+  );
+});
+
+Deno.test("buildCalendarConnectDirectiveMessage is present only when forced", () => {
+  assertEquals(buildCalendarConnectDirectiveMessage(false), null);
+  assert(buildCalendarConnectDirectiveMessage(true)?.includes('present_ui'));
 });
