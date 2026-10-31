@@ -466,6 +466,14 @@ const Dashboard = () => {
               recipients={typedRecipients}
               autopilotThreshold={autopilotThreshold}
               onOpenRecipient={handleOpenRecipientById}
+              onAddRecipient={() => setShowAddRecipient(true)}
+              onEditRecipient={(recipientId) => {
+                const recipient = typedRecipients.find((r) => r.id === recipientId);
+                if (!recipient) return;
+                // Same path as address chips: keep Thea chat put and open the existing editor.
+                setEditingRecipient(recipient);
+                setShowEditRecipient(true);
+              }}
               onSwitchToManual={() => setActiveTab('manual')}
               queuedMessage={theaQueue}
               recipientsLoaded={recipientsLoaded}

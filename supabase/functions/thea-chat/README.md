@@ -7,7 +7,7 @@ Everything about how Thea talks and behaves lives in this folder. Change it here
 | Who she is everywhere: voice, attitude, humor, how she reads people, gift directions | `THEA_GUIDE.md` |
 | The setup chat ("Getting to know Aunty"): staying on the gift, witty redirects, when to ask vs move on | `THEA_GUIDE_ONBOARDING.md` |
 | The main chat in the app: what she'll talk about, how she gets to a recommendation | `THEA_GUIDE_CHAT.md` |
-| Safety boundaries, tools, reply formats the app parses (e.g. `RECOMMENDED_IDS`, the onboarding JSON) | `index.ts` |
+| Safety boundaries, tools, reply formats the app parses (e.g. `RECOMMENDED_IDS`, `present_ui` → `ui[]`, the onboarding JSON) | `index.ts` |
 
 The guides are not documentation: they're sent to the AI word for word. Every message gets `THEA_GUIDE.md` plus the guide for that conversation, and the conversation guide wins where they differ. Write them as instructions to Thea, and keep notes for humans in this README instead. If something applies everywhere, put it in `THEA_GUIDE.md` once rather than in both conversation guides.
 

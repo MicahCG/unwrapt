@@ -105,6 +105,26 @@ top-level `review` (same shape as `select_gift`'s `review` above), otherwise `re
 The app renders it as a review card whose Confirm action sends an explicit confirmation
 message; confirmation itself is still verified server-side against the persisted marker.
 
+### Response field: `ui` (present_ui modules)
+
+`present_ui` lets Thea surface interactive in-chat modules instead of refusing calendar
+connect or recipient forms. Each successful call this turn is appended to top-level `ui`
+(empty array when unused):
+
+```json
+{
+  "ui": [
+    { "module": "calendar_connect" },
+    { "module": "add_recipient", "focus": "birthday" },
+    { "module": "edit_recipient", "recipientId": "...", "recipientName": "Aunty Andrea", "focus": "address" }
+  ]
+}
+```
+
+`edit_recipient` is validated against an owned recipient row. The dashboard Thea tab
+renders calendar connect via the existing `CalendarSyncButton` flow and opens the
+existing Add/Edit recipient modals for the person forms.
+
 ### CC-01/CC-07: recipient tools
 
 `get_recipients` (read) returns each recipient's id, name, relationship,

@@ -1,8 +1,16 @@
 import React, { useState } from 'react';
-import { Check, Gift, Loader2, MapPin } from 'lucide-react';
+import { Calendar, Check, Gift, Loader2, MapPin, UserPlus, UserRoundPen } from 'lucide-react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import CalendarSyncButton from '@/components/CalendarSyncButton';
 import { U } from '@/components/unwrapt2/theme';
 import { formatOccasionDate } from '@/lib/dateUtils';
+
+/** Modules thea-chat returns in top-level `ui` from present_ui. */
+export type ChatUiFocus = 'details' | 'address' | 'birthday' | 'interests';
+export type ChatUiModule =
+  | { module: 'calendar_connect' }
+  | { module: 'add_recipient'; focus?: ChatUiFocus }
+  | { module: 'edit_recipient'; recipientId: string; recipientName: string; focus?: ChatUiFocus };
 
 /** A catalog product as thea-chat returns it in `products`. */
 export type ChatProduct = {
@@ -170,3 +178,91 @@ export const ReviewCard: React.FC<{
     </section>
   );
 };
+
+const focusLabel = (focus?: ChatUiFocus) => {
+  switch (focus) {
+    case 'address': return 'delivery address';
+    case 'birthday': return 'birthday or anniversary';
+    case 'interests': return 'interests';
+    default: return 'details';
+  }
+};
+
+/** Google / birthday-source connect, reusing the dashboard calendar flow. */
+export const CalendarConnectCard: React.FC<{ onAddManually: () => void }> = ({ onAddManually }) => (
+  <section className="mt-2 rounded-[18px] border bg-white p-3.5" style={{ borderColor: '#DED2C1' }} aria-label="Connect calendar">
+    <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: U.accent }}>
+      <Calendar className="h-3.5 w-3.5" aria-hidden="true" /> Calendar
+    </p>
+    <p className="mt-1.5 text-[14px] font-semibold leading-5 text-[#2A2520]">Import birthdays &amp; anniversaries</p>
+    <p className="mt-1 text-[12.5px] leading-5 text-[#5A5147]">Connect Google Calendar or another source. You choose who to add before anything is saved.</p>
+    <div className="mt-3">
+      <CalendarSyncButton appearance="pill" returnTo="/?tab=thea" onAddManually={onAddManually} />
+    </div>
+  </section>
+);
+
+/** Opens the existing add-recipient editor from chat. */
+export const AddRecipientCard: React.FC<{ focus?: ChatUiFocus; onOpen: () => void }> = ({ focus, onOpen }) => (
+  <section className="mt-2 rounded-[18px] border bg-white p-3.5" style={{ borderColor: '#DED2C1' }} aria-label="Add recipient">
+    <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: U.accent }}>
+      <UserPlus className="h-3.5 w-3.5" aria-hidden="true" /> New person
+    </p>
+    <p className="mt-1.5 text-[14px] font-semibold leading-5 text-[#2A2520]">Add someone Thea should look after</p>
+    <p className="mt-1 text-[12.5px] leading-5 text-[#5A5147]">
+      Name, occasion dates, interests, and address when you have them{focus && focus !== 'details' ? ` — starting with ${focusLabel(focus)}` : ''}.
+    </p>
+    <button type="button" onClick={onOpen} className="u-press mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-[12px] text-[13px] font-semibold" style={{ background: U.ink, color: U.buttonText }}>
+      <UserPlus className="h-4 w-4" aria-hidden="true" />
+      Open add form
+    </button>
+  </section>
+);
+
+/** Opens the existing edit-recipient editor for a known person. */
+export const EditRecipientCard: React.FC<{
+  recipientName: string;
+  focus?: ChatUiFocus;
+  onOpen: () => void;
+}> = ({ recipientName, focus, onOpen }) => {
+  const first = recipientName.split(' ')[0] || recipientName;
+  return (
+    <section className="mt-2 rounded-[18px] border bg-white p-3.5" style={{ borderColor: '#DED2C1' }} aria-label={`Edit ${recipientName}`}>
+      <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: U.accent }}>
+        <UserRoundPen className="h-3.5 w-3.5" aria-hidden="true" /> Update details
+      </p>
+      <p className="mt-1.5 text-[14px] font-semibold leading-5 text-[#2A2520]">{first}&apos;s {focusLabel(focus)}</p>
+      <p className="mt-1 text-[12.5px] leading-5 text-[#5A5147]">Edit in the same form you use elsewhere — address, birthday, interests, and more.</p>
+      <button type="button" onClick={onOpen} className="u-press mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-[12px] text-[13px] font-semibold" style={{ background: U.ink, color: U.buttonText }}>
+        <UserRoundPen className="h-4 w-4" aria-hidden="true" />
+        Open {first}&apos;s form
+      </button>
+    </section>
+  );
+};
+
+/** Renders every present_ui module attached to a Thea reply. */
+export const ChatUiModules: React.FC<{
+  modules: ChatUiModule[];
+  onAddRecipient: () => void;
+  onEditRecipient: (recipientId: string, focus?: ChatUiFocus) => void;
+}> = ({ modules, onAddRecipient, onEditRecipient }) => (
+  <>
+    {modules.map((mod, i) => {
+      if (mod.module === 'calendar_connect') {
+        return <CalendarConnectCard key={`calendar-${i}`} onAddManually={onAddRecipient} />;
+      }
+      if (mod.module === 'add_recipient') {
+        return <AddRecipientCard key={`add-${i}`} focus={mod.focus} onOpen={onAddRecipient} />;
+      }
+      return (
+        <EditRecipientCard
+          key={`edit-${mod.recipientId}-${i}`}
+          recipientName={mod.recipientName}
+          focus={mod.focus}
+          onOpen={() => onEditRecipient(mod.recipientId, mod.focus)}
+        />
+      );
+    })}
+  </>
+);

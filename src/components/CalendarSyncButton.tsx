@@ -14,6 +14,8 @@ interface CalendarSyncButtonProps {
   appearance?: 'default' | 'pill';
   /** Offered whenever the calendar can't help, so the user can keep going by hand. */
   onAddManually?: () => void;
+  /** Where Google OAuth should return; defaults to Manual so existing callers stay put. */
+  returnTo?: string;
 }
 
 const statusCopy = (status: CalendarStatus, source: string): { tone: 'info' | 'warn'; text: string } | null => {
@@ -78,9 +80,9 @@ const CalendarImportReview: React.FC<{
   );
 };
 
-const CalendarSyncButton = ({ className, appearance = 'default', onAddManually }: CalendarSyncButtonProps) => {
+const CalendarSyncButton = ({ className, appearance = 'default', onAddManually, returnTo }: CalendarSyncButtonProps) => {
   const { toast } = useToast();
-  const { isConnected, status, sourceLabel, connect, findCandidates, reviewFound, importCandidates, dismiss } = useCalendarConnection();
+  const { isConnected, status, sourceLabel, connect, findCandidates, reviewFound, importCandidates, dismiss } = useCalendarConnection(returnTo);
   const [choosing, setChoosing] = useState(false);
   const busy = status.kind === 'connecting' || status.kind === 'syncing' || status.kind === 'importing';
   // An expired grant needs the consent screen again, not another sync attempt.

@@ -5,7 +5,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { TheaAvatar } from '@/components/unwrapt2/TheaAvatar';
 import { TheaCharacter } from '@/components/unwrapt2/TheaCharacter';
 import { U } from '@/components/unwrapt2/theme';
-import { ProductCards, ReviewCard, type ChatProduct, type GiftReview, type ReviewState } from '@/components/dashboard/TheaChatCards';
+import {
+  ChatUiModules,
+  ProductCards,
+  ReviewCard,
+  type ChatProduct,
+  type ChatUiFocus,
+  type ChatUiModule,
+  type GiftReview,
+  type ReviewState,
+} from '@/components/dashboard/TheaChatCards';
 import {
   buildBriefingMessage,
   briefingQuickChips,
@@ -28,6 +37,8 @@ type ChatMessage = {
   content: string;
   products?: ChatProduct[];
   review?: GiftReview | null;
+  /** Interactive modules from present_ui (calendar connect, add/edit recipient). */
+  ui?: ChatUiModule[];
   /** A write Thea attempted this turn that did not save. */
   unsaved?: boolean;
   /** A user message that never reached Thea. */
@@ -82,6 +93,8 @@ interface TheaHomeTabProps {
   recipients: RecipientRecord[];
   autopilotThreshold?: number;
   onOpenRecipient: (recipientId: string, intent?: BriefingItem['action']) => void;
+  onAddRecipient: () => void;
+  onEditRecipient: (recipientId: string, focus?: ChatUiFocus) => void;
   onSwitchToManual: () => void;
   /** A message another screen asks Thea to handle (e.g. a gift chosen in the catalog). */
   queuedMessage?: { id: number; text: string } | null;
@@ -103,6 +116,8 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   recipients,
   autopilotThreshold,
   onOpenRecipient,
+  onAddRecipient,
+  onEditRecipient,
   onSwitchToManual,
   queuedMessage,
   recipientsLoaded = true,
@@ -221,6 +236,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
         await queryClient.invalidateQueries({ queryKey: ['recipients'] });
       }
       if (writes.some((w) => w.ok && w.tool === 'confirm_scheduled_gift')) celebrate();
+      const ui = (Array.isArray(data.ui) ? data.ui : []) as ChatUiModule[];
       setMessages([
         ...nextMessages,
         {
@@ -228,9 +244,15 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
           content: cleanTheaText(data.reply),
           products: (data.products || []) as ChatProduct[],
           review: (data.review || null) as GiftReview | null,
+          ui: ui.length ? ui : undefined,
           unsaved: writes.some((w) => !w.ok),
         },
       ]);
+      // Bring up existing editors immediately so the user isn't stuck behind another tap.
+      for (const mod of ui) {
+        if (mod.module === 'add_recipient') onAddRecipient();
+        if (mod.module === 'edit_recipient') onEditRecipient(mod.recipientId, mod.focus);
+      }
       return writes;
     } catch (err) {
       console.error('Dashboard Thea chat failed', err);
@@ -378,6 +400,13 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
                     onChange={() => void send('Let’s look at other options.')}
                     onAddAddress={() => onOpenRecipient(message.review!.recipientId, 'address')}
                     onViewPlan={() => onOpenRecipient(message.review!.recipientId, 'open')}
+                  />
+                )}
+                {message.ui && message.ui.length > 0 && (
+                  <ChatUiModules
+                    modules={message.ui}
+                    onAddRecipient={onAddRecipient}
+                    onEditRecipient={onEditRecipient}
                   />
                 )}
               </div>
