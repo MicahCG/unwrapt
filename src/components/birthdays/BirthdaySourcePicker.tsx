@@ -214,39 +214,56 @@ const BirthdaySourcePicker: React.FC<BirthdaySourcePickerProps> = ({ onFound, on
     );
   }
 
+  const contactsRow = (
+    <Row
+      key="contacts"
+      icon={<BookUser className="h-[18px] w-[18px]" />}
+      title="iPhone Contacts"
+      detail={native ? 'Birthdays saved on your contacts' : 'Upload your contacts, or use the iPhone app'}
+      busy={reading === 'contacts'}
+      disabled={reading !== null}
+      onClick={() => (native ? void readDevice('contacts') : setView('contacts_file'))}
+    />
+  );
+  const calendarRow = (
+    <Row
+      key="apple_calendar"
+      icon={<CalendarDays className="h-[18px] w-[18px]" />}
+      title="Apple Calendar"
+      detail={native ? 'Yearly birthday and anniversary events' : 'Upload a calendar file, or use the iPhone app'}
+      busy={reading === 'apple_calendar'}
+      disabled={reading !== null}
+      onClick={() => (native ? void readDevice('apple_calendar') : setView('calendar_file'))}
+    />
+  );
+  const googleRow = (
+    <Row
+      key="google"
+      icon={<GoogleMark />}
+      title={googleLabel || 'Google Calendar'}
+      detail="Read-only, birthdays and anniversaries"
+      busy={googleBusy}
+      disabled={reading !== null || googleBusy}
+      onClick={() => { pick('google'); onGoogle(); }}
+    />
+  );
+  const tellRow = (
+    <Row
+      key="typed"
+      icon={<MessageCircle className="h-[18px] w-[18px]" />}
+      title="Tell Thea"
+      detail={native ? 'Type or paste names and dates' : 'Quickest here: type or paste names and dates'}
+      disabled={reading !== null}
+      onClick={() => { setError(null); setView('typed'); }}
+    />
+  );
+  // In the app, reading Contacts/Calendar directly is fastest. On the web, that needs an
+  // exported file, so typing a short list (or Google, if it's already connected) beats it.
+  const rows = native ? [contactsRow, calendarRow, googleRow, tellRow] : [tellRow, googleRow, contactsRow, calendarRow];
+
   return (
     <div className="flex flex-col gap-2">
-      <Row
-        icon={<BookUser className="h-[18px] w-[18px]" />}
-        title="iPhone Contacts"
-        detail={native ? 'Birthdays saved on your contacts' : 'Upload your contacts, or use the iPhone app'}
-        busy={reading === 'contacts'}
-        disabled={reading !== null}
-        onClick={() => (native ? void readDevice('contacts') : setView('contacts_file'))}
-      />
-      <Row
-        icon={<CalendarDays className="h-[18px] w-[18px]" />}
-        title="Apple Calendar"
-        detail={native ? 'Yearly birthday and anniversary events' : 'Upload a calendar file, or use the iPhone app'}
-        busy={reading === 'apple_calendar'}
-        disabled={reading !== null}
-        onClick={() => (native ? void readDevice('apple_calendar') : setView('calendar_file'))}
-      />
-      <Row
-        icon={<GoogleMark />}
-        title={googleLabel || 'Google Calendar'}
-        detail="Read-only, birthdays and anniversaries"
-        busy={googleBusy}
-        disabled={reading !== null || googleBusy}
-        onClick={() => { pick('google'); onGoogle(); }}
-      />
-      <Row
-        icon={<MessageCircle className="h-[18px] w-[18px]" />}
-        title="Tell Thea"
-        detail="Type or paste names and dates"
-        disabled={reading !== null}
-        onClick={() => { setError(null); setView('typed'); }}
-      />
+      {rows}
       {error && <p className="px-1 text-[12.5px] leading-5" role="alert" style={{ color: U.accent }}>{error}</p>}
     </div>
   );

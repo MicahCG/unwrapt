@@ -39,17 +39,33 @@ export function useVisualViewport(enabled = true): VisualViewportState {
   useEffect(() => {
     if (!enabled || typeof window === 'undefined') return;
 
-    const sync = () => setState(readViewport());
-    sync();
+    // iOS fires several resize events in a burst while the keyboard and its predictive-text
+    // bar animate together, and the layout and visual viewports can transiently disagree
+    // mid-burst - committing every intermediate frame to state briefly applied a bogus,
+    // squished height to the pinned shell. Settle on the first and last reading of a burst
+    // (leading so the keyboard still raises instantly, trailing so we land on the real value).
+    let settleTimer: number | undefined;
+    const SETTLE_MS = 60;
+    const sync = (immediate = false) => {
+      window.clearTimeout(settleTimer);
+      if (immediate) {
+        setState(readViewport());
+        return;
+      }
+      settleTimer = window.setTimeout(() => setState(readViewport()), SETTLE_MS);
+    };
+    sync(true);
 
     const vv = window.visualViewport;
-    vv?.addEventListener('resize', sync);
-    vv?.addEventListener('scroll', sync);
-    window.addEventListener('resize', sync);
+    const onResize = () => sync();
+    vv?.addEventListener('resize', onResize);
+    vv?.addEventListener('scroll', onResize);
+    window.addEventListener('resize', onResize);
     return () => {
-      vv?.removeEventListener('resize', sync);
-      vv?.removeEventListener('scroll', sync);
-      window.removeEventListener('resize', sync);
+      window.clearTimeout(settleTimer);
+      vv?.removeEventListener('resize', onResize);
+      vv?.removeEventListener('scroll', onResize);
+      window.removeEventListener('resize', onResize);
     };
   }, [enabled]);
 

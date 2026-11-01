@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQuery } from '@tanstack/react-query';
@@ -89,7 +89,10 @@ const Dashboard = () => {
     if (activeTab !== 'thea') setComposerFocused(false);
   }, [activeTab]);
 
-  useEffect(() => {
+  // Layout effect, not a plain effect: this must land before the browser paints the
+  // focused state, or iOS gets a frame to scroll the page itself before we lock it —
+  // that's what let the whole page (not just the chat list) scroll under the keyboard.
+  useLayoutEffect(() => {
     if (!pinToKeyboard) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';

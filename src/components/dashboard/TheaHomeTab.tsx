@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Send } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,7 +30,7 @@ import { trackProductEvent } from '@/lib/productAnalytics';
 import { useTheaReaction } from '@/hooks/useTheaReaction';
 import { importNewPeople, importRemainingCalendarPeople, useCalendarConnected } from '@/hooks/useCalendarConnection';
 import { clearOnboardingFoundPeople, loadOnboardingFoundPeople } from '@/lib/onboardingFoundPeople';
-import { startCalendarConnect } from '@/lib/calendarConnection';
+import CalendarSyncButton from '@/components/CalendarSyncButton';
 import { cleanTheaText, hideProductIds, renderTheaText } from '@/lib/theaText';
 import { theaChatPose } from '@/lib/theaState';
 import { ensureCalendarConnectUi } from '@/lib/theaChatUi';
@@ -264,8 +264,11 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     el.style.height = `${el.scrollHeight}px`;
   }, [input]);
 
-  // Composer focus / keyboard open: always jump to the latest message.
-  useEffect(() => {
+  // Composer focus / keyboard open: always jump to the latest message. A layout effect
+  // (not a plain effect) so the first pin lands before paint, ahead of iOS's own
+  // scroll-focused-input-into-view — otherwise that fires first and the list visibly
+  // jumps/blanks for a frame while our pin catches up.
+  useLayoutEffect(() => {
     if (!composerFocused) return;
     stickToBottomRef.current = true;
     const pin = () => {
@@ -827,14 +830,12 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
             </button>
           ))}
           {!calendarConnected && (
-            <button
-              type="button"
-              onClick={() => void startCalendarConnect('/?tab=manual').catch(() => onSwitchToManual())}
+            <CalendarSyncButton
+              appearance="pill"
+              onAddManually={onSwitchToManual}
               className="u-press min-h-10 rounded-full border px-3 py-2 text-[12.5px] font-medium"
               style={{ background: U.surface, borderColor: U.border, color: U.ink }}
-            >
-              Connect Google Calendar
-            </button>
+            />
           )}
           <button
             type="button"
