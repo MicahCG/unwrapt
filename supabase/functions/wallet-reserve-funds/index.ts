@@ -28,7 +28,9 @@ serve(async (req) => {
     if (userError || !user) throw new Error("User not authenticated");
 
     const body = await req.json();
-    const { scheduledGiftId } = body;
+    // `approve`: the user approved this gift (e.g. in Thea's chat), so once funds are held the
+    // automation lifecycle may charge and order it in its window.
+    const { scheduledGiftId, approve = false } = body;
 
     if (!scheduledGiftId) {
       throw new Error("Scheduled gift ID is required");
@@ -41,12 +43,21 @@ serve(async (req) => {
       .from("scheduled_gifts")
       .select("*, recipients(*)")
       .eq("id", scheduledGiftId)
+      .eq("user_id", user.id)
       .single();
 
     if (giftError || !gift) throw new Error("Gift not found");
 
-    // Calculate cost (get price from gift_type variant or use default)
-    const giftPrice = gift.payment_amount || 35; // Default to $35 if not set
+    // Already held (a retry after a top-up, or a double tap): report the existing hold.
+    if (gift.wallet_reserved) {
+      return new Response(
+        JSON.stringify({ success: true, reservedAmount: gift.wallet_reservation_amount, alreadyReserved: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
+    }
+
+    // Calculate cost from the chosen gift's price
+    const giftPrice = gift.payment_amount ?? gift.estimated_cost ?? 35; // Default to $35 if not set
     const totalCost = giftPrice + SERVICE_FEE;
 
     console.log(`💰 Total cost: $${totalCost} (gift: $${giftPrice} + service: $${SERVICE_FEE})`);
@@ -116,6 +127,9 @@ serve(async (req) => {
       .update({
         wallet_reserved: true,
         wallet_reservation_amount: totalCost,
+        ...(approve
+          ? { automation_enabled: true, status: gift.status === "scheduled" ? "approved" : gift.status }
+          : {}),
       })
       .eq("id", scheduledGiftId);
 

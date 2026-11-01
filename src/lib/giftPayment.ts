@@ -1,14 +1,18 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { GiftRecord, RecipientRecord } from '@/lib/giftStatus';
+import { isWalletGift, type GiftRecord, type RecipientRecord } from '@/lib/giftStatus';
 
 export function hasCompleteShippingAddress(recipient: Pick<RecipientRecord, 'street' | 'city' | 'state' | 'zip_code'>) {
   return Boolean(recipient.street && recipient.city && recipient.state && recipient.zip_code);
 }
 
-/** The gift (if any) left behind when a user abandoned Stripe checkout for this recipient. */
+/**
+ * The gift (if any) left behind when a user abandoned Stripe checkout for this recipient.
+ * Wallet gifts are excluded: their funds are held or topped up in Thea's chat, and a
+ * separate card checkout for one would charge twice.
+ */
 export function findResumableGift(recipient: RecipientRecord): GiftRecord | null {
   const resumable = (recipient.scheduled_gifts || [])
-    .filter((gift) => gift.payment_status === 'unpaid' && !gift.shopify_order_id && gift.status !== 'cancelled')
+    .filter((gift) => gift.payment_status === 'unpaid' && !gift.shopify_order_id && gift.status !== 'cancelled' && !isWalletGift(gift))
     .sort((a, b) => String(a.occasion_date || '').localeCompare(String(b.occasion_date || '')));
   return resumable[0] || null;
 }

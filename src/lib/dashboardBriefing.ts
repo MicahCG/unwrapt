@@ -3,6 +3,8 @@ import { getDaysUntil, getNextOccurrence, formatOccasionDate } from '@/lib/dateU
 import {
   getGiftStatus,
   getRecipientStatus,
+  giftStage,
+  isWalletGift,
   hasRecipientAddress,
   type GiftRecord,
   type RecipientRecord,
@@ -16,6 +18,8 @@ export type BriefingItem = {
   detail: string;
   kind: 'upcoming' | 'needs_info' | 'in_motion' | 'recent';
   action?: 'address' | 'interests' | 'payment' | 'review' | 'open';
+  /** For 'payment': the gift waiting on funds. */
+  giftId?: string;
 };
 
 export type DashboardBriefing = {
@@ -40,7 +44,8 @@ export const AUTOPILOT_THRESHOLDS: Record<string, number> = {
  * Thea surfaces it instead of confirming silently.
  */
 const giftNeedsReview = (g: GiftRecord, autopilotThreshold: number) => {
-  if (!Boolean(g?.wallet_reserved) || g?.fulfilled_at || g?.status === 'ordered' || g?.status === 'delivered') {
+  // 'approved': the user already approved this exact gift in Thea's chat.
+  if (!g?.wallet_reserved || g?.fulfilled_at || g?.status === 'ordered' || g?.status === 'delivered' || g?.status === 'approved') {
     return false;
   }
   const cost = g?.estimated_cost;
@@ -55,6 +60,8 @@ export function buildDashboardBriefing(
 ): DashboardBriefing {
   const upcoming: BriefingItem[] = [];
   const needsInfo: BriefingItem[] = [];
+  // Gifts that can't go out until they're paid for lead the briefing.
+  const needsFunds: BriefingItem[] = [];
   const inMotion: BriefingItem[] = [];
   const recentlyDelivered: BriefingItem[] = [];
 
@@ -105,17 +112,31 @@ export function buildDashboardBriefing(
 
     const resumable = findResumableGift(recipient);
     if (resumable) {
-      needsInfo.push({
+      needsFunds.push({
         recipientId: recipient.id,
         recipientName: cleanName(recipient.name),
         label: `Finish ${name}'s payment`,
         detail: 'Checkout was started but not completed',
         kind: 'needs_info',
         action: 'payment',
+        giftId: resumable.id,
       });
     }
 
     for (const gift of recipient.scheduled_gifts || []) {
+      const closed = ['cancelled', 'canceled', 'expired', 'archived'].includes((gift.status || '').toLowerCase());
+      if (!closed && isWalletGift(gift) && giftStage(gift) === 'scheduled') {
+        needsFunds.push({
+          recipientId: recipient.id,
+          recipientName: cleanName(recipient.name),
+          label: `Add funds for ${name}'s gift`,
+          detail: gift.gift_type || gift.gift_description || 'Approved, waiting on wallet funds',
+          kind: 'needs_info',
+          action: 'payment',
+          giftId: gift.id,
+        });
+      }
+
       if (giftNeedsReview(gift, autopilotThreshold)) {
         needsInfo.push({
           recipientId: recipient.id,
@@ -184,7 +205,7 @@ export function buildDashboardBriefing(
 
   return {
     upcoming: dedupe(upcoming).slice(0, 5),
-    needsInfo: dedupe(needsInfo).slice(0, 6),
+    needsInfo: dedupe([...needsFunds, ...needsInfo]).slice(0, 6),
     inMotion: dedupe(inMotion).slice(0, 4),
     recentlyDelivered: dedupe(recentlyDelivered).slice(0, 4),
   };

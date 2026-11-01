@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
 
 const SERVICE_FEE = 0; // No service fee
+// Gifts are confirmed and ordered at most this many days before delivery (reservation + 3-day wait from 28 days).
+const ORDER_WINDOW_DAYS = 25;
 
 type GoodyProductLookup = { price?: number | null; images?: Array<{ image_large?: { url?: string | null } | null }> };
 
@@ -145,12 +147,14 @@ async function processGiftStage(supabaseClient: any, gift: any, recipient: any, 
     return;
   }
 
-  // STAGE 2: Auto-confirm gift (3 days after reservation if address exists)
-  if (gift.wallet_reserved && gift.status !== 'confirmed' && isAddressComplete(recipient)) {
+  // STAGE 2: Auto-confirm gift (3 days after reservation if address exists), only once it's inside
+  // the order window so funds held early (e.g. at approval in Thea's chat) aren't ordered months ahead.
+  // A gift the user already approved skips the 3-day wait.
+  if (gift.wallet_reserved && gift.status !== 'confirmed' && isAddressComplete(recipient) && daysUntilDelivery <= ORDER_WINDOW_DAYS) {
     const reservationDate = new Date(gift.wallet_reservation_date || gift.updated_at);
     const daysSinceReservation = Math.ceil((today.getTime() - reservationDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    if (daysSinceReservation >= 3) {
+    if (daysSinceReservation >= 3 || gift.status === 'approved') {
       await handleGiftAutoConfirmation(supabaseClient, gift, recipient);
       return;
     }
@@ -233,21 +237,26 @@ export async function handleFundReservation(supabaseClient: any, gift: any, reci
   console.log("    💰 STAGE 1: Fund Reservation");
 
   try {
-    // Get default gift price from Goody
-    const variantId = recipient.default_gift_variant_id;
-    if (!variantId) {
-      await logAutomation(supabaseClient, gift.user_id, recipient.id, gift.id, "fund_reservation", "failed", {
-        error: "No default gift variant set"
-      });
-      return;
+    // A gift the user picked in Thea's chat carries its own price (payment_amount); otherwise use the
+    // recipient's default gift at its current price.
+    let productPrice = Number(gift.payment_amount) || 0;
+    let variantId: string | null = null;
+    if (!productPrice) {
+      variantId = recipient.default_gift_variant_id;
+      if (!variantId) {
+        await logAutomation(supabaseClient, gift.user_id, recipient.id, gift.id, "fund_reservation", "failed", {
+          error: "No default gift variant set"
+        });
+        return;
+      }
+
+      const goodyProduct = await fetchGoodyProduct(variantId);
+      if (!goodyProduct || typeof goodyProduct.price !== "number") {
+        throw new Error("Failed to fetch Goody product price");
+      }
+      productPrice = goodyProduct.price / 100;
     }
 
-    const goodyProduct = await fetchGoodyProduct(variantId);
-    if (!goodyProduct || typeof goodyProduct.price !== "number") {
-      throw new Error("Failed to fetch Goody product price");
-    }
-
-    const productPrice = goodyProduct.price / 100;
     const totalCost = productPrice + SERVICE_FEE;
 
     // Check available balance
@@ -341,7 +350,7 @@ export async function handleFundReservation(supabaseClient: any, gift: any, reci
         wallet_reserved: true,
         wallet_reservation_amount: totalCost,
         wallet_reservation_date: new Date().toISOString(),
-        default_gift_variant_id: variantId
+        ...(variantId ? { default_gift_variant_id: variantId } : {}),
       })
       .eq("id", gift.id);
 

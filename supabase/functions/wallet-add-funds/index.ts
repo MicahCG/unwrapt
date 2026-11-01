@@ -35,7 +35,9 @@ serve(async (req) => {
 
     // Parse request body
     const body = await req.json();
-    const { amount } = body;
+    const { amount, returnTo } = body;
+    // "thea": a top-up started from Thea's chat returns there, so the held gift can finish funding.
+    const fromThea = returnTo === "thea";
 
     // Validate amount
     if (!amount || typeof amount !== 'number' || amount < 10 || amount > 1000) {
@@ -88,8 +90,8 @@ serve(async (req) => {
     // Create checkout session
     const sessionData = new URLSearchParams({
       'mode': 'payment',
-      'success_url': `${cleanOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}&type=wallet&amount=${amount}`,
-      'cancel_url': `${cleanOrigin}/`,
+      'success_url': `${cleanOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}&type=wallet&amount=${amount}${fromThea ? "&return=thea" : ""}`,
+      'cancel_url': `${cleanOrigin}/${fromThea ? "?tab=thea" : ""}`,
       'line_items[0][price_data][currency]': 'usd',
       'line_items[0][price_data][product_data][name]': 'Gift Wallet Funds',
       'line_items[0][price_data][product_data][description]': 'Add funds to your Unwrapt gift wallet',

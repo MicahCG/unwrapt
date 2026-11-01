@@ -307,6 +307,14 @@ const PaymentSuccess = () => {
     navigate('/?resume=gifts', { replace: true });
   };
 
+  // A top-up started from Thea's chat goes straight back there, where the waiting gift finishes funding.
+  const returnToThea = paymentType === 'wallet' && searchParams.get('return') === 'thea';
+  useEffect(() => {
+    if (!returnToThea || isVerifying || !verificationComplete) return;
+    const timer = window.setTimeout(() => navigate('/?tab=thea', { replace: true }), 1400);
+    return () => window.clearTimeout(timer);
+  }, [returnToThea, isVerifying, verificationComplete, navigate]);
+
   const handleGoHome = () => {
     navigate('/', { replace: true });
   };

@@ -47,6 +47,8 @@ const Dashboard = () => {
   const [previousTier, setPreviousTier] = useState<string | null>(null);
   const [showEditRecipient, setShowEditRecipient] = useState(false);
   const [editingRecipient, setEditingRecipient] = useState<any>(null);
+  // True when the editor was opened for one specific person from Thea, so their name stays fixed.
+  const [editLockName, setEditLockName] = useState(false);
   const [approval, setApproval] = useState<{ gift: any; recipient: any } | null>(null);
   const [theaQueue, setTheaQueue] = useState<{ id: number; text: string } | null>(null);
   const [composerFocused, setComposerFocused] = useState(false);
@@ -316,6 +318,7 @@ const Dashboard = () => {
     if (intent === 'address') {
       // The edit form opens over whichever tab is active, so Thea's conversation stays put.
       setEditingRecipient(recipient);
+      setEditLockName(true);
       setShowEditRecipient(true);
       return;
     }
@@ -349,6 +352,7 @@ const Dashboard = () => {
   const handleEditRecipient = (recipient: RecipientRecord) => {
     setRecipientDetailId(null);
     setEditingRecipient(recipient);
+    setEditLockName(false);
     setShowEditRecipient(true);
   };
 
@@ -465,6 +469,7 @@ const Dashboard = () => {
                 if (!recipient) return;
                 // Same path as address chips: keep Thea chat put and open the existing editor.
                 setEditingRecipient(recipient);
+                setEditLockName(true);
                 setShowEditRecipient(true);
               }}
               onSwitchToManual={() => setActiveTab('manual')}
@@ -517,7 +522,7 @@ const Dashboard = () => {
         <AddFundsModal isOpen={showAddFunds} onClose={() => setShowAddFunds(false)} currentBalance={userProfile.gift_wallet_balance || 0} />
       )}
       {showEditRecipient && editingRecipient && (
-        <EditRecipientModal isOpen={showEditRecipient} onClose={() => { setShowEditRecipient(false); setEditingRecipient(null); }} recipient={editingRecipient} />
+        <EditRecipientModal isOpen={showEditRecipient} onClose={() => { setShowEditRecipient(false); setEditingRecipient(null); }} recipient={editingRecipient} lockName={editLockName} />
       )}
       <VIPWelcomeModal open={showVIPOnboarding} onComplete={() => { setShowVIPOnboarding(false); refetchProfile(); }} />
     </>

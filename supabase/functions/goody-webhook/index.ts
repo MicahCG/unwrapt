@@ -68,6 +68,27 @@ const sendNotificationEmail = async (
   }
 };
 
+/** First shipment is in transit (https://developer.ongoody.com/webhooks/events/order.shipped). */
+const handleOrderShipped = async (admin: ReturnType<typeof createClient>, order: Record<string, unknown>) => {
+  const goodyOrderId = order.id as string | undefined;
+  if (!goodyOrderId) return;
+
+  const shipments = (order.shipments as Array<Record<string, unknown>> | undefined) || [];
+  // tracking_number is only sent to approved distribution partners, so it's often absent.
+  const trackingNumber = (shipments.find((s) => s.tracking_number)?.tracking_number as string | undefined) || null;
+
+  await admin
+    .from("scheduled_gifts")
+    .update({
+      status: "shipped",
+      ...(trackingNumber ? { goody_tracking_number: trackingNumber } : {}),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("goody_order_id", goodyOrderId)
+    // A late or replayed shipped event must not move a delivered gift backwards.
+    .neq("status", "delivered");
+};
+
 const handleOrderDelivered = async (admin: ReturnType<typeof createClient>, order: Record<string, unknown>) => {
   const goodyOrderId = order.id as string | undefined;
   if (!goodyOrderId) return;
@@ -166,6 +187,9 @@ Deno.serve(async (req: Request) => {
     const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
     switch (eventType) {
+      case "order.shipped":
+        await handleOrderShipped(admin, order);
+        break;
       case "order.delivered":
         await handleOrderDelivered(admin, order);
         break;

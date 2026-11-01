@@ -16,6 +16,8 @@ interface EditRecipientModalProps {
   recipient: RecipientRecord;
   isOpen: boolean;
   onClose: () => void;
+  /** Opened for a specific person (e.g. from Thea's chat): their name is shown, not editable. */
+  lockName?: boolean;
 }
 
 const blankForm = {
@@ -23,7 +25,7 @@ const blankForm = {
   street: '', city: '', state: '', zipCode: '', country: 'United States', interests: [] as string[],
 };
 
-const EditRecipientModal: React.FC<EditRecipientModalProps> = ({ recipient, isOpen, onClose }) => {
+const EditRecipientModal: React.FC<EditRecipientModalProps> = ({ recipient, isOpen, onClose, lockName = false }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -56,7 +58,7 @@ const EditRecipientModal: React.FC<EditRecipientModalProps> = ({ recipient, isOp
     if (!user?.id) return;
     setIsLoading(true);
     const { error } = await supabase.from('recipients').update({
-      name: formData.name, relationship: formData.relationship || null, email: formData.email || null, phone: formData.phone || null,
+      name: lockName ? recipient.name : formData.name, relationship: formData.relationship || null, email: formData.email || null, phone: formData.phone || null,
       birthday: formData.birthday || null, anniversary: formData.anniversary || null, street: formData.street || null,
       city: formData.city || null, state: formData.state || null, zip_code: formData.zipCode || null, country: formData.country,
       interests: formData.interests, updated_at: new Date().toISOString(),
@@ -68,17 +70,18 @@ const EditRecipientModal: React.FC<EditRecipientModalProps> = ({ recipient, isOp
       return;
     }
     await queryClient.invalidateQueries({ queryKey: ['recipients'] });
-    toast({ title: 'Recipient updated', description: `${formData.name}'s details are ready.` });
+    toast({ title: 'Recipient updated', description: `${lockName ? recipient.name : formData.name}'s details are ready.` });
     onClose();
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="max-h-[92dvh] w-[calc(100%-1.5rem)] max-w-lg overflow-y-auto rounded-[24px] p-5 sm:p-6">
-        <DialogHeader><DialogTitle>Edit recipient</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{lockName ? `Edit ${recipient.name}` : 'Edit recipient'}</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2"><Label htmlFor="edit-name">Name *</Label><Input id="edit-name" value={formData.name} onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))} required /></div>
+            {/* autoComplete="off" keeps a browser address autofill from writing the user's own name over the recipient's. */}
+            {!lockName && <div className="space-y-2"><Label htmlFor="edit-name">Name *</Label><Input id="edit-name" autoComplete="off" value={formData.name} onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))} required /></div>}
             <div className="space-y-2"><Label>Relationship</Label><Select value={formData.relationship} onValueChange={(value) => setFormData((p) => ({ ...p, relationship: value }))}><SelectTrigger><SelectValue placeholder="Select relationship" /></SelectTrigger><SelectContent>{['Mom','Dad','Partner','Sibling','Friend','Child','Grandparent','Other'].map((label) => <SelectItem key={label} value={label.toLowerCase()}>{label}</SelectItem>)}</SelectContent></Select></div>
           </div>
           <OccasionFields
@@ -97,8 +100,8 @@ const EditRecipientModal: React.FC<EditRecipientModalProps> = ({ recipient, isOp
           <div className="rounded-2xl border border-[#E4DCD2] bg-[#FAF8F3] p-4">
             <h3 className="font-medium">Delivery details</h3><p className="mb-4 text-xs text-muted-foreground">Optional until a gift is ready to order.</p>
             <div className="space-y-3">
-              <Input aria-label="Street address" placeholder="Street address" value={formData.street} onChange={(e) => setFormData((p) => ({ ...p, street: e.target.value }))} />
-              <div className="grid grid-cols-2 gap-2"><Input aria-label="City" placeholder="City" value={formData.city} onChange={(e) => setFormData((p) => ({ ...p, city: e.target.value }))} /><Input aria-label="State" placeholder="State" value={formData.state} onChange={(e) => setFormData((p) => ({ ...p, state: e.target.value }))} /><Input aria-label="ZIP code" placeholder="ZIP code" value={formData.zipCode} onChange={(e) => setFormData((p) => ({ ...p, zipCode: e.target.value }))} /><Select value={formData.country} onValueChange={(value) => setFormData((p) => ({ ...p, country: value }))}><SelectTrigger aria-label="Country"><SelectValue /></SelectTrigger><SelectContent>{['United States','Canada','United Kingdom','Australia'].map((country) => <SelectItem key={country} value={country}>{country}</SelectItem>)}</SelectContent></Select></div>
+              <Input aria-label="Street address" autoComplete="shipping street-address" placeholder="Street address" value={formData.street} onChange={(e) => setFormData((p) => ({ ...p, street: e.target.value }))} />
+              <div className="grid grid-cols-2 gap-2"><Input aria-label="City" autoComplete="shipping address-level2" placeholder="City" value={formData.city} onChange={(e) => setFormData((p) => ({ ...p, city: e.target.value }))} /><Input aria-label="State" autoComplete="shipping address-level1" placeholder="State" value={formData.state} onChange={(e) => setFormData((p) => ({ ...p, state: e.target.value }))} /><Input aria-label="ZIP code" autoComplete="shipping postal-code" placeholder="ZIP code" value={formData.zipCode} onChange={(e) => setFormData((p) => ({ ...p, zipCode: e.target.value }))} /><Select value={formData.country} onValueChange={(value) => setFormData((p) => ({ ...p, country: value }))}><SelectTrigger aria-label="Country"><SelectValue /></SelectTrigger><SelectContent>{['United States','Canada','United Kingdom','Australia'].map((country) => <SelectItem key={country} value={country}>{country}</SelectItem>)}</SelectContent></Select></div>
             </div>
           </div>
 

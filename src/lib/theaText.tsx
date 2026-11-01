@@ -6,7 +6,7 @@ import React from 'react';
  * `**text**` for `renderTheaText` to style.
  */
 export function cleanTheaText(text: string): string {
-  return text
+  return hideProductIds(text)
     .replace(/^\s*(RECOMMENDED_IDS|GIFT_REVIEW):.*$/gim, '')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]+)\]\((?:https?:\/\/|www\.)[^)]*\)/g, '$1')
@@ -19,7 +19,15 @@ export function cleanTheaText(text: string): string {
     .trim();
 }
 
-const renderInline = (line: string, keyPrefix: string) =>
+/**
+ * A tapped product card sends "I'd like the X (product <id>)." so Thea can pick the exact item;
+ * the id is for her, not for the user's bubble.
+ */
+export function hideProductIds(text: string): string {
+  return text.replace(/\s*\(product [\w-]*\d[\w-]*\)/gi, '');
+}
+
+const renderInline =(line: string, keyPrefix: string) =>
   line
     .split(/(\*\*[^*]+\*\*)/g)
     .filter(Boolean)

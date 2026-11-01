@@ -13,20 +13,24 @@ import {
   type ChatUiFocus,
   type ChatUiModule,
   type GiftReview,
+  type GiftStage,
+  type ReviewAddress,
   type ReviewState,
 } from '@/components/dashboard/TheaChatCards';
+import { useAuth } from '@/components/auth/AuthProvider';
 import {
   buildBriefingMessage,
   briefingQuickChips,
   buildDashboardBriefing,
   type BriefingItem,
 } from '@/lib/dashboardBriefing';
-import type { RecipientRecord } from '@/lib/giftStatus';
+import { giftStage, hasRecipientAddress, type GiftRecord, type RecipientRecord } from '@/lib/giftStatus';
+import { calculateGiftCost, getAvailableBalance, holdGiftFunds, startGiftTopUp, takePendingWalletHold } from '@/lib/wallet';
 import { trackProductEvent } from '@/lib/productAnalytics';
 import { useTheaReaction } from '@/hooks/useTheaReaction';
 import { useCalendarConnected } from '@/hooks/useCalendarConnection';
 import { startCalendarConnect } from '@/lib/calendarConnection';
-import { cleanTheaText, renderTheaText } from '@/lib/theaText';
+import { cleanTheaText, hideProductIds, renderTheaText } from '@/lib/theaText';
 import { theaChatPose } from '@/lib/theaState';
 import { ensureCalendarConnectUi } from '@/lib/theaChatUi';
 import type { TheaPose } from '@/components/unwrapt2/TheaFigure';
@@ -52,6 +56,13 @@ type ChatMessage = {
 };
 
 type HistoryState = 'loading' | 'ready' | 'error';
+type WalletTopUpModule = Extract<ChatUiModule, { module: 'wallet_topup' }>;
+
+const money = (amount: number) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: amount % 1 ? 2 : 0 }).format(amount);
+/** A top-up's deposit lands by Stripe webhook, so holding right after the redirect may need a few tries. */
+const HOLD_RETRY_MS = 2500;
+const HOLD_ATTEMPTS = 5;
 
 const TYPEWRITER_BASE_MS = 28;
 const TYPEWRITER_MAX_DURATION_MS = 4000;
@@ -130,6 +141,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   onComposerFocusChange,
 }) => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const briefing = useMemo(() => buildDashboardBriefing(recipients, autopilotThreshold), [recipients, autopilotThreshold]);
   const seed = useMemo(() => buildBriefingMessage(displayName, briefing), [displayName, briefing]);
   const chips = useMemo(() => briefingQuickChips(briefing), [briefing]);
@@ -149,6 +161,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatContentRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLFormElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   /** Stay glued to the newest message unless the user scrolls up to read history. */
   const stickToBottomRef = useRef(true);
   const celebrateTimer = useRef<number>();
@@ -212,6 +225,14 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     ro.observe(composer);
     return () => ro.disconnect();
   }, []);
+
+  // Grow the composer with its text so long messages stay readable; CSS max-height caps it and scrolls past that.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [input]);
 
   // Composer focus / keyboard open: always jump to the latest message.
   useEffect(() => {
@@ -324,6 +345,40 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
       recent: briefing.recentlyDelivered.length,
     });
   }, [history, recipientsLoaded, seed, briefing, messages.length]);
+
+  // Back from a wallet top-up started in chat: hold the funds for the gift it was for, then say so.
+  // Runs after the greeting seed and only appends, so neither replaces the other.
+  const walletHoldApplied = useRef(false);
+  useEffect(() => {
+    if (history === 'loading' || !recipientsLoaded || !seeded.current || walletHoldApplied.current) return;
+    walletHoldApplied.current = true;
+    const pending = takePendingWalletHold();
+    if (!pending) return;
+    const first = pending.recipientName.split(' ')[0] || pending.recipientName;
+    void (async () => {
+      for (let attempt = 1; attempt <= HOLD_ATTEMPTS; attempt += 1) {
+        const hold = await holdGiftFunds(pending.scheduledGiftId).catch(() => null);
+        if (hold?.held) {
+          await queryClient.invalidateQueries({ queryKey: ['recipients'] });
+          setMessages((current) => [...current, {
+            role: 'assistant',
+            content: `Funds added. ${money(hold.amount)} is set aside for ${first}'s ${pending.giftTitle}, and it's charged only when I place the order closer to the date.`,
+          }]);
+          return;
+        }
+        if (hold && attempt === HOLD_ATTEMPTS) {
+          const available = user?.id ? await getAvailableBalance(user.id) : 0;
+          setMessages((current) => [...current, {
+            role: 'assistant',
+            content: `Your wallet still doesn't cover ${first}'s gift. If you just added funds they may take a moment to land.`,
+            ui: [{ module: 'wallet_topup', scheduledGiftId: pending.scheduledGiftId, recipientName: pending.recipientName, giftTitle: pending.giftTitle, needed: hold.needed, available }],
+          }]);
+          return;
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, HOLD_RETRY_MS));
+      }
+    })();
+  }, [history, recipientsLoaded, queryClient, user?.id]);
 
   // New turns / typing indicator: stay pinned only when already near the bottom (or forced by send/focus).
   useEffect(() => {
@@ -441,8 +496,94 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     setReviewStates((s) => ({ ...s, [key]: scheduled ? 'scheduled' : 'pending' }));
   };
 
+  // Live gift state from the recipients query, so cards follow a top-up or an order webhook without a new reply.
+  const giftsById = useMemo(() => {
+    const map = new Map<string, GiftRecord>();
+    for (const recipient of recipients) {
+      for (const gift of recipient.scheduled_gifts || []) if (gift.id) map.set(gift.id, gift);
+    }
+    return map;
+  }, [recipients]);
+  const stageOf = useCallback((giftId: string): GiftStage | null => {
+    const gift = giftsById.get(giftId);
+    return gift ? giftStage(gift) : null;
+  }, [giftsById]);
+
+  /** True once the gift this review approved has its funds held (or is further along). */
+  const reviewFunded = (review: GiftReview) => {
+    const recipient = recipients.find((r) => r.id === review.recipientId);
+    const gift = (recipient?.scheduled_gifts || []).find(
+      (g) => g.gift_variant_id === review.productId && g.occasion_date === review.occasionDate,
+    );
+    return Boolean(gift && giftStage(gift) !== 'scheduled');
+  };
+
+  const topUp = (mod: WalletTopUpModule, amount: number) => {
+    void trackProductEvent('dashboard_thea_wallet_topup_started', { amount });
+    return startGiftTopUp(amount, { scheduledGiftId: mod.scheduledGiftId, recipientName: mod.recipientName, giftTitle: mod.giftTitle });
+  };
+
+  const holdFromBalance = async (mod: WalletTopUpModule) => {
+    const hold = await holdGiftFunds(mod.scheduledGiftId);
+    if (hold.held) await queryClient.invalidateQueries({ queryKey: ['recipients'] });
+    return hold.held;
+  };
+
+  // "Finish payment" / "Add funds" chips fund the gift from the wallet right here in chat.
+  const showWalletTopUp = async (item: BriefingItem) => {
+    const gift = item.giftId ? giftsById.get(item.giftId) : undefined;
+    if (!gift?.id) {
+      onOpenRecipient(item.recipientId, 'open');
+      return;
+    }
+    const first = item.recipientName.split(' ')[0] || item.recipientName;
+    const giftTitle = gift.gift_type || gift.gift_description || 'their gift';
+    const available = user?.id ? await getAvailableBalance(user.id) : 0;
+    stickToBottomRef.current = true;
+    setMessages((current) => [...current, {
+      role: 'assistant',
+      content: `${first}'s ${giftTitle} is approved and just needs wallet funds. Add some below and I'll hold them until I place the order.`,
+      ui: [{
+        module: 'wallet_topup',
+        scheduledGiftId: gift.id!,
+        recipientName: item.recipientName,
+        giftTitle,
+        needed: calculateGiftCost(Number(gift.payment_amount ?? gift.estimated_cost) || 0),
+        available,
+      }],
+    }]);
+  };
+
+  // A review's address comes from the live recipient, so saving one (here or anywhere) updates the card.
+  const reviewAddress = (review: GiftReview): ReviewAddress | null => {
+    const recipient = recipients.find((r) => r.id === review.recipientId);
+    if (!recipient || !hasRecipientAddress(recipient)) return null;
+    return { street: recipient.street!, city: recipient.city!, state: recipient.state!, zipCode: recipient.zip_code! };
+  };
+
+  // Writes only the address, only for this review's recipient, so nothing else about them can change here.
+  const saveReviewAddress = async (review: GiftReview, address: ReviewAddress) => {
+    if (!user?.id) return false;
+    const recipient = recipients.find((r) => r.id === review.recipientId);
+    const { error } = await supabase.from('recipients').update({
+      street: address.street, city: address.city, state: address.state, zip_code: address.zipCode,
+      country: recipient?.country || 'United States', updated_at: new Date().toISOString(),
+    }).eq('id', review.recipientId).eq('user_id', user.id);
+    if (error) {
+      console.error('Saving review address failed', error);
+      return false;
+    }
+    void trackProductEvent('dashboard_thea_review_address_saved', {});
+    await queryClient.invalidateQueries({ queryKey: ['recipients'] });
+    return true;
+  };
+
   const handleChip = (item: BriefingItem) => {
-    if (item.action === 'address' || item.action === 'interests' || item.action === 'open' || item.action === 'payment' || item.action === 'review') {
+    if (item.action === 'payment') {
+      void showWalletTopUp(item);
+      return;
+    }
+    if (item.action === 'address' || item.action === 'interests' || item.action === 'open' || item.action === 'review') {
       onOpenRecipient(item.recipientId, item.action);
       if (item.action === 'address' || item.action === 'interests') {
         onSwitchToManual();
@@ -517,7 +658,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
                   className="max-w-[85%] rounded-[18px] rounded-tr-[6px] px-3.5 py-2.5 text-[14px] leading-5"
                   style={{ background: U.ink, color: U.buttonText, opacity: message.failed ? 0.6 : 1 }}
                 >
-                  {message.content}
+                  {hideProductIds(message.content)}
                 </div>
                 {message.failed && (
                   <p className="mt-1 text-[12px]" style={{ color: U.accent }}>
@@ -553,17 +694,23 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
                       review={message.review}
                       state={reviewStates[reviewKey(message.review)] || 'pending'}
                       disabled={sending || index !== latestReviewIndex}
+                      address={reviewAddress(message.review)}
+                      funded={reviewFunded(message.review)}
                       onConfirm={() => void confirmReview(message.review!)}
                       onChange={() => void send('Let’s look at other options.')}
-                      onAddAddress={() => onOpenRecipient(message.review!.recipientId, 'address')}
+                      onSaveAddress={(address) => saveReviewAddress(message.review!, address)}
                       onViewPlan={() => onOpenRecipient(message.review!.recipientId, 'open')}
                     />
                   )}
                   {message.ui && message.ui.length > 0 && (
                     <ChatUiModules
                       modules={message.ui}
+                      disabled={sending}
                       onAddRecipient={onAddRecipient}
                       onEditRecipient={onEditRecipient}
+                      stageOf={stageOf}
+                      onTopUp={topUp}
+                      onUseBalance={holdFromBalance}
                     />
                   )}
                 </div>
@@ -627,7 +774,9 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
         className={`u-thea-composer shrink-0${composerFocused ? ' u-thea-composer--focused' : ''}`}
       >
         <div className="flex items-end gap-2">
-          <input
+          <textarea
+            ref={inputRef}
+            rows={1}
             value={input}
             onChange={(event) => setInput(event.target.value)}
             onFocus={() => {

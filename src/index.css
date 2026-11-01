@@ -656,6 +656,11 @@
   appearance: none;
   padding: 10px 4px;
   min-height: 44px;
+  /* A textarea that grows with its text (height set in TheaHomeTab); scrolls once it hits the cap. */
+  max-height: 148px;
+  overflow-y: auto;
+  resize: none;
+  display: block;
 }
 .u-thea-composer__input::placeholder {
   color: #9A8E7C;
@@ -685,6 +690,7 @@
 .u-thea-character--chat { height: clamp(118px, 19dvh, 160px); max-width: 210px; }
 .u-thea-character--medium { height: clamp(170px, 27dvh, 245px); max-width: 300px; }
 .u-thea-character--large { height: clamp(175px, 32dvh, 310px); max-width: 360px; }
+.u-thea-character--landing { height: clamp(260px, 42vh, 420px); max-width: 420px; }
 
 .u-thea-character__glow {
   position: absolute;

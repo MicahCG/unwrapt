@@ -2,9 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Logo } from "@/components/ui/logo";
 import LandingHero from "@/components/landing/LandingHero";
-import PinnedJourney from "@/components/landing/PinnedJourney";
-import OccasionPortal from "@/components/landing/OccasionPortal";
-import LuxuryGiftShowcase from "@/components/LuxuryGiftShowcase";
+import TheaStory from "@/components/landing/TheaStory";
 import FinalCta from "@/components/landing/FinalCta";
 import PricingSection from "@/components/landing/PricingSection";
 import FAQSection from "@/components/landing/FAQSection";
@@ -117,11 +115,7 @@ const Landing = () => {
       />
 
       <Divider />
-      <PinnedJourney />
-      <Divider />
-      <OccasionPortal />
-      <Divider />
-      <LuxuryGiftShowcase />
+      <TheaStory />
       <Divider />
       <PricingSection ctaVariant={ctaVariant} experiment={ctaExperiment} />
       <Divider />

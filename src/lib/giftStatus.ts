@@ -13,7 +13,24 @@ export type GiftRecord = {
   estimated_cost?: number | null;
   delivery_date?: string | null;
   tracking_number?: string | null;
+  goody_order_id?: string | null;
+  automation_enabled?: boolean | null;
+  payment_amount?: number | null;
+  recipient_id?: string | null;
 };
+
+/** Where a gift is on its way to the recipient. Mirrors giftStage in supabase/functions/thea-chat. */
+export const giftStage = (gift: GiftRecord): 'scheduled' | 'funded' | 'ordered' | 'in_transit' | 'delivered' => {
+  const status = (gift.status || '').toLowerCase();
+  if (status === 'delivered') return 'delivered';
+  if (status === 'shipped') return 'in_transit';
+  if (status === 'ordered' || gift.goody_order_id) return 'ordered';
+  if (gift.wallet_reserved || gift.payment_status === 'paid') return 'funded';
+  return 'scheduled';
+};
+
+/** Paid from the wallet: approved in Thea's chat (or funded there) and handed to the automation lifecycle. */
+export const isWalletGift = (gift: GiftRecord) => Boolean(gift.automation_enabled || gift.wallet_reserved);
 
 export type RecipientRecord = {
   id: string;
@@ -119,7 +136,7 @@ export const getGiftStatus = (gift: GiftRecord, recipient: RecipientRecord): Gif
   if (raw.includes('cancel') || raw.includes('fail') || raw.includes('exception')) return statuses.attention;
   if (raw === 'delivered') return statuses.delivered;
   if (raw === 'shipped' || Boolean(gift.tracking_number)) return statuses.shipped;
-  if (raw === 'ordered' || Boolean(gift.shopify_order_id) || Boolean(gift.fulfilled_at)) return statuses.ordered;
+  if (raw === 'ordered' || Boolean(gift.shopify_order_id) || Boolean(gift.goody_order_id) || Boolean(gift.fulfilled_at)) return statuses.ordered;
 
   const readiness = getGiftReadiness(gift, recipient);
   const completeCount = readiness.filter((item) => item.complete).length;

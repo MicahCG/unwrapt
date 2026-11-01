@@ -11,6 +11,7 @@ import {
   buildTurnContextMessage,
   checkRecommendationIntegrity,
   extractTappedProductId,
+  giftStage,
   looksLikeConfirmation,
   matchNamedRecommendedProduct,
   nextOccasionDate,
@@ -301,6 +302,16 @@ Deno.test("resolvePresentUi requires an owned recipient for edit_recipient", () 
 Deno.test("resolvePresentUi rejects unknown modules and bogus focus values", () => {
   assertEquals(resolvePresentUi({ module: "wallet" }, null).ok, false);
   assertEquals(resolvePresentUi({ module: "add_recipient", focus: "ssn" }, null), { ok: true, ui: { module: "add_recipient" } });
+});
+
+Deno.test("giftStage follows a gift from approval to delivery", () => {
+  const gift = { status: "approved", payment_status: "unpaid", wallet_reserved: false, goody_order_id: null };
+  assertEquals(giftStage(gift), "scheduled");
+  assertEquals(giftStage({ ...gift, wallet_reserved: true }), "funded");
+  assertEquals(giftStage({ ...gift, status: "confirmed", payment_status: "paid" }), "funded");
+  assertEquals(giftStage({ ...gift, status: "ordered", goody_order_id: "g1" }), "ordered");
+  assertEquals(giftStage({ ...gift, status: "shipped", goody_order_id: "g1" }), "in_transit");
+  assertEquals(giftStage({ ...gift, status: "delivered", goody_order_id: "g1" }), "delivered");
 });
 
 Deno.test("looksLikeCalendarConnectIntent catches connect / import asks", () => {

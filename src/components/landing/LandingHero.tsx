@@ -1,9 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { ArrowRight } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
-import ceramicCollection from "@/assets/ceramic-collection.png";
 import PaperDust from "@/components/landing/PaperDust";
-import HeroGiftCanvasLazy from "@/components/landing/HeroGiftCanvasLazy";
 
 const softEase = [0.22, 1, 0.36, 1] as const;
 
@@ -17,23 +15,6 @@ const LandingHero: React.FC<LandingHeroProps> = ({
   onGetStarted,
 }) => {
   const reduceMotion = useReducedMotion();
-  const [isNarrow, setIsNarrow] = useState(false);
-  const [heroInView, setHeroInView] = useState(true);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 767px)");
-    const apply = () => setIsNarrow(mq.matches);
-    apply();
-    mq.addEventListener("change", apply);
-    return () => mq.removeEventListener("change", apply);
-  }, []);
-
-  useEffect(() => {
-    const onScroll = () => setHeroInView(window.scrollY < window.innerHeight * 1.1);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
 
   return (
     <section
@@ -52,43 +33,7 @@ const LandingHero: React.FC<LandingHeroProps> = ({
         content="Premium gift scheduling service with smart reminders, personalized gift ideas, and automatic delivery"
       />
 
-      {/* Full-bleed ceramic atmosphere */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <motion.img
-          src={ceramicCollection}
-          alt=""
-          aria-hidden="true"
-          className="absolute left-1/2 top-1/2 w-[120vmin] max-w-none -translate-x-1/2 -translate-y-[48%] object-cover opacity-[0.22] blur-[1px]"
-          initial={reduceMotion ? false : { opacity: 0, scale: 1.08 }}
-          animate={{ opacity: 0.22, scale: 1 }}
-          transition={{ duration: 1.6, ease: softEase }}
-        />
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(ellipse at 50% 40%, transparent 20%, rgba(248,241,230,0.55) 70%, #F8F1E6 100%)",
-          }}
-        />
-      </div>
-
       {!reduceMotion && <PaperDust density={22} />}
-
-      {/* 3D gift — dominant plane behind / through type */}
-      <motion.div
-        className="pointer-events-none absolute inset-x-0 top-[12%] mx-auto h-[52vmin] min-h-[240px] max-h-[520px] w-[min(92vw,640px)] sm:pointer-events-auto"
-        initial={reduceMotion ? false : { opacity: 0, scale: 1.06 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 1.2, delay: 0.15, ease: softEase }}
-        aria-hidden="true"
-      >
-        <HeroGiftCanvasLazy
-          className="h-full w-full"
-          revealProgress={0}
-          active={heroInView}
-          forcePoster={isNarrow}
-        />
-      </motion.div>
 
       <div className="relative z-10 mx-auto w-full max-w-[920px]">
         <div className="flex flex-col items-center text-center">
