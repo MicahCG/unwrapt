@@ -28,7 +28,8 @@ import { giftStage, hasRecipientAddress, type GiftRecord, type RecipientRecord }
 import { calculateGiftCost, getAvailableBalance, holdGiftFunds, startGiftTopUp, takePendingWalletHold } from '@/lib/wallet';
 import { trackProductEvent } from '@/lib/productAnalytics';
 import { useTheaReaction } from '@/hooks/useTheaReaction';
-import { importRemainingCalendarPeople, useCalendarConnected } from '@/hooks/useCalendarConnection';
+import { importNewPeople, importRemainingCalendarPeople, useCalendarConnected } from '@/hooks/useCalendarConnection';
+import { clearOnboardingFoundPeople, loadOnboardingFoundPeople } from '@/lib/onboardingFoundPeople';
 import { startCalendarConnect } from '@/lib/calendarConnection';
 import { cleanTheaText, hideProductIds, renderTheaText } from '@/lib/theaText';
 import { theaChatPose } from '@/lib/theaState';
@@ -409,38 +410,51 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     })();
   }, [history, recipientsLoaded, queryClient, user?.id]);
 
-  // Onboarding saves only the few people the user picked. In the chat, quietly bring in everyone
-  // else from their calendar and tell them, so Thea isn't working from a partial list.
+  // Onboarding focuses on a few people and saves only the one the user picked. Once they're
+  // subscribed and in the chat, bring in everyone else it found (and anyone else on a connected
+  // Google Calendar), then say so, so Thea isn't working from a partial list.
   const calendarImportStarted = useRef(false);
   useEffect(() => {
     if (history === 'loading' || !recipientsLoaded || !seeded.current || calendarImportStarted.current) return;
-    if (!user?.id || !calendarChecked || !calendarConnected) return;
-    const key = `${CALENDAR_IMPORT_KEY}:${user.id}`;
+    if (!user?.id || !calendarChecked) return;
+    const userId = user.id;
+    const key = `${CALENDAR_IMPORT_KEY}:${userId}`;
+    let calendarDone = false;
     try {
-      if (localStorage.getItem(key)) return;
+      calendarDone = Boolean(localStorage.getItem(key));
     } catch {
-      /* storage unavailable; the import skips people already saved, so running again is safe */
+      /* storage unavailable; imports skip people already saved, so running again is safe */
     }
+    const found = loadOnboardingFoundPeople(userId);
+    const importCalendar = calendarConnected && !calendarDone;
+    if (!found?.people.length && !importCalendar) return;
     calendarImportStarted.current = true;
     void (async () => {
+      let added = 0;
       try {
-        const added = await importRemainingCalendarPeople(user.id);
-        try {
-          localStorage.setItem(key, new Date().toISOString());
-        } catch {
-          /* storage unavailable */
+        if (found?.people.length) {
+          added += (await importNewPeople(userId, found.people, found.sourceLabel)).length;
+          clearOnboardingFoundPeople(userId);
         }
-        if (!added.length) return;
-        await queryClient.invalidateQueries({ queryKey: ['recipients'] });
-        const people = added.length === 1 ? '1 more person' : `${added.length} more people`;
-        setMessages((current) => [...current, {
-          role: 'assistant',
-          content: `I brought in ${people} from your calendar, so everyone's saved now. I'll keep my focus on dates in the next 30 days, and you can ask me about anyone further out. If someone's missing, just tell me and I'll add them.`,
-        }]);
-        void trackProductEvent('dashboard_calendar_remaining_imported', { count: added.length });
+        if (importCalendar) {
+          added += (await importRemainingCalendarPeople(userId)).length;
+          try {
+            localStorage.setItem(key, new Date().toISOString());
+          } catch {
+            /* storage unavailable */
+          }
+        }
       } catch (err) {
         console.error('Importing the rest of the calendar failed', err);
       }
+      if (!added) return;
+      await queryClient.invalidateQueries({ queryKey: ['recipients'] });
+      const people = added === 1 ? 'the other person' : `the other ${added} people`;
+      setMessages((current) => [...current, {
+        role: 'assistant',
+        content: `I've imported ${people} from ${found?.sourceLabel || 'your calendar'}, so I can automate their gifts too. You can always see and reference them in your calendar. I'll keep my focus on dates in the next 30 days, and you can ask me about anyone further out. If someone's missing, just tell me and I'll add them.`,
+      }]);
+      void trackProductEvent('dashboard_calendar_remaining_imported', { count: added });
     })();
   }, [history, recipientsLoaded, calendarChecked, calendarConnected, queryClient, user?.id]);
 

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ShieldCheck, Sparkles } from 'lucide-react';
+import { CalendarHeart, ShieldCheck, Sparkles } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -42,6 +42,7 @@ import {
   type OnboardingStep,
 } from '@/lib/onboardingProgress';
 import { savePendingGiftResume } from '@/lib/postSubscribeResume';
+import { loadOnboardingFoundPeople, saveOnboardingFoundPeople } from '@/lib/onboardingFoundPeople';
 
 interface AgentOnboardingFlowProps {
   /** Called once recipients are created so the parent can show the dashboard. */
@@ -113,11 +114,10 @@ function groupEventsIntoPeople(events: CalendarEvent[]): Person[] {
       if (event.type === 'anniversary' && !p.anniversary) p.anniversary = event.date;
     }
   });
-  // Soonest occasions first; cap the list so the Continue CTA fits on mobile.
+  // Soonest occasions first. The caller shows only the first few; the rest come in after subscribing.
   // Choose the first person by default so this step always has one clear focus.
   return Array.from(map.values())
     .sort((a, b) => nextOccasionTime(a.primaryDate) - nextOccasionTime(b.primaryDate))
-    .slice(0, ONBOARDING_PEOPLE_PICKER_LIMIT)
     .map((p, i) => ({ ...p, selected: i === 0 }));
 }
 
@@ -411,7 +411,7 @@ function FoundPeopleScreen({
               <span style={{ color: U.accent }}>
                 {people.length} {people.length === 1 ? 'person' : 'people'}
               </span>{' '}
-              in {sourceLabel}.
+              with upcoming {people.every((p) => p.primaryType !== 'anniversary') ? 'birthdays' : 'birthdays and anniversaries'} in {sourceLabel}.
             </>
           )}
         </Display>
@@ -503,6 +503,8 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
   const [connecting, setConnecting] = useState(false);
   const [people, setPeople] = useState<Person[]>([]);
   const [peopleSource, setPeopleSource] = useState<BirthdaySource>('google');
+  /** Everyone the scan found; onboarding focuses on a few and the rest come in after subscribing. */
+  const [foundPeopleCount, setFoundPeopleCount] = useState(0);
   const [scanLabel, setScanLabel] = useState('Reading your calendar…');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [focusingId, setFocusingId] = useState<string | null>(null);
@@ -613,6 +615,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
           shouldResumeOnboarding(progress.step) && progress.recipients.length > 0;
 
         if (canResume) {
+          setFoundPeopleCount(loadOnboardingFoundPeople(user.id)?.people.length ?? 0);
           const restored = progress.recipients.map((row, index) => {
             const fields = personFieldsFromRecipient(row, index);
             return { ...fields, tone: toneForIndex(index) } as Person;
@@ -761,6 +764,14 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     }
   };
 
+  /** Shows the soonest few people and keeps everyone found for after subscribing. */
+  const showFoundPeople = (found: Person[], source: BirthdaySource) => {
+    if (user?.id) saveOnboardingFoundPeople(user.id, found, SOURCE_LABEL[source]);
+    setFoundPeopleCount(found.length);
+    setPeople(found.slice(0, ONBOARDING_PEOPLE_PICKER_LIMIT));
+    setScreen('found');
+  };
+
   const fetchCalendarEvents = async (autoAdvance = false) => {
     setScanning(true);
     if (autoAdvance) setScreen('import');
@@ -783,8 +794,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       setTimeout(() => {
         setScanning(false);
         if (grouped.length > 0) {
-          setPeople(grouped);
-          setScreen('found');
+          showFoundPeople(grouped, 'google');
         } else {
           setCalendarNotice('Your calendar is connected, but I didn’t find birthdays or anniversaries yet. Add someone yourself and I’ll take it from there.');
         }
@@ -807,8 +817,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     setCalendarNotice(null);
     setPeopleSource(source);
     if (source === 'typed') {
-      setPeople(grouped);
-      setScreen('found');
+      showFoundPeople(grouped, source);
       return;
     }
     // The same short "reading" beat as Google, for the concierge feel.
@@ -816,8 +825,7 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
     setScanning(true);
     window.setTimeout(() => {
       setScanning(false);
-      setPeople(grouped);
-      setScreen('found');
+      showFoundPeople(grouped, source);
     }, 1100);
   };
 
@@ -1602,6 +1610,8 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
       const first = firstNameOf(activePerson.name);
       const occasion = occasionPhrase(activePerson);
       const interests = activePerson.interests.length ? activePerson.interests : intelFacts;
+      // Everyone found except the person being set up now.
+      const otherPeopleCount = Math.max(0, foundPeopleCount - (activePerson.fromCalendar ? 1 : 0));
       const headline = occasion
         ? `Here are options I’d recommend for ${first}’s ${occasion}.`
         : `Here are options I’d recommend for ${first}.`;
@@ -1653,6 +1663,14 @@ const AgentOnboardingFlow: React.FC<AgentOnboardingFlowProps> = ({ onComplete })
             <p className="mt-2 text-[12.5px] leading-5" style={{ color: '#D8CFC1' }}>
               Thea keeps refining picks like these, remembers the occasion, and brings you a recommendation when it’s time. You approve before any purchase.
             </p>
+            {otherPeopleCount > 0 && (
+              <div className="mt-3 flex items-start gap-2 border-t pt-3" style={{ borderColor: 'rgba(216,207,193,0.2)' }}>
+                <CalendarHeart size={16} color={U.accent} className="mt-0.5 shrink-0" aria-hidden="true" />
+                <p className="text-[12.5px] leading-5">
+                  Import the other {otherPeopleCount} {otherPeopleCount === 1 ? 'person' : 'people'} {peopleSource === 'contacts' ? 'in' : 'on'} {SOURCE_LABEL[peopleSource]} and automate their gifts too.
+                </p>
+              </div>
+            )}
           </section>
 
           <div className="mt-4 flex items-center justify-center gap-2 text-[11.5px]" style={{ color: U.muted }}>

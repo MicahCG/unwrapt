@@ -76,14 +76,28 @@ async function insertPeople(userId: string, people: CalendarCandidate[], sourceL
   return data?.length ?? people.length;
 }
 
+/** Saves whichever of these people aren't saved yet, without a review. Returns who was added. */
+export async function importNewPeople(
+  userId: string,
+  people: Array<{ name: string; birthday: string | null; anniversary: string | null }>,
+  sourceLabel: string,
+): Promise<CalendarCandidate[]> {
+  const byKey = new Map<string, CalendarCandidate>();
+  for (const p of people) {
+    const key = normalizeRecipientName(p.name);
+    if (key && !byKey.has(key)) byKey.set(key, { key, name: p.name, birthday: p.birthday, anniversary: p.anniversary });
+  }
+  const remaining = await unsavedPeople(userId, byKey);
+  if (remaining.length) await insertPeople(userId, remaining, sourceLabel);
+  return remaining;
+}
+
 /**
  * Onboarding only saves the few people the user picked. Once they're in Thea's chat, bring in
  * everyone else from the connected calendar without another review. Returns who was added.
  */
 export async function importRemainingCalendarPeople(userId: string): Promise<CalendarCandidate[]> {
-  const remaining = await unsavedPeople(userId, await fetchGoogleCalendarPeople());
-  if (remaining.length) await insertPeople(userId, remaining, SOURCE_LABEL.google);
-  return remaining;
+  return importNewPeople(userId, [...(await fetchGoogleCalendarPeople()).values()], SOURCE_LABEL.google);
 }
 
 /** Whether this user has a live Google Calendar connection (shared cache across screens). */
