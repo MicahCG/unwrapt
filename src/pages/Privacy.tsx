@@ -61,6 +61,9 @@ const Privacy = () => {
                 <li>Payment information when you subscribe to VIP or add funds to your gift wallet. We do not store your full card number - this is handled directly by our payment processor, Stripe. We do store a reference to your saved payment method so we can process wallet reloads and subscription renewals you've authorized.</li>
               </ul>
               <p className="mb-4">
+                <strong>Birthdays and anniversaries from your phone (optional).</strong> If you choose to, you can let Thea find birthdays and anniversaries from your iPhone Contacts or Apple Calendar, or by uploading a contacts (.vcf) or calendar (.ics) file. This is read-only - we never create, edit, or delete anything in your contacts or calendar - and only the person's name and the date of the birthday or anniversary are read; we do not read phone numbers, emails, addresses, or other contact details. This reading and matching happens on your device, not on our servers, and nothing is sent to us or stored until you review the people found and choose which ones to save as recipients.
+              </p>
+              <p className="mb-4">
                 <strong>Information about the people you're gifting to.</strong> To schedule and send a gift, we collect information you provide about your gift recipients, which may include their name, shipping address, birthday or anniversary, relationship to you, interests, and (optionally) their email or phone number. This information is provided by you, not collected directly from the recipient, and is used solely to plan, personalize, and deliver their gift.
               </p>
               <p>
@@ -78,6 +81,7 @@ const Privacy = () => {
               <ul className="list-disc list-inside space-y-2 mb-4">
                 <li>Authenticate you and create your account in the app.</li>
                 <li>Display your Google Calendar events inside the app to help sync schedules, and highlight important dates such as birthdays and anniversaries.</li>
+                <li>If you choose to use it, read birthdays and anniversaries from your iPhone Contacts, Apple Calendar, or an uploaded contacts/calendar file, so you can quickly add the people you want Thea to help you gift for.</li>
                 <li>Curate, personalize, and recommend gifts for the recipients you tell us about.</li>
                 <li>Process payments, manage your subscription, and process gift wallet transactions.</li>
                 <li>Source, order, and ship gifts through our fulfillment partner.</li>
@@ -106,7 +110,7 @@ const Privacy = () => {
                 4. Data Storage, Security, and Service Providers
               </h2>
               <p className="mb-4">
-                Account, recipient, gift, and payment-related data you provide is stored in our database for as long as your account is active, so we can keep your gift plans, history, and preferences available to you. Google Calendar data is accessed in real time via the Google API and is not separately stored beyond what's needed to display it in the app.
+                Account, recipient, gift, and payment-related data you provide is stored in our database for as long as your account is active, so we can keep your gift plans, history, and preferences available to you. Google Calendar data is accessed in real time via the Google API and is not separately stored beyond what's needed to display it in the app. Your iPhone Contacts and Apple Calendar are read and processed only on your device - this data is never transmitted to or stored on our servers, except for the specific names and dates of the recipients you choose to save, which are then stored like any other recipient information.
               </p>
               <p className="mb-4">We work with the following service providers, each of which only receives the data needed to perform its function for us:</p>
               <ul className="list-disc list-inside space-y-2 mb-4">
@@ -140,6 +144,7 @@ const Privacy = () => {
               <ul className="list-disc list-inside space-y-2">
                 <li>Turn off optional emails (occasion reminders, gift tips, savings alerts) at any time in Settings.</li>
                 <li>Turn off gift automation, or change how much Thea can approve without asking, at any time in Settings.</li>
+                <li>Revoke the app's access to your iPhone Contacts or Calendar at any time in your iPhone's Settings app, under Settings &gt; Unwrapt.</li>
                 <li>
                   Revoke the app's access to your Google Account at any time via your Google Account Permissions:
                   <a
