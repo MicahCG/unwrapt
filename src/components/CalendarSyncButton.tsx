@@ -10,6 +10,8 @@ import { formatOccasionDate } from '@/lib/dateUtils';
 
 interface CalendarSyncButtonProps {
   className?: string;
+  /** Pill-only: overrides the default pill colors, so it can match the chrome of wherever it's dropped in. */
+  style?: React.CSSProperties;
   /** Softer pill that matches the Manual tab chrome, with inline status and next steps. */
   appearance?: 'default' | 'pill';
   /** Offered whenever the calendar can't help, so the user can keep going by hand. */
@@ -84,7 +86,7 @@ const CalendarImportReview: React.FC<{
   );
 };
 
-const CalendarSyncButton = ({ className, appearance = 'default', onAddManually, returnTo }: CalendarSyncButtonProps) => {
+const CalendarSyncButton = ({ className, style, appearance = 'default', onAddManually, returnTo }: CalendarSyncButtonProps) => {
   const { toast } = useToast();
   const { isConnected, status, sourceLabel, connect, findCandidates, reviewFound, importCandidates, dismiss } = useCalendarConnection(returnTo);
   const [choosing, setChoosing] = useState(false);
@@ -133,7 +135,7 @@ const CalendarSyncButton = ({ className, appearance = 'default', onAddManually, 
           disabled={busy}
           aria-busy={busy}
           className={className || 'u-press inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border px-3.5 py-2.5 text-[12.5px] font-semibold disabled:opacity-60'}
-          style={{ borderColor: 'rgba(42,37,32,0.14)', background: '#F1E7D5', color: '#2A2520' }}
+          style={style || { borderColor: 'rgba(42,37,32,0.14)', background: '#F1E7D5', color: '#2A2520' }}
         >
           {icon}
           {pillLabel}

@@ -30,7 +30,7 @@ import { trackProductEvent } from '@/lib/productAnalytics';
 import { useTheaReaction } from '@/hooks/useTheaReaction';
 import { importNewPeople, importRemainingCalendarPeople, useCalendarConnected } from '@/hooks/useCalendarConnection';
 import { clearOnboardingFoundPeople, loadOnboardingFoundPeople } from '@/lib/onboardingFoundPeople';
-import { startCalendarConnect } from '@/lib/calendarConnection';
+import CalendarSyncButton from '@/components/CalendarSyncButton';
 import { cleanTheaText, hideProductIds, renderTheaText } from '@/lib/theaText';
 import { theaChatPose } from '@/lib/theaState';
 import { ensureCalendarConnectUi } from '@/lib/theaChatUi';
@@ -827,14 +827,12 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
             </button>
           ))}
           {!calendarConnected && (
-            <button
-              type="button"
-              onClick={() => void startCalendarConnect('/?tab=manual').catch(() => onSwitchToManual())}
+            <CalendarSyncButton
+              appearance="pill"
+              onAddManually={onSwitchToManual}
               className="u-press min-h-10 rounded-full border px-3 py-2 text-[12.5px] font-medium"
               style={{ background: U.surface, borderColor: U.border, color: U.ink }}
-            >
-              Connect Google Calendar
-            </button>
+            />
           )}
           <button
             type="button"
