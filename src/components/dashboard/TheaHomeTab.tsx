@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Send } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -264,8 +264,11 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     el.style.height = `${el.scrollHeight}px`;
   }, [input]);
 
-  // Composer focus / keyboard open: always jump to the latest message.
-  useEffect(() => {
+  // Composer focus / keyboard open: always jump to the latest message. A layout effect
+  // (not a plain effect) so the first pin lands before paint, ahead of iOS's own
+  // scroll-focused-input-into-view — otherwise that fires first and the list visibly
+  // jumps/blanks for a frame while our pin catches up.
+  useLayoutEffect(() => {
     if (!composerFocused) return;
     stickToBottomRef.current = true;
     const pin = () => {
