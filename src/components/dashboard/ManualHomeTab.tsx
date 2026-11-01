@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CalendarDays, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { PersonAvatar } from '@/components/unwrapt2/TheaAvatar';
@@ -7,7 +7,7 @@ import GiftStatusBadge from '@/components/GiftStatusBadge';
 import CalendarSyncButton from '@/components/CalendarSyncButton';
 import { U, toneForIndex, initialsOf } from '@/components/unwrapt2/theme';
 import { cleanName } from '@/lib/utils';
-import { formatOccasionDate, getDaysUntil, getNextOccurrence } from '@/lib/dateUtils';
+import { formatOccasionDate, getDaysUntil, getNextOccurrence, parseLocalDate } from '@/lib/dateUtils';
 import { getRecipientStatus, type RecipientRecord } from '@/lib/giftStatus';
 import { buildDashboardBriefing } from '@/lib/dashboardBriefing';
 
@@ -45,13 +45,14 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
     return map;
   }, [briefing]);
 
+  // Keyed by month and day, so birthdays repeat in every year the calendar pages to.
   const occasionDays = useMemo(() => {
     const map = new Map<string, { recipient: RecipientRecord; label: string }[]>();
     for (const recipient of recipients) {
       const dateStr = recipient.birthday || recipient.anniversary;
       if (!dateStr) continue;
-      const next = getNextOccurrence(dateStr);
-      const key = `${next.getFullYear()}-${next.getMonth()}-${next.getDate()}`;
+      const date = parseLocalDate(dateStr);
+      const key = `${date.getMonth()}-${date.getDate()}`;
       const label = recipient.birthday ? 'Birthday' : 'Anniversary';
       const list = map.get(key) || [];
       list.push({ recipient, label });
@@ -68,6 +69,14 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
     ...Array.from({ length: daysInMonth }, (_, i) => new Date(cursor.getFullYear(), cursor.getMonth(), i + 1)),
   ];
 
+  const occasionsOn = useCallback((day: Date) => {
+    const hits = occasionDays.get(`${day.getMonth()}-${day.getDate()}`) || [];
+    // Feb 29 birthdays land on Feb 28 in other years.
+    const isLeap = new Date(day.getFullYear(), 1, 29).getMonth() === 1;
+    if (day.getMonth() === 1 && day.getDate() === 28 && !isLeap) return [...hits, ...(occasionDays.get('1-29') || [])];
+    return hits;
+  }, [occasionDays]);
+
   const sortedRecipients = useMemo(() => {
     let list = [...recipients].sort((a, b) => {
       const aDate = a.birthday || a.anniversary;
@@ -78,12 +87,11 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
       return getNextOccurrence(aDate).getTime() - getNextOccurrence(bDate).getTime();
     });
     if (selectedDay) {
-      const key = `${selectedDay.getFullYear()}-${selectedDay.getMonth()}-${selectedDay.getDate()}`;
-      const matches = new Set((occasionDays.get(key) || []).map((m) => m.recipient.id));
+      const matches = new Set(occasionsOn(selectedDay).map((m) => m.recipient.id));
       if (matches.size) list = list.filter((r) => matches.has(r.id));
     }
     return list;
-  }, [recipients, selectedDay, occasionDays]);
+  }, [recipients, selectedDay, occasionsOn]);
 
   return (
     // Children keep their natural height; only this column scrolls (never squashed rows).
@@ -190,7 +198,7 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
           {cells.map((day, index) => {
             if (!day) return <div key={`empty-${index}`} className="aspect-square" />;
             const key = `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`;
-            const hits = occasionDays.get(key) || [];
+            const hits = occasionsOn(day);
             const isToday = sameDay(day, today);
             const isSelected = selectedDay ? sameDay(day, selectedDay) : false;
             return (

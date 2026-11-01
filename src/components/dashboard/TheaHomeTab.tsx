@@ -64,8 +64,10 @@ const money = (amount: number) =>
 /** A top-up's deposit lands by Stripe webhook, so holding right after the redirect may need a few tries. */
 const HOLD_RETRY_MS = 2500;
 const HOLD_ATTEMPTS = 5;
-/** Per user and device: the rest of their calendar has been brought in once. */
-const CALENDAR_IMPORT_KEY = 'unwrapt_calendar_remaining_imported';
+/** Per user and device: when the calendar was last checked for people who aren't saved yet. */
+const CALENDAR_SYNC_KEY = 'unwrapt_calendar_synced_at';
+/** Re-check the calendar this often, so birthdays added later still reach Thea. */
+const CALENDAR_SYNC_EVERY_MS = 6 * 60 * 60 * 1000;
 
 const TYPEWRITER_BASE_MS = 28;
 const TYPEWRITER_MAX_DURATION_MS = 4000;
@@ -418,15 +420,15 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     if (history === 'loading' || !recipientsLoaded || !seeded.current || calendarImportStarted.current) return;
     if (!user?.id || !calendarChecked) return;
     const userId = user.id;
-    const key = `${CALENDAR_IMPORT_KEY}:${userId}`;
-    let calendarDone = false;
+    const key = `${CALENDAR_SYNC_KEY}:${userId}`;
+    let lastSync = 0;
     try {
-      calendarDone = Boolean(localStorage.getItem(key));
+      lastSync = Number(localStorage.getItem(key)) || 0;
     } catch {
       /* storage unavailable; imports skip people already saved, so running again is safe */
     }
     const found = loadOnboardingFoundPeople(userId);
-    const importCalendar = calendarConnected && !calendarDone;
+    const importCalendar = calendarConnected && Date.now() - lastSync > CALENDAR_SYNC_EVERY_MS;
     if (!found?.people.length && !importCalendar) return;
     calendarImportStarted.current = true;
     void (async () => {
@@ -439,7 +441,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
         if (importCalendar) {
           added += (await importRemainingCalendarPeople(userId)).length;
           try {
-            localStorage.setItem(key, new Date().toISOString());
+            localStorage.setItem(key, String(Date.now()));
           } catch {
             /* storage unavailable */
           }
@@ -449,11 +451,13 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
       }
       if (!added) return;
       await queryClient.invalidateQueries({ queryKey: ['recipients'] });
-      const people = added === 1 ? 'the other person' : `the other ${added} people`;
-      setMessages((current) => [...current, {
-        role: 'assistant',
-        content: `I've imported ${people} from ${found?.sourceLabel || 'your calendar'}, so I can automate their gifts too. You can always see and reference them in your calendar. I'll keep my focus on dates in the next 30 days, and you can ask me about anyone further out. If someone's missing, just tell me and I'll add them.`,
-      }]);
+      // The first import follows onboarding's few people; later checks only find newly added birthdays.
+      const firstImport = Boolean(found?.people.length) || !lastSync;
+      const people = added === 1 ? 'person' : 'people';
+      const content = firstImport
+        ? `I've imported the other ${added === 1 ? 'person' : `${added} people`} from ${found?.sourceLabel || 'your calendar'}, so I can automate their gifts too. You can always see and reference them in your calendar. I'll keep my focus on dates in the next 30 days, and you can ask me about anyone further out. If someone's missing, just tell me and I'll add them.`
+        : `I found ${added} new ${people} in your calendar and added them. You'll see them in your calendar, and I'll bring them up as their dates get close.`;
+      setMessages((current) => [...current, { role: 'assistant', content }]);
       void trackProductEvent('dashboard_calendar_remaining_imported', { count: added });
     })();
   }, [history, recipientsLoaded, calendarChecked, calendarConnected, queryClient, user?.id]);
