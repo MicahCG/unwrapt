@@ -14,7 +14,7 @@ const DEFAULTS = {
   title: "Unwrapt - Automatic Gift Scheduling & Thoughtful Gift Ideas",
   description:
     "Never forget special occasions. Unwrapt automatically schedules and delivers personalized, premium gifts for birthdays, anniversaries, and holidays.",
-  ogImage: "https://unwrapt.io/lovable-uploads/6170f25c-7f24-484e-92c6-9fb845379f79.png",
+  ogImage: "https://app.unwrapt.io/og-thea.png",
   siteUrl: "https://unwrapt.io",
 };
 
