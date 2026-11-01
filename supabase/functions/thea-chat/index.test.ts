@@ -365,6 +365,24 @@ Deno.test("formatAccountRosterSection lists saved people and connected calendar 
   assert(section?.includes("do not open calendar_connect"));
 });
 
+Deno.test("account roster orders by next occurrence across the new year", () => {
+  const dec15 = new Date(2026, 11, 15);
+  const roster = buildAccountRosterFromRows(
+    [
+      { name: "March", birthday: "1990-03-01" },
+      { name: "January", birthday: "1985-01-04" },
+      { name: "December", birthday: "1970-12-20" },
+      { name: "No date" },
+    ],
+    true,
+    dec15,
+  );
+  assertEquals(roster.people.map((p) => p.name), ["December", "January", "March", "No date"]);
+  assertEquals(roster.people.map((p) => p.daysAway), [5, 20, 76, null]);
+  assert(roster.people[1].occasion?.includes("2027-01-04"));
+  assert(formatAccountRosterSection(roster)?.includes("2 of them have an occasion in the next 30 days"));
+});
+
 Deno.test("formatAccountRosterSection notes when calendar is disconnected", () => {
   const section = formatAccountRosterSection(buildAccountRosterFromRows([], false));
   assert(section?.includes("Saved people: none yet"));

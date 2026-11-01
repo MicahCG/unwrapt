@@ -28,7 +28,7 @@ import { giftStage, hasRecipientAddress, type GiftRecord, type RecipientRecord }
 import { calculateGiftCost, getAvailableBalance, holdGiftFunds, startGiftTopUp, takePendingWalletHold } from '@/lib/wallet';
 import { trackProductEvent } from '@/lib/productAnalytics';
 import { useTheaReaction } from '@/hooks/useTheaReaction';
-import { useCalendarConnected } from '@/hooks/useCalendarConnection';
+import { importRemainingCalendarPeople, useCalendarConnected } from '@/hooks/useCalendarConnection';
 import { startCalendarConnect } from '@/lib/calendarConnection';
 import { cleanTheaText, hideProductIds, renderTheaText } from '@/lib/theaText';
 import { theaChatPose } from '@/lib/theaState';
@@ -63,6 +63,8 @@ const money = (amount: number) =>
 /** A top-up's deposit lands by Stripe webhook, so holding right after the redirect may need a few tries. */
 const HOLD_RETRY_MS = 2500;
 const HOLD_ATTEMPTS = 5;
+/** Per user and device: the rest of their calendar has been brought in once. */
+const CALENDAR_IMPORT_KEY = 'unwrapt_calendar_remaining_imported';
 
 const TYPEWRITER_BASE_MS = 28;
 const TYPEWRITER_MAX_DURATION_MS = 4000;
@@ -145,7 +147,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   const briefing = useMemo(() => buildDashboardBriefing(recipients, autopilotThreshold), [recipients, autopilotThreshold]);
   const seed = useMemo(() => buildBriefingMessage(displayName, briefing), [displayName, briefing]);
   const chips = useMemo(() => briefingQuickChips(briefing), [briefing]);
-  const { data: calendarConnected = true } = useCalendarConnected();
+  const { data: calendarConnected = true, isSuccess: calendarChecked } = useCalendarConnected();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [history, setHistory] = useState<HistoryState>('loading');
@@ -406,6 +408,41 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
       }
     })();
   }, [history, recipientsLoaded, queryClient, user?.id]);
+
+  // Onboarding saves only the few people the user picked. In the chat, quietly bring in everyone
+  // else from their calendar and tell them, so Thea isn't working from a partial list.
+  const calendarImportStarted = useRef(false);
+  useEffect(() => {
+    if (history === 'loading' || !recipientsLoaded || !seeded.current || calendarImportStarted.current) return;
+    if (!user?.id || !calendarChecked || !calendarConnected) return;
+    const key = `${CALENDAR_IMPORT_KEY}:${user.id}`;
+    try {
+      if (localStorage.getItem(key)) return;
+    } catch {
+      /* storage unavailable; the import skips people already saved, so running again is safe */
+    }
+    calendarImportStarted.current = true;
+    void (async () => {
+      try {
+        const added = await importRemainingCalendarPeople(user.id);
+        try {
+          localStorage.setItem(key, new Date().toISOString());
+        } catch {
+          /* storage unavailable */
+        }
+        if (!added.length) return;
+        await queryClient.invalidateQueries({ queryKey: ['recipients'] });
+        const people = added.length === 1 ? '1 more person' : `${added.length} more people`;
+        setMessages((current) => [...current, {
+          role: 'assistant',
+          content: `I brought in ${people} from your calendar, so everyone's saved now. I'll keep my focus on dates in the next 30 days, and you can ask me about anyone further out. If someone's missing, just tell me and I'll add them.`,
+        }]);
+        void trackProductEvent('dashboard_calendar_remaining_imported', { count: added.length });
+      } catch (err) {
+        console.error('Importing the rest of the calendar failed', err);
+      }
+    })();
+  }, [history, recipientsLoaded, calendarChecked, calendarConnected, queryClient, user?.id]);
 
   // New turns / typing indicator: stay pinned only when already near the bottom (or forced by send/focus).
   useEffect(() => {

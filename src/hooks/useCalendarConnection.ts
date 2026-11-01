@@ -31,6 +31,61 @@ type CalendarEvent = { category?: string; personName?: string; date?: string };
 
 const dateOnly = (date: string | null | undefined) => (date ? date.split('T')[0] : null);
 
+/** Every birthday/anniversary person in the connected Google Calendar, keyed by normalized name. */
+export async function fetchGoogleCalendarPeople(): Promise<Map<string, CalendarCandidate>> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Please sign in again.');
+  const { data, error } = await supabase.functions.invoke('google-calendar', {
+    body: { action: 'fetch_dashboard_events' },
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  });
+  if (error || data?.error) throw await toCalendarError(error, data);
+
+  const people = new Map<string, CalendarCandidate>();
+  for (const event of (data?.events || []) as CalendarEvent[]) {
+    if (!event.personName || (event.category !== 'birthday' && event.category !== 'anniversary')) continue;
+    const key = normalizeRecipientName(event.personName);
+    const person = people.get(key) || { key, name: event.personName, birthday: null, anniversary: null };
+    if (event.category === 'birthday') person.birthday ||= dateOnly(event.date);
+    else person.anniversary ||= dateOnly(event.date);
+    people.set(key, person);
+  }
+  return people;
+}
+
+/** Drops people this user already saved (matched by normalized name). */
+async function unsavedPeople(userId: string, people: Map<string, CalendarCandidate>): Promise<CalendarCandidate[]> {
+  const { data: existing } = await supabase.from('recipients').select('name').eq('user_id', userId);
+  const known = new Set((existing || []).map((r) => normalizeRecipientName(r.name)));
+  return [...people.values()].filter((p) => !known.has(p.key));
+}
+
+async function insertPeople(userId: string, people: CalendarCandidate[], sourceLabel: string): Promise<number> {
+  const { data, error } = await supabase
+    .from('recipients')
+    .insert(people.map((p) => ({
+      user_id: userId,
+      name: p.name,
+      birthday: p.birthday,
+      anniversary: p.anniversary,
+      interests: [],
+      notes: `Imported from ${sourceLabel.replace('your ', '')}`,
+    })))
+    .select('id');
+  if (error) throw error;
+  return data?.length ?? people.length;
+}
+
+/**
+ * Onboarding only saves the few people the user picked. Once they're in Thea's chat, bring in
+ * everyone else from the connected calendar without another review. Returns who was added.
+ */
+export async function importRemainingCalendarPeople(userId: string): Promise<CalendarCandidate[]> {
+  const remaining = await unsavedPeople(userId, await fetchGoogleCalendarPeople());
+  if (remaining.length) await insertPeople(userId, remaining, SOURCE_LABEL.google);
+  return remaining;
+}
+
 /** Whether this user has a live Google Calendar connection (shared cache across screens). */
 export function useCalendarConnected() {
   const { user } = useAuth();
@@ -70,9 +125,7 @@ export function useCalendarConnection(returnTo = '/?tab=manual') {
       setStatus({ kind: 'no_events' });
       return;
     }
-    const { data: existing } = await supabase.from('recipients').select('name').eq('user_id', user.id);
-    const known = new Set((existing || []).map((r) => normalizeRecipientName(r.name)));
-    const candidates = [...people.values()].filter((p) => !known.has(p.key));
+    const candidates = await unsavedPeople(user.id, people);
     setStatus(candidates.length ? { kind: 'review', candidates } : { kind: 'up_to_date' });
   }, [user]);
 
@@ -106,24 +159,7 @@ export function useCalendarConnection(returnTo = '/?tab=manual') {
     setSourceLabel(SOURCE_LABEL.google);
     setStatus({ kind: 'syncing' });
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Please sign in again.');
-      const { data, error } = await supabase.functions.invoke('google-calendar', {
-        body: { action: 'fetch_dashboard_events' },
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      if (error || data?.error) throw await toCalendarError(error, data);
-
-      const people = new Map<string, CalendarCandidate>();
-      for (const event of (data?.events || []) as CalendarEvent[]) {
-        if (!event.personName || (event.category !== 'birthday' && event.category !== 'anniversary')) continue;
-        const key = normalizeRecipientName(event.personName);
-        const person = people.get(key) || { key, name: event.personName, birthday: null, anniversary: null };
-        if (event.category === 'birthday') person.birthday ||= dateOnly(event.date);
-        else person.anniversary ||= dateOnly(event.date);
-        people.set(key, person);
-      }
-      await showReview(people);
+      await showReview(await fetchGoogleCalendarPeople());
     } catch (error) {
       const code = (error as { code?: string }).code;
       if (code === 'access_expired') setStatus({ kind: 'expired' });
@@ -140,25 +176,17 @@ export function useCalendarConnection(returnTo = '/?tab=manual') {
       return;
     }
     setStatus({ kind: 'importing', candidates: selected });
-    const { data, error } = await supabase
-      .from('recipients')
-      .insert(selected.map((p) => ({
-        user_id: user.id,
-        name: p.name,
-        birthday: p.birthday,
-        anniversary: p.anniversary,
-        interests: [],
-        notes: `Imported from ${sourceLabel.replace('your ', '')}`,
-      })))
-      .select('id');
-    if (error) {
+    let count: number;
+    try {
+      count = await insertPeople(user.id, selected, sourceLabel);
+    } catch (error) {
       setStatus({ kind: 'review', candidates: selected });
       throw error;
     }
     // Prefix-match so both ['recipients'] and ['recipients', userId] refetch.
     await queryClient.invalidateQueries({ queryKey: ['recipients'] });
     await queryClient.invalidateQueries({ queryKey: ['calendar-connection', user.id] });
-    setStatus({ kind: 'imported', count: data?.length ?? selected.length });
+    setStatus({ kind: 'imported', count });
   }, [user, queryClient, sourceLabel]);
 
   const dismiss = useCallback(() => setStatus({ kind: 'idle' }), []);

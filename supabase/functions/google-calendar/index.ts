@@ -74,6 +74,49 @@ function extractPersonFromEvent(eventSummary: string) {
   return personName;
 }
 
+const MAX_EVENT_PAGES = 10
+
+/**
+ * Contact birthdays Google syncs into the primary calendar (eventType "birthday") can be titled
+ * with just the person's name. Give them the same "Name's birthday" title as hand-made events
+ * so the filters below pick them up. The user's own birthday ("self") is left out.
+ */
+function labelContactOccasion(event: any) {
+  const kind = event?.eventType === 'birthday' ? event.birthdayProperties?.type : null
+  if (kind !== 'birthday' && kind !== 'anniversary') return event
+  const summary = event.summary || ''
+  if (new RegExp(kind === 'birthday' ? 'birthday|bday' : 'anniversary', 'i').test(summary)) return event
+  return { ...event, summary: `${summary.trim()}'s ${kind}` }
+}
+
+/**
+ * Every event in the next 12 months. Google returns at most 250 per page, so a busy calendar
+ * used to stop a few weeks in and miss most birthdays; follow nextPageToken instead.
+ */
+async function listCalendarEvents(accessToken: string): Promise<{ items: any[]; error?: any }> {
+  const items: any[] = []
+  let pageToken: string | undefined
+  for (let page = 0; page < MAX_EVENT_PAGES; page++) {
+    const params = new URLSearchParams({
+      timeMin: new Date().toISOString(),
+      timeMax: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+      maxResults: '250',
+      singleEvents: 'true',
+      orderBy: 'startTime',
+    })
+    if (pageToken) params.set('pageToken', pageToken)
+    const response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`, {
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+    })
+    const data = await response.json()
+    if (data.error) return { items, error: data.error }
+    items.push(...(data.items || []).map(labelContactOccasion))
+    pageToken = data.nextPageToken
+    if (!pageToken) break
+  }
+  return { items }
+}
+
 // Encryption helper functions using Web Crypto API
 async function encryptToken(token: string): Promise<string> {
   const encryptionKey = Deno.env.get('TOKEN_ENCRYPTION_KEY');
@@ -390,19 +433,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Onboarding flow - fetch events for the next 12 months so we don't miss recurring dates
-      const calendarResponse = await fetch(
-        'https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=' + 
-        new Date().toISOString() +
-        '&timeMax=' +
-        new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString() + // Next 12 months
-        '&maxResults=250&singleEvents=true&orderBy=startTime',
-        {
-          headers: { 'Authorization': `Bearer ${validAccessToken}` }
-        }
-      )
-
-      const calendarData = await calendarResponse.json()
+      const calendarData = await listCalendarEvents(validAccessToken)
 
       if (calendarData.error) {
         console.error('❌ Calendar API error (onboarding):', calendarData.error);
@@ -531,19 +562,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      // NEW: Dashboard flow - fetch comprehensive events for multiple people
-      const calendarResponse = await fetch(
-        'https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=' + 
-        new Date().toISOString() + 
-        '&timeMax=' + 
-        new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString() + // Next 12 months
-        '&maxResults=250&singleEvents=true&orderBy=startTime',
-        {
-          headers: { 'Authorization': `Bearer ${validAccessToken}` }
-        }
-      )
-
-      const calendarData = await calendarResponse.json()
+      const calendarData = await listCalendarEvents(validAccessToken)
 
       if (calendarData.error) {
         console.error('❌ Calendar API error:', calendarData.error);

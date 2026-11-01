@@ -31,6 +31,12 @@ export type DashboardBriefing = {
 
 const firstName = (name: string) => cleanName(name).split(/\s+/)[0] || 'them';
 
+/**
+ * Thea's default horizon. With a whole calendar imported, nudging about everyone at once is
+ * noise, so the briefing only covers occasions this close. Gifts already in progress always show.
+ */
+export const FOCUS_WINDOW_DAYS = 30;
+
 /** profiles.autopilot_level -> the $ amount Thea can confirm without asking first. */
 export const AUTOPILOT_THRESHOLDS: Record<string, number> = {
   always: 0,
@@ -70,24 +76,22 @@ export function buildDashboardBriefing(
     const occasionDate = recipient.birthday || recipient.anniversary;
     const occasionLabel = recipient.birthday ? 'birthday' : recipient.anniversary ? 'anniversary' : 'occasion';
     const status = getRecipientStatus(recipient);
+    const daysAway = occasionDate ? getDaysUntil(occasionDate) : null;
+    const inFocus = daysAway != null && daysAway <= FOCUS_WINDOW_DAYS;
 
-    if (occasionDate) {
-      const days = getDaysUntil(occasionDate);
-      if (days != null && days <= 60) {
-        upcoming.push({
-          recipientId: recipient.id,
-          recipientName: cleanName(recipient.name),
-          label: `${name}'s ${occasionLabel}`,
-          detail: days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `In ${days} days · ${formatOccasionDate(occasionDate)}`,
-          kind: 'upcoming',
-          action: 'open',
-        });
-      }
+    if (occasionDate && inFocus) {
+      upcoming.push({
+        recipientId: recipient.id,
+        recipientName: cleanName(recipient.name),
+        label: `${name}'s ${occasionLabel}`,
+        detail: daysAway === 0 ? 'Today' : daysAway === 1 ? 'Tomorrow' : `In ${daysAway} days · ${formatOccasionDate(occasionDate)}`,
+        kind: 'upcoming',
+        action: 'open',
+      });
     }
 
     if (!hasRecipientAddress(recipient) && occasionDate) {
-      const days = getDaysUntil(occasionDate);
-      if (days != null && days <= 90) {
+      if (inFocus) {
         needsInfo.push({
           recipientId: recipient.id,
           recipientName: cleanName(recipient.name),
@@ -99,7 +103,7 @@ export function buildDashboardBriefing(
       }
     }
 
-    if (!(recipient.interests || []).length) {
+    if (inFocus && !(recipient.interests || []).length) {
       needsInfo.push({
         recipientId: recipient.id,
         recipientName: cleanName(recipient.name),
@@ -172,7 +176,7 @@ export function buildDashboardBriefing(
     }
 
     // Surface status-level needs when no gifts yet but person is incomplete.
-    if (status.key === 'needs_details' && !needsInfo.some((n) => n.recipientId === recipient.id)) {
+    if (inFocus && status.key === 'needs_details' && !needsInfo.some((n) => n.recipientId === recipient.id)) {
       needsInfo.push({
         recipientId: recipient.id,
         recipientName: cleanName(recipient.name),

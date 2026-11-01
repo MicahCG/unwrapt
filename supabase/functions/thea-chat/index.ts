@@ -125,6 +125,8 @@ You may call present_ui more than once in the same turn (e.g. calendar_connect a
 If they already gave a clear new name (and optional relationship/dates/interests) in chat and just want you to save it, create_recipient is fine without a form. Prefer present_ui when they ask for a form, connection, or to fill in details themselves.
 
 ## Recipients: reading and saving details
+Focus on what's close. By default, only bring up occasions in the next 30 days (the next occurrence, so in December a January birthday counts). Talk about anyone further out only when the user asks, for example "who's coming up after that" or about a specific person. When someone the user mentions isn't saved, offer to add them; they can always just tell you about more people.
+
 Account context (when present) already lists saved people and whether a calendar is connected. Use that for count/list questions ("how many people", "who's on my calendar", "who have I added"). Call get_recipients whenever you need a real recipientId, whenever the user refers to someone by name, or whenever you're unsure if the person they're describing already exists. Never guess an id or invent one.
 - If the user gives you an address or interests for someone who already exists, call update_recipient. Parse any free-text address into street/city/state/zip/country yourself. Pass only the new interest(s) mentioned, not a full list; they're merged automatically and capped at 3.
 - If get_recipients returns more than one plausible match for who the user means, ask which one in one short line instead of guessing.
@@ -453,8 +455,12 @@ const sanitizeBriefingItems = (input: unknown, max: number): BriefingItem[] => {
 
 type AccountRoster = {
   calendarConnected: boolean;
-  people: Array<{ name: string; fromCalendar: boolean; occasion: string | null }>;
+  people: Array<{ name: string; fromCalendar: boolean; occasion: string | null; daysAway: number | null }>;
 };
+
+/** Thea's default horizon: occasions this close get her attention unless the user asks about others. */
+export const FOCUS_WINDOW_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Live saved-people + calendar connection for Thea (answers count/list questions). */
 export const formatAccountRosterSection = (roster: AccountRoster | null): string | null => {
@@ -473,28 +479,45 @@ export const formatAccountRosterSection = (roster: AccountRoster | null): string
     return `- ${bits.join(" · ")}`;
   });
   const more = count > 40 ? `\n(+${count - 40} more; call get_recipients for the rest)` : "";
-  return `Saved people (${count}):\n${lines.join("\n")}${more}\n${calendarLine}`;
+  const inFocus = roster.people.filter((p) => p.daysAway != null && p.daysAway <= FOCUS_WINDOW_DAYS).length;
+  const focusLine = `Sorted by next occasion, soonest first (a January date counts as soon in December). ${inFocus} of them have an occasion in the next ${FOCUS_WINDOW_DAYS} days. By default only bring up those; talk about people further out only when the user asks.`;
+  return `Saved people (${count}):\n${lines.join("\n")}${more}\n${focusLine}\n${calendarLine}`;
 };
 
 export const buildAccountRosterFromRows = (
   recipients: Array<{ name?: string | null; birthday?: string | null; anniversary?: string | null; notes?: string | null }>,
   calendarConnected: boolean,
+  today: Date = new Date(),
 ): AccountRoster => ({
   calendarConnected,
-  people: recipients.map((r) => {
-    const occasion = r.birthday
-      ? `birthday ${String(r.birthday).slice(0, 10)}`
-      : r.anniversary
-        ? `anniversary ${String(r.anniversary).slice(0, 10)}`
+  people: recipients
+    .map((r) => {
+      // The next time it comes around, which may be next year, so the model never does date math.
+      const next = nextOccasionDate(
+        r.birthday ? String(r.birthday).slice(0, 10) : null,
+        r.anniversary ? String(r.anniversary).slice(0, 10) : null,
+        today,
+      );
+      const daysAway = next ? daysUntilIsoDate(next.date, today) : null;
+      const occasion = next
+        ? `${next.occasionType} ${next.date}, ${daysAway === 0 ? "today" : daysAway === 1 ? "tomorrow" : `in ${daysAway} days`}`
         : null;
-    const notes = (r.notes || "").toLowerCase();
-    return {
-      name: (r.name || "Unknown").slice(0, 100),
-      fromCalendar: notes.includes("imported") || notes.includes("calendar"),
-      occasion,
-    };
-  }),
+      const notes = (r.notes || "").toLowerCase();
+      return {
+        name: (r.name || "Unknown").slice(0, 100),
+        fromCalendar: notes.includes("imported") || notes.includes("calendar"),
+        occasion,
+        daysAway,
+      };
+    })
+    .sort((a, b) => (a.daysAway ?? Infinity) - (b.daysAway ?? Infinity) || a.name.localeCompare(b.name)),
 });
+
+const daysUntilIsoDate = (iso: string, today: Date): number => {
+  const [y, m, d] = iso.split("-").map(Number);
+  const start = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((Date.UTC(y, m - 1, d) - start) / DAY_MS);
+};
 
 const buildContextMessage = (briefing: unknown, roster: AccountRoster | null = null): string | null => {
   const b = briefing && typeof briefing === "object" ? briefing as Record<string, unknown> : null;
@@ -532,7 +555,7 @@ const fetchAccountRoster = async (
         .select("name, birthday, anniversary, notes")
         .eq("user_id", userId)
         .order("name", { ascending: true })
-        .limit(50),
+        .limit(500),
       authClient.rpc("get_my_calendar_integration"),
     ]);
     const rows = (recipientsRes.data || []) as Array<{
@@ -1094,11 +1117,12 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 export const nextOccasionDate = (
   birthday: string | null,
   anniversary: string | null,
+  now: Date = new Date(),
 ): { occasion: string; occasionType: "birthday" | "anniversary"; date: string } | null => {
   const source = birthday || anniversary;
   if (!source || !ISO_DATE_RE.test(source)) return null;
   const [, month, day] = source.split("-").map(Number);
-  const today = new Date();
+  const today = new Date(now);
   today.setHours(0, 0, 0, 0);
   const thisYear = new Date(today.getFullYear(), month - 1, day);
   thisYear.setHours(0, 0, 0, 0);
@@ -1106,7 +1130,7 @@ export const nextOccasionDate = (
   return {
     occasion: birthday ? "Birthday" : "Anniversary",
     occasionType: birthday ? "birthday" : "anniversary",
-    date: next.toISOString().split("T")[0],
+    date: `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(next.getDate()).padStart(2, "0")}`,
   };
 };
 
@@ -1142,6 +1166,8 @@ const fetchOwnedRecipient = async (
   return (data as RecipientRow | null) ?? null;
 };
 
+const GET_RECIPIENTS_LIMIT = 60;
+
 const handleGetRecipients = async (
   authClient: ReturnType<typeof createClient>,
   userId: string,
@@ -1151,9 +1177,10 @@ const handleGetRecipients = async (
   if (typeof args.name_query === "string" && args.name_query.trim()) {
     query = query.ilike("name", `%${args.name_query.trim().slice(0, 80)}%`);
   }
-  const { data, error } = await query.limit(50);
+  const { data, error } = await query.limit(500);
   if (error) return { ok: false, error: error.message };
-  const recipients = (data as RecipientRow[] || []).map((r) => {
+  // Soonest next occurrence first (ISO dates sort as strings; a January date sorts after December's).
+  const all = (data as RecipientRow[] || []).map((r) => {
     const occasion = nextOccasionDate(r.birthday, r.anniversary);
     return {
       recipientId: r.id,
@@ -1163,12 +1190,16 @@ const handleGetRecipients = async (
       hasAddress: hasAddress(r),
       nextOccasion: occasion,
     };
-  });
+  }).sort((a, b) => (a.nextOccasion?.date ?? "9999").localeCompare(b.nextOccasion?.date ?? "9999"));
+  const recipients = all.slice(0, GET_RECIPIENTS_LIMIT);
   // Surfaced only for the caller's own cross-turn context tracking (see
   // TurnContext) when there's no ambiguity about who "in focus" means -
   // not part of the model-facing contract, which is just `recipients`.
   const singleMatch = recipients.length === 1 ? { id: recipients[0].recipientId, name: recipients[0].name } : undefined;
-  return { ok: true, recipients, singleMatch };
+  const more = all.length > recipients.length
+    ? { total: all.length, note: `Showing the ${recipients.length} soonest. Pass name_query to find anyone else.` }
+    : {};
+  return { ok: true, recipients, ...more, singleMatch };
 };
 
 const handleUpdateRecipient = async (
