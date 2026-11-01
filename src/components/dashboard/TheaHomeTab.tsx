@@ -191,11 +191,29 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     if (!scrollEl || !contentEl) return;
 
     const NEAR_BOTTOM_PX = 80;
+    // Only a finger, wheel, or scrollbar drag may unstick. The keyboard opening shrinks the
+    // list and fires scroll events too, and those used to unpin it mid-animation.
+    let userScrolling = false;
+    let wheelTimer: number | undefined;
+    const startUserScroll = () => { userScrolling = true; };
+    const endUserScroll = () => { userScrolling = false; };
+    const onWheel = () => {
+      userScrolling = true;
+      window.clearTimeout(wheelTimer);
+      wheelTimer = window.setTimeout(endUserScroll, 200);
+    };
     const handleScroll = () => {
-      stickToBottomRef.current =
-        scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < NEAR_BOTTOM_PX;
+      const nearBottom = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < NEAR_BOTTOM_PX;
+      if (nearBottom) stickToBottomRef.current = true;
+      else if (userScrolling) stickToBottomRef.current = false;
     };
     scrollEl.addEventListener('scroll', handleScroll, { passive: true });
+    scrollEl.addEventListener('touchstart', startUserScroll, { passive: true });
+    scrollEl.addEventListener('pointerdown', startUserScroll, { passive: true });
+    scrollEl.addEventListener('wheel', onWheel, { passive: true });
+    window.addEventListener('touchend', endUserScroll, { passive: true });
+    window.addEventListener('touchcancel', endUserScroll, { passive: true });
+    window.addEventListener('pointerup', endUserScroll, { passive: true });
 
     const pinIfSticky = () => {
       if (stickToBottomRef.current) scrollEl.scrollTop = scrollEl.scrollHeight;
@@ -205,7 +223,14 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     observer.observe(scrollEl);
 
     return () => {
+      window.clearTimeout(wheelTimer);
       scrollEl.removeEventListener('scroll', handleScroll);
+      scrollEl.removeEventListener('touchstart', startUserScroll);
+      scrollEl.removeEventListener('pointerdown', startUserScroll);
+      scrollEl.removeEventListener('wheel', onWheel);
+      window.removeEventListener('touchend', endUserScroll);
+      window.removeEventListener('touchcancel', endUserScroll);
+      window.removeEventListener('pointerup', endUserScroll);
       observer.disconnect();
     };
   }, []);
@@ -246,6 +271,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     // iOS keyboard + chrome collapse settle over a couple frames.
     const t1 = window.setTimeout(pin, 50);
     const t2 = window.setTimeout(pin, 280);
+    const t3 = window.setTimeout(pin, 600);
 
     const vv = window.visualViewport;
     const onViewport = () => pin();
@@ -256,6 +282,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
       cancelAnimationFrame(raf);
       window.clearTimeout(t1);
       window.clearTimeout(t2);
+      window.clearTimeout(t3);
       vv?.removeEventListener('resize', onViewport);
       vv?.removeEventListener('scroll', onViewport);
     };
