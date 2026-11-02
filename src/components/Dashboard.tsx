@@ -89,17 +89,26 @@ const Dashboard = () => {
     if (activeTab !== 'thea') setComposerFocused(false);
   }, [activeTab]);
 
-  // Layout effect, not a plain effect: this must land before the browser paints the
-  // focused state, or iOS gets a frame to scroll the page itself before we lock it —
-  // that's what let the whole page (not just the chat list) scroll under the keyboard.
+  // Lock the body for the whole time we're on the compact (phone-width) shell, not just
+  // while the composer is focused. A reactive, focus-triggered lock still left a gap
+  // between the native focus event and React's effect catching up - iOS filled that gap
+  // with its own "scroll the focused input into view" behavior, scrolling the document
+  // body itself (confirmed on a real device: the native scrollbar indicator was drawn
+  // along the page during the resulting blank, not just the chat list). Locking it ahead
+  // of time, before any focus can happen, removes the gap instead of racing it. Every
+  // scroll area on this route (the chat list, the Manual tab's list) already has its own
+  // internal overflow-y-auto container, so the body never needs to scroll here anyway.
   useLayoutEffect(() => {
-    if (!pinToKeyboard) return;
+    if (!compactChrome) return;
     const previousOverflow = document.body.style.overflow;
+    const previousOverscroll = document.body.style.overscrollBehavior;
     document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
     return () => {
       document.body.style.overflow = previousOverflow;
+      document.body.style.overscrollBehavior = previousOverscroll;
     };
-  }, [pinToKeyboard]);
+  }, [compactChrome]);
 
   const setActiveTab = useCallback((tab: DashboardTab) => {
     setSearchParams((prev) => {
