@@ -100,13 +100,32 @@ const Dashboard = () => {
   // internal overflow-y-auto container, so the body never needs to scroll here anyway.
   useLayoutEffect(() => {
     if (!compactChrome) return;
-    const previousOverflow = document.body.style.overflow;
-    const previousOverscroll = document.body.style.overscrollBehavior;
-    document.body.style.overflow = 'hidden';
-    document.body.style.overscrollBehavior = 'none';
+    // html can still scroll even when only body is locked - iOS used that gap for the
+    // same native focus-scroll behavior this is meant to shut out. Lock both, with an
+    // explicit height so neither has any overflow left to scroll in the first place.
+    const html = document.documentElement;
+    const body = document.body;
+    const previous = {
+      htmlOverflow: html.style.overflow,
+      htmlHeight: html.style.height,
+      htmlOverscroll: html.style.overscrollBehavior,
+      bodyOverflow: body.style.overflow,
+      bodyHeight: body.style.height,
+      bodyOverscroll: body.style.overscrollBehavior,
+    };
+    html.style.overflow = 'hidden';
+    html.style.height = '100%';
+    html.style.overscrollBehavior = 'none';
+    body.style.overflow = 'hidden';
+    body.style.height = '100%';
+    body.style.overscrollBehavior = 'none';
     return () => {
-      document.body.style.overflow = previousOverflow;
-      document.body.style.overscrollBehavior = previousOverscroll;
+      html.style.overflow = previous.htmlOverflow;
+      html.style.height = previous.htmlHeight;
+      html.style.overscrollBehavior = previous.htmlOverscroll;
+      body.style.overflow = previous.bodyOverflow;
+      body.style.height = previous.bodyHeight;
+      body.style.overscrollBehavior = previous.bodyOverscroll;
     };
   }, [compactChrome]);
 
