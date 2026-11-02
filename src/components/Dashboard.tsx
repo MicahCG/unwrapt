@@ -372,6 +372,24 @@ const Dashboard = () => {
 
   return (
     <>
+      {searchParams.get('debug') === 'viewport' && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            zIndex: 99999,
+            background: 'rgba(0,0,0,0.82)',
+            color: '#7CFF8A',
+            font: '10px/1.4 ui-monospace, monospace',
+            padding: '4px 6px',
+            pointerEvents: 'none',
+            whiteSpace: 'pre',
+          }}
+        >
+          {`innerH=${typeof window !== 'undefined' ? window.innerHeight : '?'} vv.h=${viewport.height} vv.off=${viewport.offsetTop} inset=${viewport.keyboardInset} manualFix=${needsManualKeyboardFix} pin=${pinToKeyboard} t=${Date.now() % 100000}`}
+        </div>
+      )}
       {successRecipient && (
         <GiftScheduledSuccess recipient={successRecipient} onComplete={handleSuccessComplete} isVisible={showSuccessAnimation} />
       )}
