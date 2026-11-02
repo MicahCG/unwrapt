@@ -23,7 +23,6 @@ import ManualHomeTab from '@/components/dashboard/ManualHomeTab';
 import AccountMenu from '@/components/dashboard/AccountMenu';
 import { AUTOPILOT_THRESHOLDS, type BriefingItem } from '@/lib/dashboardBriefing';
 import type { GiftCatalogItem } from '@/lib/giftCatalog';
-import { useVisualViewport } from '@/hooks/useVisualViewport';
 
 type DashboardTab = 'thea' | 'manual';
 
@@ -67,23 +66,15 @@ const Dashboard = () => {
   const tabParam = searchParams.get('tab');
   const activeTab: DashboardTab = tabParam === 'manual' ? 'manual' : 'thea';
   // Only pin to the visual viewport while Thea's composer is focused under the tab-bar
-  // layout — that's when the software keyboard otherwise zooms/shifts the shell.
+  // layout — that's when the software keyboard otherwise zooms/shifts the shell. The
+  // keyboard resize itself is left entirely to CSS (100dvh + index.html's
+  // interactive-widget=resizes-content) plus the html/body scroll lock below, rather
+  // than measuring window.visualViewport in JS and forcing an explicit canvas height -
+  // that measure-and-force approach went through several rounds (squished canvas,
+  // multi-second blanks, a shorter blank that cleared on the first keystroke) because
+  // it kept racing the keyboard's own in-progress resize/predictive-bar animation on a
+  // real device. Native CSS has no such race, and is consistent across browsers.
   const pinToKeyboard = compactChrome && activeTab === 'thea' && composerFocused;
-  const viewport = useVisualViewport(pinToKeyboard);
-  // Only force the canvas to an explicit pixel height/offset when there's an
-  // actual mismatch left to correct for. On a browser where the keyboard
-  // already natively resizes the layout viewport (interactive-widget=
-  // resizes-content, which index.html sets - supported from iOS 17.4),
-  // `100dvh` already shrinks the canvas correctly on its own, and
-  // visualViewport.height/offsetTop should read back as (near) the same
-  // value with ~0 inset left over - forcing an explicit height anyway risks
-  // fighting that native resize instead of matching it, and was the likely
-  // cause of a reported live gap between the composer and the keyboard that
-  // a correctly-measured viewport height did not reproduce in testing.
-  // `keyboardInset > 0` is exactly the classic pre-resizes-content signal
-  // (layout viewport stayed full height while the visual viewport shrank),
-  // which is when this manual fix is actually needed.
-  const needsManualKeyboardFix = pinToKeyboard && (viewport.keyboardInset > 24 || viewport.offsetTop > 0);
 
   useEffect(() => {
     if (activeTab !== 'thea') setComposerFocused(false);
@@ -421,17 +412,6 @@ const Dashboard = () => {
           pinToKeyboard ? 'overflow-hidden pt-3' : 'pt-10'
         } ${activeTab === 'thea' ? 'overflow-hidden' : 'overflow-y-auto'}`}
         footerClassName="lg:hidden"
-        canvasClassName={needsManualKeyboardFix ? '!min-h-0' : ''}
-        canvasStyle={
-          needsManualKeyboardFix && viewport.height
-            ? {
-                height: viewport.height,
-                maxHeight: viewport.height,
-                minHeight: viewport.height,
-                transform: viewport.offsetTop ? `translateY(${viewport.offsetTop}px)` : undefined,
-              }
-            : undefined
-        }
         footer={
           // Hide Thea/Manual while typing — the keyboard needs that space, and a modern
           // agent composer shouldn't compete with a tab bar.
