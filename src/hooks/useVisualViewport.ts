@@ -39,33 +39,30 @@ export function useVisualViewport(enabled = true): VisualViewportState {
   useEffect(() => {
     if (!enabled || typeof window === 'undefined') return;
 
-    // iOS fires several resize events in a burst while the keyboard and its predictive-text
-    // bar animate together, and the layout and visual viewports can transiently disagree
-    // mid-burst - committing every intermediate frame to state briefly applied a bogus,
-    // squished height to the pinned shell. Settle on the first and last reading of a burst
-    // (leading so the keyboard still raises instantly, trailing so we land on the real value).
+    // iOS fires several resize events in a burst while the keyboard (and its predictive-text
+    // bar) animate, including right when it first rises on focus, and the layout and visual
+    // viewports can transiently disagree mid-burst. CSS's own 100dvh / interactive-widget=
+    // resizes-content (index.html) already tracks the keyboard smoothly on its own during
+    // that transition, so there's nothing to gain by applying an intermediate reading early -
+    // including the very first one. Always wait for a burst to go quiet before committing a
+    // reading, so the pinned shell only ever sees the settled, correct value.
     let settleTimer: number | undefined;
     const SETTLE_MS = 60;
-    const sync = (immediate = false) => {
+    const sync = () => {
       window.clearTimeout(settleTimer);
-      if (immediate) {
-        setState(readViewport());
-        return;
-      }
       settleTimer = window.setTimeout(() => setState(readViewport()), SETTLE_MS);
     };
-    sync(true);
+    sync();
 
     const vv = window.visualViewport;
-    const onResize = () => sync();
-    vv?.addEventListener('resize', onResize);
-    vv?.addEventListener('scroll', onResize);
-    window.addEventListener('resize', onResize);
+    vv?.addEventListener('resize', sync);
+    vv?.addEventListener('scroll', sync);
+    window.addEventListener('resize', sync);
     return () => {
       window.clearTimeout(settleTimer);
-      vv?.removeEventListener('resize', onResize);
-      vv?.removeEventListener('scroll', onResize);
-      window.removeEventListener('resize', onResize);
+      vv?.removeEventListener('resize', sync);
+      vv?.removeEventListener('scroll', sync);
+      window.removeEventListener('resize', sync);
     };
   }, [enabled]);
 
