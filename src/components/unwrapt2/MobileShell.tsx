@@ -48,7 +48,7 @@ export const MobileShell: React.FC<MobileShellProps> = ({
 }) => (
   <div
     style={{ background: U.bg }}
-    className="relative flex min-h-screen w-full justify-center overflow-hidden"
+    className="relative flex min-h-[100dvh] w-full justify-center overflow-hidden"
   >
     {/* Ambient desktop-only decoration: sits behind the card, only visible
         in the margins once the viewport is wider than the canvas. */}
@@ -64,7 +64,7 @@ export const MobileShell: React.FC<MobileShellProps> = ({
     </div>
 
     <div
-      className={`relative z-10 flex h-[100dvh] min-h-screen w-full flex-col overflow-hidden ${maxWidthClassName} ${
+      className={`relative z-10 flex h-[100dvh] min-h-[100dvh] w-full flex-col overflow-hidden ${maxWidthClassName} ${
         animate ? 'animate-u-fadeUp' : ''
       } ${canvasClassName}`}
       style={{
