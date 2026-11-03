@@ -28,7 +28,8 @@ type EmailType =
   | 'subscription_cancelled'
   | 'order_cancelled'
   | 'occasion_reminder'
-  | 'gift_tip';
+  | 'gift_tip'
+  | 'gift_idea_reminder';
 
 interface EmailRequest {
   type: EmailType;
@@ -170,6 +171,8 @@ function getEmailSubject(type: EmailType, data: any): string {
       return `🎂 ${data?.recipientName}'s ${data?.occasion} is in ${data?.daysRemaining} days`;
     case 'gift_tip':
       return `✨ A gift idea for ${data?.recipientName}`;
+    case 'gift_idea_reminder':
+      return `🎂 ${data?.recipientName}'s ${data?.occasion || 'birthday'} is coming up`;
     default:
       return 'Notification from Unwrapt';
   }
@@ -726,6 +729,27 @@ function getEmailContent(type: EmailType, userName: string | undefined, data: an
             </div>
             <div class="cta">
               <a href="${data?.modifyLink || appUrl}" class="button primary">See this idea</a>
+            </div>
+          </div>
+          ${getFooter()}
+        </div>
+      `;
+
+    case 'gift_idea_reminder':
+      return `
+        ${baseStyles}
+        <div class="container">
+          <div class="header">
+            <h2>🎂 ${data?.recipientName}'s ${data?.occasion || 'birthday'} is coming up</h2>
+            <p>${greeting}</p>
+          </div>
+          <div class="content">
+            <p><strong>${data?.recipientName}'s</strong> ${data?.occasion || 'birthday'} is coming up and there's no gift scheduled yet.</p>
+            <div class="info-box">
+              <p>Come check out Unwrapt and schedule a gift for them - we've got a wide selection of options to choose from.</p>
+            </div>
+            <div class="cta">
+              <a href="${data?.modifyLink || appUrl}" class="button primary">Browse gift ideas</a>
             </div>
           </div>
           ${getFooter()}
