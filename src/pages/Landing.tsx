@@ -8,6 +8,7 @@ import FAQSection from "@/components/landing/FAQSection";
 import SEOHead from "@/components/seo/SEOHead";
 import { PublicChrome } from "@/components/marketing/PublicChrome";
 import { trackProductEvent } from "@/lib/productAnalytics";
+import { VIP_WEB_PRICE_LABEL } from "@/seo/site";
 
 const Divider = () => (
   <div
@@ -36,39 +37,46 @@ const Landing = () => {
       <Divider />
       <TheaStory />
       <Divider />
-      <PricingSection onCtaClick={() => trackCta("pricing")} />
-      <Divider />
-      <FAQSection />
-      <section className="px-6 py-16" style={{ backgroundColor: "#F8F1E6" }}>
-        <div className="mx-auto max-w-3xl text-center">
-          <h2 className="font-serif text-3xl text-[#3D3428] md:text-4xl">Keep reading</h2>
-          <p className="mx-auto mt-4 max-w-xl text-[#6B5D4D]">
-            The short version is on this page. The longer answers live on their own URLs, with the same facts.
+      <section id="about" className="scroll-mt-24 px-6 py-24 md:py-28" style={{ backgroundColor: "#F8F1E6" }}>
+        <div className="mx-auto max-w-xl text-center">
+          <p className="mb-4 text-xs uppercase tracking-[0.35em] text-[#8B7355]">About</p>
+          <h2 className="font-serif text-4xl tracking-tight text-[#3D3428] md:text-5xl">
+            For the dates you mean to keep
+          </h2>
+          <p className="mt-6 text-base leading-relaxed text-[#3D3428] md:text-lg">
+            Unwrapt is for people who want birthdays handled before the last minute. You save who matters. Thea suggests a gift and checks with you before it is purchased.
           </p>
-          <ul className="mt-8 flex flex-col items-center gap-3 text-[#3D3428]">
+          <p className="mt-4 text-base leading-relaxed text-[#6B5D4D]">
+            {`VIP is ${VIP_WEB_PRICE_LABEL} a month on the web. Gifts are priced separately and ship to a street address in the United States.`}
+          </p>
+          <ul className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-[#3D3428]">
             <li>
               <Link to="/how-it-works" className="underline decoration-[#D2B887] underline-offset-4">
-                How Unwrapt and Thea send a gift
+                How it works
               </Link>
             </li>
             <li>
               <Link to="/pricing" className="underline decoration-[#D2B887] underline-offset-4">
-                What VIP costs, and what the gift costs
+                Pricing
               </Link>
             </li>
             <li>
               <Link to="/faq" className="underline decoration-[#D2B887] underline-offset-4">
-                Delivery, approval, and cancellation
+                FAQ
               </Link>
             </li>
             <li>
               <Link to="/guides/never-forget-birthdays" className="underline decoration-[#D2B887] underline-offset-4">
-                How to stop forgetting birthdays
+                Birthday guide
               </Link>
             </li>
           </ul>
         </div>
       </section>
+      <Divider />
+      <PricingSection onCtaClick={() => trackCta("pricing")} />
+      <Divider />
+      <FAQSection />
       <FinalCta onCtaClick={() => trackCta("final")} />
     </PublicChrome>
   );

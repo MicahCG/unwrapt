@@ -14,7 +14,12 @@ function readDist(path: string) {
 test("prerendered public HTML has unique metadata and answer text", () => {
   const home = readDist("index.html");
   assert.match(home, /data-prerender="\/"/);
-  assert.match(home, /Thea, the gifting assistant, remembers the dates/);
+  assert.match(home, /<h1[\s\S]*Never miss[\s\S]*a moment[\s\S]*<\/h1>/);
+  assert.match(home, /Thea remembers the date, and you approve the gift\./);
+  assert.match(home, /id="about"/);
+  assert.match(home, /Thea suggests a gift and checks with you before it is purchased/);
+  assert.match(home, /VIP is \$4\.99 a month on the web/);
+  assert.equal(home.includes("You introduce the people who matter. Thea, the gifting assistant"), false);
   assert.match(home, /rel="canonical" href="https:\/\/www\.unwrapt\.io\/"/);
   assert.match(home, /<title[^>]*>Thea remembers birthdays and helps send gifts \| Unwrapt<\/title>/);
   assert.equal(home.includes("data-lov-"), false);
@@ -76,7 +81,8 @@ test("static routing returns real 404s and keeps app deep links", async () => {
     const home = await fetch(origin + "/", { headers: { "x-forwarded-host": "www.unwrapt.io" } });
     assert.equal(home.status, 200);
     const homeHtml = await home.text();
-    assert.match(homeHtml, /Thea, the gifting assistant/);
+    assert.match(homeHtml, /Thea remembers the date, and you approve the gift/);
+    assert.match(homeHtml, /id="about"/);
 
     const unknown = await fetch(origin + "/zzz-nope", { headers: { "x-forwarded-host": "www.unwrapt.io" } });
     assert.equal(unknown.status, 404);
@@ -98,7 +104,8 @@ test("static routing returns real 404s and keeps app deep links", async () => {
     const appHome = await fetch(origin + "/", { headers: { "x-forwarded-host": "app.unwrapt.io" } });
     assert.equal(appHome.status, 200);
     const appHtml = await appHome.text();
-    assert.equal(appHtml.includes("Thea, the gifting assistant"), false);
+    assert.equal(appHtml.includes("Thea remembers the date, and you approve the gift"), false);
+    assert.equal(appHtml.includes('id="about"'), false);
 
     const apex = await fetch(origin + "/faq", { headers: { "x-forwarded-host": "unwrapt.io" }, redirect: "manual" });
     assert.equal(apex.status, 308);
