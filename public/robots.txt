@@ -1,45 +1,20 @@
-
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
-# AI Search Engine Crawlers
-User-agent: GPTBot
-Allow: /
-
-User-agent: ChatGPT-User
-Allow: /
-
-User-agent: PerplexityBot
-Allow: /
-
-User-agent: Claude-Web
-Allow: /
-
-User-agent: anthropic-ai
-Allow: /
-
-User-agent: Applebot
-Allow: /
-
 User-agent: *
 Allow: /
+Disallow: /app
+Disallow: /settings
+Disallow: /gift-history
+Disallow: /history
+Disallow: /wishlist
+Disallow: /analytics
+Disallow: /notifications
+Disallow: /onboarding
+Disallow: /payment
+Disallow: /confirm-address
+Disallow: /gifts/
+Disallow: /auth/
+Disallow: /gift-choice/
+Disallow: /testing
+Disallow: /spa.html
+Disallow: /muse/
 
-# Sitemap
-Sitemap: https://unwrapt.io/sitemap.xml
-
-# Security: Block access to sensitive files
-User-agent: *
-Disallow: /.git/
-Disallow: /.hg/
-Disallow: /.env
-Disallow: /config/
-Disallow: /logs/
+Sitemap: https://www.unwrapt.io/sitemap.xml

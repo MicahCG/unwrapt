@@ -1,4 +1,5 @@
 import React, { useRef } from "react";
+import { Link } from "react-router-dom";
 import { motion, useInView, useReducedMotion } from "framer-motion";
 import { TheaCharacter } from "@/components/unwrapt2/TheaCharacter";
 import type { TheaPose, TheaReaction } from "@/components/unwrapt2/TheaFigure";
@@ -24,7 +25,7 @@ const chapters: Chapter[] = [
     title: "Tell me who",
     accent: "matters most",
     description:
-      "Family, friends, the clients you never want to forget. Introduce them once and I'll get to know what they love.",
+      "Family, friends, and anyone you do not want to forget. Introduce them once, with the dates and interests you actually know.",
     pose: "welcome",
     bubble: "Hi, I'm Thea!",
   },
@@ -34,7 +35,7 @@ const chapters: Chapter[] = [
     title: "I keep track of",
     accent: "every date",
     description:
-      "Birthdays, anniversaries, milestones. Pulled from your calendar or added once, then remembered every year.",
+      "Birthdays and other dates you add yourself, or import if you choose to connect a calendar. Thea keeps the ones you save.",
     pose: "thinking",
     bubble: "Mom's birthday is in 3 weeks",
   },
@@ -44,22 +45,22 @@ const chapters: Chapter[] = [
     title: "I find something",
     accent: "they'll actually love",
     description:
-      "Handmade, rare, carefully chosen pieces from small makers. Picked for the person, never pulled from a bestseller list.",
+      "Thea suggests a gift from the catalog. Fulfillment is through Goody. A suggestion can be unavailable, and you can skip it.",
     pose: "curious",
     reaction: "magnify",
-    bubble: "Ooh, she'd love this",
+    bubble: "Here's one idea",
   },
   {
     number: "04",
     eyebrow: "You decide",
     title: "You approve,",
-    accent: "it arrives on time",
+    accent: "then it can ship",
     description:
-      "Nothing ships without your yes. I prepare, schedule and send it, so the gift shows up right when it should.",
+      "By default Thea waits for your approval, and you see the price first. You can later allow gifts under a limit you set. Shipping is to a United States street address, not a same-day promise.",
     pose: "basic",
     reaction: "thumbsup",
-    bubble: "Approved in under a minute",
-    points: ["You approve every send", "Gift cost shown up front", "On time, every time"],
+    bubble: "Want me to send this?",
+    points: ["You approve by default", "Price shown first", "Ships in the United States"],
   },
 ];
 
@@ -74,16 +75,10 @@ const ChapterRow: React.FC<{ chapter: Chapter; index: number }> = ({ chapter, in
     <li
       ref={ref}
       className={`flex flex-col items-center gap-10 md:gap-16 ${theaOnRight ? "md:flex-row-reverse" : "md:flex-row"}`}
-      itemProp="step"
-      itemScope
-      itemType="https://schema.org/HowToStep"
     >
-      <meta itemProp="position" content={String(index + 1)} />
-
       <motion.div
         className="relative flex w-full max-w-[380px] shrink-0 items-end justify-center md:w-[44%] md:max-w-none"
-        initial={reduceMotion ? false : { opacity: 0, x: theaOnRight ? 32 : -32 }}
-        animate={inView ? { opacity: 1, x: 0 } : undefined}
+        initial={false}
         transition={{ duration: 0.8, ease: softEase }}
       >
         <div
@@ -106,8 +101,7 @@ const ChapterRow: React.FC<{ chapter: Chapter; index: number }> = ({ chapter, in
 
       <motion.div
         className="w-full max-w-xl text-center md:text-left"
-        initial={reduceMotion ? false : { opacity: 0, y: 24 }}
-        animate={inView ? { opacity: 1, y: 0 } : undefined}
+        initial={false}
         transition={{ duration: 0.8, delay: 0.12, ease: softEase }}
       >
         <p className="mb-4 text-xs uppercase tracking-[0.35em]" style={{ color: "#B59A77" }}>
@@ -120,7 +114,6 @@ const ChapterRow: React.FC<{ chapter: Chapter; index: number }> = ({ chapter, in
         <h3
           className="mb-5 font-serif text-4xl leading-[1.08] tracking-tight md:text-5xl"
           style={{ color: "#3D3428" }}
-          itemProp="name"
         >
           {chapter.title}
           <br />
@@ -129,7 +122,6 @@ const ChapterRow: React.FC<{ chapter: Chapter; index: number }> = ({ chapter, in
         <p
           className="mx-auto max-w-md text-base leading-relaxed md:mx-0 md:text-lg"
           style={{ color: "#6B5D4D" }}
-          itemProp="text"
         >
           {chapter.description}
         </p>
@@ -158,16 +150,19 @@ const TheaStory: React.FC = () => (
     id="journey"
     className="px-6 py-24 md:py-32"
     style={{ backgroundColor: "#F8F1E6" }}
-    itemScope
-    itemType="https://schema.org/HowTo"
   >
     <div className="mx-auto mb-20 max-w-2xl text-center md:mb-28">
       <p className="mb-4 text-xs uppercase tracking-[0.35em]" style={{ color: "#B59A77" }}>
         How it works
       </p>
-      <h2 className="font-serif text-4xl md:text-5xl" style={{ color: "#3D3428" }} itemProp="name">
+      <h2 className="font-serif text-4xl md:text-5xl" style={{ color: "#3D3428" }}>
         Meet Thea, <span style={{ color: "#8B7355" }}>your gifting concierge</span>
       </h2>
+      <p className="mt-4 text-base" style={{ color: "#6B5D4D" }}>
+        <Link to="/how-it-works" className="underline decoration-[#D2B887] underline-offset-4">
+          Read the full explanation
+        </Link>
+      </p>
     </div>
 
     <ol className="mx-auto flex max-w-6xl flex-col gap-24 md:gap-32">

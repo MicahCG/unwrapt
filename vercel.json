@@ -1,8 +1,51 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "trailingSlash": false,
+  "proxy": {
+    "entrypoint": "proxy.ts",
+    "matcher": ["/((?!assets/|lovable-uploads/).*)"]
+  },
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "unwrapt.io" }],
+      "destination": "https://www.unwrapt.io/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/landing",
+      "has": [{ "type": "host", "value": "www.unwrapt.io" }],
+      "destination": "/",
+      "permanent": true
+    }
+  ],
   "rewrites": [
+    { "source": "/app", "destination": "/spa.html" },
+    { "source": "/settings", "destination": "/spa.html" },
+    { "source": "/gift-history", "destination": "/spa.html" },
+    { "source": "/history", "destination": "/spa.html" },
+    { "source": "/wishlist", "destination": "/spa.html" },
+    { "source": "/analytics", "destination": "/spa.html" },
+    { "source": "/notifications", "destination": "/spa.html" },
+    { "source": "/onboarding", "destination": "/spa.html" },
+    { "source": "/payment/success", "destination": "/spa.html" },
+    { "source": "/payment-success", "destination": "/spa.html" },
+    { "source": "/gift-choice/:token", "destination": "/spa.html" },
+    { "source": "/confirm-address/:giftId", "destination": "/spa.html" },
+    { "source": "/gifts/confirm-address/:giftId", "destination": "/spa.html" },
+    { "source": "/auth/:path*", "destination": "/spa.html" }
+  ],
+  "headers": [
+    {
+      "source": "/spa.html",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+    },
     {
       "source": "/(.*)",
-      "destination": "/index.html"
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
     }
   ]
 }

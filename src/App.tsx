@@ -5,14 +5,20 @@ import Testing from './pages/Testing';
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/components/auth/AuthProvider";
-import { HelmetProvider } from "react-helmet-async";
+import { Helmet, HelmetProvider } from "react-helmet-async";
+import { isMarketingHostname } from "@/seo/site";
+import { isIndexablePublicPath, normalizePath } from "@/seo/routing";
 import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import AppStart from "./pages/AppStart";
 import Privacy from "./pages/Privacy";
 import TermsOfService from "./pages/TermsOfService";
+import HowItWorks from "./pages/HowItWorks";
+import PricingPage from "./pages/PricingPage";
+import FaqPage from "./pages/FaqPage";
+import NeverForgetBirthdays from "./pages/guides/NeverForgetBirthdays";
 import Settings from "./pages/Settings";
 import GiftHistory from "./pages/GiftHistory";
 import PaymentSuccess from "./pages/PaymentSuccess";
@@ -32,8 +38,20 @@ import RequirePaid from '@/components/auth/RequirePaid';
 const queryClient = new QueryClient();
 const isProd = import.meta.env.PROD;
 
+function RouteRobots() {
+  const { pathname } = useLocation();
+  const indexable =
+    isMarketingHostname(window.location.hostname) && isIndexablePublicPath(normalizePath(pathname));
+  if (indexable) return null;
+  return (
+    <Helmet>
+      <meta name="robots" content="noindex, nofollow" />
+    </Helmet>
+  );
+}
+
 function App() {
-  const isMarketingHost = ['unwrapt.io', 'www.unwrapt.io'].includes(window.location.hostname);
+  const isMarketingHost = isMarketingHostname(window.location.hostname);
 
   return (
     <HelmetProvider>
@@ -48,8 +66,13 @@ function App() {
             <TheaProvider>
             <ScrollToTop />
             <ProductAnalytics />
+            <RouteRobots />
             <Routes>
-              <Route path="/landing" element={<Landing />} />
+              <Route path="/landing" element={<Navigate to="/" replace />} />
+              <Route path="/how-it-works" element={<HowItWorks />} />
+              <Route path="/pricing" element={<PricingPage />} />
+              <Route path="/faq" element={<FaqPage />} />
+              <Route path="/guides/never-forget-birthdays" element={<NeverForgetBirthdays />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<TermsOfService />} />
               <Route path="/gift-choice/:token" element={<GiftChoice />} />

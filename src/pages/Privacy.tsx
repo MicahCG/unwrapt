@@ -18,7 +18,7 @@ const Privacy = () => {
 
   return (
     <div className="min-h-screen bg-gradient-primary">
-      <SEOHead title="Privacy Policy" description="Unwrapt privacy policy. Learn how we protect your data and handle personal information." canonical="https://unwrapt.io/privacy" />
+      <SEOHead title="Privacy Policy" description="How KinGira LLC collects, uses, and shares information when you use Unwrapt and Thea, including optional calendar access and gift delivery details." path="/privacy" />
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="bg-white rounded-2xl shadow-elegant p-8 md:p-12">
           <div className="mb-8">
@@ -48,7 +48,7 @@ const Privacy = () => {
             </p>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-brand-charcoal mb-4">
+              <h2 id="information-we-collect" className="text-2xl font-semibold text-brand-charcoal mb-4">
                 1. Information We Collect
               </h2>
               <p className="mb-4">
