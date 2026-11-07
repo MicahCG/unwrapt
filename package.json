@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsx scripts/write-seo-files.ts && vite build && tsx scripts/prerender-public.ts",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit",
+    "test": "tsx --test src/seo/routing.test.ts",
+    "test:html": "tsx --test src/seo/static-output.test.ts",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -61,6 +64,7 @@
     "@supabase/supabase-js": "^2.49.8",
     "@tanstack/react-query": "^5.56.2",
     "@vercel/analytics": "^2.0.1",
+    "@vercel/functions": "^3.11.0",
     "@vercel/speed-insights": "^2.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -101,6 +105,7 @@
     "lovable-tagger": "^1.1.7",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.11",
+    "tsx": "^4.23.15",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
     "vite": "^5.4.1"

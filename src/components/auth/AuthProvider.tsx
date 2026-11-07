@@ -30,7 +30,9 @@ const sha256Hex = async (text: string) => {
 /** Where a web sign-in should come back to. */
 const webRedirectUrl = () => {
   if (window.location.hostname === 'localhost') return `http://localhost:${window.location.port || '8080'}/`;
-  if (window.location.hostname === 'unwrapt.io') return 'https://app.unwrapt.io/';
+  if (window.location.hostname === 'unwrapt.io' || window.location.hostname === 'www.unwrapt.io') {
+    return 'https://app.unwrapt.io/';
+  }
   return `${window.location.origin}/`;
 };
 

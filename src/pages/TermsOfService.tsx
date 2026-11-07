@@ -18,7 +18,7 @@ const TermsOfService = () => {
 
   return (
     <div className="min-h-screen bg-gradient-primary">
-      <SEOHead title="Terms of Service" description="Unwrapt terms of service. Review our terms and conditions for using the automatic gift scheduling platform." canonical="https://unwrapt.io/terms" />
+      <SEOHead title="Terms of Service" description="Terms for using Unwrapt, including VIP billing, gift purchases, approval settings, and fulfillment by third-party partners." path="/terms" />
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="bg-white rounded-2xl shadow-elegant p-8 md:p-12">
           <div className="mb-8">
@@ -90,7 +90,7 @@ const TermsOfService = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-brand-charcoal mb-4">
+              <h2 id="payments" className="text-2xl font-semibold text-brand-charcoal mb-4">
                 5. Payments, Subscriptions, and Gift Wallet
               </h2>
               <ul className="list-disc list-inside space-y-2">

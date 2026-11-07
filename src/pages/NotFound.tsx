@@ -1,39 +1,44 @@
-
-import { useLocation, useNavigate } from "react-router-dom";
-import { useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Home } from "lucide-react";
+import { Link } from "react-router-dom";
+import SEOHead from "@/components/seo/SEOHead";
+import { PublicChrome } from "@/components/marketing/PublicChrome";
 
 const NotFound = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    console.error(
-      "404 Error: User attempted to access non-existent route:",
-      location.pathname
-    );
-  }, [location.pathname]);
-
-  const handleGoHome = () => {
-    console.log('🔧 NotFound: Navigating to home');
-    navigate('/');
-  };
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-brand-cream">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4 text-brand-charcoal">404</h1>
-        <p className="text-xl text-brand-charcoal/70 mb-4">Oops! Page not found</p>
-        <Button 
-          onClick={handleGoHome}
-          className="bg-brand-charcoal text-brand-cream hover:bg-brand-charcoal/90"
-        >
-          <Home className="h-4 w-4 mr-2" />
-          Return to Home
-        </Button>
+    <PublicChrome>
+      <SEOHead
+        noindex
+        title="Page not found"
+        description="That address is not a page on Unwrapt."
+      />
+      <div className="mx-auto max-w-xl px-6 py-24 text-center">
+        <h1 className="font-serif text-5xl text-[#3D3428]">Page not found</h1>
+        <p className="mt-4 text-lg text-[#6B5D4D]">
+          That URL is not a public page. If you were opening a gift, sign-in, or settings link, start from the app.
+        </p>
+        <ul className="mt-8 space-y-3 text-[#3D3428]">
+          <li>
+            <Link to="/" className="underline decoration-[#D2B887] underline-offset-4">
+              Home
+            </Link>
+          </li>
+          <li>
+            <Link to="/how-it-works" className="underline decoration-[#D2B887] underline-offset-4">
+              How it works
+            </Link>
+          </li>
+          <li>
+            <Link to="/pricing" className="underline decoration-[#D2B887] underline-offset-4">
+              Pricing
+            </Link>
+          </li>
+          <li>
+            <a href="https://app.unwrapt.io/" className="underline decoration-[#D2B887] underline-offset-4">
+              app.unwrapt.io
+            </a>
+          </li>
+        </ul>
       </div>
-    </div>
+    </PublicChrome>
   );
 };
 
