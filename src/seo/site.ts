@@ -1,4 +1,4 @@
-import { VIP_MONTHLY_AMOUNT_LABEL } from "../lib/stripe";
+import { VIP_MONTHLY_AMOUNT_LABEL } from "../lib/stripe.js";
 
 /**
  * Preferred public host. unwrapt.io already redirects to www in production;

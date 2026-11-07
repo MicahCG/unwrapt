@@ -1,4 +1,4 @@
-import { APP_HOST, APEX_HOST, CANONICAL_HOST, CANONICAL_ORIGIN, INDEXABLE_PATHS } from "./site";
+import { APP_HOST, APEX_HOST, CANONICAL_HOST, CANONICAL_ORIGIN, INDEXABLE_PATHS } from "./site.js";
 
 export type RouteDecision =
   | { type: "redirect"; status: 301 | 308; to: string }

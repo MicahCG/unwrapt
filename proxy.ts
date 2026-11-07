@@ -1,10 +1,12 @@
-import { decideRoute } from "./src/seo/routing";
+import { decideRoute } from "./src/seo/routing.js";
 
 /**
  * Vercel invokes this on every matched request. Do not import `@vercel/functions`:
  * its package root loads OIDC code that reads the filesystem at runtime,
  * and that throws inside the middleware bundle (MIDDLEWARE_INVOCATION_FAILED on
  * every host). `next` and `rewrite` only set the two headers below.
+ * Vercel ships this file unbundled as proxy.js on nodejs24.x. Relative imports
+ * need the .js specifier or Node throws ERR_MODULE_NOT_FOUND before any route runs.
  */
 function continueRequest(): Response {
   return new Response(null, { headers: { "x-middleware-next": "1" } });
