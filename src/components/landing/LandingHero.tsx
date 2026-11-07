@@ -1,5 +1,6 @@
 import { ArrowRight } from "lucide-react";
 import PaperDust from "@/components/landing/PaperDust";
+import { TheaFigure } from "@/components/unwrapt2/TheaFigure";
 import { APP_ORIGIN } from "@/seo/site";
 
 type LandingHeroProps = {
@@ -26,8 +27,14 @@ const LandingHero = ({ onCtaClick }: LandingHeroProps) => {
             <br />
             <span className="text-[#8B7355]">a moment</span>
           </h1>
-          <p className="mb-10 max-w-md text-base text-[#6B5D4D] md:text-lg">
-            Thea remembers the date, and you approve the gift.
+          <p className="mb-10 flex max-w-md items-center gap-3 text-left text-base text-[#6B5D4D] md:text-lg">
+            <span
+              aria-hidden="true"
+              className="h-16 w-16 shrink-0 overflow-hidden rounded-full border border-[#E8DCC8] bg-[#F3E7D3]"
+            >
+              <TheaFigure framing="portrait" pose="welcome" animated={false} style={{ width: "100%", height: "100%" }} />
+            </span>
+            Meet Thea, your gifting assistant.
           </p>
           <a
             href={APP_ORIGIN}
