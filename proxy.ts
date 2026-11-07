@@ -1,13 +1,33 @@
-import { next, rewrite } from "@vercel/functions";
 import { decideRoute } from "./src/seo/routing";
 
 /**
- * Runs before the static files. The marketing homepage is dist/index.html, so
- * app.unwrapt.io must be rewritten to the empty spa.html shell or the app
- * would receive the public landing page. Unknown marketing URLs return 404.
+ * Vercel invokes this on every matched request. Do not import `@vercel/functions`:
+ * its package root loads OIDC code that reads the filesystem at runtime,
+ * and that throws inside the middleware bundle (MIDDLEWARE_INVOCATION_FAILED on
+ * every host). `next` and `rewrite` only set the two headers below.
  */
-export default async function proxy(request: Request) {
-  const url = new URL(request.url);
+function continueRequest(): Response {
+  return new Response(null, { headers: { "x-middleware-next": "1" } });
+}
+
+function rewriteTo(destination: URL, status = 200): Response {
+  const headers = new Headers();
+  headers.set("x-middleware-rewrite", destination.toString());
+  if (status === 404) headers.set("x-robots-tag", "noindex, nofollow");
+  return new Response(null, { status, headers });
+}
+
+function requestUrl(request: Request): URL {
+  try {
+    return new URL(request.url);
+  } catch {
+    const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || "localhost";
+    return new URL(request.url || "/", `https://${host}`);
+  }
+}
+
+export default function proxy(request: Request): Response {
+  const url = requestUrl(request);
   const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || url.host;
   const decision = decideRoute(host, url.pathname, url.search);
 
@@ -17,24 +37,15 @@ export default async function proxy(request: Request) {
   }
 
   if (decision.type === "spa") {
-    return rewrite(new URL("/spa.html", url), {
-      headers: { "x-robots-tag": "noindex, nofollow" },
-    });
+    const headers = new Headers();
+    headers.set("x-middleware-rewrite", new URL("/spa.html", url).toString());
+    headers.set("x-robots-tag", "noindex, nofollow");
+    return new Response(null, { headers });
   }
 
   if (decision.type === "not_found") {
-    const notFound = new URL("/404.html", url);
-    const page = await fetch(notFound);
-    const body = page.ok ? await page.arrayBuffer() : "Not found";
-    return new Response(body, {
-      status: 404,
-      headers: {
-        "content-type": "text/html; charset=utf-8",
-        "x-robots-tag": "noindex, nofollow",
-        "cache-control": "no-store",
-      },
-    });
+    return rewriteTo(new URL("/404.html", url), 404);
   }
 
-  return next();
+  return continueRequest();
 }
