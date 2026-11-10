@@ -1,5 +1,12 @@
 import type { ChatUiModule, RecipientStatusEntry } from '@/components/dashboard/TheaChatCards';
-import { hasRecipientAddress, type RecipientRecord } from '@/lib/giftStatus';
+import {
+  giftStage,
+  hasRecipientAddress,
+  isWalletGift,
+  type GiftRecord,
+  type RecipientRecord,
+} from '@/lib/giftStatus';
+import { calculateGiftCost } from '@/lib/wallet';
 
 /**
  * User is asking to connect/sync/import a calendar — not merely mentioning one.
@@ -114,5 +121,76 @@ export const ensureRecipientStatusUi = (
   return {
     reply,
     ui: [...ui, { module: 'recipient_status', recipients: buildRecipientStatusEntries(recipients) }],
+  };
+};
+
+/**
+ * Payment / funding asks — keep in sync with supabase/functions/thea-chat.
+ * Matches "did we pay for Ulan?", "finish payment", "add funds for …".
+ */
+export const looksLikePaymentIntent = (message: string): boolean => {
+  const t = message.trim().toLowerCase();
+  if (!t) return false;
+  if (/\b(?:did|have|has)\s+(?:we|i|you)\s+pay(?:\s+for)?\b/.test(t)) return true;
+  if (/\b(?:is|was)\s+(?:.+?\s+)?(?:paid|unpaid|funded)\b/.test(t)) return true;
+  if (/\b(?:finish|complete|complete(?:d)?)\s+(?:the\s+)?payment\b/.test(t)) return true;
+  if (/\b(?:add|top[\s-]?up)\s+(?:funds|money|wallet)\b/.test(t)) return true;
+  if (/\b(?:waiting|needs?|need)\s+(?:on\s+)?(?:payment|funds|wallet)\b/.test(t)) return true;
+  if (/\bpayment\b.{0,24}\b(?:incomplete|pending|missing|not\s+done|not\s+finished)\b/.test(t)) return true;
+  if (/\b(?:pay|fund)\s+(?:for\s+)?(?:the\s+)?gift\b/.test(t)) return true;
+  return false;
+};
+
+/** Pick the unpaid wallet gift this payment ask most likely refers to. */
+export const findUnpaidWalletGiftForMessage = (
+  message: string,
+  recipients: RecipientRecord[],
+): { recipientName: string; gift: GiftRecord } | null => {
+  const t = message.trim().toLowerCase();
+  const unpaid: Array<{ recipientName: string; gift: GiftRecord; nameHit: boolean }> = [];
+  for (const recipient of recipients) {
+    const name = (recipient.name || '').toLowerCase();
+    const first = name.split(/\s+/)[0] || '';
+    const nameHit = Boolean(name && (t.includes(name) || (first.length > 2 && t.includes(first))));
+    for (const gift of recipient.scheduled_gifts || []) {
+      if (!gift.id) continue;
+      if (CLOSED_GIFT.has((gift.status || '').toLowerCase())) continue;
+      if (!isWalletGift(gift) || giftStage(gift) !== 'scheduled') continue;
+      unpaid.push({ recipientName: recipient.name, gift, nameHit });
+    }
+  }
+  if (!unpaid.length) return null;
+  unpaid.sort((a, b) => Number(b.nameHit) - Number(a.nameHit));
+  const best = unpaid[0];
+  return { recipientName: best.recipientName, gift: best.gift };
+};
+
+/**
+ * If the user asked about payment / funding and the edge omitted wallet_topup,
+ * attach the card from live recipient gift rows.
+ */
+export const ensureWalletTopUpUi = (
+  userMessage: string,
+  reply: string,
+  ui: ChatUiModule[],
+  recipients: RecipientRecord[],
+  available: number,
+): { reply: string; ui: ChatUiModule[] } => {
+  if (!looksLikePaymentIntent(userMessage)) return { reply, ui };
+  if (ui.some((m) => m.module === 'wallet_topup')) return { reply, ui };
+  const match = findUnpaidWalletGiftForMessage(userMessage, recipients);
+  if (!match?.gift.id) return { reply, ui };
+
+  const giftTitle = match.gift.gift_type || match.gift.gift_description || 'their gift';
+  return {
+    reply,
+    ui: [...ui, {
+      module: 'wallet_topup' as const,
+      scheduledGiftId: match.gift.id,
+      recipientName: match.recipientName,
+      giftTitle,
+      needed: calculateGiftCost(Number(match.gift.payment_amount ?? match.gift.estimated_cost) || 0),
+      available,
+    }],
   };
 };
