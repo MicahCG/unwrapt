@@ -121,6 +121,7 @@ When the user wants to connect a calendar, add people via a form, or update some
 - edit_recipient: open the edit form for an existing person. Pass recipientId from get_recipients (call that first if needed) and optional focus (address, birthday, interests, details). Use when they want to update address, birthday, anniversary, interests, or "details".
 - wallet_topup: when they ask about a gift waiting on payment, an incomplete checkout, or adding funds for someone's gift. Pass that person's recipientId; the module shows top-up amounts and holds the funds once added.
 - gift_progress: when they ask how a gift is going, where it is, whether it shipped or arrived. Pass that person's recipientId. The card shows the real stage, so reply with one short line and don't describe the stage yourself.
+- recipient_status: when they ask who has a gift scheduled, who doesn't, who's ready / missing address or preferences, or want a people status overview. Call get_recipients first, then present_ui with module recipient_status and recipientIds for the people you're covering (omit recipientIds to show everyone). Reply with one short line; the cards show gift scheduled (with gift name), address, and preferences - do not dump the same checklist as a long bullet list.
 You may call present_ui more than once in the same turn (e.g. calendar_connect and add_recipient together when they ask to connect a calendar and add more people).
 If they already gave a clear new name (and optional relationship/dates/interests) in chat and just want you to save it, create_recipient is fine without a form. Prefer present_ui when they ask for a form, connection, or to fill in details themselves.
 
@@ -178,7 +179,7 @@ const GET_RECIPIENTS_TOOL = {
   type: "function",
   function: {
     name: "get_recipients",
-    description: "List this user's saved gift recipients (id, name, relationship, birthday/anniversary, interests, whether an address is on file, next occasion date). Always call this before update_recipient, create_recipient, or select_gift so you have real recipient ids to work with, and to check whether someone the user is describing already exists before creating a duplicate.",
+    description: "List this user's saved gift recipients (id, name, relationship, birthday/anniversary, interests, hasAddress, hasPreferences, giftScheduled, scheduledGiftTitle, next occasion date). Always call this before update_recipient, create_recipient, select_gift, or recipient_status so you have real recipient ids to work with, and to check whether someone the user is describing already exists before creating a duplicate. Use these fields for who's-scheduled / readiness answers, then present_ui recipient_status cards instead of a long bullet list.",
     parameters: {
       type: "object",
       properties: {
@@ -278,18 +279,23 @@ const PRESENT_UI_TOOL = {
   type: "function",
   function: {
     name: "present_ui",
-    description: "Show an interactive in-chat module. Use when the user wants to connect/reconnect/sync/import a calendar, add a person via a form, update someone's details, fund a gift that's waiting on payment, or see how a gift is progressing. Do NOT use calendar_connect for questions about people already saved (counts, names, who's on their calendar) — answer from account context or get_recipients. Never refuse real connect/form requests or say you can't connect calendars / external apps / forms. The app renders the module; reply with one short line about what you're opening.",
+    description: "Show an interactive in-chat module. Use when the user wants to connect/reconnect/sync/import a calendar, add a person via a form, update someone's details, fund a gift that's waiting on payment, see how a gift is progressing, or see status cards for who is scheduled / missing address or preferences. Do NOT use calendar_connect for questions about people already saved (counts, names, who's on their calendar) — answer from account context or get_recipients. For who's-scheduled / readiness overviews, use recipient_status (not a long prose list). Never refuse real connect/form requests or say you can't connect calendars / external apps / forms. The app renders the module; reply with one short line about what you're opening.",
     parameters: {
       type: "object",
       properties: {
         module: {
           type: "string",
-          enum: ["calendar_connect", "add_recipient", "edit_recipient", "wallet_topup", "gift_progress"],
-          description: "calendar_connect = Google/calendar OAuth connect + full VIP import (not the onboarding 3-person sample); add_recipient = add-person form; edit_recipient = edit an existing person's details; wallet_topup = add wallet funds for that person's gift that is waiting on payment; gift_progress = a progress bar for that person's gifts (scheduled, funds held, ordered, in transit, delivered).",
+          enum: ["calendar_connect", "add_recipient", "edit_recipient", "wallet_topup", "gift_progress", "recipient_status"],
+          description: "calendar_connect = Google/calendar OAuth connect + full VIP import (not the onboarding 3-person sample); add_recipient = add-person form; edit_recipient = edit an existing person's details; wallet_topup = add wallet funds for that person's gift that is waiting on payment; gift_progress = a progress bar for that person's gifts (scheduled, funds held, ordered, in transit, delivered); recipient_status = cards showing gift scheduled/not, address, and preferences for one or more people.",
         },
         recipientId: {
           type: "string",
-          description: "Required for edit_recipient, wallet_topup and gift_progress. Get it from get_recipients first.",
+          description: "Required for edit_recipient, wallet_topup and gift_progress. Optional for recipient_status (single person). Get it from get_recipients first.",
+        },
+        recipientIds: {
+          type: "array",
+          items: { type: "string" },
+          description: "For recipient_status: the people to show cards for (from get_recipients). Omit to show everyone (capped).",
         },
         focus: {
           type: "string",
@@ -328,12 +334,22 @@ type GiftProgress = {
   carrier: string | null;
 };
 
+type RecipientStatusEntry = {
+  recipientId: string;
+  recipientName: string;
+  giftScheduled: boolean;
+  giftTitle: string | null;
+  hasAddress: boolean;
+  hasPreferences: boolean;
+};
+
 type ChatUiModule =
   | { module: "calendar_connect" }
   | { module: "add_recipient"; focus?: UiFocus }
   | { module: "edit_recipient"; recipientId: string; recipientName: string; focus?: UiFocus }
   | { module: "wallet_topup"; scheduledGiftId: string; recipientName: string; giftTitle: string; needed: number; available: number }
-  | { module: "gift_progress"; recipientId: string; recipientName: string; gifts: GiftProgress[] };
+  | { module: "gift_progress"; recipientId: string; recipientName: string; gifts: GiftProgress[] }
+  | { module: "recipient_status"; recipients: RecipientStatusEntry[] };
 
 const UI_FOCUS_VALUES = new Set<string>(["details", "address", "birthday", "interests"]);
 
@@ -411,6 +427,36 @@ export const buildCalendarConnectDirectiveMessage = (force: boolean): string | n
 
 const CALENDAR_CONNECT_FALLBACK_REPLY =
   "Here's the calendar connect module. Tap connect to link Google Calendar (or another birthday source), and you choose who to add.";
+
+/**
+ * Status / who's-scheduled overviews — keep in sync with src/lib/theaChatUi.ts.
+ * Matches asks like "who has stuff scheduled and who doesn't".
+ */
+export const looksLikeRecipientStatusIntent = (message: string): boolean => {
+  const t = message.trim().toLowerCase();
+  if (!t) return false;
+  if (/\bwho(?:'s| is| are| has| have)\b.{0,48}\b(?:stuff )?scheduled\b/.test(t)) return true;
+  if (/\bwho(?:'s| is| are)\b.{0,40}\b(?:not|without|missing)\b.{0,24}\b(?:gift|scheduled)\b/.test(t)) return true;
+  if (/\b(?:scheduled|not scheduled).{0,24}\b(?:who|anyone|everybody|everyone)\b/.test(t)) return true;
+  if (/\bwho\b.{0,36}\b(?:doesn'?t|does not|don'?t|missing|without)\b.{0,36}\b(?:gift|scheduled|address|preferences?|interests?)\b/.test(t)) return true;
+  if (/\b(?:status|overview|readiness|checklist)\b.{0,28}\b(?:people|recipients|everyone|everybody|folks)\b/.test(t)) return true;
+  if (/\b(?:people|recipients|everyone|everybody)\b.{0,28}\b(?:status|ready|missing|scheduled)\b/.test(t)) return true;
+  if (/\bwho(?:'s| is)\b.{0,24}\bready\b/.test(t)) return true;
+  return false;
+};
+
+export const shouldForceRecipientStatusUi = (
+  latestUserMessage: string,
+  alreadyPresented: ChatUiModule[],
+): boolean => {
+  if (alreadyPresented.some((m) => m.module === "recipient_status")) return false;
+  return looksLikeRecipientStatusIntent(latestUserMessage);
+};
+
+export const buildRecipientStatusDirectiveMessage = (force: boolean): string | null => {
+  if (!force) return null;
+  return 'The user wants a status overview of their people (who has a gift scheduled, who is missing address/preferences, etc.). Call get_recipients if needed, then present_ui with module "recipient_status" and recipientIds for the people you are covering (or omit recipientIds to show everyone). Reply with one short line — the cards carry the checklist, so do not repeat it as a long bullet list.';
+};
 
 /** Mirrors src/lib/stripe.ts isPaidVip - keep both in sync. */
 const isPaidVip = (profile: { subscription_tier?: string | null; subscription_status?: string | null } | null) => {
@@ -1111,6 +1157,8 @@ const RECIPIENT_SELECT_FIELDS = "id, name, relationship, birthday, anniversary, 
 const hasAddress = (r: Pick<RecipientRow, "street" | "city" | "state" | "zip_code">) =>
   Boolean(r.street?.trim() && r.city?.trim() && r.state?.trim() && r.zip_code?.trim());
 
+const CLOSED_GIFT_STATUSES = new Set(["cancelled", "canceled", "expired", "archived"]);
+
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Next occurrence of a recipient's birthday or anniversary (birthday wins if both are set), mirroring ScheduleGiftModal's getDefaultOccasionDate. */
@@ -1177,17 +1225,38 @@ const handleGetRecipients = async (
   if (typeof args.name_query === "string" && args.name_query.trim()) {
     query = query.ilike("name", `%${args.name_query.trim().slice(0, 80)}%`);
   }
-  const { data, error } = await query.limit(500);
+  const [{ data, error }, giftsRes] = await Promise.all([
+    query.limit(500),
+    authClient
+      .from("scheduled_gifts")
+      .select("recipient_id, gift_type, occasion_date, status")
+      .eq("user_id", userId)
+      .order("occasion_date", { ascending: true })
+      .limit(200),
+  ]);
   if (error) return { ok: false, error: error.message };
+
+  const giftByRecipient = new Map<string, string>();
+  for (const g of (giftsRes.data as Array<{ recipient_id?: string; gift_type?: string | null; status?: string | null }> | null) || []) {
+    if (!g.recipient_id || giftByRecipient.has(g.recipient_id)) continue;
+    if (CLOSED_GIFT_STATUSES.has((g.status || "").toLowerCase())) continue;
+    giftByRecipient.set(g.recipient_id, (g.gift_type || "Gift").slice(0, 120));
+  }
+
   // Soonest next occurrence first (ISO dates sort as strings; a January date sorts after December's).
   const all = (data as RecipientRow[] || []).map((r) => {
     const occasion = nextOccasionDate(r.birthday, r.anniversary);
+    const interests = r.interests || [];
+    const scheduledGiftTitle = giftByRecipient.get(r.id) || null;
     return {
       recipientId: r.id,
       name: r.name,
       relationship: r.relationship,
-      interests: r.interests || [],
+      interests,
       hasAddress: hasAddress(r),
+      hasPreferences: interests.length > 0,
+      giftScheduled: Boolean(scheduledGiftTitle),
+      scheduledGiftTitle,
       nextOccasion: occasion,
     };
   }).sort((a, b) => (a.nextOccasion?.date ?? "9999").localeCompare(b.nextOccasion?.date ?? "9999"));
@@ -1433,8 +1502,6 @@ type GiftProgressRow = {
   estimated_cost: number | null;
 };
 
-const CLOSED_GIFT_STATUSES = new Set(["cancelled", "canceled", "expired", "archived"]);
-
 /** Exported for unit tests. */
 export const giftStage = (gift: Pick<GiftProgressRow, "status" | "payment_status" | "wallet_reserved" | "goody_order_id">): GiftStage => {
   const status = (gift.status || "").toLowerCase();
@@ -1483,6 +1550,83 @@ const buildGiftProgressUi = async (
         stage: giftStage(g),
         carrier: null,
       })),
+    },
+  };
+};
+
+const RECIPIENT_STATUS_LIMIT = 12;
+
+const parseRecipientStatusIds = (args: { recipientId?: unknown; recipientIds?: unknown }): string[] => {
+  const ids: string[] = [];
+  if (Array.isArray(args.recipientIds)) {
+    for (const raw of args.recipientIds) {
+      if (typeof raw === "string" && raw.trim()) ids.push(raw.trim());
+    }
+  }
+  if (typeof args.recipientId === "string" && args.recipientId.trim()) ids.push(args.recipientId.trim());
+  return [...new Set(ids)];
+};
+
+/** Builds recipient_status cards from owned rows + open scheduled gifts. Exported for unit tests. */
+export const buildRecipientStatusEntries = (
+  rows: RecipientRow[],
+  giftTitleByRecipient: Map<string, string>,
+): RecipientStatusEntry[] =>
+  rows.map((r) => {
+    const interests = r.interests || [];
+    const giftTitle = giftTitleByRecipient.get(r.id) || null;
+    return {
+      recipientId: r.id,
+      recipientName: r.name,
+      giftScheduled: Boolean(giftTitle),
+      giftTitle,
+      hasAddress: hasAddress(r),
+      hasPreferences: interests.length > 0,
+    };
+  });
+
+const buildRecipientStatusUi = async (
+  authClient: ReturnType<typeof createClient>,
+  userId: string,
+  args: { recipientId?: unknown; recipientIds?: unknown },
+): Promise<{ ok: true; ui: ChatUiModule } | { ok: false; error: string }> => {
+  const requestedIds = parseRecipientStatusIds(args);
+  let query = authClient.from("recipients").select(RECIPIENT_SELECT_FIELDS).eq("user_id", userId);
+  if (requestedIds.length) query = query.in("id", requestedIds.slice(0, RECIPIENT_STATUS_LIMIT));
+  const [{ data, error }, giftsRes] = await Promise.all([
+    query.order("name", { ascending: true }).limit(RECIPIENT_STATUS_LIMIT),
+    authClient
+      .from("scheduled_gifts")
+      .select("recipient_id, gift_type, occasion_date, status")
+      .eq("user_id", userId)
+      .order("occasion_date", { ascending: true })
+      .limit(200),
+  ]);
+  if (error) return { ok: false, error: error.message };
+
+  const rows = (data as RecipientRow[] | null) || [];
+  if (!rows.length) {
+    return { ok: false, error: requestedIds.length ? "No matching recipients found for those ids." : "No recipients saved yet." };
+  }
+
+  const giftTitleByRecipient = new Map<string, string>();
+  for (const g of (giftsRes.data as Array<{ recipient_id?: string; gift_type?: string | null; status?: string | null }> | null) || []) {
+    if (!g.recipient_id || giftTitleByRecipient.has(g.recipient_id)) continue;
+    if (CLOSED_GIFT_STATUSES.has((g.status || "").toLowerCase())) continue;
+    giftTitleByRecipient.set(g.recipient_id, (g.gift_type || "Gift").slice(0, 120));
+  }
+
+  // Keep the caller's order when they passed ids; otherwise name order from the query.
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const ordered = requestedIds.length
+    ? requestedIds.map((id) => byId.get(id)).filter((r): r is RecipientRow => Boolean(r))
+    : rows;
+
+  return {
+    ok: true,
+    ui: {
+      module: "recipient_status",
+      recipients: buildRecipientStatusEntries(ordered.slice(0, RECIPIENT_STATUS_LIMIT), giftTitleByRecipient),
     },
   };
 };
@@ -1889,6 +2033,8 @@ Use the whole conversation, not just the last message. Return JSON only:
       [],
     );
     const calendarConnectDirectiveMessage = buildCalendarConnectDirectiveMessage(forceCalendarConnect);
+    const forceRecipientStatus = shouldForceRecipientStatusUi(latestUserMessageContent, []);
+    const recipientStatusDirectiveMessage = buildRecipientStatusDirectiveMessage(forceRecipientStatus);
 
     const seenProducts = new Map<string, Product>();
     // Seed from the prior turn's carried-over recommendations (CC-02) so
@@ -1947,6 +2093,7 @@ Use the whole conversation, not just the last message. Return JSON only:
       ...(tappedSelectionMessage ? [{ role: "system", content: tappedSelectionMessage }] : []),
       ...(confirmDirectiveMessage ? [{ role: "system", content: confirmDirectiveMessage }] : []),
       ...(calendarConnectDirectiveMessage ? [{ role: "system", content: calendarConnectDirectiveMessage }] : []),
+      ...(recipientStatusDirectiveMessage ? [{ role: "system", content: recipientStatusDirectiveMessage }] : []),
     ];
 
     // Surfaced to the frontend as top-level `writes` so it can invalidate
@@ -2091,11 +2238,16 @@ Use the whole conversation, not just the last message. Return JSON only:
             const owned = await fetchOwnedRecipient(authClient, user.id, args.recipientId);
             if (owned) recipientLookup = { id: owned.id, name: owned.name };
           }
-          const result = args.module === "wallet_topup" || args.module === "gift_progress"
-            ? recipientLookup
+          let result: { ok: true; ui: ChatUiModule } | { ok: false; error: string };
+          if (args.module === "recipient_status") {
+            result = await buildRecipientStatusUi(authClient, user.id, args as { recipientId?: unknown; recipientIds?: unknown });
+          } else if (args.module === "wallet_topup" || args.module === "gift_progress") {
+            result = recipientLookup
               ? await (args.module === "wallet_topup" ? buildWalletTopUpUi : buildGiftProgressUi)(authClient, user.id, recipientLookup)
-              : { ok: false as const, error: `${args.module} requires a valid recipientId from get_recipients for this user.` }
-            : resolvePresentUi(args, recipientLookup);
+              : { ok: false as const, error: `${args.module} requires a valid recipientId from get_recipients for this user.` };
+          } else {
+            result = resolvePresentUi(args, recipientLookup);
+          }
           if (result.ok) {
             // Dedupe identical modules in one turn (model sometimes double-calls).
             const key = JSON.stringify(result.ui);
@@ -2152,6 +2304,12 @@ Use the whole conversation, not just the last message. Return JSON only:
     )) {
       presentedUi.push({ module: "calendar_connect" });
       if (replyRefusesCalendar(reply) || !reply) reply = CALENDAR_CONNECT_FALLBACK_REPLY;
+    }
+
+    // Deterministic status cards for who's-scheduled / readiness overviews.
+    if (shouldForceRecipientStatusUi(latestUserMessageContent, presentedUi)) {
+      const statusResult = await buildRecipientStatusUi(authClient, user.id, {});
+      if (statusResult.ok) presentedUi.push(statusResult.ui);
     }
 
     const products = recommendedIds.length > 0
