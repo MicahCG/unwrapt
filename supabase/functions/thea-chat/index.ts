@@ -143,10 +143,11 @@ This is a hard rule with no exceptions: whenever a select_gift result includes a
 Only call confirm_scheduled_gift once the user's own message you are now replying to explicitly confirms (yes, confirm, do it, sounds good, etc.) - never when you are the one presenting the review for the first time in this same reply (they cannot confirm something they have not seen yet), never on an assumption that silence or a different topic means yes.
 You will often no longer have the exact recipientId, productId, and occasionDate in context by the time the user confirms (for example, this is a new message and earlier tool results aren't repeated to you) - if so, call get_recipients and select_gift again first in this reply to re-derive them from the recipient and gift the user is confirming, then call confirm_scheduled_gift right after, in that same reply. This is safe and expected: confirmation is verified against what was already shown to the user earlier, not against which tools you call in this reply.
 confirm_scheduled_gift needs the recipient's delivery address on file. If it fails with addressRequired, say in one line that you need their address first and that they can add it right on the review card; don't open another form.
-After confirm_scheduled_gift succeeds, read its funding field:
-- funding.held true: say it's approved and that funding.amount is set aside in their wallet, charged only when you place the order closer to the date. Never say it's paid or ordered.
-- funding.held false: say it's approved but their wallet needs a top-up before you can send it, and that they can add funds right below. The app shows the top-up card automatically; never call it "all set".
-If the result includes swapped: true, acknowledge the swap in one short line (old gift → new gift) before the funding line.`;
+After confirm_scheduled_gift succeeds, read its funding and timing fields:
+- funding.held true: say it's approved and that funding.amount is set aside in their wallet. Use timing.placeOrderOn and timing.deliveryBy exactly (e.g. "I'll place the order around November 4 so it arrives by November 29; shipping usually takes about 2–3 weeks after I order"). Never say vague phrases like "closer to the date" or "closer to their birthday". Never say it's paid or ordered already.
+- funding.held false: say it's approved but their wallet needs a top-up before you can send it, and that they can add funds right below. The app shows the top-up card automatically; never call it "all set". Still mention timing.placeOrderOn / timing.deliveryBy when present.
+If the result includes swapped: true, acknowledge the swap in one short line (old gift → new gift) before the funding line.
+When the user asks when you will place the order / when it ships / delivery timing, answer with the concrete placeOrderOn and deliveryBy dates for that gift (from get_recipients timing fields, the last confirm timing, or gift_progress occasion/delivery dates). Shipping estimate is about 2–3 weeks after the order is placed. Never answer with only "closer to the occasion".`;
 
 const SEARCH_GIFTS_TOOL = {
   type: "function",
@@ -181,7 +182,7 @@ const GET_RECIPIENTS_TOOL = {
   type: "function",
   function: {
     name: "get_recipients",
-    description: "List this user's saved gift recipients (id, name, relationship, birthday/anniversary, interests, hasAddress, hasPreferences, giftScheduled, scheduledGiftTitle, next occasion date). Always call this before update_recipient, create_recipient, select_gift, or recipient_status so you have real recipient ids to work with, and to check whether someone the user is describing already exists before creating a duplicate. Use these fields for who's-scheduled / readiness answers, then present_ui recipient_status cards instead of a long bullet list.",
+    description: "List this user's saved gift recipients (id, name, relationship, birthday/anniversary, interests, hasAddress, hasPreferences, giftScheduled, scheduledGiftTitle, scheduledOccasionDate, placeOrderOn, deliveryBy, shippingEstimate, next occasion date). Always call this before update_recipient, create_recipient, select_gift, or recipient_status so you have real recipient ids to work with, and to check whether someone the user is describing already exists before creating a duplicate. Use placeOrderOn/deliveryBy when answering when an order will be placed or arrive. Use these fields for who's-scheduled / readiness answers, then present_ui recipient_status cards instead of a long bullet list.",
     parameters: {
       type: "object",
       properties: {
@@ -1193,6 +1194,34 @@ const CLOSED_GIFT_STATUSES = new Set(["cancelled", "canceled", "expired", "archi
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Keep in sync with src/lib/giftTiming.ts and process-automation-lifecycle ORDER_WINDOW_DAYS. */
+const DELIVERY_LEAD_DAYS = 3;
+const ORDER_WINDOW_DAYS = 25;
+const PLACE_ORDER_LEAD_DAYS = ORDER_WINDOW_DAYS + DELIVERY_LEAD_DAYS;
+const SHIPPING_ESTIMATE = "about 2–3 weeks after I place the order";
+
+/** Shift YYYY-MM-DD by whole days in local calendar math (avoids UTC off-by-one). */
+const shiftIsoDate = (isoDate: string, days: number): string => {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const date = new Date(y, (m || 1) - 1, d || 1);
+  date.setDate(date.getDate() + days);
+  const yy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+};
+
+/** Concrete order / delivery dates for a gift occasion. Exported for unit tests. */
+export const giftOrderTiming = (occasionDate: string) => {
+  if (!ISO_DATE_RE.test(occasionDate)) return null;
+  return {
+    occasionDate,
+    deliveryBy: shiftIsoDate(occasionDate, -DELIVERY_LEAD_DAYS),
+    placeOrderOn: shiftIsoDate(occasionDate, -PLACE_ORDER_LEAD_DAYS),
+    shippingEstimate: SHIPPING_ESTIMATE,
+  };
+};
+
 /** Next occurrence of a recipient's birthday or anniversary (birthday wins if both are set), mirroring ScheduleGiftModal's getDefaultOccasionDate. */
 export const nextOccasionDate = (
   birthday: string | null,
@@ -1268,18 +1297,23 @@ const handleGetRecipients = async (
   ]);
   if (error) return { ok: false, error: error.message };
 
-  const giftByRecipient = new Map<string, string>();
-  for (const g of (giftsRes.data as Array<{ recipient_id?: string; gift_type?: string | null; status?: string | null }> | null) || []) {
+  type GiftMeta = { title: string; occasionDate: string | null };
+  const giftByRecipient = new Map<string, GiftMeta>();
+  for (const g of (giftsRes.data as Array<{ recipient_id?: string; gift_type?: string | null; status?: string | null; occasion_date?: string | null }> | null) || []) {
     if (!g.recipient_id || giftByRecipient.has(g.recipient_id)) continue;
     if (CLOSED_GIFT_STATUSES.has((g.status || "").toLowerCase())) continue;
-    giftByRecipient.set(g.recipient_id, (g.gift_type || "Gift").slice(0, 120));
+    giftByRecipient.set(g.recipient_id, {
+      title: (g.gift_type || "Gift").slice(0, 120),
+      occasionDate: g.occasion_date || null,
+    });
   }
 
   // Soonest next occurrence first (ISO dates sort as strings; a January date sorts after December's).
   const all = (data as RecipientRow[] || []).map((r) => {
     const occasion = nextOccasionDate(r.birthday, r.anniversary);
     const interests = r.interests || [];
-    const scheduledGiftTitle = giftByRecipient.get(r.id) || null;
+    const scheduled = giftByRecipient.get(r.id) || null;
+    const timing = scheduled?.occasionDate ? giftOrderTiming(scheduled.occasionDate) : null;
     return {
       recipientId: r.id,
       name: r.name,
@@ -1287,8 +1321,12 @@ const handleGetRecipients = async (
       interests,
       hasAddress: hasAddress(r),
       hasPreferences: interests.length > 0,
-      giftScheduled: Boolean(scheduledGiftTitle),
-      scheduledGiftTitle,
+      giftScheduled: Boolean(scheduled),
+      scheduledGiftTitle: scheduled?.title || null,
+      scheduledOccasionDate: scheduled?.occasionDate || null,
+      placeOrderOn: timing?.placeOrderOn || null,
+      deliveryBy: timing?.deliveryBy || null,
+      shippingEstimate: timing?.shippingEstimate || null,
       nextOccasion: occasion,
     };
   }).sort((a, b) => (a.nextOccasion?.date ?? "9999").localeCompare(b.nextOccasion?.date ?? "9999"));
@@ -1817,7 +1855,8 @@ const handleConfirmScheduledGift = async (
 
   const occasionType = recipient.birthday === args.occasionDate ? "birthday" : recipient.anniversary === args.occasionDate ? "anniversary" : "custom";
   const occasion = occasionType === "birthday" ? "Birthday" : occasionType === "anniversary" ? "Anniversary" : "Special occasion";
-  const deliveryDate = new Date(new Date(args.occasionDate).getTime() - 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const timing = giftOrderTiming(args.occasionDate);
+  const deliveryDate = timing?.deliveryBy || shiftIsoDate(args.occasionDate, -DELIVERY_LEAD_DAYS);
 
   const giftFields = {
     occasion,
@@ -1866,6 +1905,7 @@ const handleConfirmScheduledGift = async (
         occasion_date: args.occasionDate,
         replaced: existing.gift_type,
       },
+      timing,
       funding: await holdGiftFunds(authClient, userId, existing.id, product.price),
     };
   }
@@ -1885,6 +1925,7 @@ const handleConfirmScheduledGift = async (
     ok: true,
     recordId: inserted.id,
     saved: { recipientName: recipient.name, gift_type: product.title, price: product.price, occasion_date: args.occasionDate },
+    timing,
     funding: await holdGiftFunds(authClient, userId, inserted.id, product.price),
   };
 };

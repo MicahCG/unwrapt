@@ -28,6 +28,11 @@ import {
 import { giftStage, hasRecipientAddress, isWalletGift, type GiftRecord, type RecipientRecord } from '@/lib/giftStatus';
 import { resumeGiftPayment } from '@/lib/giftPayment';
 import { calculateGiftCost, getAvailableBalance, holdGiftFunds, startGiftTopUp, takePendingWalletHold } from '@/lib/wallet';
+import { formatGiftTimingLine, giftOrderTiming } from '@/lib/giftTiming';
+import {
+  WalletHoldSuccessModal,
+  type WalletHoldSuccess,
+} from '@/components/wallet/WalletHoldSuccessModal';
 import { trackProductEvent } from '@/lib/productAnalytics';
 import { useTheaReaction } from '@/hooks/useTheaReaction';
 import { importNewPeople, importRemainingCalendarPeople, useCalendarConnected } from '@/hooks/useCalendarConnection';
@@ -171,6 +176,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [reviewStates, setReviewStates] = useState<Record<string, ReviewState>>({});
   const [celebrating, setCelebrating] = useState(false);
+  const [holdSuccess, setHoldSuccess] = useState<WalletHoldSuccess | null>(null);
   const { reaction, reactTo } = useTheaReaction();
   const seeded = useRef(false);
   const giftResumeApplied = useRef(false);
@@ -392,7 +398,23 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     });
   }, [history, recipientsLoaded, seed, briefing, messages.length]);
 
-  // Back from a wallet top-up started in chat: hold the funds for the gift it was for, then say so.
+  const showHoldSuccess = useCallback((detail: WalletHoldSuccess) => {
+    setHoldSuccess(detail);
+    const first = detail.recipientName.split(' ')[0] || detail.recipientName;
+    const timingLine = detail.timing ? ` ${formatGiftTimingLine(detail.timing)}` : '';
+    const lead = detail.fromTopUp === false ? 'Funds held.' : 'Funds added.';
+    stickToBottomRef.current = true;
+    setMessages((current) => [...current, {
+      role: 'assistant',
+      content: `${lead} ${money(detail.amount)} is set aside for ${first}'s ${detail.giftTitle}.${timingLine}`,
+    }]);
+    void trackProductEvent('dashboard_thea_wallet_hold_success_modal', {
+      amount: detail.amount,
+      gift: detail.giftTitle,
+    });
+  }, []);
+
+  // Back from a wallet top-up started in chat: hold the funds for the gift it was for, then celebrate.
   // Runs after the greeting seed and only appends, so neither replaces the other.
   const walletHoldApplied = useRef(false);
   useEffect(() => {
@@ -406,10 +428,15 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
         const hold = await holdGiftFunds(pending.scheduledGiftId).catch(() => null);
         if (hold?.held) {
           await queryClient.invalidateQueries({ queryKey: ['recipients'] });
-          setMessages((current) => [...current, {
-            role: 'assistant',
-            content: `Funds added. ${money(hold.amount)} is set aside for ${first}'s ${pending.giftTitle}, and it's charged only when I place the order closer to the date.`,
-          }]);
+          const gift = recipients.flatMap((r) => r.scheduled_gifts || []).find((g) => g.id === pending.scheduledGiftId);
+          const occasionDate = pending.occasionDate || gift?.occasion_date || null;
+          showHoldSuccess({
+            amount: hold.amount,
+            recipientName: pending.recipientName,
+            giftTitle: pending.giftTitle,
+            timing: occasionDate ? giftOrderTiming(occasionDate) : null,
+            fromTopUp: true,
+          });
           return;
         }
         if (hold && attempt === HOLD_ATTEMPTS) {
@@ -424,7 +451,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
         await new Promise((resolve) => window.setTimeout(resolve, HOLD_RETRY_MS));
       }
     })();
-  }, [history, recipientsLoaded, queryClient, user?.id]);
+  }, [history, recipientsLoaded, queryClient, user?.id, recipients, showHoldSuccess]);
 
   // Onboarding focuses on a few people and saves only the one the user picked. Once they're
   // subscribed and in the chat, bring in everyone else it found (and anyone else on a connected
@@ -698,12 +725,28 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
 
   const topUp = (mod: WalletTopUpModule, amount: number) => {
     void trackProductEvent('dashboard_thea_wallet_topup_started', { amount });
-    return startGiftTopUp(amount, { scheduledGiftId: mod.scheduledGiftId, recipientName: mod.recipientName, giftTitle: mod.giftTitle });
+    const gift = giftsById.get(mod.scheduledGiftId);
+    return startGiftTopUp(amount, {
+      scheduledGiftId: mod.scheduledGiftId,
+      recipientName: mod.recipientName,
+      giftTitle: mod.giftTitle,
+      occasionDate: gift?.occasion_date || null,
+    });
   };
 
   const holdFromBalance = async (mod: WalletTopUpModule) => {
     const hold = await holdGiftFunds(mod.scheduledGiftId);
-    if (hold.held) await queryClient.invalidateQueries({ queryKey: ['recipients'] });
+    if (hold.held) {
+      await queryClient.invalidateQueries({ queryKey: ['recipients'] });
+      const gift = giftsById.get(mod.scheduledGiftId);
+      showHoldSuccess({
+        amount: hold.amount || mod.needed,
+        recipientName: mod.recipientName,
+        giftTitle: mod.giftTitle,
+        timing: gift?.occasion_date ? giftOrderTiming(gift.occasion_date) : null,
+        fromTopUp: false,
+      });
+    }
     return hold.held;
   };
 
@@ -1019,6 +1062,12 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
           </button>
         </div>
       </form>
+
+      <WalletHoldSuccessModal
+        open={Boolean(holdSuccess)}
+        detail={holdSuccess}
+        onClose={() => setHoldSuccess(null)}
+      />
     </div>
   );
 };

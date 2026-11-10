@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Settings, Wallet } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { U, initialsOf } from '@/components/unwrapt2/theme';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { getWalletBreakdown, type PendingReservation } from '@/lib/wallet';
 
 interface AccountMenuProps {
   displayName: string;
@@ -23,12 +25,31 @@ const money = (amount: number) => new Intl.NumberFormat('en-US', { style: 'curre
 const AccountMenu: React.FC<AccountMenuProps> = ({
   displayName, planLabel, tier, walletBalance, autopilotThreshold, onAddFunds, onOpenSettings,
 }) => {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
+  const [reserved, setReserved] = useState(0);
+  const [available, setAvailable] = useState<number | null>(null);
+  const [reservations, setReservations] = useState<PendingReservation[]>([]);
   const hasWallet = tier === 'vip' && walletBalance != null;
   const close = (then: () => void) => () => {
     setOpen(false);
     then();
   };
+
+  useEffect(() => {
+    if (!open || !hasWallet || !user?.id) return;
+    let cancelled = false;
+    void (async () => {
+      const breakdown = await getWalletBreakdown(user.id);
+      if (cancelled) return;
+      setReserved(breakdown.reserved);
+      setAvailable(breakdown.available);
+      setReservations(breakdown.reservations);
+    })();
+    return () => { cancelled = true; };
+  }, [open, hasWallet, user?.id, walletBalance]);
+
+  const shownAvailable = available ?? walletBalance ?? 0;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -37,9 +58,9 @@ const AccountMenu: React.FC<AccountMenuProps> = ({
           type="button"
           className="u-press flex min-h-11 items-center gap-2 rounded-full py-1 pl-3 pr-1"
           style={{ background: '#E5DBC6', color: '#5A5147' }}
-          aria-label={hasWallet ? `Account and gift wallet, balance ${money(walletBalance!)}` : 'Account'}
+          aria-label={hasWallet ? `Account and gift wallet, available ${money(shownAvailable)}` : 'Account'}
         >
-          {hasWallet && <span className="font-mono text-[12px] font-semibold">{money(walletBalance!)}</span>}
+          {hasWallet && <span className="font-mono text-[12px] font-semibold">{money(shownAvailable)}</span>}
           <span
             className="flex h-[34px] w-[34px] items-center justify-center rounded-full"
             style={{ background: U.surface, fontFamily: "'Newsreader', serif", fontStyle: 'italic', fontSize: 15 }}
@@ -59,6 +80,33 @@ const AccountMenu: React.FC<AccountMenuProps> = ({
           {hasWallet ? (
             <>
               <p className="mt-1 font-mono text-[20px]" style={{ color: U.ink }}>{money(walletBalance!)}</p>
+              <dl className="mt-2 grid gap-1 text-[12px]" style={{ color: U.textSecondary }}>
+                <div className="flex justify-between gap-3">
+                  <dt>Available</dt>
+                  <dd className="font-mono font-semibold" style={{ color: U.ink }}>{money(shownAvailable)}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt>Reserved</dt>
+                  <dd className="font-mono font-semibold" style={{ color: U.ink }}>{money(reserved)}</dd>
+                </div>
+              </dl>
+              {reservations.length > 0 && (
+                <ul className="mt-2 space-y-1.5 border-t pt-2" style={{ borderColor: 'rgba(42,37,32,0.08)' }} aria-label="Reserved for upcoming gifts">
+                  {reservations.map((row) => {
+                    const first = row.recipientName.split(' ')[0] || row.recipientName;
+                    return (
+                      <li key={row.scheduledGiftId} className="flex items-start justify-between gap-2 text-[11.5px] leading-4" style={{ color: U.textSecondary }}>
+                        <span className="min-w-0">
+                          <span className="font-medium" style={{ color: U.ink }}>{first}</span>
+                          {' · '}
+                          {row.giftTitle}
+                        </span>
+                        <span className="shrink-0 font-mono font-semibold" style={{ color: U.ink }}>{money(row.amount)}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
               <button type="button" onClick={close(onAddFunds)} className="u-press mt-2 min-h-11 w-full rounded-[12px] text-[13px] font-semibold" style={{ background: U.ink, color: U.buttonText }}>
                 Add funds
               </button>
