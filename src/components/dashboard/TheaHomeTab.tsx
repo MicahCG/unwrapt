@@ -666,7 +666,10 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   const confirmReview = async (review: GiftReview) => {
     const key = reviewKey(review);
     setReviewStates((s) => ({ ...s, [key]: 'confirming' }));
-    const writes = await send(`Yes, confirm the ${review.productTitle} for ${review.recipientName}.`);
+    const confirmText = review.replacesGiftTitle
+      ? `Yes, swap to the ${review.productTitle} for ${review.recipientName} (replace ${review.replacesGiftTitle}).`
+      : `Yes, confirm the ${review.productTitle} for ${review.recipientName}.`;
+    const writes = await send(confirmText);
     const scheduled = writes?.some((w) => w.ok && w.tool === 'confirm_scheduled_gift');
     setReviewStates((s) => ({ ...s, [key]: scheduled ? 'scheduled' : 'pending' }));
   };

@@ -62,6 +62,9 @@ export type GiftReview = {
   occasionDate: string;
   occasion: string;
   hasAddress: boolean;
+  /** When set, confirming replaces this already-scheduled gift for the same occasion. */
+  replacesGiftId?: string | null;
+  replacesGiftTitle?: string | null;
 };
 
 export type ReviewState = 'pending' | 'confirming' | 'scheduled';
@@ -200,12 +203,18 @@ export const ReviewCard: React.FC<{
   const set = (field: keyof ReviewAddress) => (event: React.ChangeEvent<HTMLInputElement>) =>
     setDraft((d) => ({ ...d, [field]: event.target.value }));
 
+  const isSwap = Boolean(review.replacesGiftTitle);
   return (
     <section className="mt-2 rounded-[18px] border bg-white p-3.5" style={{ borderColor: '#DED2C1' }} aria-label="Gift review">
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: U.accent }}>
-        {state === 'scheduled' ? 'Approved' : 'Review before scheduling'}
+        {state === 'scheduled' ? 'Approved' : isSwap ? 'Swap gift' : 'Review before scheduling'}
       </p>
       <p className="mt-1.5 text-[14px] font-semibold leading-5 text-[#2A2520]">{review.productTitle}</p>
+      {isSwap && state !== 'scheduled' && (
+        <p className="mt-1 text-[12.5px] leading-5 text-[#5A5147]">
+          Replaces <span className="font-medium text-[#2A2520]">{review.replacesGiftTitle}</span> for this occasion.
+        </p>
+      )}
       <dl className="mt-2 grid gap-1 text-[12.5px] text-[#5A5147]">
         <div className="flex justify-between gap-3"><dt>For</dt><dd className="font-medium text-[#2A2520]">{review.recipientName}</dd></div>
         <div className="flex justify-between gap-3"><dt>Occasion</dt><dd className="font-medium text-[#2A2520]">{review.occasion} · {formatOccasionDate(review.occasionDate)}</dd></div>
@@ -279,7 +288,7 @@ export const ReviewCard: React.FC<{
             style={{ background: U.ink, color: U.buttonText }}
           >
             {state === 'confirming' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-            {state === 'confirming' ? 'Scheduling…' : 'Confirm gift'}
+            {state === 'confirming' ? (isSwap ? 'Swapping…' : 'Scheduling…') : (isSwap ? 'Confirm swap' : 'Confirm gift')}
           </button>
         </div>
       )}
