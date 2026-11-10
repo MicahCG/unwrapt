@@ -458,6 +458,36 @@ export const buildRecipientStatusDirectiveMessage = (force: boolean): string | n
   return 'The user wants a status overview of their people (who has a gift scheduled, who is missing address/preferences, etc.). Call get_recipients if needed, then present_ui with module "recipient_status" and recipientIds for the people you are covering (or omit recipientIds to show everyone). Reply with one short line — the cards carry the checklist, so do not repeat it as a long bullet list.';
 };
 
+/**
+ * Payment / funding asks — keep in sync with src/lib/theaChatUi.ts.
+ * Matches "did we pay for Ulan?", "finish payment", "add funds for …".
+ */
+export const looksLikePaymentIntent = (message: string): boolean => {
+  const t = message.trim().toLowerCase();
+  if (!t) return false;
+  if (/\b(?:did|have|has)\s+(?:we|i|you)\s+pay(?:\s+for)?\b/.test(t)) return true;
+  if (/\b(?:is|was)\s+(?:.+?\s+)?(?:paid|unpaid|funded)\b/.test(t)) return true;
+  if (/\b(?:finish|complete|complete(?:d)?)\s+(?:the\s+)?payment\b/.test(t)) return true;
+  if (/\b(?:add|top[\s-]?up)\s+(?:funds|money|wallet)\b/.test(t)) return true;
+  if (/\b(?:waiting|needs?|need)\s+(?:on\s+)?(?:payment|funds|wallet)\b/.test(t)) return true;
+  if (/\bpayment\b.{0,24}\b(?:incomplete|pending|missing|not\s+done|not\s+finished)\b/.test(t)) return true;
+  if (/\b(?:pay|fund)\s+(?:for\s+)?(?:the\s+)?gift\b/.test(t)) return true;
+  return false;
+};
+
+export const shouldForceWalletTopUpUi = (
+  latestUserMessage: string,
+  alreadyPresented: ChatUiModule[],
+): boolean => {
+  if (alreadyPresented.some((m) => m.module === "wallet_topup")) return false;
+  return looksLikePaymentIntent(latestUserMessage);
+};
+
+export const buildWalletTopUpDirectiveMessage = (force: boolean): string | null => {
+  if (!force) return null;
+  return 'The user is asking about gift payment / funding. Call get_recipients if needed, then present_ui with module "wallet_topup" and the recipientId for the person whose gift is waiting on funds. Reply with one short line — the wallet module is the action, not a long explanation.';
+};
+
 /** Mirrors src/lib/stripe.ts isPaidVip - keep both in sync. */
 const isPaidVip = (profile: { subscription_tier?: string | null; subscription_status?: string | null } | null) => {
   if (!profile || profile.subscription_tier !== "vip") return false;
@@ -1652,6 +1682,45 @@ const buildWalletTopUpUi = async (
   };
 };
 
+/** First open gift still waiting on funds, preferring a name mentioned in the user message. */
+const buildForcedWalletTopUpUi = async (
+  authClient: ReturnType<typeof createClient>,
+  userId: string,
+  latestUserMessage: string,
+): Promise<ChatUiModule | null> => {
+  const { data } = await authClient
+    .from("scheduled_gifts")
+    .select(`${GIFT_PROGRESS_FIELDS}, recipients!inner(id, name)`)
+    .eq("user_id", userId)
+    .order("occasion_date", { ascending: true })
+    .limit(30);
+  type Row = GiftProgressRow & { recipients: { id: string; name: string } | { id: string; name: string }[] | null };
+  const rows = ((data as Row[] | null) || []).filter((g) => !CLOSED_GIFT_STATUSES.has((g.status || "").toLowerCase()));
+  const waiting = rows.filter((g) => giftStage(g) === "scheduled");
+  if (!waiting.length) return null;
+
+  const t = latestUserMessage.trim().toLowerCase();
+  const scored = waiting.map((g) => {
+    const recipient = Array.isArray(g.recipients) ? g.recipients[0] : g.recipients;
+    const name = (recipient?.name || "").toLowerCase();
+    const first = name.split(/\s+/)[0] || "";
+    const nameHit = Boolean(name && (t.includes(name) || (first.length > 2 && t.includes(first))));
+    return { g, recipient, nameHit };
+  });
+  scored.sort((a, b) => Number(b.nameHit) - Number(a.nameHit));
+  const best = scored[0];
+  if (!best?.recipient?.name) return null;
+  const price = Number(best.g.payment_amount ?? best.g.estimated_cost) || 0;
+  return {
+    module: "wallet_topup",
+    scheduledGiftId: best.g.id,
+    recipientName: best.recipient.name,
+    giftTitle: best.g.gift_type || "their gift",
+    needed: price + SERVICE_FEE,
+    available: await getAvailableBalance(authClient, userId),
+  };
+};
+
 /** The top-up card a confirm result asks for when its funds couldn't be held. */
 const topUpUiFromConfirm = (result: ToolResult): ChatUiModule | null => {
   const funding = result.funding as Funding | undefined;
@@ -2035,6 +2104,8 @@ Use the whole conversation, not just the last message. Return JSON only:
     const calendarConnectDirectiveMessage = buildCalendarConnectDirectiveMessage(forceCalendarConnect);
     const forceRecipientStatus = shouldForceRecipientStatusUi(latestUserMessageContent, []);
     const recipientStatusDirectiveMessage = buildRecipientStatusDirectiveMessage(forceRecipientStatus);
+    const forceWalletTopUp = shouldForceWalletTopUpUi(latestUserMessageContent, []);
+    const walletTopUpDirectiveMessage = buildWalletTopUpDirectiveMessage(forceWalletTopUp);
 
     const seenProducts = new Map<string, Product>();
     // Seed from the prior turn's carried-over recommendations (CC-02) so
@@ -2094,6 +2165,7 @@ Use the whole conversation, not just the last message. Return JSON only:
       ...(confirmDirectiveMessage ? [{ role: "system", content: confirmDirectiveMessage }] : []),
       ...(calendarConnectDirectiveMessage ? [{ role: "system", content: calendarConnectDirectiveMessage }] : []),
       ...(recipientStatusDirectiveMessage ? [{ role: "system", content: recipientStatusDirectiveMessage }] : []),
+      ...(walletTopUpDirectiveMessage ? [{ role: "system", content: walletTopUpDirectiveMessage }] : []),
     ];
 
     // Surfaced to the frontend as top-level `writes` so it can invalidate
@@ -2310,6 +2382,12 @@ Use the whole conversation, not just the last message. Return JSON only:
     if (shouldForceRecipientStatusUi(latestUserMessageContent, presentedUi)) {
       const statusResult = await buildRecipientStatusUi(authClient, user.id, {});
       if (statusResult.ok) presentedUi.push(statusResult.ui);
+    }
+
+    // Deterministic wallet card for payment / "did we pay" asks.
+    if (shouldForceWalletTopUpUi(latestUserMessageContent, presentedUi)) {
+      const topUp = await buildForcedWalletTopUpUi(authClient, user.id, latestUserMessageContent);
+      if (topUp) presentedUi.push(topUp);
     }
 
     const products = recommendedIds.length > 0

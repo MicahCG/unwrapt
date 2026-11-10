@@ -22,6 +22,9 @@ import {
   buildCalendarConnectDirectiveMessage,
   looksLikeRecipientStatusIntent,
   shouldForceRecipientStatusUi,
+  looksLikePaymentIntent,
+  shouldForceWalletTopUpUi,
+  buildWalletTopUpDirectiveMessage,
   buildRecipientStatusEntries,
   buildAccountRosterFromRows,
   formatAccountRosterSection,
@@ -407,6 +410,33 @@ Deno.test("shouldForceRecipientStatusUi forces once, then skips when cards alrea
     shouldForceRecipientStatusUi("who has stuff scheduled", [{ module: "recipient_status", recipients: [] }]),
     false,
   );
+});
+
+Deno.test("looksLikePaymentIntent catches unpaid / funding asks", () => {
+  assert(looksLikePaymentIntent("did we pay for ulan"));
+  assert(looksLikePaymentIntent("have we paid for Aunty Ulan?"));
+  assert(looksLikePaymentIntent("finish payment"));
+  assert(looksLikePaymentIntent("add funds for her gift"));
+  assert(looksLikePaymentIntent("is the gift unpaid?"));
+  assertEquals(looksLikePaymentIntent("who needs an address"), false);
+  assertEquals(looksLikePaymentIntent("what's a good gift for mom?"), false);
+});
+
+Deno.test("shouldForceWalletTopUpUi forces once, then skips when card already present", () => {
+  assert(shouldForceWalletTopUpUi("did we pay for ulan", []));
+  assertEquals(
+    shouldForceWalletTopUpUi("did we pay for ulan", [{
+      module: "wallet_topup",
+      scheduledGiftId: "g1",
+      recipientName: "Aunty Ulan",
+      giftTitle: "Coffee Beans",
+      needed: 40,
+      available: 0,
+    }]),
+    false,
+  );
+  assert(buildWalletTopUpDirectiveMessage(true)?.includes("wallet_topup"));
+  assertEquals(buildWalletTopUpDirectiveMessage(false), null);
 });
 
 Deno.test("buildRecipientStatusEntries maps gift/address/preferences checks", () => {
