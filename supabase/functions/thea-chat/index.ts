@@ -135,16 +135,19 @@ Account context (when present) already lists saved people and whether a calendar
 - Never ask for or store a recipient's phone number or email in this chat (see hard boundaries above). For shipping address and structured details, prefer present_ui (edit_recipient / add_recipient) over asking them to type everything into the chat.
 
 ## Choosing and scheduling a specific gift
-When the user picks one specific gift for a specific recipient, whether by tapping a card or naming it in text (match their words to the right id from your most recent search_gifts results, do not search again or repeat the list), call select_gift. It returns a review, not a save - nothing has been scheduled yet. Tell the user, in one short line, exactly what you're about to schedule (recipient, gift, price, occasion date) and ask them to confirm. Use future or conditional phrasing only ("I'll schedule...", "Ready to send...", "Want me to lock this in?") - never past tense or completed-action phrasing ("I've scheduled...", "This is booked...", "Done!") for a review, since nothing is booked until the user confirms and you call confirm_scheduled_gift; claiming otherwise is exactly the kind of invented completed action the hard boundaries above forbid. If select_gift reports the gift is already scheduled, say so plainly (that one genuinely is booked) instead of asking to confirm again.
+When the user picks one specific gift for a specific recipient, whether by tapping a card or naming it in text (match their words to the right id from your most recent search_gifts results, do not search again or repeat the list), call select_gift. It returns a review, not a save - nothing has been scheduled yet. Tell the user, in one short line, exactly what you're about to schedule (recipient, gift, price, occasion date) and ask them to confirm. Use future or conditional phrasing only ("I'll schedule...", "Ready to send...", "Want me to lock this in?") - never past tense or completed-action phrasing ("I've scheduled...", "This is booked...", "Done!") for a review, since nothing is booked until the user confirms and you call confirm_scheduled_gift; claiming otherwise is exactly the kind of invented completed action the hard boundaries above forbid.
+If select_gift returns a review with replacesGiftTitle, the recipient already has a different gift scheduled for that occasion that can still be changed - offer the swap in one short line (e.g. "I'll swap Coffee Beans for the French Chocolate box - confirm?") and still include the reviewMarker; do not dead-end or tell them to pick someone else. If select_gift reports alreadyScheduled with no review (same gift already booked, or it's already ordered/shipped), say so plainly instead of asking to confirm again.
 
 This is a hard rule with no exceptions: whenever a select_gift result includes a reviewMarker field, add that exact string, unmodified, on its own new line somewhere in your reply (example: GIFT_REVIEW: abc123:def456:2026-11-01) - before the RECOMMENDED_IDS line if your reply also has one. Do this every time you present that review, including if you repeat or rephrase it later - the user never sees this line, but omitting it permanently breaks their ability to confirm the gift. Do not include this line in any other reply, and never include it when select_gift reported alreadyScheduled instead of a review.
 
 Only call confirm_scheduled_gift once the user's own message you are now replying to explicitly confirms (yes, confirm, do it, sounds good, etc.) - never when you are the one presenting the review for the first time in this same reply (they cannot confirm something they have not seen yet), never on an assumption that silence or a different topic means yes.
 You will often no longer have the exact recipientId, productId, and occasionDate in context by the time the user confirms (for example, this is a new message and earlier tool results aren't repeated to you) - if so, call get_recipients and select_gift again first in this reply to re-derive them from the recipient and gift the user is confirming, then call confirm_scheduled_gift right after, in that same reply. This is safe and expected: confirmation is verified against what was already shown to the user earlier, not against which tools you call in this reply.
 confirm_scheduled_gift needs the recipient's delivery address on file. If it fails with addressRequired, say in one line that you need their address first and that they can add it right on the review card; don't open another form.
-After confirm_scheduled_gift succeeds, read its funding field:
-- funding.held true: say it's approved and that funding.amount is set aside in their wallet, charged only when you place the order closer to the date. Never say it's paid or ordered.
-- funding.held false: say it's approved but their wallet needs a top-up before you can send it, and that they can add funds right below. The app shows the top-up card automatically; never call it "all set".`;
+After confirm_scheduled_gift succeeds, read its funding and timing fields:
+- funding.held true: say it's approved and that funding.amount is set aside in their wallet. Use timing.placeOrderOn and timing.deliveryBy exactly (e.g. "I'll place the order around November 4 so it arrives by November 29; shipping usually takes about 2–3 weeks after I order"). Never say vague phrases like "closer to the date" or "closer to their birthday". Never say it's paid or ordered already.
+- funding.held false: say it's approved but their wallet needs a top-up before you can send it, and that they can add funds right below. The app shows the top-up card automatically; never call it "all set". Still mention timing.placeOrderOn / timing.deliveryBy when present.
+If the result includes swapped: true, acknowledge the swap in one short line (old gift → new gift) before the funding line.
+When the user asks when you will place the order / when it ships / delivery timing, answer with the concrete placeOrderOn and deliveryBy dates for that gift (from get_recipients timing fields, the last confirm timing, or gift_progress occasion/delivery dates). Shipping estimate is about 2–3 weeks after the order is placed. Never answer with only "closer to the occasion".`;
 
 const SEARCH_GIFTS_TOOL = {
   type: "function",
@@ -179,7 +182,7 @@ const GET_RECIPIENTS_TOOL = {
   type: "function",
   function: {
     name: "get_recipients",
-    description: "List this user's saved gift recipients (id, name, relationship, birthday/anniversary, interests, hasAddress, hasPreferences, giftScheduled, scheduledGiftTitle, next occasion date). Always call this before update_recipient, create_recipient, select_gift, or recipient_status so you have real recipient ids to work with, and to check whether someone the user is describing already exists before creating a duplicate. Use these fields for who's-scheduled / readiness answers, then present_ui recipient_status cards instead of a long bullet list.",
+    description: "List this user's saved gift recipients (id, name, relationship, birthday/anniversary, interests, hasAddress, hasPreferences, giftScheduled, scheduledGiftTitle, scheduledOccasionDate, placeOrderOn, deliveryBy, shippingEstimate, next occasion date). Always call this before update_recipient, create_recipient, select_gift, or recipient_status so you have real recipient ids to work with, and to check whether someone the user is describing already exists before creating a duplicate. Use placeOrderOn/deliveryBy when answering when an order will be placed or arrive. Use these fields for who's-scheduled / readiness answers, then present_ui recipient_status cards instead of a long bullet list.",
     parameters: {
       type: "object",
       properties: {
@@ -245,7 +248,7 @@ const SELECT_GIFT_TOOL = {
   type: "function",
   function: {
     name: "select_gift",
-    description: "Call this the moment the user picks a specific gift for a specific recipient, whether by tapping a card (you'll be given its id) or naming it in text (e.g. 'do the coffee beans by methodical coffee' after you just listed it) - match their description to the right id from your most recent search_gifts results yourself, do not search again or show the list over. This does NOT save anything yet - it returns a review summary. Read the review back to the user in one line (recipient, gift, price, occasion date) and ask them to confirm before calling confirm_scheduled_gift. Never call confirm_scheduled_gift in the same turn as this - wait for the user's next message.",
+    description: "Call this the moment the user picks a specific gift for a specific recipient, whether by tapping a card (you'll be given its id) or naming it in text (e.g. 'do the coffee beans by methodical coffee' after you just listed it) - match their description to the right id from your most recent search_gifts results yourself, do not search again or show the list over. This does NOT save anything yet - it returns a review summary. If they already have a different gift scheduled for that occasion that can still be changed, the review includes replacesGiftTitle — offer the swap and ask them to confirm (do not refuse). Read the review back in one line (recipient, gift, price, occasion date, and swap when present) and ask them to confirm before calling confirm_scheduled_gift. Never call confirm_scheduled_gift in the same turn as this - wait for the user's next message.",
     parameters: {
       type: "object",
       properties: {
@@ -262,7 +265,7 @@ const CONFIRM_SCHEDULED_GIFT_TOOL = {
   type: "function",
   function: {
     name: "confirm_scheduled_gift",
-    description: "Create the scheduled gift. Only call this after select_gift returned a review AND the user has explicitly confirmed in their own message (e.g. 'yes', 'confirm', 'do it') - never on the same turn as select_gift, never on an assumption. Use the exact same recipientId, productId, and occasionDate the review gave you. The recipient must have a delivery address on file first. On success it also tries to hold the gift's cost (gift + $7 service fee) from the user's Unwrapt wallet; the result's `funding` says whether the money was set aside or a top-up is needed. Nothing is charged until the order is placed near the delivery date.",
+    description: "Create or swap the scheduled gift. Only call this after select_gift returned a review AND the user has explicitly confirmed in their own message (e.g. 'yes', 'confirm', 'do it', 'swap it') - never on the same turn as select_gift, never on an assumption. Use the exact same recipientId, productId, and occasionDate the review gave you. If that review was a swap (replacesGiftTitle), confirming replaces the prior gift for that occasion. The recipient must have a delivery address on file first. On success it also tries to hold the gift's cost (gift + $7 service fee) from the user's Unwrapt wallet; the result's `funding` says whether the money was set aside or a top-up is needed. Nothing is charged until the order is placed near the delivery date.",
     parameters: {
       type: "object",
       properties: {
@@ -736,7 +739,7 @@ const fetchLastTurnContext = async (
 // turn specifically ended by presenting a review and asking to confirm),
 // which already strongly implies the user's very next short reply is
 // responding to that review, not something else.
-const CONFIRMATION_PATTERN = /\b(yes|yeah|yep|yup|confirm(ed)?|do it|go ahead|sounds good|let'?s do it|book it|that works|proceed|sure)\b/i;
+const CONFIRMATION_PATTERN = /\b(yes|yeah|yep|yup|confirm(ed)?|do it|go ahead|sounds good|let'?s do it|book it|that works|proceed|sure|swap( it| to)?|replace( it)?)\b/i;
 
 /** Detects an explicit confirmation in the user's newest message. Exported
  * for unit testing. */
@@ -1191,6 +1194,34 @@ const CLOSED_GIFT_STATUSES = new Set(["cancelled", "canceled", "expired", "archi
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Keep in sync with src/lib/giftTiming.ts and process-automation-lifecycle ORDER_WINDOW_DAYS. */
+const DELIVERY_LEAD_DAYS = 3;
+const ORDER_WINDOW_DAYS = 25;
+const PLACE_ORDER_LEAD_DAYS = ORDER_WINDOW_DAYS + DELIVERY_LEAD_DAYS;
+const SHIPPING_ESTIMATE = "about 2–3 weeks after I place the order";
+
+/** Shift YYYY-MM-DD by whole days in local calendar math (avoids UTC off-by-one). */
+const shiftIsoDate = (isoDate: string, days: number): string => {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const date = new Date(y, (m || 1) - 1, d || 1);
+  date.setDate(date.getDate() + days);
+  const yy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+};
+
+/** Concrete order / delivery dates for a gift occasion. Exported for unit tests. */
+export const giftOrderTiming = (occasionDate: string) => {
+  if (!ISO_DATE_RE.test(occasionDate)) return null;
+  return {
+    occasionDate,
+    deliveryBy: shiftIsoDate(occasionDate, -DELIVERY_LEAD_DAYS),
+    placeOrderOn: shiftIsoDate(occasionDate, -PLACE_ORDER_LEAD_DAYS),
+    shippingEstimate: SHIPPING_ESTIMATE,
+  };
+};
+
 /** Next occurrence of a recipient's birthday or anniversary (birthday wins if both are set), mirroring ScheduleGiftModal's getDefaultOccasionDate. */
 export const nextOccasionDate = (
   birthday: string | null,
@@ -1266,18 +1297,23 @@ const handleGetRecipients = async (
   ]);
   if (error) return { ok: false, error: error.message };
 
-  const giftByRecipient = new Map<string, string>();
-  for (const g of (giftsRes.data as Array<{ recipient_id?: string; gift_type?: string | null; status?: string | null }> | null) || []) {
+  type GiftMeta = { title: string; occasionDate: string | null };
+  const giftByRecipient = new Map<string, GiftMeta>();
+  for (const g of (giftsRes.data as Array<{ recipient_id?: string; gift_type?: string | null; status?: string | null; occasion_date?: string | null }> | null) || []) {
     if (!g.recipient_id || giftByRecipient.has(g.recipient_id)) continue;
     if (CLOSED_GIFT_STATUSES.has((g.status || "").toLowerCase())) continue;
-    giftByRecipient.set(g.recipient_id, (g.gift_type || "Gift").slice(0, 120));
+    giftByRecipient.set(g.recipient_id, {
+      title: (g.gift_type || "Gift").slice(0, 120),
+      occasionDate: g.occasion_date || null,
+    });
   }
 
   // Soonest next occurrence first (ISO dates sort as strings; a January date sorts after December's).
   const all = (data as RecipientRow[] || []).map((r) => {
     const occasion = nextOccasionDate(r.birthday, r.anniversary);
     const interests = r.interests || [];
-    const scheduledGiftTitle = giftByRecipient.get(r.id) || null;
+    const scheduled = giftByRecipient.get(r.id) || null;
+    const timing = scheduled?.occasionDate ? giftOrderTiming(scheduled.occasionDate) : null;
     return {
       recipientId: r.id,
       name: r.name,
@@ -1285,8 +1321,12 @@ const handleGetRecipients = async (
       interests,
       hasAddress: hasAddress(r),
       hasPreferences: interests.length > 0,
-      giftScheduled: Boolean(scheduledGiftTitle),
-      scheduledGiftTitle,
+      giftScheduled: Boolean(scheduled),
+      scheduledGiftTitle: scheduled?.title || null,
+      scheduledOccasionDate: scheduled?.occasionDate || null,
+      placeOrderOn: timing?.placeOrderOn || null,
+      deliveryBy: timing?.deliveryBy || null,
+      shippingEstimate: timing?.shippingEstimate || null,
       nextOccasion: occasion,
     };
   }).sort((a, b) => (a.nextOccasion?.date ?? "9999").localeCompare(b.nextOccasion?.date ?? "9999"));
@@ -1353,7 +1393,32 @@ const handleCreateRecipient = async (
   return { ok: true, recordId: data.id, saved: { name: data.name, ...payload }, recipientName: data.name };
 };
 
-const ACTIVE_GIFT_STATUSES_BLOCKING = new Set(["cancelled", "expired"]);
+/** Inactive rows do not block scheduling a new gift for the same occasion. */
+const INACTIVE_GIFT_STATUSES = new Set(["cancelled", "canceled", "expired", "archived"]);
+
+type ExistingGiftRow = {
+  id: string;
+  status: string | null;
+  gift_type: string | null;
+  gift_variant_id: string | null;
+  goody_order_id: string | null;
+  wallet_reserved: boolean | null;
+  payment_status: string | null;
+};
+
+/** True when an open gift can still be replaced (not yet ordered / shipped). Exported for unit tests. */
+export const isSwappableExistingGift = (
+  gift: Pick<ExistingGiftRow, "status" | "goody_order_id" | "gift_variant_id">,
+  nextProductId: string,
+): boolean => {
+  if (INACTIVE_GIFT_STATUSES.has((gift.status || "").toLowerCase())) return false;
+  if (gift.goody_order_id) return false;
+  const status = (gift.status || "").toLowerCase();
+  if (["ordered", "shipped", "delivered", "confirmed"].includes(status)) return false;
+  // Same product is already booked — not a swap.
+  if (gift.gift_variant_id && gift.gift_variant_id === nextProductId) return false;
+  return true;
+};
 
 const handleSelectGift = async (
   authClient: ReturnType<typeof createClient>,
@@ -1413,13 +1478,15 @@ const handleSelectGift = async (
   // rather than risk an error from more than one match.
   const { data: existingRows } = await authClient
     .from("scheduled_gifts")
-    .select("id, status, gift_type")
+    .select("id, status, gift_type, gift_variant_id, goody_order_id, wallet_reserved, payment_status")
     .eq("recipient_id", args.recipientId)
     .eq("occasion_date", occasionDate)
     .order("created_at", { ascending: false })
     .limit(1);
-  const existing = existingRows?.[0] ?? null;
-  if (existing && !ACTIVE_GIFT_STATUSES_BLOCKING.has((existing.status || "").toLowerCase())) {
+  const existing = (existingRows?.[0] as ExistingGiftRow | undefined) ?? null;
+
+  // Same gift already booked, or past the point where a swap is safe.
+  if (existing && !INACTIVE_GIFT_STATUSES.has((existing.status || "").toLowerCase()) && !isSwappableExistingGift(existing, product.id)) {
     return {
       ok: true,
       alreadyScheduled: true,
@@ -1428,19 +1495,26 @@ const handleSelectGift = async (
     };
   }
 
+  const review: Record<string, unknown> = {
+    recipientId: recipient.id,
+    recipientName: recipient.name,
+    productId: product.id,
+    productTitle: product.title,
+    price: product.price,
+    currency: product.currency,
+    occasionDate,
+    occasion: occasionLabel,
+    hasAddress: hasAddress(recipient),
+  };
+  // Different gift still waiting — offer a confirmable swap instead of dead-ending.
+  if (existing && isSwappableExistingGift(existing, product.id)) {
+    review.replacesGiftId = existing.id;
+    review.replacesGiftTitle = existing.gift_type || "the current gift";
+  }
+
   return {
     ok: true,
-    review: {
-      recipientId: recipient.id,
-      recipientName: recipient.name,
-      productId: product.id,
-      productTitle: product.title,
-      price: product.price,
-      currency: product.currency,
-      occasionDate,
-      occasion: occasionLabel,
-      hasAddress: hasAddress(recipient),
-    },
+    review,
     reviewMarker: `GIFT_REVIEW: ${recipient.id}:${product.id}:${occasionDate}`,
   };
 };
@@ -1759,15 +1833,12 @@ const handleConfirmScheduledGift = async (
 
   const { data: existingRows } = await authClient
     .from("scheduled_gifts")
-    .select("id, status, gift_type")
+    .select("id, status, gift_type, gift_variant_id, goody_order_id, wallet_reserved, payment_status")
     .eq("recipient_id", args.recipientId)
     .eq("occasion_date", args.occasionDate)
     .order("created_at", { ascending: false })
     .limit(1);
-  const existing = existingRows?.[0] ?? null;
-  if (existing && !ACTIVE_GIFT_STATUSES_BLOCKING.has((existing.status || "").toLowerCase())) {
-    return { ok: true, alreadyScheduled: true, recordId: existing.id, saved: { gift_type: existing.gift_type, status: existing.status } };
-  }
+  const existing = (existingRows?.[0] as ExistingGiftRow | undefined) ?? null;
 
   // Price/availability validated fresh right before the write when
   // possible; falls back to this conversation's own known data (this
@@ -1777,29 +1848,74 @@ const handleConfirmScheduledGift = async (
   const product = (await findGoodyProductById(args.productId)) ?? fallbackProduct ?? null;
   if (!product) return { ok: false, error: "That product is no longer available - search again for current options." };
 
+  // Same gift already booked, or already ordered — leave it alone.
+  if (existing && !INACTIVE_GIFT_STATUSES.has((existing.status || "").toLowerCase()) && !isSwappableExistingGift(existing, product.id)) {
+    return { ok: true, alreadyScheduled: true, recordId: existing.id, saved: { gift_type: existing.gift_type, status: existing.status } };
+  }
+
   const occasionType = recipient.birthday === args.occasionDate ? "birthday" : recipient.anniversary === args.occasionDate ? "anniversary" : "custom";
   const occasion = occasionType === "birthday" ? "Birthday" : occasionType === "anniversary" ? "Anniversary" : "Special occasion";
-  const deliveryDate = new Date(new Date(args.occasionDate).getTime() - 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const timing = giftOrderTiming(args.occasionDate);
+  const deliveryDate = timing?.deliveryBy || shiftIsoDate(args.occasionDate, -DELIVERY_LEAD_DAYS);
+
+  const giftFields = {
+    occasion,
+    occasion_date: args.occasionDate,
+    occasion_type: occasionType,
+    gift_type: product.title,
+    gift_variant_id: product.id,
+    gift_image_url: product.featured_image_url,
+    estimated_cost: product.price,
+    price_range: `$${product.price.toFixed(2)}`,
+    payment_amount: product.price,
+    delivery_date: deliveryDate,
+    // The user approved this exact gift in chat; the lifecycle job charges and orders it in its window.
+    status: "approved",
+    automation_enabled: true,
+    payment_status: "unpaid",
+    wallet_reserved: false,
+  };
+
+  // Swap path: update the open gift in place (release any prior hold first).
+  if (existing && isSwappableExistingGift(existing, product.id)) {
+    if (existing.wallet_reserved) {
+      await authClient
+        .from("wallet_transactions")
+        .update({ status: "cancelled" })
+        .eq("scheduled_gift_id", existing.id)
+        .eq("transaction_type", "reservation")
+        .eq("status", "pending");
+    }
+    const { error: swapError } = await authClient
+      .from("scheduled_gifts")
+      .update(giftFields)
+      .eq("id", existing.id)
+      .eq("user_id", userId);
+    if (swapError) return { ok: false, error: swapError.message };
+
+    return {
+      ok: true,
+      recordId: existing.id,
+      swapped: true,
+      replacedGiftTitle: existing.gift_type || "the previous gift",
+      saved: {
+        recipientName: recipient.name,
+        gift_type: product.title,
+        price: product.price,
+        occasion_date: args.occasionDate,
+        replaced: existing.gift_type,
+      },
+      timing,
+      funding: await holdGiftFunds(authClient, userId, existing.id, product.price),
+    };
+  }
 
   const { data: inserted, error } = await authClient
     .from("scheduled_gifts")
     .insert({
       user_id: userId,
       recipient_id: args.recipientId,
-      occasion,
-      occasion_date: args.occasionDate,
-      occasion_type: occasionType,
-      gift_type: product.title,
-      gift_variant_id: product.id,
-      gift_image_url: product.featured_image_url,
-      estimated_cost: product.price,
-      price_range: `$${product.price.toFixed(2)}`,
-      payment_amount: product.price,
-      delivery_date: deliveryDate,
-      // The user approved this exact gift in chat; the lifecycle job charges and orders it in its window.
-      status: "approved",
-      automation_enabled: true,
-      payment_status: "unpaid",
+      ...giftFields,
     })
     .select("id")
     .single();
@@ -1809,6 +1925,7 @@ const handleConfirmScheduledGift = async (
     ok: true,
     recordId: inserted.id,
     saved: { recipientName: recipient.name, gift_type: product.title, price: product.price, occasion_date: args.occasionDate },
+    timing,
     funding: await holdGiftFunds(authClient, userId, inserted.id, product.price),
   };
 };

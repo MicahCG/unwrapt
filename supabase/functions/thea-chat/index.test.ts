@@ -25,6 +25,8 @@ import {
   looksLikePaymentIntent,
   shouldForceWalletTopUpUi,
   buildWalletTopUpDirectiveMessage,
+  isSwappableExistingGift,
+  giftOrderTiming,
   buildRecipientStatusEntries,
   buildAccountRosterFromRows,
   formatAccountRosterSection,
@@ -437,6 +439,22 @@ Deno.test("shouldForceWalletTopUpUi forces once, then skips when card already pr
   );
   assert(buildWalletTopUpDirectiveMessage(true)?.includes("wallet_topup"));
   assertEquals(buildWalletTopUpDirectiveMessage(false), null);
+});
+
+Deno.test("isSwappableExistingGift allows replacing a different pre-order gift", () => {
+  const coffee = { status: "approved", goody_order_id: null, gift_variant_id: "prod_coffee" };
+  assert(isSwappableExistingGift(coffee, "prod_chocolate"));
+  assertEquals(isSwappableExistingGift(coffee, "prod_coffee"), false);
+  assertEquals(isSwappableExistingGift({ ...coffee, goody_order_id: "goody_1" }, "prod_chocolate"), false);
+  assertEquals(isSwappableExistingGift({ ...coffee, status: "ordered" }, "prod_chocolate"), false);
+  assertEquals(isSwappableExistingGift({ ...coffee, status: "cancelled" }, "prod_chocolate"), false);
+});
+
+Deno.test("giftOrderTiming places the order ~28 days before the occasion", () => {
+  const timing = giftOrderTiming("2026-12-02");
+  assertEquals(timing?.placeOrderOn, "2026-11-04");
+  assertEquals(timing?.deliveryBy, "2026-11-29");
+  assert(timing?.shippingEstimate.includes("2–3 weeks"));
 });
 
 Deno.test("buildRecipientStatusEntries maps gift/address/preferences checks", () => {
