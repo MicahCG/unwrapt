@@ -9,42 +9,85 @@ export const calculateGiftCost = (giftPrice: number): number => {
   return giftPrice + SERVICE_FEE;
 };
 
+export type PendingReservation = {
+  amount: number;
+  scheduledGiftId: string;
+  giftTitle: string;
+  recipientName: string;
+  occasionDate: string | null;
+};
+
+export type WalletBreakdown = {
+  balance: number;
+  reserved: number;
+  available: number;
+  reservations: PendingReservation[];
+};
+
+type ReservationJoinRow = {
+  amount: number;
+  scheduled_gift_id: string | null;
+  scheduled_gifts: {
+    gift_type: string | null;
+    occasion_date: string | null;
+    recipients: { name: string } | { name: string }[] | null;
+  } | null;
+};
+
+/** Pending holds linked to upcoming gifts (for the Gift Wallet available/reserved UI). */
+export const listPendingReservations = async (userId: string): Promise<PendingReservation[]> => {
+  const { data, error } = await supabase
+    .from('wallet_transactions')
+    .select('amount, scheduled_gift_id, scheduled_gifts(gift_type, occasion_date, recipients(name))')
+    .eq('user_id', userId)
+    .eq('transaction_type', 'reservation')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+
+  return ((data as ReservationJoinRow[] | null) || [])
+    .filter((row) => row.scheduled_gift_id)
+    .map((row) => {
+      const gift = row.scheduled_gifts;
+      const recipient = Array.isArray(gift?.recipients) ? gift?.recipients[0] : gift?.recipients;
+      return {
+        amount: Math.abs(Number(row.amount) || 0),
+        scheduledGiftId: row.scheduled_gift_id!,
+        giftTitle: gift?.gift_type || 'Gift',
+        recipientName: recipient?.name || 'Someone',
+        occasionDate: gift?.occasion_date || null,
+      };
+    });
+};
+
+/** Gross balance, reserved total, available, and per-gift holds. */
+export const getWalletBreakdown = async (userId: string): Promise<WalletBreakdown> => {
+  try {
+    const [{ data: profile, error: profileError }, reservations] = await Promise.all([
+      supabase.from('profiles').select('gift_wallet_balance').eq('id', userId).single(),
+      listPendingReservations(userId).catch(() => [] as PendingReservation[]),
+    ]);
+    if (profileError) throw profileError;
+    const balance = Number(profile?.gift_wallet_balance) || 0;
+    const reserved = reservations.reduce((sum, row) => sum + row.amount, 0);
+    return {
+      balance,
+      reserved,
+      available: Math.round((balance - reserved) * 100) / 100,
+      reservations,
+    };
+  } catch (error) {
+    console.error('Error getting wallet breakdown:', error);
+    return { balance: 0, reserved: 0, available: 0, reservations: [] };
+  }
+};
+
 /**
  * Get user's available wallet balance (balance minus pending reservations)
  */
 export const getAvailableBalance = async (userId: string): Promise<number> => {
-  try {
-    // Get current wallet balance
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('gift_wallet_balance')
-      .eq('id', userId)
-      .single();
-
-    if (profileError) throw profileError;
-
-    const currentBalance = profile?.gift_wallet_balance || 0;
-
-    // Get sum of pending reservations
-    const { data: reservations, error: reservationsError } = await supabase
-      .from('wallet_transactions')
-      .select('amount')
-      .eq('user_id', userId)
-      .eq('transaction_type', 'reservation')
-      .eq('status', 'pending');
-
-    if (reservationsError) throw reservationsError;
-
-    const totalReserved = reservations?.reduce(
-      (sum, transaction) => sum + Math.abs(transaction.amount),
-      0
-    ) || 0;
-
-    return currentBalance - totalReserved;
-  } catch (error) {
-    console.error('Error getting available balance:', error);
-    return 0;
-  }
+  const breakdown = await getWalletBreakdown(userId);
+  return breakdown.available;
 };
 
 /** Top-up amounts Thea offers in chat when the wallet doesn't cover a gift. */
@@ -76,7 +119,13 @@ export const holdGiftFunds = async (scheduledGiftId: string): Promise<GiftHold> 
 const LS_PENDING_WALLET_HOLD = 'unwrapt_pending_wallet_hold';
 const PENDING_HOLD_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
-export type PendingWalletHold = { scheduledGiftId: string; recipientName: string; giftTitle: string; savedAt: number };
+export type PendingWalletHold = {
+  scheduledGiftId: string;
+  recipientName: string;
+  giftTitle: string;
+  occasionDate?: string | null;
+  savedAt: number;
+};
 
 export const takePendingWalletHold = (): PendingWalletHold | null => {
   try {
