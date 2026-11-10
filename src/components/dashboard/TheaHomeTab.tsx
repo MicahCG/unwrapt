@@ -33,7 +33,7 @@ import { clearOnboardingFoundPeople, loadOnboardingFoundPeople } from '@/lib/onb
 import CalendarSyncButton from '@/components/CalendarSyncButton';
 import { cleanTheaText, hideProductIds, renderTheaText } from '@/lib/theaText';
 import { theaChatPose } from '@/lib/theaState';
-import { ensureCalendarConnectUi } from '@/lib/theaChatUi';
+import { ensureCalendarConnectUi, ensureRecipientStatusUi } from '@/lib/theaChatUi';
 import type { TheaPose } from '@/components/unwrapt2/TheaFigure';
 import {
   buildGiftResumeMessage,
@@ -517,11 +517,18 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
       if (writes.some((w) => w.ok && w.tool === 'confirm_scheduled_gift')) celebrate();
       // Client safety net: if the edge function is stale or the model refuses
       // calendar connect after a poisoned history, still surface the module.
-      const ensured = ensureCalendarConnectUi(
+      const calendarEnsured = ensureCalendarConnectUi(
         trimmed,
         nextMessages,
         cleanTheaText(data.reply),
         (Array.isArray(data.ui) ? data.ui : []) as ChatUiModule[],
+      );
+      // Same idea for who's-scheduled / status overviews: show cards, not only prose.
+      const ensured = ensureRecipientStatusUi(
+        trimmed,
+        calendarEnsured.reply,
+        calendarEnsured.ui,
+        recipients,
       );
       const ui = ensured.ui;
       setMessages([
@@ -793,6 +800,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
                       disabled={sending}
                       onAddRecipient={onAddRecipient}
                       onEditRecipient={onEditRecipient}
+                      onOpenRecipient={(recipientId) => onOpenRecipient(recipientId, 'open')}
                       stageOf={stageOf}
                       onTopUp={topUp}
                       onUseBalance={holdFromBalance}

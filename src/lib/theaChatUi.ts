@@ -1,4 +1,5 @@
-import type { ChatUiModule } from '@/components/dashboard/TheaChatCards';
+import type { ChatUiModule, RecipientStatusEntry } from '@/components/dashboard/TheaChatCards';
+import { hasRecipientAddress, type RecipientRecord } from '@/lib/giftStatus';
 
 /**
  * User is asking to connect/sync/import a calendar — not merely mentioning one.
@@ -58,4 +59,60 @@ export const ensureCalendarConnectUi = (
 
   const nextReply = replyRefusesCalendar(reply) ? CALENDAR_FALLBACK_REPLY : reply;
   return { reply: nextReply, ui: nextUi };
+};
+
+/**
+ * Status / who's-scheduled overviews — keep in sync with thea-chat.
+ * Matches asks like "who has stuff scheduled and who doesn't".
+ */
+export const looksLikeRecipientStatusIntent = (message: string): boolean => {
+  const t = message.trim().toLowerCase();
+  if (!t) return false;
+  if (/\bwho(?:'s| is| are| has| have)\b.{0,48}\b(?:stuff )?scheduled\b/.test(t)) return true;
+  if (/\bwho(?:'s| is| are)\b.{0,40}\b(?:not|without|missing)\b.{0,24}\b(?:gift|scheduled)\b/.test(t)) return true;
+  if (/\b(?:scheduled|not scheduled).{0,24}\b(?:who|anyone|everybody|everyone)\b/.test(t)) return true;
+  if (/\bwho\b.{0,36}\b(?:doesn'?t|does not|don'?t|missing|without)\b.{0,36}\b(?:gift|scheduled|address|preferences?|interests?)\b/.test(t)) return true;
+  if (/\b(?:status|overview|readiness|checklist)\b.{0,28}\b(?:people|recipients|everyone|everybody|folks)\b/.test(t)) return true;
+  if (/\b(?:people|recipients|everyone|everybody)\b.{0,28}\b(?:status|ready|missing|scheduled)\b/.test(t)) return true;
+  if (/\bwho(?:'s| is)\b.{0,24}\bready\b/.test(t)) return true;
+  return false;
+};
+
+const CLOSED_GIFT = new Set(['cancelled', 'canceled', 'expired', 'archived']);
+
+/** Build recipient_status entries from live dashboard recipient rows. */
+export const buildRecipientStatusEntries = (
+  recipients: RecipientRecord[],
+  limit = 12,
+): RecipientStatusEntry[] =>
+  recipients.slice(0, limit).map((r) => {
+    const openGift = (r.scheduled_gifts || []).find((g) => !CLOSED_GIFT.has((g.status || '').toLowerCase()));
+    return {
+      recipientId: r.id,
+      recipientName: r.name,
+      giftScheduled: Boolean(openGift),
+      giftTitle: openGift?.gift_type || openGift?.gift_description || null,
+      hasAddress: hasRecipientAddress(r),
+      hasPreferences: (r.interests || []).length > 0,
+    };
+  });
+
+/**
+ * If the user asked for a who's-scheduled / status overview and the edge
+ * omitted recipient_status cards, attach them from live recipient data.
+ */
+export const ensureRecipientStatusUi = (
+  userMessage: string,
+  reply: string,
+  ui: ChatUiModule[],
+  recipients: RecipientRecord[],
+): { reply: string; ui: ChatUiModule[] } => {
+  if (!looksLikeRecipientStatusIntent(userMessage)) return { reply, ui };
+  if (ui.some((m) => m.module === 'recipient_status')) return { reply, ui };
+  if (!recipients.length) return { reply, ui };
+
+  return {
+    reply,
+    ui: [...ui, { module: 'recipient_status', recipients: buildRecipientStatusEntries(recipients) }],
+  };
 };

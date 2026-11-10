@@ -20,6 +20,9 @@ import {
   looksLikeCalendarConnectIntent,
   shouldForceCalendarConnectUi,
   buildCalendarConnectDirectiveMessage,
+  looksLikeRecipientStatusIntent,
+  shouldForceRecipientStatusUi,
+  buildRecipientStatusEntries,
   buildAccountRosterFromRows,
   formatAccountRosterSection,
   scoreInterestText,
@@ -387,4 +390,69 @@ Deno.test("formatAccountRosterSection notes when calendar is disconnected", () =
   const section = formatAccountRosterSection(buildAccountRosterFromRows([], false));
   assert(section?.includes("Saved people: none yet"));
   assert(section?.includes("not connected"));
+});
+
+Deno.test("looksLikeRecipientStatusIntent catches who's-scheduled / readiness asks", () => {
+  assert(looksLikeRecipientStatusIntent("yeah who has stuff scheduled and who doesnt"));
+  assert(looksLikeRecipientStatusIntent("who has a gift scheduled?"));
+  assert(looksLikeRecipientStatusIntent("who's missing an address"));
+  assert(looksLikeRecipientStatusIntent("people status overview"));
+  assertEquals(looksLikeRecipientStatusIntent("what's a good gift for mom?"), false);
+  assertEquals(looksLikeRecipientStatusIntent("how many people are in my calendar"), false);
+});
+
+Deno.test("shouldForceRecipientStatusUi forces once, then skips when cards already present", () => {
+  assert(shouldForceRecipientStatusUi("who has stuff scheduled", []));
+  assertEquals(
+    shouldForceRecipientStatusUi("who has stuff scheduled", [{ module: "recipient_status", recipients: [] }]),
+    false,
+  );
+});
+
+Deno.test("buildRecipientStatusEntries maps gift/address/preferences checks", () => {
+  const giftTitles = new Map([["rec_1", "Coffee Beans by Methodical Coffee"]]);
+  const entries = buildRecipientStatusEntries(
+    [
+      {
+        id: "rec_1",
+        name: "Aunty Ulan",
+        relationship: null,
+        birthday: null,
+        anniversary: null,
+        interests: ["coffee"],
+        street: "1 Main",
+        apartment: null,
+        city: "Austin",
+        state: "TX",
+        zip_code: "78701",
+        country: "United States",
+      },
+      {
+        id: "rec_2",
+        name: "Brianna Friedman",
+        relationship: null,
+        birthday: null,
+        anniversary: null,
+        interests: [],
+        street: null,
+        apartment: null,
+        city: null,
+        state: null,
+        zip_code: null,
+        country: null,
+      },
+    ],
+    giftTitles,
+  );
+  assertEquals(entries[0], {
+    recipientId: "rec_1",
+    recipientName: "Aunty Ulan",
+    giftScheduled: true,
+    giftTitle: "Coffee Beans by Methodical Coffee",
+    hasAddress: true,
+    hasPreferences: true,
+  });
+  assertEquals(entries[1].giftScheduled, false);
+  assertEquals(entries[1].hasAddress, false);
+  assertEquals(entries[1].hasPreferences, false);
 });
