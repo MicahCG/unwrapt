@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Send, X } from 'lucide-react';
+import { CalendarDays, Send, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { TheaAvatar } from '@/components/unwrapt2/TheaAvatar';
@@ -32,7 +32,9 @@ import {
   priorityPaymentItems,
   type BriefingItem,
 } from '@/lib/dashboardBriefing';
-import { giftStage, hasRecipientAddress, isWalletGift, type GiftRecord, type RecipientRecord } from '@/lib/giftStatus';
+import { getRecipientStatus, giftStage, hasRecipientAddress, isWalletGift, type GiftRecord, type RecipientRecord } from '@/lib/giftStatus';
+import { VoiceDictateButton } from '@/components/dashboard/VoiceDictateButton';
+import { useSpeechDictation } from '@/hooks/useSpeechDictation';
 import { resumeGiftPayment } from '@/lib/giftPayment';
 import { calculateGiftCost, getAvailableBalance, holdGiftFunds, startGiftTopUp, takePendingWalletHold } from '@/lib/wallet';
 import { formatGiftTimingLine, giftOrderTiming } from '@/lib/giftTiming';
@@ -78,9 +80,23 @@ function splitChromePose(pose: TheaPose | TheaReaction): { pose: TheaPose; react
  * Freestanding Thea (ChatGPT Athena-style) with a frosted “Thea” name pill under her.
  * Tap opens a frosted presence modal with her full animation.
  */
-export const TheaIdentityChip: React.FC<{ chrome: TheaHeaderChrome; className?: string }> = ({
+export type UpcomingEventPreview = {
+  id: string;
+  recipient: string;
+  status: string;
+  when: string;
+};
+
+export const TheaIdentityChip: React.FC<{
+  chrome: TheaHeaderChrome;
+  className?: string;
+  upcoming?: UpcomingEventPreview[];
+  onSeeCalendar?: () => void;
+}> = ({
   chrome,
   className = '',
+  upcoming = [],
+  onSeeCalendar,
 }) => {
   const [open, setOpen] = useState(false);
   const { pose, reaction } = splitChromePose(chrome.pose);
@@ -111,7 +127,7 @@ export const TheaIdentityChip: React.FC<{ chrome: TheaHeaderChrome; className?: 
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="u-thea-presence-modal max-w-[min(400px,calc(100vw-1.5rem))] gap-0 overflow-hidden rounded-[28px] border p-0 shadow-[0_24px_60px_rgba(42,37,32,0.18)] sm:rounded-[28px]">
+        <DialogContent className="u-thea-presence-modal max-h-[min(88dvh,640px)] max-w-[min(400px,calc(100vw-1.5rem))] gap-0 overflow-y-auto rounded-[28px] border p-0 shadow-[0_24px_60px_rgba(42,37,32,0.18)] sm:rounded-[28px]">
           <DialogClose
             className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border opacity-100"
             style={{ background: 'rgba(250,246,238,0.85)', borderColor: 'rgba(42,37,32,0.1)', color: U.ink }}
@@ -140,6 +156,57 @@ export const TheaIdentityChip: React.FC<{ chrome: TheaHeaderChrome; className?: 
             <p className="mt-2 text-center text-[13px] leading-5" style={{ color: U.textSecondary }}>
               {chrome.status}
             </p>
+            <section className="mt-5 w-full text-left" aria-labelledby="upcoming-events-heading">
+              <h3
+                id="upcoming-events-heading"
+                className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+                style={{ color: U.muted }}
+              >
+                Upcoming events
+              </h3>
+              {upcoming.length === 0 ? (
+                <p className="mt-2 text-[13px] leading-5" style={{ color: U.textSecondary }}>
+                  Nothing coming up yet.
+                </p>
+              ) : (
+                <ul className="mt-2 space-y-2">
+                  {upcoming.slice(0, 3).map((event) => (
+                    <li
+                      key={event.id}
+                      className="flex items-center justify-between gap-3 rounded-[14px] border px-3 py-2"
+                      style={{ background: U.surface, borderColor: U.border }}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-[14px] font-medium" style={{ color: U.ink }}>
+                          {event.recipient}
+                        </span>
+                        <span className="block truncate text-[12px]" style={{ color: U.muted }}>
+                          {event.when}
+                        </span>
+                      </span>
+                      <span
+                        className="shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold"
+                        style={{ background: U.chip, color: '#5A5147' }}
+                      >
+                        {event.status}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onSeeCalendar?.();
+                }}
+                className="u-press mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-full text-[13px] font-semibold"
+                style={{ background: U.ink, color: U.buttonText }}
+              >
+                <CalendarDays className="h-4 w-4" aria-hidden="true" />
+                See the calendar
+              </button>
+            </section>
           </div>
         </DialogContent>
       </Dialog>
@@ -930,13 +997,16 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   };
 
   const lastMessage = messages[messages.length - 1];
-  const pose = theaChatPose({
-    sending,
-    failed: history === 'error' || Boolean(lastMessage?.failed || lastMessage?.unsaved),
-    succeeded: celebrating,
-    typing: input.trim().length > 0,
-    lastReply: lastMessage?.role === 'assistant' && !lastMessage.products?.length && !lastMessage.review ? lastMessage.content : null,
-  });
+  const dictation = useSpeechDictation();
+  const pose = dictation.listening
+    ? 'listening'
+    : theaChatPose({
+      sending,
+      failed: history === 'error' || Boolean(lastMessage?.failed || lastMessage?.unsaved),
+      succeeded: celebrating,
+      typing: input.trim().length > 0,
+      lastReply: lastMessage?.role === 'assistant' && !lastMessage.products?.length && !lastMessage.review ? lastMessage.content : null,
+    });
   const latestReviewIndex = messages.reduce((latest, m, i) => (m.review ? i : latest), -1);
   // Soft expand while she reacts, thinks, or a send is in flight — then settle.
   const chipLively = sending || Boolean(reaction) || pose === 'thinking' || pose === 'listening';
@@ -946,6 +1016,16 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     lively: chipLively,
     status: headerStatus,
   };
+  const upcomingEvents = briefing.upcoming.slice(0, 3).map((item) => {
+    const recipient = recipients.find((row) => row.id === item.recipientId);
+    const hasGift = Boolean(recipient?.scheduled_gifts?.length);
+    return {
+      id: `${item.recipientId}:${item.label}`,
+      recipient: item.recipientName,
+      when: item.detail,
+      status: recipient && hasGift ? getRecipientStatus(recipient).label : 'No gift yet',
+    };
+  });
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
@@ -953,7 +1033,11 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
         {!hidePresenceOrb && (
           <div className="pointer-events-none absolute inset-x-0 top-0 z-[25] flex justify-center pt-2 md:pt-2.5">
             <div className="pointer-events-auto">
-              <TheaIdentityChip chrome={orbChrome} />
+              <TheaIdentityChip
+                chrome={orbChrome}
+                upcoming={upcomingEvents}
+                onSeeCalendar={onSwitchToManual}
+              />
             </div>
           </div>
         )}
@@ -1141,6 +1225,11 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
             autoCorrect="on"
             className="u-thea-composer__input min-w-0 flex-1"
           />
+          <VoiceDictateButton
+            listening={dictation.listening}
+            disabled={sending}
+            onClick={() => dictation.toggle(input, setInput)}
+          />
           <button
             type="submit"
             disabled={!input.trim() || sending}
@@ -1151,6 +1240,14 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
             <Send className="h-4 w-4" />
           </button>
         </div>
+        <p className="sr-only" role="status">
+          {dictation.listening ? 'Listening. Your words will appear in the message.' : ''}
+        </p>
+        {dictation.error && (
+          <p className="px-1 pt-1 text-[12px]" role="status" style={{ color: U.accent }}>
+            {dictation.error}
+          </p>
+        )}
       </form>
 
       <WalletHoldSuccessModal

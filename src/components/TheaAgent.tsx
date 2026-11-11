@@ -12,6 +12,8 @@ import { TheaContextValue, type TheaContext } from '@/hooks/useThea';
 import { supabase } from '@/integrations/supabase/client';
 import { VIPUpgradeModal } from '@/components/subscription/VIPUpgradeModal';
 import { VIP_MONTHLY_AMOUNT_LABEL } from '@/lib/stripe';
+import { VoiceDictateButton } from '@/components/dashboard/VoiceDictateButton';
+import { useSpeechDictation } from '@/hooks/useSpeechDictation';
 import {
   dismissTheaUpgrade,
   hasTheaValueSeen,
@@ -124,6 +126,7 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [open, setOpen] = useState(false);
   const [context, setContext] = useState<TheaContext>({});
   const [question, setQuestion] = useState('');
+  const dictation = useSpeechDictation();
   const [matchedIntent, setMatchedIntent] = useState<(typeof suggestions)[number] | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatProducts, setChatProducts] = useState<ThreadProduct[]>([]);
@@ -513,6 +516,11 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 // TheaHomeTab's composer via .u-thea-composer__input).
                 className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-[16px] text-[#2A2520] outline-none placeholder:text-[#9A8E7C] disabled:opacity-60"
               />
+              <VoiceDictateButton
+                listening={dictation.listening}
+                disabled={sending}
+                onClick={() => dictation.toggle(question, setQuestion)}
+              />
               <button
                 type="submit"
                 disabled={!question.trim() || sending}
@@ -522,6 +530,12 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 <Send className="h-4 w-4" />
               </button>
             </div>
+            <p className="sr-only" role="status">
+              {dictation.listening ? 'Listening. Your words will appear in the message.' : ''}
+            </p>
+            {dictation.error && (
+              <p className="px-3 pb-1 text-[12px] text-[#B65B3C]" role="status">{dictation.error}</p>
+            )}
           </form>
 
           {!isTheaLlmTester && matchedIntent && (
