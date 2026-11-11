@@ -3,7 +3,6 @@ import { Send } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { TheaAvatar } from '@/components/unwrapt2/TheaAvatar';
-import { TheaCharacter } from '@/components/unwrapt2/TheaCharacter';
 import { U } from '@/components/unwrapt2/theme';
 import {
   ChatUiModules,
@@ -46,12 +45,53 @@ import {
   ensureWalletTopUpUi,
   looksLikePaymentIntent,
 } from '@/lib/theaChatUi';
-import type { TheaPose } from '@/components/unwrapt2/TheaFigure';
+import type { TheaPose, TheaReaction } from '@/components/unwrapt2/TheaFigure';
 import {
   buildGiftResumeMessage,
   consumePendingGiftResume,
   type PendingGiftResume,
 } from '@/lib/postSubscribeResume';
+
+/** Live identity state Thea reports so the dashboard can share one header row with the account pill. */
+export type TheaHeaderChrome = {
+  pose: TheaPose | TheaReaction;
+  lively: boolean;
+  status: string;
+};
+
+export const TheaIdentityChip: React.FC<{ chrome: TheaHeaderChrome; className?: string }> = ({
+  chrome,
+  className = '',
+}) => (
+  <div
+    className={`u-thea-identity-chip min-w-0${chrome.lively ? ' u-thea-identity-chip--lively' : ''}${className ? ` ${className}` : ''}`}
+    aria-label="Thea, your gifting agent"
+  >
+    <TheaAvatar size={34} pose={chrome.pose} />
+    <div className="u-thea-identity-chip__copy">
+      <div className="truncate text-[9px] font-semibold uppercase tracking-[0.14em]" style={{ color: U.accent }}>
+        Your gifting agent
+      </div>
+      <div className="font-display truncate text-[17px] leading-tight" style={{ color: U.ink }}>
+        Thea
+      </div>
+      <span className="sr-only" aria-live="polite">
+        {chrome.status}
+      </span>
+    </div>
+  </div>
+);
+
+/** Reports chip state upward without putting a hook after late render math in TheaHomeTab. */
+const TheaChromeReporter: React.FC<{
+  chrome: TheaHeaderChrome;
+  onChange: (chrome: TheaHeaderChrome) => void;
+}> = ({ chrome, onChange }) => {
+  useEffect(() => {
+    onChange(chrome);
+  }, [chrome.pose, chrome.lively, chrome.status, onChange]);
+  return null;
+};
 
 /** Per user+gift: unpaid return nudge already shown this browser session. */
 const UNPAID_NUDGE_KEY = 'unwrapt_unpaid_nudge';
@@ -139,6 +179,8 @@ interface TheaHomeTabProps {
   recipientsLoaded?: boolean;
   /** Lets the dashboard hide the Thea/Manual tab bar and pin to the visual viewport while typing. */
   onComposerFocusChange?: (focused: boolean) => void;
+  /** Keeps Thea's frosted identity chip in the shared dashboard header beside the account pill. */
+  onHeaderChromeChange?: (chrome: TheaHeaderChrome) => void;
 }
 
 const STATUS_LINE: Partial<Record<TheaPose, string>> = {
@@ -159,6 +201,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   queuedMessage,
   recipientsLoaded = true,
   onComposerFocusChange,
+  onHeaderChromeChange,
 }) => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -841,36 +884,21 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     lastReply: lastMessage?.role === 'assistant' && !lastMessage.products?.length && !lastMessage.review ? lastMessage.content : null,
   });
   const latestReviewIndex = messages.reduce((latest, m, i) => (m.review ? i : latest), -1);
+  // Soft expand while she reacts, thinks, or a send is in flight — then settle.
+  const chipLively = sending || Boolean(reaction) || pose === 'thinking' || pose === 'listening';
+  const headerStatus = STATUS_LINE[pose] || 'Here when you need me';
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
-      <div
-        className={`flex shrink-0 items-center border-b px-1 ${composerFocused ? 'gap-2.5 py-2' : 'gap-3 pb-3'}`}
-        style={{ borderColor: 'rgba(42,37,32,0.08)' }}
-      >
-        {composerFocused ? (
-          <TheaAvatar size={40} pose={pose} />
-        ) : (
-          <TheaCharacter size="compact" pose={pose} reaction={reaction} speaking={false} className="u-thea-character--chat" />
-        )}
-        <div className="min-w-0 flex-1 text-left">
-          {!composerFocused && (
-            <div className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: U.accent }}>
-              Your gifting agent
-            </div>
-          )}
-          <div className={`font-display leading-tight ${composerFocused ? 'text-[18px]' : 'text-[22px]'}`} style={{ color: U.ink }}>
-            Thea
-          </div>
-          <div className="truncate text-[11.5px]" style={{ color: U.muted }} aria-live="polite">
-            {STATUS_LINE[pose] || 'Here when you need me'}
-          </div>
-        </div>
-      </div>
-
+      {onHeaderChromeChange && (
+        <TheaChromeReporter
+          chrome={{ pose: reaction ?? pose, lively: chipLively, status: headerStatus }}
+          onChange={onHeaderChromeChange}
+        />
+      )}
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto pt-4 pr-1"
+        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto pt-1 pr-1"
         style={{ scrollPaddingBottom: listPadBottom }}
         aria-live="polite"
       >

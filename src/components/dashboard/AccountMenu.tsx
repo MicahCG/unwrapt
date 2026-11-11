@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Settings, Wallet } from 'lucide-react';
+import { Crown, Settings, Wallet } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { U, initialsOf } from '@/components/unwrapt2/theme';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -61,16 +61,36 @@ const AccountMenu: React.FC<AccountMenuProps> = ({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="u-press flex min-h-11 items-center gap-2 rounded-full py-1 pl-3 pr-1"
-          style={{ background: '#E5DBC6', color: '#5A5147' }}
-          aria-label={hasWallet ? `Account and gift wallet, available ${money(shownAvailable)}` : 'Account'}
+          className="u-press u-account-glass-pill flex min-h-11 items-center gap-2 rounded-full py-1 pl-3 pr-1"
+          aria-label={
+            hasWallet
+              ? `VIP account and gift wallet, available ${money(shownAvailable)}`
+              : tier === 'vip'
+                ? 'VIP account'
+                : 'Account'
+          }
         >
           {hasWallet && <span className="font-mono text-[12px] font-semibold">{money(shownAvailable)}</span>}
-          <span
-            className="flex h-[34px] w-[34px] items-center justify-center rounded-full"
-            style={{ background: U.surface, fontFamily: "'Newsreader', serif", fontStyle: 'italic', fontSize: 15 }}
-          >
-            {initialsOf(displayName).charAt(0)}
+          <span className="relative flex h-[34px] w-[34px] shrink-0 items-center justify-center">
+            <span
+              className="flex h-full w-full items-center justify-center rounded-full"
+              style={{ background: U.surface, fontFamily: "'Newsreader', serif", fontStyle: 'italic', fontSize: 15 }}
+            >
+              {initialsOf(displayName).charAt(0)}
+            </span>
+            {tier === 'vip' && (
+              <span
+                className="absolute -right-0.5 -top-1 flex h-[16px] w-[16px] items-center justify-center rounded-full"
+                style={{
+                  background: '#FBEFE5',
+                  border: '1px solid rgba(182,91,60,0.35)',
+                  boxShadow: '0 1px 2px rgba(42,37,32,0.08)',
+                }}
+                aria-hidden="true"
+              >
+                <Crown className="h-[9px] w-[9px]" style={{ color: '#B65B3C' }} />
+              </span>
+            )}
           </span>
         </button>
       </PopoverTrigger>
