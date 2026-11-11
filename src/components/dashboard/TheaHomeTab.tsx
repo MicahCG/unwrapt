@@ -75,7 +75,7 @@ function splitChromePose(pose: TheaPose | TheaReaction): { pose: TheaPose; react
 }
 
 /**
- * Freestanding Thea (ChatGPT Athena-style): no chip/box — just her figure centered over chat.
+ * Freestanding Thea (ChatGPT Athena-style) with a frosted “Thea” name pill under her.
  * Tap opens a frosted presence modal with her full animation.
  */
 export const TheaIdentityChip: React.FC<{ chrome: TheaHeaderChrome; className?: string }> = ({
@@ -102,6 +102,9 @@ export const TheaIdentityChip: React.FC<{ chrome: TheaHeaderChrome; className?: 
           speaking={false}
           className="u-thea-character--orb-inline"
         />
+        <span className="u-thea-name-pill" aria-hidden="true">
+          Thea
+        </span>
         <span className="sr-only" aria-live="polite">
           {chrome.status}
         </span>
@@ -956,7 +959,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
         )}
         <div
           ref={scrollRef}
-          className={`h-full min-h-0 overflow-x-hidden overflow-y-auto pr-1 ${hidePresenceOrb ? 'pt-1' : 'pt-[7.75rem]'}`}
+          className={`h-full min-h-0 overflow-x-hidden overflow-y-auto pr-1 ${hidePresenceOrb ? 'pt-1' : 'pt-[9rem]'}`}
           style={{ scrollPaddingBottom: listPadBottom }}
           aria-live="polite"
         >
