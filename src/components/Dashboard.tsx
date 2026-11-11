@@ -411,13 +411,9 @@ const Dashboard = () => {
           pinToKeyboard ? 'overflow-hidden pt-3' : 'pt-3'
         } ${activeTab === 'thea' ? 'overflow-hidden' : 'overflow-y-auto'}`}
       >
-        {/* Cursor-style frost fades into chat; gear left, account pill right. */}
-        <div
-          className={`u-dashboard-frost-nav pointer-events-none absolute inset-x-0 top-0 z-20 -mx-5 px-5 md:-mx-8 md:px-8 ${
-            pinToKeyboard ? 'hidden' : ''
-          }`}
-        >
-          <div className="pointer-events-auto flex items-center justify-between gap-2 pt-0.5">
+        {/* Frost + chrome stay visible while the keyboard is open (composer focus). */}
+        <div className="u-dashboard-frost-nav pointer-events-none absolute inset-x-0 top-0 z-20 -mx-5 px-5 md:-mx-8 md:px-8">
+          <div className="pointer-events-auto flex items-center justify-between gap-2 px-1 pt-2.5 md:px-1.5 md:pt-3">
             <button
               type="button"
               className="u-press u-account-glass-pill flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
@@ -460,7 +456,7 @@ const Dashboard = () => {
               queuedMessage={theaQueue}
               recipientsLoaded={recipientsLoaded}
               onComposerFocusChange={setComposerFocused}
-              hidePresenceOrb={pinToKeyboard || (compactChrome && activeTab !== 'thea')}
+              hidePresenceOrb={compactChrome && activeTab !== 'thea'}
             />
           </div>
           <div className={`${activeTab === 'manual' ? 'h-full' : 'hidden'} ${pinToKeyboard ? '' : 'pt-12'} lg:block lg:h-full lg:min-h-0 lg:rounded-[24px] lg:border lg:border-[rgba(42,37,32,0.09)] lg:bg-[rgba(250,246,238,0.6)] lg:px-5 lg:pt-5`}>
