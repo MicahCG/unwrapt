@@ -27,6 +27,7 @@ import {
 import { useAuth } from '@/components/auth/AuthProvider';
 import {
   buildBriefingMessage,
+  addressChipForm,
   briefingQuickChips,
   buildDashboardBriefing,
   priorityPaymentItems,
@@ -967,6 +968,11 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   };
 
   const handleChip = (item: BriefingItem) => {
+    const addressForm = addressChipForm(item);
+    if (addressForm) {
+      onEditRecipient(addressForm.recipientId, addressForm.focus);
+      return;
+    }
     if (item.action === 'payment') {
       const gift = item.giftId ? giftsById.get(item.giftId) : undefined;
       // VIP / wallet gifts stay in chat; Stripe abandoned checkouts resume checkout.
@@ -989,11 +995,9 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
       void showWalletTopUp(item);
       return;
     }
-    if (item.action === 'address' || item.action === 'interests' || item.action === 'open' || item.action === 'review') {
+    if (item.action === 'interests' || item.action === 'open' || item.action === 'review') {
       onOpenRecipient(item.recipientId, item.action);
-      if (item.action === 'address' || item.action === 'interests') {
-        onSwitchToManual();
-      }
+      if (item.action === 'interests') onSwitchToManual();
       return;
     }
     void send(item.label);
