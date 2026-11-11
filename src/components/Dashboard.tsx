@@ -18,10 +18,7 @@ import RecipientDetailSheet from '@/components/RecipientDetailSheet';
 import CatalogPreviewSheet from '@/components/CatalogPreviewSheet';
 import { type RecipientRecord, type GiftRecord } from '@/lib/giftStatus';
 import { findResumableGift, resumeGiftPayment, hasCompleteShippingAddress } from '@/lib/giftPayment';
-import TheaHomeTab, {
-  TheaIdentityChip,
-  type TheaHeaderChrome,
-} from '@/components/dashboard/TheaHomeTab';
+import TheaHomeTab from '@/components/dashboard/TheaHomeTab';
 import ManualHomeTab from '@/components/dashboard/ManualHomeTab';
 import AccountMenu from '@/components/dashboard/AccountMenu';
 import { AUTOPILOT_THRESHOLDS, type BriefingItem } from '@/lib/dashboardBriefing';
@@ -54,17 +51,6 @@ const Dashboard = () => {
   const [approval, setApproval] = useState<{ gift: any; recipient: any } | null>(null);
   const [theaQueue, setTheaQueue] = useState<{ id: number; text: string } | null>(null);
   const [composerFocused, setComposerFocused] = useState(false);
-  const [theaChrome, setTheaChrome] = useState<TheaHeaderChrome | null>(null);
-  const handleTheaChromeChange = useCallback((chrome: TheaHeaderChrome) => {
-    setTheaChrome((prev) => (
-      prev
-      && prev.pose === chrome.pose
-      && prev.lively === chrome.lively
-      && prev.status === chrome.status
-        ? prev
-        : chrome
-    ));
-  }, []);
   // Match MobileShell's `lg:hidden` tab bar — phones/tablets, not the side-by-side desktop layout.
   const [compactChrome, setCompactChrome] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches,
@@ -422,8 +408,8 @@ const Dashboard = () => {
           side, each with its own single scroll area, so desktop uses its width instead of a phone column. */}
       <MobileShell
         maxWidthClassName="max-w-[440px] md:max-w-[680px] lg:max-w-[1180px] xl:max-w-[1400px]"
-        contentClassName={`flex min-h-0 flex-col px-5 pb-2 md:px-8 lg:overflow-hidden lg:pb-6 ${
-          pinToKeyboard ? 'overflow-hidden pt-3' : 'pt-5'
+        contentClassName={`relative flex min-h-0 flex-col px-5 pb-2 md:px-8 lg:overflow-hidden lg:pb-6 ${
+          pinToKeyboard ? 'overflow-hidden pt-3' : 'pt-3'
         } ${activeTab === 'thea' ? 'overflow-hidden' : 'overflow-y-auto'}`}
         footerClassName="lg:hidden"
         footer={
@@ -465,14 +451,13 @@ const Dashboard = () => {
           )
         }
       >
-        <div className={`mb-2 flex shrink-0 items-end justify-between gap-2 ${pinToKeyboard ? 'hidden' : ''}`}>
-          {/* Top nav: cropped Thea chip left, account/balance pill right — not floating mid-chat. */}
-          <div className="min-w-0">
-            {theaChrome && (activeTab === 'thea' || !compactChrome) ? (
-              <TheaIdentityChip chrome={theaChrome} />
-            ) : null}
-          </div>
-          <div className="shrink-0 self-center">
+        {/* Cursor-style frost fades into chat; account pill stays top-right. Thea is freestanding in TheaHomeTab. */}
+        <div
+          className={`u-dashboard-frost-nav pointer-events-none absolute inset-x-0 top-0 z-20 -mx-5 px-5 md:-mx-8 md:px-8 ${
+            pinToKeyboard ? 'hidden' : ''
+          }`}
+        >
+          <div className="pointer-events-auto flex justify-end pt-0.5">
             <AccountMenu
               displayName={displayName}
               planLabel={planLabel}
@@ -506,10 +491,10 @@ const Dashboard = () => {
               queuedMessage={theaQueue}
               recipientsLoaded={recipientsLoaded}
               onComposerFocusChange={setComposerFocused}
-              onHeaderChromeChange={handleTheaChromeChange}
+              hidePresenceOrb={pinToKeyboard || (compactChrome && activeTab !== 'thea')}
             />
           </div>
-          <div className={`${activeTab === 'manual' ? 'h-full' : 'hidden'} lg:block lg:h-full lg:min-h-0 lg:rounded-[24px] lg:border lg:border-[rgba(42,37,32,0.09)] lg:bg-[rgba(250,246,238,0.6)] lg:px-5 lg:pt-5`}>
+          <div className={`${activeTab === 'manual' ? 'h-full' : 'hidden'} ${pinToKeyboard ? '' : 'pt-12'} lg:block lg:h-full lg:min-h-0 lg:rounded-[24px] lg:border lg:border-[rgba(42,37,32,0.09)] lg:bg-[rgba(250,246,238,0.6)] lg:px-5 lg:pt-5`}>
             <ManualHomeTab
               recipients={typedRecipients}
               autopilotThreshold={autopilotThreshold}
