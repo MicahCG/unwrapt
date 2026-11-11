@@ -1,9 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { goodyMailingCountry } from "../_shared/isoCountry.ts";
 
-// Inlined rather than imported from ../_shared/cors.ts so this function is a
-// single self-contained file, pastable directly into the Supabase Dashboard
-// function editor (which only sees this one file, not sibling folders).
+// CORS stays inlined rather than imported from ../_shared/cors.ts. Country
+// codes are normalized in ../_shared/isoCountry.ts, which `supabase functions
+// deploy` bundles with this function.
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -131,6 +132,15 @@ Deno.serve(async (req: Request) => {
     const [firstName, ...lastNameParts] = recipient.name.trim().split(/\s+/);
     const fromName = profile?.full_name || (profile?.email ? profile.email.split("@")[0] : "A friend");
 
+    // Blank country keeps the historical US default. A stored English name
+    // such as "United States" has to be ISO 3166-1 alpha-2 before Goody sees it.
+    const country = goodyMailingCountry(recipient.country);
+    if (!country) {
+      const rawCountry = typeof recipient.country === "string" ? recipient.country.trim().slice(0, 80) : "";
+      console.error("goody-order rejected a recipient country that is not ISO 3166-1 alpha-2", rawCountry);
+      return json({ success: false, error: "Recipient country must be a 2-letter ISO 3166-1 code" }, 400);
+    }
+
     const orderBody = {
       from_name: fromName,
       send_method: "direct_send",
@@ -147,7 +157,7 @@ Deno.serve(async (req: Request) => {
             city: recipient.city,
             state: recipient.state,
             postal_code: recipient.zip_code,
-            country: recipient.country || "US",
+            country,
           },
         },
       ],

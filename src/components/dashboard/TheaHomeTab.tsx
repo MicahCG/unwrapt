@@ -27,6 +27,7 @@ import {
 import { useAuth } from '@/components/auth/AuthProvider';
 import {
   buildBriefingMessage,
+  addressChipForm,
   briefingQuickChips,
   buildDashboardBriefing,
   priorityPaymentItems,
@@ -50,6 +51,7 @@ import CalendarSyncButton from '@/components/CalendarSyncButton';
 import { cleanTheaText, hideProductIds, renderTheaText } from '@/lib/theaText';
 import { theaChatPose } from '@/lib/theaState';
 import {
+  ensureAddressFormUi,
   ensureCalendarConnectUi,
   ensureRecipientStatusUi,
   ensureWalletTopUpUi,
@@ -804,12 +806,14 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
         const available = user?.id ? await getAvailableBalance(user.id).catch(() => 0) : 0;
         ensured = ensureWalletTopUpUi(trimmed, statusEnsured.reply, statusEnsured.ui, recipients, available);
       }
-      const ui = ensured.ui;
+      // Same safety net for a missing address: open the form, and don't repeat a false "address is missing".
+      const addressEnsured = ensureAddressFormUi(trimmed, nextMessages.slice(0, -1), ensured.reply, ensured.ui, recipients);
+      const ui = addressEnsured.ui;
       setMessages([
         ...nextMessages,
         {
           role: 'assistant',
-          content: ensured.reply,
+          content: addressEnsured.reply,
           products: (data.products || []) as ChatProduct[],
           review: (data.review || null) as GiftReview | null,
           ui: ui.length ? ui : undefined,
@@ -964,6 +968,11 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   };
 
   const handleChip = (item: BriefingItem) => {
+    const addressForm = addressChipForm(item);
+    if (addressForm) {
+      onEditRecipient(addressForm.recipientId, addressForm.focus);
+      return;
+    }
     if (item.action === 'payment') {
       const gift = item.giftId ? giftsById.get(item.giftId) : undefined;
       // VIP / wallet gifts stay in chat; Stripe abandoned checkouts resume checkout.
@@ -986,11 +995,9 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
       void showWalletTopUp(item);
       return;
     }
-    if (item.action === 'address' || item.action === 'interests' || item.action === 'open' || item.action === 'review') {
+    if (item.action === 'interests' || item.action === 'open' || item.action === 'review') {
       onOpenRecipient(item.recipientId, item.action);
-      if (item.action === 'address' || item.action === 'interests') {
-        onSwitchToManual();
-      }
+      if (item.action === 'interests') onSwitchToManual();
       return;
     }
     void send(item.label);
