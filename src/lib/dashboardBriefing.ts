@@ -272,3 +272,12 @@ export function buildBriefingMessage(displayName: string, briefing: DashboardBri
 export function briefingQuickChips(briefing: DashboardBriefing): BriefingItem[] {
   return [...briefing.needsInfo, ...briefing.upcoming].slice(0, 4);
 }
+
+/**
+ * Scheduled gifts waiting on payment/funds — already ranked first in needsInfo.
+ * Used by Thea home to surface a priority wallet nudge on return instead of
+ * softer "who needs an address" noise.
+ */
+export function priorityPaymentItems(briefing: DashboardBriefing): BriefingItem[] {
+  return briefing.needsInfo.filter((item) => item.action === 'payment' && Boolean(item.giftId));
+}

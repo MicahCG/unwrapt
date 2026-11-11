@@ -1,10 +1,17 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Send } from 'lucide-react';
+import { Send, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { TheaAvatar } from '@/components/unwrapt2/TheaAvatar';
 import { TheaCharacter } from '@/components/unwrapt2/TheaCharacter';
 import { U } from '@/components/unwrapt2/theme';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   ChatUiModules,
   ProductCards,
@@ -22,10 +29,17 @@ import {
   buildBriefingMessage,
   briefingQuickChips,
   buildDashboardBriefing,
+  priorityPaymentItems,
   type BriefingItem,
 } from '@/lib/dashboardBriefing';
-import { giftStage, hasRecipientAddress, type GiftRecord, type RecipientRecord } from '@/lib/giftStatus';
+import { giftStage, hasRecipientAddress, isWalletGift, type GiftRecord, type RecipientRecord } from '@/lib/giftStatus';
+import { resumeGiftPayment } from '@/lib/giftPayment';
 import { calculateGiftCost, getAvailableBalance, holdGiftFunds, startGiftTopUp, takePendingWalletHold } from '@/lib/wallet';
+import { formatGiftTimingLine, giftOrderTiming } from '@/lib/giftTiming';
+import {
+  WalletHoldSuccessModal,
+  type WalletHoldSuccess,
+} from '@/components/wallet/WalletHoldSuccessModal';
 import { trackProductEvent } from '@/lib/productAnalytics';
 import { useTheaReaction } from '@/hooks/useTheaReaction';
 import { importNewPeople, importRemainingCalendarPeople, useCalendarConnected } from '@/hooks/useCalendarConnection';
@@ -33,13 +47,113 @@ import { clearOnboardingFoundPeople, loadOnboardingFoundPeople } from '@/lib/onb
 import CalendarSyncButton from '@/components/CalendarSyncButton';
 import { cleanTheaText, hideProductIds, renderTheaText } from '@/lib/theaText';
 import { theaChatPose } from '@/lib/theaState';
-import { ensureCalendarConnectUi } from '@/lib/theaChatUi';
-import type { TheaPose } from '@/components/unwrapt2/TheaFigure';
+import {
+  ensureCalendarConnectUi,
+  ensureRecipientStatusUi,
+  ensureWalletTopUpUi,
+  looksLikePaymentIntent,
+} from '@/lib/theaChatUi';
+import type { TheaPose, TheaReaction } from '@/components/unwrapt2/TheaFigure';
 import {
   buildGiftResumeMessage,
   consumePendingGiftResume,
   type PendingGiftResume,
 } from '@/lib/postSubscribeResume';
+
+/** Live identity state Thea reports so the dashboard can share one header row with the account pill. */
+export type TheaHeaderChrome = {
+  pose: TheaPose | TheaReaction;
+  lively: boolean;
+  status: string;
+};
+
+const THEA_REACTIONS = new Set<string>(['thumbsup', 'sparkle', 'clap', 'toss', 'magnify', 'laugh', 'upset']);
+
+function splitChromePose(pose: TheaPose | TheaReaction): { pose: TheaPose; reaction: TheaReaction | null } {
+  if (THEA_REACTIONS.has(pose)) return { pose: 'basic', reaction: pose as TheaReaction };
+  return { pose: pose as TheaPose, reaction: null };
+}
+
+/**
+ * Centered frosted island (ChatGPT-style): figure above the name, floating over chat.
+ * Tap opens a larger frosted presence modal with her full animation.
+ */
+export const TheaIdentityChip: React.FC<{ chrome: TheaHeaderChrome; className?: string }> = ({
+  chrome,
+  className = '',
+}) => {
+  const [open, setOpen] = useState(false);
+  const { pose, reaction } = splitChromePose(chrome.pose);
+
+  return (
+    <>
+      <button
+        type="button"
+        className={`u-thea-identity-chip u-press${chrome.lively ? ' u-thea-identity-chip--lively' : ''}${className ? ` ${className}` : ''}`}
+        aria-label="Thea, your gifting agent. Open to see her."
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen(true)}
+      >
+        <TheaCharacter
+          size="chip"
+          pose={pose}
+          reaction={reaction}
+          speaking={false}
+          className="u-thea-character--chip-inline"
+        />
+        <div className="u-thea-identity-chip__copy">
+          <div className="font-display text-[18px] leading-none" style={{ color: U.ink }}>
+            Thea
+          </div>
+          <div className="mt-1 text-[9px] font-semibold uppercase tracking-[0.14em]" style={{ color: U.accent }}>
+            Your gifting agent
+          </div>
+          <span className="sr-only" aria-live="polite">
+            {chrome.status}
+          </span>
+        </div>
+      </button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="u-thea-presence-modal max-w-[min(400px,calc(100vw-1.5rem))] gap-0 overflow-hidden rounded-[28px] border p-0 shadow-[0_24px_60px_rgba(42,37,32,0.18)] sm:rounded-[28px]">
+          <DialogClose
+            className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border opacity-100"
+            style={{ background: 'rgba(250,246,238,0.85)', borderColor: 'rgba(42,37,32,0.1)', color: U.ink }}
+          >
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
+          <div className="flex flex-col items-center px-5 pb-6 pt-8">
+            <TheaCharacter
+              size="large"
+              pose={pose}
+              reaction={reaction}
+              speaking
+              bubble={chrome.lively ? undefined : 'Here when you need me'}
+              className="u-thea-character--presence"
+            />
+            <DialogTitle className="mt-1 font-display text-[28px] font-normal leading-tight" style={{ color: U.ink }}>
+              Thea
+            </DialogTitle>
+            <DialogDescription
+              className="mt-1 text-[11px] font-semibold uppercase tracking-[0.16em]"
+              style={{ color: U.accent }}
+            >
+              Your gifting agent
+            </DialogDescription>
+            <p className="mt-2 text-center text-[13px] leading-5" style={{ color: U.textSecondary }}>
+              {chrome.status}
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
+
+/** Per user+gift: unpaid return nudge already shown this browser session. */
+const UNPAID_NUDGE_KEY = 'unwrapt_unpaid_nudge';
 
 type WriteResult = { tool: string; ok: boolean; recordId?: string; error?: string };
 
@@ -150,6 +264,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   const briefing = useMemo(() => buildDashboardBriefing(recipients, autopilotThreshold), [recipients, autopilotThreshold]);
   const seed = useMemo(() => buildBriefingMessage(displayName, briefing), [displayName, briefing]);
   const chips = useMemo(() => briefingQuickChips(briefing), [briefing]);
+  const paymentPriority = useMemo(() => priorityPaymentItems(briefing), [briefing]);
   const { data: calendarConnected = true, isSuccess: calendarChecked } = useCalendarConnected();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -160,6 +275,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [reviewStates, setReviewStates] = useState<Record<string, ReviewState>>({});
   const [celebrating, setCelebrating] = useState(false);
+  const [holdSuccess, setHoldSuccess] = useState<WalletHoldSuccess | null>(null);
   const { reaction, reactTo } = useTheaReaction();
   const seeded = useRef(false);
   const giftResumeApplied = useRef(false);
@@ -381,7 +497,23 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     });
   }, [history, recipientsLoaded, seed, briefing, messages.length]);
 
-  // Back from a wallet top-up started in chat: hold the funds for the gift it was for, then say so.
+  const showHoldSuccess = useCallback((detail: WalletHoldSuccess) => {
+    setHoldSuccess(detail);
+    const first = detail.recipientName.split(' ')[0] || detail.recipientName;
+    const timingLine = detail.timing ? ` ${formatGiftTimingLine(detail.timing)}` : '';
+    const lead = detail.fromTopUp === false ? 'Funds held.' : 'Funds added.';
+    stickToBottomRef.current = true;
+    setMessages((current) => [...current, {
+      role: 'assistant',
+      content: `${lead} ${money(detail.amount)} is set aside for ${first}'s ${detail.giftTitle}.${timingLine}`,
+    }]);
+    void trackProductEvent('dashboard_thea_wallet_hold_success_modal', {
+      amount: detail.amount,
+      gift: detail.giftTitle,
+    });
+  }, []);
+
+  // Back from a wallet top-up started in chat: hold the funds for the gift it was for, then celebrate.
   // Runs after the greeting seed and only appends, so neither replaces the other.
   const walletHoldApplied = useRef(false);
   useEffect(() => {
@@ -395,10 +527,15 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
         const hold = await holdGiftFunds(pending.scheduledGiftId).catch(() => null);
         if (hold?.held) {
           await queryClient.invalidateQueries({ queryKey: ['recipients'] });
-          setMessages((current) => [...current, {
-            role: 'assistant',
-            content: `Funds added. ${money(hold.amount)} is set aside for ${first}'s ${pending.giftTitle}, and it's charged only when I place the order closer to the date.`,
-          }]);
+          const gift = recipients.flatMap((r) => r.scheduled_gifts || []).find((g) => g.id === pending.scheduledGiftId);
+          const occasionDate = pending.occasionDate || gift?.occasion_date || null;
+          showHoldSuccess({
+            amount: hold.amount,
+            recipientName: pending.recipientName,
+            giftTitle: pending.giftTitle,
+            timing: occasionDate ? giftOrderTiming(occasionDate) : null,
+            fromTopUp: true,
+          });
           return;
         }
         if (hold && attempt === HOLD_ATTEMPTS) {
@@ -413,7 +550,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
         await new Promise((resolve) => window.setTimeout(resolve, HOLD_RETRY_MS));
       }
     })();
-  }, [history, recipientsLoaded, queryClient, user?.id]);
+  }, [history, recipientsLoaded, queryClient, user?.id, recipients, showHoldSuccess]);
 
   // Onboarding focuses on a few people and saves only the one the user picked. Once they're
   // subscribed and in the chat, bring in everyone else it found (and anyone else on a connected
@@ -464,6 +601,72 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
       void trackProductEvent('dashboard_calendar_remaining_imported', { count: added });
     })();
   }, [history, recipientsLoaded, calendarChecked, calendarConnected, queryClient, user?.id]);
+
+  // Return / session open: if a scheduled gift still needs payment, surface a priority
+  // wallet_topup card immediately — don't wait for "did we pay for Ulan?".
+  const unpaidNudgeStarted = useRef(false);
+  useEffect(() => {
+    if (history === 'loading' || !recipientsLoaded || !seeded.current || unpaidNudgeStarted.current) return;
+    if (!user?.id) return;
+
+    const pick = paymentPriority.find((item) => {
+      const gift = item.giftId ? recipients
+        .flatMap((r) => r.scheduled_gifts || [])
+        .find((g) => g.id === item.giftId) : undefined;
+      return Boolean(gift?.id && isWalletGift(gift) && giftStage(gift) === 'scheduled');
+    });
+    if (!pick?.giftId) {
+      // Nothing unpaid yet; allow a later recipients refresh to try again.
+      return;
+    }
+
+    const gift = recipients.flatMap((r) => r.scheduled_gifts || []).find((g) => g.id === pick.giftId);
+    if (!gift?.id) return;
+
+    const storageKey = `${UNPAID_NUDGE_KEY}:${user.id}:${gift.id}`;
+    try {
+      if (sessionStorage.getItem(storageKey)) {
+        unpaidNudgeStarted.current = true;
+        return;
+      }
+    } catch {
+      /* sessionStorage unavailable — still nudge once via the ref */
+    }
+
+    unpaidNudgeStarted.current = true;
+    void (async () => {
+      const first = pick.recipientName.split(' ')[0] || pick.recipientName;
+      const giftTitle = gift.gift_type || gift.gift_description || 'their gift';
+      const available = await getAvailableBalance(user.id).catch(() => 0);
+      stickToBottomRef.current = true;
+      setMessages((current) => {
+        if (current.some((m) => m.ui?.some((mod) => mod.module === 'wallet_topup' && mod.scheduledGiftId === gift.id))) {
+          return current;
+        }
+        return [...current, {
+          role: 'assistant',
+          content: `${first}'s ${giftTitle} is scheduled but payment isn't finished yet. Add funds below and I'll hold them until I place the order.`,
+          ui: [{
+            module: 'wallet_topup',
+            scheduledGiftId: gift.id!,
+            recipientName: pick.recipientName,
+            giftTitle,
+            needed: calculateGiftCost(Number(gift.payment_amount ?? gift.estimated_cost) || 0),
+            available,
+          }],
+        }];
+      });
+      try {
+        sessionStorage.setItem(storageKey, '1');
+      } catch {
+        /* ignore */
+      }
+      void trackProductEvent('dashboard_thea_unpaid_nudge_shown', {
+        gift_id: gift.id,
+        recipient: pick.recipientName,
+      });
+    })();
+  }, [history, recipientsLoaded, paymentPriority, recipients, user?.id]);
 
   // New turns / typing indicator: stay pinned only when already near the bottom (or forced by send/focus).
   useEffect(() => {
@@ -517,12 +720,25 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
       if (writes.some((w) => w.ok && w.tool === 'confirm_scheduled_gift')) celebrate();
       // Client safety net: if the edge function is stale or the model refuses
       // calendar connect after a poisoned history, still surface the module.
-      const ensured = ensureCalendarConnectUi(
+      const calendarEnsured = ensureCalendarConnectUi(
         trimmed,
         nextMessages,
         cleanTheaText(data.reply),
         (Array.isArray(data.ui) ? data.ui : []) as ChatUiModule[],
       );
+      // Same idea for who's-scheduled / status overviews: show cards, not only prose.
+      const statusEnsured = ensureRecipientStatusUi(
+        trimmed,
+        calendarEnsured.reply,
+        calendarEnsured.ui,
+        recipients,
+      );
+      // Payment / "did we pay" asks should open the wallet card, not only prose.
+      let ensured = statusEnsured;
+      if (looksLikePaymentIntent(trimmed) && !statusEnsured.ui.some((m) => m.module === 'wallet_topup')) {
+        const available = user?.id ? await getAvailableBalance(user.id).catch(() => 0) : 0;
+        ensured = ensureWalletTopUpUi(trimmed, statusEnsured.reply, statusEnsured.ui, recipients, available);
+      }
       const ui = ensured.ui;
       setMessages([
         ...nextMessages,
@@ -576,7 +792,10 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   const confirmReview = async (review: GiftReview) => {
     const key = reviewKey(review);
     setReviewStates((s) => ({ ...s, [key]: 'confirming' }));
-    const writes = await send(`Yes, confirm the ${review.productTitle} for ${review.recipientName}.`);
+    const confirmText = review.replacesGiftTitle
+      ? `Yes, swap to the ${review.productTitle} for ${review.recipientName} (replace ${review.replacesGiftTitle}).`
+      : `Yes, confirm the ${review.productTitle} for ${review.recipientName}.`;
+    const writes = await send(confirmText);
     const scheduled = writes?.some((w) => w.ok && w.tool === 'confirm_scheduled_gift');
     setReviewStates((s) => ({ ...s, [key]: scheduled ? 'scheduled' : 'pending' }));
   };
@@ -605,12 +824,28 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
 
   const topUp = (mod: WalletTopUpModule, amount: number) => {
     void trackProductEvent('dashboard_thea_wallet_topup_started', { amount });
-    return startGiftTopUp(amount, { scheduledGiftId: mod.scheduledGiftId, recipientName: mod.recipientName, giftTitle: mod.giftTitle });
+    const gift = giftsById.get(mod.scheduledGiftId);
+    return startGiftTopUp(amount, {
+      scheduledGiftId: mod.scheduledGiftId,
+      recipientName: mod.recipientName,
+      giftTitle: mod.giftTitle,
+      occasionDate: gift?.occasion_date || null,
+    });
   };
 
   const holdFromBalance = async (mod: WalletTopUpModule) => {
     const hold = await holdGiftFunds(mod.scheduledGiftId);
-    if (hold.held) await queryClient.invalidateQueries({ queryKey: ['recipients'] });
+    if (hold.held) {
+      await queryClient.invalidateQueries({ queryKey: ['recipients'] });
+      const gift = giftsById.get(mod.scheduledGiftId);
+      showHoldSuccess({
+        amount: hold.amount || mod.needed,
+        recipientName: mod.recipientName,
+        giftTitle: mod.giftTitle,
+        timing: gift?.occasion_date ? giftOrderTiming(gift.occasion_date) : null,
+        fromTopUp: false,
+      });
+    }
     return hold.held;
   };
 
@@ -665,6 +900,24 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
 
   const handleChip = (item: BriefingItem) => {
     if (item.action === 'payment') {
+      const gift = item.giftId ? giftsById.get(item.giftId) : undefined;
+      // VIP / wallet gifts stay in chat; Stripe abandoned checkouts resume checkout.
+      if (gift && !isWalletGift(gift)) {
+        const recipient = recipients.find((r) => r.id === item.recipientId);
+        if (recipient) {
+          void resumeGiftPayment(gift, recipient)
+            .then((url) => {
+              window.location.href = url;
+            })
+            .catch((err) => {
+              console.error('Resuming gift payment failed', err);
+              onOpenRecipient(item.recipientId, 'payment');
+            });
+          return;
+        }
+        onOpenRecipient(item.recipientId, 'payment');
+        return;
+      }
       void showWalletTopUp(item);
       return;
     }
@@ -687,44 +940,35 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     lastReply: lastMessage?.role === 'assistant' && !lastMessage.products?.length && !lastMessage.review ? lastMessage.content : null,
   });
   const latestReviewIndex = messages.reduce((latest, m, i) => (m.review ? i : latest), -1);
+  // Soft expand while she reacts, thinks, or a send is in flight — then settle.
+  const chipLively = sending || Boolean(reaction) || pose === 'thinking' || pose === 'listening';
+  const headerStatus = STATUS_LINE[pose] || 'Here when you need me';
+  const islandChrome: TheaHeaderChrome = {
+    pose: reaction ?? pose,
+    lively: chipLively,
+    status: headerStatus,
+  };
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
-      <div
-        className={`flex shrink-0 items-center border-b px-1 ${composerFocused ? 'gap-2.5 py-2' : 'gap-3 pb-3'}`}
-        style={{ borderColor: 'rgba(42,37,32,0.08)' }}
-      >
-        {composerFocused ? (
-          <TheaAvatar size={40} pose={pose} />
-        ) : (
-          <TheaCharacter size="compact" pose={pose} reaction={reaction} speaking={false} className="u-thea-character--chat" />
-        )}
-        <div className="min-w-0 flex-1 text-left">
-          {!composerFocused && (
-            <div className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: U.accent }}>
-              Your gifting agent
-            </div>
-          )}
-          <div className={`font-display leading-tight ${composerFocused ? 'text-[18px]' : 'text-[22px]'}`} style={{ color: U.ink }}>
-            Thea
-          </div>
-          <div className="truncate text-[11.5px]" style={{ color: U.muted }} aria-live="polite">
-            {STATUS_LINE[pose] || 'Here when you need me'}
+      <div className="relative min-h-0 flex-1">
+        {/* Centered frosted island floats over the transcript (ChatGPT agent-chip pattern). */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center px-2 pt-0.5">
+          <div className="pointer-events-auto">
+            <TheaIdentityChip chrome={islandChrome} />
           </div>
         </div>
-      </div>
-
-      <div
-        ref={scrollRef}
-        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto pt-4 pr-1"
-        style={{ scrollPaddingBottom: listPadBottom }}
-        aria-live="polite"
-      >
         <div
-          ref={chatContentRef}
-          className="space-y-3"
-          style={{ paddingBottom: listPadBottom }}
+          ref={scrollRef}
+          className="h-full min-h-0 overflow-x-hidden overflow-y-auto pt-[9.75rem] pr-1"
+          style={{ scrollPaddingBottom: listPadBottom }}
+          aria-live="polite"
         >
+          <div
+            ref={chatContentRef}
+            className="space-y-3"
+            style={{ paddingBottom: listPadBottom }}
+          >
           {history === 'loading' && (
             <p className="text-center text-[12.5px]" style={{ color: U.muted }}>Loading your conversation…</p>
           )}
@@ -793,6 +1037,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
                       disabled={sending}
                       onAddRecipient={onAddRecipient}
                       onEditRecipient={onEditRecipient}
+                      onOpenRecipient={(recipientId) => onOpenRecipient(recipientId, 'open')}
                       stageOf={stageOf}
                       onTopUp={topUp}
                       onUseBalance={holdFromBalance}
@@ -813,40 +1058,52 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
 
-      {!composerFocused && messages.length <= 2 && (chips.length > 0 || !calendarConnected) && (
-        <div className="mb-3 flex flex-wrap gap-2">
-          {chips.map((chip) => (
-            <button
-              key={`${chip.recipientId}-${chip.label}`}
-              type="button"
-              onClick={() => handleChip(chip)}
-              className="u-press min-h-10 rounded-full border px-3 py-2 text-left text-[12.5px] font-medium"
-              style={{ background: U.chip, borderColor: 'rgba(42,37,32,0.1)', color: '#5A5147' }}
-            >
-              {chip.label}
-            </button>
-          ))}
-          {!calendarConnected && (
-            <CalendarSyncButton
-              appearance="pill"
-              onAddManually={onSwitchToManual}
-              className="u-press min-h-10 rounded-full border px-3 py-2 text-[12.5px] font-medium"
-              style={{ background: U.surface, borderColor: U.border, color: U.ink }}
-            />
-          )}
-          <button
-            type="button"
-            onClick={onSwitchToManual}
-            className="u-press min-h-10 rounded-full border px-3 py-2 text-[12.5px] font-medium"
-            style={{ background: U.surface, borderColor: U.border, color: U.muted }}
-          >
-            Open calendar
-          </button>
-        </div>
-      )}
+      {(() => {
+        // Fresh session: full chip set. Longer threads: only unpaid payment chips stay sticky
+        // so softer "need address" noise doesn't compete with finishing payment.
+        const earlySession = messages.length <= 2;
+        const stickyPayment = !earlySession && paymentPriority.length > 0;
+        const chipsToShow = earlySession ? chips : paymentPriority.slice(0, 2);
+        const showBar = !composerFocused && ((earlySession && (chips.length > 0 || !calendarConnected)) || stickyPayment);
+        if (!showBar) return null;
+        return (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {chipsToShow.map((chip) => (
+              <button
+                key={`${chip.recipientId}-${chip.label}`}
+                type="button"
+                onClick={() => handleChip(chip)}
+                className="u-press min-h-10 rounded-full border px-3 py-2 text-left text-[12.5px] font-medium"
+                style={{ background: U.chip, borderColor: 'rgba(42,37,32,0.1)', color: '#5A5147' }}
+              >
+                {chip.label}
+              </button>
+            ))}
+            {earlySession && !calendarConnected && (
+              <CalendarSyncButton
+                appearance="pill"
+                onAddManually={onSwitchToManual}
+                className="u-press min-h-10 rounded-full border px-3 py-2 text-[12.5px] font-medium"
+                style={{ background: U.surface, borderColor: U.border, color: U.ink }}
+              />
+            )}
+            {earlySession && (
+              <button
+                type="button"
+                onClick={onSwitchToManual}
+                className="u-press min-h-10 rounded-full border px-3 py-2 text-[12.5px] font-medium"
+                style={{ background: U.surface, borderColor: U.border, color: U.muted }}
+              >
+                Open calendar
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       <form
         ref={composerRef}
@@ -896,6 +1153,12 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
           </button>
         </div>
       </form>
+
+      <WalletHoldSuccessModal
+        open={Boolean(holdSuccess)}
+        detail={holdSuccess}
+        onClose={() => setHoldSuccess(null)}
+      />
     </div>
   );
 };

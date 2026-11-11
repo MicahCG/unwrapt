@@ -5,7 +5,7 @@ export type TheaGesture = 'Greeting' | 'Present' | 'Listen';
 export type TheaActivity = 'idle' | 'calendar' | 'clipboard' | 'chat';
 
 interface TheaCharacterProps {
-  size?: 'compact' | 'medium' | 'large';
+  size?: 'chip' | 'compact' | 'medium' | 'large';
   speaking?: boolean;
   animated?: boolean;
   className?: string;

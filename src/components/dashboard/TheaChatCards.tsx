@@ -4,6 +4,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import CalendarSyncButton from '@/components/CalendarSyncButton';
 import { U } from '@/components/unwrapt2/theme';
 import { formatOccasionDate } from '@/lib/dateUtils';
+import { formatGiftTimingLine, giftOrderTiming } from '@/lib/giftTiming';
 import { TOP_UP_AMOUNTS, topUpFor } from '@/lib/wallet';
 
 /** Modules thea-chat returns in top-level `ui` from present_ui. */
@@ -22,13 +23,24 @@ export type GiftProgress = {
   carrier: string | null;
 };
 
+/** One person's readiness snapshot for status overviews ("who's scheduled?"). */
+export type RecipientStatusEntry = {
+  recipientId: string;
+  recipientName: string;
+  giftScheduled: boolean;
+  giftTitle: string | null;
+  hasAddress: boolean;
+  hasPreferences: boolean;
+};
+
 export type ChatUiModule =
   | { module: 'calendar_connect' }
   | { module: 'add_recipient'; focus?: ChatUiFocus }
   | { module: 'suggest_add_recipient'; name: string }
   | { module: 'edit_recipient'; recipientId: string; recipientName: string; focus?: ChatUiFocus }
   | { module: 'wallet_topup'; scheduledGiftId: string; recipientName: string; giftTitle: string; needed: number; available: number }
-  | { module: 'gift_progress'; recipientId: string; recipientName: string; gifts: GiftProgress[] };
+  | { module: 'gift_progress'; recipientId: string; recipientName: string; gifts: GiftProgress[] }
+  | { module: 'recipient_status'; recipients: RecipientStatusEntry[] };
 
 /** A catalog product as thea-chat returns it in `products`. */
 export type ChatProduct = {
@@ -52,6 +64,9 @@ export type GiftReview = {
   occasionDate: string;
   occasion: string;
   hasAddress: boolean;
+  /** When set, confirming replaces this already-scheduled gift for the same occasion. */
+  replacesGiftId?: string | null;
+  replacesGiftTitle?: string | null;
 };
 
 export type ReviewState = 'pending' | 'confirming' | 'scheduled';
@@ -190,17 +205,32 @@ export const ReviewCard: React.FC<{
   const set = (field: keyof ReviewAddress) => (event: React.ChangeEvent<HTMLInputElement>) =>
     setDraft((d) => ({ ...d, [field]: event.target.value }));
 
+  const isSwap = Boolean(review.replacesGiftTitle);
+  const timing = giftOrderTiming(review.occasionDate);
   return (
     <section className="mt-2 rounded-[18px] border bg-white p-3.5" style={{ borderColor: '#DED2C1' }} aria-label="Gift review">
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: U.accent }}>
-        {state === 'scheduled' ? 'Approved' : 'Review before scheduling'}
+        {state === 'scheduled' ? 'Approved' : isSwap ? 'Swap gift' : 'Review before scheduling'}
       </p>
       <p className="mt-1.5 text-[14px] font-semibold leading-5 text-[#2A2520]">{review.productTitle}</p>
+      {isSwap && state !== 'scheduled' && (
+        <p className="mt-1 text-[12.5px] leading-5 text-[#5A5147]">
+          Replaces <span className="font-medium text-[#2A2520]">{review.replacesGiftTitle}</span> for this occasion.
+        </p>
+      )}
       <dl className="mt-2 grid gap-1 text-[12.5px] text-[#5A5147]">
         <div className="flex justify-between gap-3"><dt>For</dt><dd className="font-medium text-[#2A2520]">{review.recipientName}</dd></div>
         <div className="flex justify-between gap-3"><dt>Occasion</dt><dd className="font-medium text-[#2A2520]">{review.occasion} · {formatOccasionDate(review.occasionDate)}</dd></div>
         <div className="flex justify-between gap-3"><dt>Price</dt><dd className="font-medium text-[#2A2520]">{money(review.price, review.currency)}</dd></div>
       </dl>
+      {timing && state !== 'scheduled' && (
+        <p
+          className="mt-2 text-[12.5px] leading-5"
+          style={{ color: timing.feasible ? '#5A5147' : U.accent }}
+        >
+          {formatGiftTimingLine(timing)}
+        </p>
+      )}
       {editing ? (
         <form onSubmit={saveAddress} className="mt-2.5 rounded-[12px] p-3" style={{ background: U.accentSoft }} aria-label={`${first}'s delivery address`}>
           <p className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold text-[#3A332B]">
@@ -242,8 +272,15 @@ export const ReviewCard: React.FC<{
       {state === 'scheduled' ? (
         <div className="mt-3">
           {funded ? (
-            <p className="flex items-center gap-1.5 text-[12.5px] font-semibold" style={{ color: U.sage }}>
-              <Check className="h-4 w-4 shrink-0" aria-hidden="true" /> Funds are held. I’ll order it closer to the date.
+            <p className="text-[12.5px] font-semibold leading-5" style={{ color: U.sage }}>
+              <span className="inline-flex items-center gap-1.5">
+                <Check className="h-4 w-4 shrink-0" aria-hidden="true" /> Funds are held.
+              </span>
+              {timing ? (
+                <span className="mt-1 block font-normal text-[#5A5147]">{formatGiftTimingLine(timing)}</span>
+              ) : (
+                <span className="mt-1 block font-normal text-[#5A5147]">I’ll place the order about 4 weeks before the occasion so it arrives a few days early.</span>
+              )}
             </p>
           ) : (
             <p className="flex items-center gap-1.5 text-[12.5px] font-semibold" style={{ color: U.accent }}>
@@ -269,7 +306,7 @@ export const ReviewCard: React.FC<{
             style={{ background: U.ink, color: U.buttonText }}
           >
             {state === 'confirming' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-            {state === 'confirming' ? 'Scheduling…' : 'Confirm gift'}
+            {state === 'confirming' ? (isSwap ? 'Swapping…' : 'Scheduling…') : (isSwap ? 'Confirm swap' : 'Confirm gift')}
           </button>
         </div>
       )}
@@ -379,7 +416,7 @@ export const WalletTopUpCard: React.FC<{
         <p className="flex items-center gap-1.5 text-[12.5px] font-semibold" style={{ color: U.sage }}>
           <Check className="h-4 w-4" aria-hidden="true" /> {money(mod.needed)} is set aside for {first}&apos;s gift
         </p>
-        <p className="mt-1 text-[12.5px] leading-5 text-[#5A5147]">It&apos;s charged only when I place the order, closer to the date.</p>
+        <p className="mt-1 text-[12.5px] leading-5 text-[#5A5147]">It&apos;s charged when I place the order (~4 weeks before the occasion) so it can arrive a few days early.</p>
       </section>
     );
   }
@@ -476,9 +513,13 @@ const STAGES: { key: GiftStage; label: string }[] = [
 ];
 
 const stageLine = (gift: GiftProgress, stage: GiftStage) => {
+  const timing = gift.occasionDate ? giftOrderTiming(gift.occasionDate) : null;
   switch (stage) {
     case 'scheduled': return 'Waiting on wallet funds before I can order it.';
-    case 'funded': return 'Funds are held. I’ll place the order closer to the date.';
+    case 'funded':
+      return timing
+        ? `Funds are held. ${formatGiftTimingLine(timing)}`
+        : 'Funds are held. I’ll place the order with enough lead time for shipping so it arrives a few days before the occasion.';
     case 'ordered': return 'Order placed. It ships soon.';
     case 'in_transit': return gift.deliveryDate ? `On its way, due by ${formatOccasionDate(gift.deliveryDate)}.` : 'On its way.';
     case 'delivered': return 'Delivered.';
@@ -548,16 +589,111 @@ export const GiftProgressCard: React.FC<{
   );
 };
 
+const StatusCheck: React.FC<{
+  ok: boolean;
+  label: string;
+  detail?: string | null;
+  fixLabel?: string;
+  onFix?: () => void;
+}> = ({ ok, label, detail, fixLabel, onFix }) => (
+  <div className="flex items-start gap-2 text-[12.5px] leading-5">
+    <span
+      className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full"
+      style={{ background: ok ? U.sageSoft : U.accentSoft, color: ok ? U.sage : U.accent }}
+      aria-hidden="true"
+    >
+      {ok ? <Check className="h-3 w-3" /> : <span className="text-[10px] font-bold leading-none">!</span>}
+    </span>
+    <div className="min-w-0 flex-1">
+      <p className="font-medium text-[#2A2520]">
+        {label}{ok ? '' : ' — missing'}
+      </p>
+      {ok && detail ? <p className="truncate text-[#5A5147]">{detail}</p> : null}
+      {!ok && onFix ? (
+        <button type="button" onClick={onFix} className="mt-0.5 font-semibold text-[#B65B3C]">
+          {fixLabel || `Add ${label.toLowerCase()}`}
+        </button>
+      ) : null}
+    </div>
+  </div>
+);
+
+/**
+ * Status cards for people Thea is summarizing — gift scheduled, address, preferences.
+ * Tap the primary action to open plan/edit flows already used elsewhere in VIP Thea home.
+ */
+export const RecipientStatusCards: React.FC<{
+  recipients: RecipientStatusEntry[];
+  disabled?: boolean;
+  onEditRecipient: (recipientId: string, focus?: ChatUiFocus) => void;
+  onOpenRecipient: (recipientId: string) => void;
+}> = ({ recipients, disabled, onEditRecipient, onOpenRecipient }) => {
+  if (!recipients.length) return null;
+  return (
+    <div className="mt-2 space-y-2" role="list" aria-label="Recipient status">
+      {recipients.map((person) => {
+        const first = person.recipientName.split(' ')[0] || person.recipientName;
+        const primary = person.giftScheduled
+          ? { label: `View ${first}'s plan`, run: () => onOpenRecipient(person.recipientId) }
+          : { label: `Plan a gift for ${first}`, run: () => onOpenRecipient(person.recipientId) };
+        return (
+          <section
+            key={person.recipientId}
+            role="listitem"
+            className="rounded-[18px] border bg-white p-3.5"
+            style={{ borderColor: '#DED2C1' }}
+            aria-label={`${person.recipientName} status`}
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: U.accent }}>
+              {person.recipientName}
+            </p>
+            <div className="mt-2.5 space-y-2">
+              <StatusCheck
+                ok={person.giftScheduled}
+                label={person.giftScheduled ? 'Gift scheduled' : 'Gift'}
+                detail={person.giftTitle}
+                fixLabel="Plan a gift"
+                onFix={disabled || person.giftScheduled ? undefined : () => onOpenRecipient(person.recipientId)}
+              />
+              <StatusCheck
+                ok={person.hasAddress}
+                label="Address"
+                onFix={disabled || person.hasAddress ? undefined : () => onEditRecipient(person.recipientId, 'address')}
+              />
+              <StatusCheck
+                ok={person.hasPreferences}
+                label="Preferences"
+                onFix={disabled || person.hasPreferences ? undefined : () => onEditRecipient(person.recipientId, 'interests')}
+              />
+            </div>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={primary.run}
+              className="u-press mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-[12px] text-[13px] font-semibold disabled:opacity-50"
+              style={{ background: U.ink, color: U.buttonText }}
+            >
+              <Gift className="h-4 w-4" aria-hidden="true" />
+              {primary.label}
+            </button>
+          </section>
+        );
+      })}
+    </div>
+  );
+};
+
 /** Renders every present_ui module attached to a Thea reply. */
 export const ChatUiModules: React.FC<{
   modules: ChatUiModule[];
   disabled?: boolean;
   onAddRecipient: (prefillName?: string) => void;
   onEditRecipient: (recipientId: string, focus?: ChatUiFocus) => void;
+  onOpenRecipient?: (recipientId: string) => void;
   stageOf: (giftId: string) => GiftStage | null;
   onTopUp: (mod: Extract<ChatUiModule, { module: 'wallet_topup' }>, amount: number) => Promise<void>;
   onUseBalance: (mod: Extract<ChatUiModule, { module: 'wallet_topup' }>) => Promise<boolean>;
-}> = ({ modules, disabled, onAddRecipient, onEditRecipient, stageOf, onTopUp, onUseBalance }) => (
+}> = ({ modules, disabled, onAddRecipient, onEditRecipient, onOpenRecipient, stageOf, onTopUp, onUseBalance }) => (
   <>
     {modules.map((mod, i) => {
       if (mod.module === 'calendar_connect') {
@@ -583,6 +719,17 @@ export const ChatUiModules: React.FC<{
       }
       if (mod.module === 'gift_progress') {
         return <GiftProgressCard key={`progress-${mod.recipientId}-${i}`} module={mod} stageOf={stageOf} />;
+      }
+      if (mod.module === 'recipient_status') {
+        return (
+          <RecipientStatusCards
+            key={`status-${i}`}
+            recipients={mod.recipients}
+            disabled={disabled}
+            onEditRecipient={onEditRecipient}
+            onOpenRecipient={onOpenRecipient || ((id) => onEditRecipient(id))}
+          />
+        );
       }
       return (
         <EditRecipientCard

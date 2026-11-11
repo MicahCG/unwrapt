@@ -1,11 +1,11 @@
 import React from 'react';
 import { U } from './theme';
-import { TheaFigure, type TheaPose } from './TheaFigure';
+import { TheaFigure, type TheaPose, type TheaReaction } from './TheaFigure';
 
 interface TheaAvatarProps {
   size?: number;
   pulse?: boolean;
-  pose?: TheaPose;
+  pose?: TheaPose | TheaReaction;
   className?: string;
 }
 

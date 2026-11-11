@@ -21,6 +21,16 @@ import {
   looksLikeCalendarConnectIntent,
   shouldForceCalendarConnectUi,
   buildCalendarConnectDirectiveMessage,
+  looksLikeRecipientStatusIntent,
+  shouldForceRecipientStatusUi,
+  looksLikePaymentIntent,
+  shouldForceWalletTopUpUi,
+  buildWalletTopUpDirectiveMessage,
+  isSwappableExistingGift,
+  giftOrderTiming,
+  resolveShippingLeadDays,
+  shippingLeadDaysFromProduct,
+  buildRecipientStatusEntries,
   buildAccountRosterFromRows,
   formatAccountRosterSection,
   scoreInterestText,
@@ -452,4 +462,146 @@ Deno.test("formatAccountRosterSection notes when calendar is disconnected", () =
   const section = formatAccountRosterSection(buildAccountRosterFromRows([], false));
   assert(section?.includes("Saved people: none yet"));
   assert(section?.includes("not connected"));
+});
+
+Deno.test("looksLikeRecipientStatusIntent catches who's-scheduled / readiness asks", () => {
+  assert(looksLikeRecipientStatusIntent("yeah who has stuff scheduled and who doesnt"));
+  assert(looksLikeRecipientStatusIntent("who has a gift scheduled?"));
+  assert(looksLikeRecipientStatusIntent("who's missing an address"));
+  assert(looksLikeRecipientStatusIntent("people status overview"));
+  assertEquals(looksLikeRecipientStatusIntent("what's a good gift for mom?"), false);
+  assertEquals(looksLikeRecipientStatusIntent("how many people are in my calendar"), false);
+});
+
+Deno.test("shouldForceRecipientStatusUi forces once, then skips when cards already present", () => {
+  assert(shouldForceRecipientStatusUi("who has stuff scheduled", []));
+  assertEquals(
+    shouldForceRecipientStatusUi("who has stuff scheduled", [{ module: "recipient_status", recipients: [] }]),
+    false,
+  );
+});
+
+Deno.test("looksLikePaymentIntent catches unpaid / funding asks", () => {
+  assert(looksLikePaymentIntent("did we pay for ulan"));
+  assert(looksLikePaymentIntent("have we paid for Aunty Ulan?"));
+  assert(looksLikePaymentIntent("finish payment"));
+  assert(looksLikePaymentIntent("add funds for her gift"));
+  assert(looksLikePaymentIntent("is the gift unpaid?"));
+  assertEquals(looksLikePaymentIntent("who needs an address"), false);
+  assertEquals(looksLikePaymentIntent("what's a good gift for mom?"), false);
+});
+
+Deno.test("shouldForceWalletTopUpUi forces once, then skips when card already present", () => {
+  assert(shouldForceWalletTopUpUi("did we pay for ulan", []));
+  assertEquals(
+    shouldForceWalletTopUpUi("did we pay for ulan", [{
+      module: "wallet_topup",
+      scheduledGiftId: "g1",
+      recipientName: "Aunty Ulan",
+      giftTitle: "Coffee Beans",
+      needed: 40,
+      available: 0,
+    }]),
+    false,
+  );
+  assert(buildWalletTopUpDirectiveMessage(true)?.includes("wallet_topup"));
+  assertEquals(buildWalletTopUpDirectiveMessage(false), null);
+});
+
+Deno.test("isSwappableExistingGift allows replacing a different pre-order gift", () => {
+  const coffee = { status: "approved", goody_order_id: null, gift_variant_id: "prod_coffee" };
+  assert(isSwappableExistingGift(coffee, "prod_chocolate"));
+  assertEquals(isSwappableExistingGift(coffee, "prod_coffee"), false);
+  assertEquals(isSwappableExistingGift({ ...coffee, goody_order_id: "goody_1" }, "prod_chocolate"), false);
+  assertEquals(isSwappableExistingGift({ ...coffee, status: "ordered" }, "prod_chocolate"), false);
+  assertEquals(isSwappableExistingGift({ ...coffee, status: "cancelled" }, "prod_chocolate"), false);
+});
+
+Deno.test("giftOrderTiming places the order from occasion minus shipping lead minus buffer", () => {
+  // Default lead 21 + arrival buffer 3 = 24 days before the occasion.
+  const timing = giftOrderTiming("2026-12-02", { today: "2026-10-01" });
+  assertEquals(timing?.placeOrderOn, "2026-11-08");
+  assertEquals(timing?.deliveryBy, "2026-11-29");
+  assertEquals(timing?.shippingLeadDays, 21);
+  assertEquals(timing?.placeOrderASAP, false);
+  assertEquals(timing?.feasible, true);
+  assert(timing?.shippingEstimate.includes("2–3 weeks"));
+});
+
+Deno.test("giftOrderTiming clamps past place dates to today and marks tight windows infeasible", () => {
+  // Mid-November for a Dec 2 birthday: ideal place (Nov 8) is past; 21-day ship can't hit Nov 29.
+  const timing = giftOrderTiming("2026-12-02", { today: "2026-11-11" });
+  assertEquals(timing?.placeOrderOn, "2026-11-11");
+  assertEquals(timing?.deliveryBy, "2026-11-29");
+  assertEquals(timing?.placeOrderASAP, true);
+  assertEquals(timing?.feasible, false);
+  // Never invent day-before-occasion (Dec 1) when shipping takes weeks.
+  assert(timing?.placeOrderOn !== "2026-12-01");
+});
+
+Deno.test("giftOrderTiming uses per-gift shipping lead when provided", () => {
+  const timing = giftOrderTiming("2026-12-02", { shippingLeadDays: 7, today: "2026-10-01" });
+  assertEquals(timing?.shippingLeadDays, 7);
+  assertEquals(timing?.placeOrderOn, "2026-11-22");
+  assertEquals(timing?.deliveryBy, "2026-11-29");
+  assertEquals(timing?.feasible, true);
+  assert(timing?.shippingEstimate.includes("1 week"));
+});
+
+Deno.test("resolveShippingLeadDays and shippingLeadDaysFromProduct fall back sensibly", () => {
+  assertEquals(resolveShippingLeadDays(undefined), 21);
+  assertEquals(resolveShippingLeadDays(null), 21);
+  assertEquals(resolveShippingLeadDays(0), 21);
+  assertEquals(resolveShippingLeadDays(10.2), 11);
+  assertEquals(shippingLeadDaysFromProduct(null), undefined);
+  assertEquals(shippingLeadDaysFromProduct({ shipping_lead_days: 14 }), 14);
+  assertEquals(shippingLeadDaysFromProduct({ estimated_delivery_days: 5 }), 5);
+});
+
+Deno.test("buildRecipientStatusEntries maps gift/address/preferences checks", () => {
+  const giftTitles = new Map([["rec_1", "Coffee Beans by Methodical Coffee"]]);
+  const entries = buildRecipientStatusEntries(
+    [
+      {
+        id: "rec_1",
+        name: "Aunty Ulan",
+        relationship: null,
+        birthday: null,
+        anniversary: null,
+        interests: ["coffee"],
+        street: "1 Main",
+        apartment: null,
+        city: "Austin",
+        state: "TX",
+        zip_code: "78701",
+        country: "United States",
+      },
+      {
+        id: "rec_2",
+        name: "Brianna Friedman",
+        relationship: null,
+        birthday: null,
+        anniversary: null,
+        interests: [],
+        street: null,
+        apartment: null,
+        city: null,
+        state: null,
+        zip_code: null,
+        country: null,
+      },
+    ],
+    giftTitles,
+  );
+  assertEquals(entries[0], {
+    recipientId: "rec_1",
+    recipientName: "Aunty Ulan",
+    giftScheduled: true,
+    giftTitle: "Coffee Beans by Methodical Coffee",
+    hasAddress: true,
+    hasPreferences: true,
+  });
+  assertEquals(entries[1].giftScheduled, false);
+  assertEquals(entries[1].hasAddress, false);
+  assertEquals(entries[1].hasPreferences, false);
 });

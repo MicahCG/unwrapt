@@ -33,6 +33,9 @@ type Product = {
   product_type: string | null;
   gift_vibe: string | null;
   provider: "goody";
+  /** Optional per-item transit days when the catalog exposes them. */
+  shipping_lead_days?: number | null;
+  estimated_delivery_days?: number | null;
 };
 
 type GoodyProduct = {
@@ -45,6 +48,9 @@ type GoodyProduct = {
   brand?: { name?: string | null } | null;
   images?: Array<{ image_large?: { url?: string | null } | null }>;
   variants?: Array<{ image_large?: { url?: string | null } | null }>;
+  /** Present only if Goody starts returning lead-time fields; otherwise ignored. */
+  shipping_lead_days?: number | null;
+  estimated_delivery_days?: number | null;
 };
 
 const json = (body: unknown, status = 200) =>
@@ -127,6 +133,7 @@ When the user wants to connect a calendar, add people via a form, or update some
 - edit_recipient: open the edit form for an existing person. Pass recipientId from get_recipients (call that first if needed) and optional focus (address, birthday, interests, details). Use when they want to update address, birthday, anniversary, interests, or "details".
 - wallet_topup: when they ask about a gift waiting on payment, an incomplete checkout, or adding funds for someone's gift. Pass that person's recipientId; the module shows top-up amounts and holds the funds once added.
 - gift_progress: when they ask how a gift is going, where it is, whether it shipped or arrived. Pass that person's recipientId. The card shows the real stage, so reply with one short line and don't describe the stage yourself.
+- recipient_status: when they ask who has a gift scheduled, who doesn't, who's ready / missing address or preferences, or want a people status overview. Call get_recipients first, then present_ui with module recipient_status and recipientIds for the people you're covering (omit recipientIds to show everyone). Reply with one short line; the cards show gift scheduled (with gift name), address, and preferences - do not dump the same checklist as a long bullet list.
 You may call present_ui more than once in the same turn (e.g. calendar_connect and add_recipient together when they ask to connect a calendar and add more people).
 If they already gave a clear new name (and optional relationship/dates/interests) in chat and just want you to save it, create_recipient is fine without a form. Prefer present_ui when they ask for a form, connection, or to fill in details themselves.
 
@@ -140,16 +147,28 @@ Account context (when present) already lists saved people and whether a calendar
 - Never ask for or store a recipient's phone number or email in this chat (see hard boundaries above). For shipping address and structured details, prefer present_ui (edit_recipient / add_recipient) over asking them to type everything into the chat.
 
 ## Choosing and scheduling a specific gift
-When the user picks one specific gift for a specific recipient, whether by tapping a card or naming it in text (match their words to the right id from your most recent search_gifts results, do not search again or repeat the list), call select_gift. It returns a review, not a save - nothing has been scheduled yet. Tell the user, in one short line, exactly what you're about to schedule (recipient, gift, price, occasion date) and ask them to confirm. Use future or conditional phrasing only ("I'll schedule...", "Ready to send...", "Want me to lock this in?") - never past tense or completed-action phrasing ("I've scheduled...", "This is booked...", "Done!") for a review, since nothing is booked until the user confirms and you call confirm_scheduled_gift; claiming otherwise is exactly the kind of invented completed action the hard boundaries above forbid. If select_gift reports the gift is already scheduled, say so plainly (that one genuinely is booked) instead of asking to confirm again.
+When the user picks one specific gift for a specific recipient, whether by tapping a card or naming it in text (match their words to the right id from your most recent search_gifts results, do not search again or repeat the list), call select_gift. It returns a review, not a save - nothing has been scheduled yet. Tell the user, in one short line, exactly what you're about to schedule (recipient, gift, price, occasion date, and the concrete place/arrive timing from review.timing) and ask them to confirm. If review.timing.feasible is false, lead with that warning and options before asking to confirm. Use future or conditional phrasing only ("I'll schedule...", "Ready to send...", "Want me to lock this in?") - never past tense or completed-action phrasing ("I've scheduled...", "This is booked...", "Done!") for a review, since nothing is booked until the user confirms and you call confirm_scheduled_gift; claiming otherwise is exactly the kind of invented completed action the hard boundaries above forbid.
+If select_gift returns a review with replacesGiftTitle, the recipient already has a different gift scheduled for that occasion that can still be changed - offer the swap in one short line (e.g. "I'll swap Coffee Beans for the French Chocolate box - confirm?") and still include the reviewMarker; do not dead-end or tell them to pick someone else. If select_gift reports alreadyScheduled with no review (same gift already booked, or it's already ordered/shipped), say so plainly instead of asking to confirm again.
 
 This is a hard rule with no exceptions: whenever a select_gift result includes a reviewMarker field, add that exact string, unmodified, on its own new line somewhere in your reply (example: GIFT_REVIEW: abc123:def456:2026-11-01) - before the RECOMMENDED_IDS line if your reply also has one. Do this every time you present that review, including if you repeat or rephrase it later - the user never sees this line, but omitting it permanently breaks their ability to confirm the gift. Do not include this line in any other reply, and never include it when select_gift reported alreadyScheduled instead of a review.
 
 Only call confirm_scheduled_gift once the user's own message you are now replying to explicitly confirms (yes, confirm, do it, sounds good, etc.) - never when you are the one presenting the review for the first time in this same reply (they cannot confirm something they have not seen yet), never on an assumption that silence or a different topic means yes.
 You will often no longer have the exact recipientId, productId, and occasionDate in context by the time the user confirms (for example, this is a new message and earlier tool results aren't repeated to you) - if so, call get_recipients and select_gift again first in this reply to re-derive them from the recipient and gift the user is confirming, then call confirm_scheduled_gift right after, in that same reply. This is safe and expected: confirmation is verified against what was already shown to the user earlier, not against which tools you call in this reply.
 confirm_scheduled_gift needs the recipient's delivery address on file. If it fails with addressRequired, say in one line that you need their address first and that they can add it right on the review card; don't open another form.
-After confirm_scheduled_gift succeeds, read its funding field:
-- funding.held true: say it's approved and that funding.amount is set aside in their wallet, charged only when you place the order closer to the date. Never say it's paid or ordered.
-- funding.held false: say it's approved but their wallet needs a top-up before you can send it, and that they can add funds right below. The app shows the top-up card automatically; never call it "all set".`;
+## Order timing (hard rules — never improvise dates)
+Place-order timing is computed as: occasion date minus that gift's shipping lead time minus a small arrival buffer (so it arrives on or slightly before the event). Prefer arriving a little early over late.
+- Read timing from select_gift.review.timing, confirm_scheduled_gift.timing, or get_recipients fields (placeOrderOn, deliveryBy, shippingLeadDays, shippingEstimate, placeOrderASAP, feasible). Never invent place dates.
+- When a gift exposes its own shippingLeadDays, use that estimate. Otherwise use the default encoded in timing (about 2–3 weeks). Do not hardcode a different lead time in your reply than timing.shippingEstimate / shippingLeadDays.
+- Quote placeOrderOn and deliveryBy exactly. Never say vague phrases like "closer to the date" / "closer to their birthday". Never invent a day-before-occasion place date (e.g. never "around December 1" for a December 2 birthday when shipping takes multiple weeks).
+- If placeOrderASAP is true and feasible is true: say you'll place it as soon as funds and address are ready so it can arrive by deliveryBy.
+- If feasible is false: do NOT pretend the gift will arrive by the occasion. Say the lead time makes on-time arrival unrealistic, and offer options (place immediately for the soonest delivery, choose a faster gift, or plan an earlier send). Still be honest if they insist on scheduling it anyway.
+
+After confirm_scheduled_gift succeeds, read its funding and timing fields:
+- funding.held true: say it's approved and that funding.amount is set aside in their wallet. Follow the order-timing rules above with timing.* exactly. Never say it's paid or ordered already.
+- funding.held false: say it's approved but their wallet needs a top-up before you can send it, and that they can add funds right below. The app shows the top-up card automatically; never call it "all set". Still follow timing.* when present.
+If the result includes swapped: true, acknowledge the swap in one short line (old gift → new gift) before the funding line.
+When presenting a select_gift review, mention the concrete place/arrive dates from review.timing (and flag infeasibility up front when feasible is false) before asking them to confirm.
+When the user asks when you will place the order / when it ships / delivery timing, answer with the concrete timing fields for that gift. Never answer with only "closer to the occasion".`;
 
 const SEARCH_GIFTS_TOOL = {
   type: "function",
@@ -184,7 +203,7 @@ const GET_RECIPIENTS_TOOL = {
   type: "function",
   function: {
     name: "get_recipients",
-    description: "List this user's saved gift recipients (id, name, relationship, birthday/anniversary, interests, whether an address is on file, next occasion date). Always call this before update_recipient, create_recipient, or select_gift so you have real recipient ids to work with, and to check whether someone the user is describing already exists before creating a duplicate.",
+    description: "List this user's saved gift recipients (id, name, relationship, birthday/anniversary, interests, hasAddress, hasPreferences, giftScheduled, scheduledGiftTitle, scheduledOccasionDate, placeOrderOn, deliveryBy, shippingLeadDays, shippingEstimate, placeOrderASAP, feasible, next occasion date). Always call this before update_recipient, create_recipient, select_gift, or recipient_status so you have real recipient ids to work with, and to check whether someone the user is describing already exists before creating a duplicate. Use the timing fields when answering when an order will be placed or arrive — placeOrderOn is occasion minus shipping lead minus buffer; if feasible is false, say on-time arrival is unrealistic and offer options. Use these fields for who's-scheduled / readiness answers, then present_ui recipient_status cards instead of a long bullet list.",
     parameters: {
       type: "object",
       properties: {
@@ -250,7 +269,7 @@ const SELECT_GIFT_TOOL = {
   type: "function",
   function: {
     name: "select_gift",
-    description: "Call this the moment the user picks a specific gift for a specific recipient, whether by tapping a card (you'll be given its id) or naming it in text (e.g. 'do the coffee beans by methodical coffee' after you just listed it) - match their description to the right id from your most recent search_gifts results yourself, do not search again or show the list over. This does NOT save anything yet - it returns a review summary. Read the review back to the user in one line (recipient, gift, price, occasion date) and ask them to confirm before calling confirm_scheduled_gift. Never call confirm_scheduled_gift in the same turn as this - wait for the user's next message.",
+    description: "Call this the moment the user picks a specific gift for a specific recipient, whether by tapping a card (you'll be given its id) or naming it in text (e.g. 'do the coffee beans by methodical coffee' after you just listed it) - match their description to the right id from your most recent search_gifts results yourself, do not search again or show the list over. This does NOT save anything yet - it returns a review summary including timing (placeOrderOn, deliveryBy, shippingLeadDays, placeOrderASAP, feasible). If they already have a different gift scheduled for that occasion that can still be changed, the review includes replacesGiftTitle — offer the swap and ask them to confirm (do not refuse). Read the review back in one line (recipient, gift, price, occasion date, concrete place/arrive timing, and swap when present). If timing.feasible is false, warn that on-time arrival is unrealistic and offer options before asking to confirm. Never call confirm_scheduled_gift in the same turn as this - wait for the user's next message.",
     parameters: {
       type: "object",
       properties: {
@@ -267,7 +286,7 @@ const CONFIRM_SCHEDULED_GIFT_TOOL = {
   type: "function",
   function: {
     name: "confirm_scheduled_gift",
-    description: "Create the scheduled gift. Only call this after select_gift returned a review AND the user has explicitly confirmed in their own message (e.g. 'yes', 'confirm', 'do it') - never on the same turn as select_gift, never on an assumption. Use the exact same recipientId, productId, and occasionDate the review gave you. The recipient must have a delivery address on file first. On success it also tries to hold the gift's cost (gift + $7 service fee) from the user's Unwrapt wallet; the result's `funding` says whether the money was set aside or a top-up is needed. Nothing is charged until the order is placed near the delivery date.",
+    description: "Create or swap the scheduled gift. Only call this after select_gift returned a review AND the user has explicitly confirmed in their own message (e.g. 'yes', 'confirm', 'do it', 'swap it') - never on the same turn as select_gift, never on an assumption. Use the exact same recipientId, productId, and occasionDate the review gave you. If that review was a swap (replacesGiftTitle), confirming replaces the prior gift for that occasion. The recipient must have a delivery address on file first. On success it also tries to hold the gift's cost (gift + $7 service fee) from the user's Unwrapt wallet; the result's `funding` says whether the money was set aside or a top-up is needed. Nothing is charged until the order is placed on timing.placeOrderOn (ASAP when placeOrderASAP is true). Read timing.* for exact place/arrive dates and feasibility.",
     parameters: {
       type: "object",
       properties: {
@@ -284,18 +303,23 @@ const PRESENT_UI_TOOL = {
   type: "function",
   function: {
     name: "present_ui",
-    description: "Show an interactive in-chat module. Use when the user wants to connect/reconnect/sync/import a calendar, add a person via a form, update someone's details, fund a gift that's waiting on payment, or see how a gift is progressing. Do NOT use calendar_connect for questions about people already saved (counts, names, who's on their calendar) — answer from account context or get_recipients. Never refuse real connect/form requests or say you can't connect calendars / external apps / forms. The app renders the module; reply with one short line about what you're opening.",
+    description: "Show an interactive in-chat module. Use when the user wants to connect/reconnect/sync/import a calendar, add a person via a form, update someone's details, fund a gift that's waiting on payment, see how a gift is progressing, or see status cards for who is scheduled / missing address or preferences. Do NOT use calendar_connect for questions about people already saved (counts, names, who's on their calendar) — answer from account context or get_recipients. For who's-scheduled / readiness overviews, use recipient_status (not a long prose list). Never refuse real connect/form requests or say you can't connect calendars / external apps / forms. The app renders the module; reply with one short line about what you're opening.",
     parameters: {
       type: "object",
       properties: {
         module: {
           type: "string",
-          enum: ["calendar_connect", "add_recipient", "suggest_add_recipient", "edit_recipient", "wallet_topup", "gift_progress"],
-          description: "calendar_connect = Google/calendar OAuth connect + full VIP import (not the onboarding 3-person sample); add_recipient = opens the full add-person form now; suggest_add_recipient = a small tap target offering to add one named person, shown alongside your reply without opening a form; edit_recipient = edit an existing person's details; wallet_topup = add wallet funds for that person's gift that is waiting on payment; gift_progress = a progress bar for that person's gifts (scheduled, funds held, ordered, in transit, delivered).",
+          enum: ["calendar_connect", "add_recipient", "suggest_add_recipient", "edit_recipient", "wallet_topup", "gift_progress", "recipient_status"],
+          description: "calendar_connect = Google/calendar OAuth connect + full VIP import (not the onboarding 3-person sample); add_recipient = opens the full add-person form now; suggest_add_recipient = a small tap target offering to add one named person, shown alongside your reply without opening a form; edit_recipient = edit an existing person's details; wallet_topup = add wallet funds for that person's gift that is waiting on payment; gift_progress = a progress bar for that person's gifts (scheduled, funds held, ordered, in transit, delivered); recipient_status = cards showing gift scheduled/not, address, and preferences for one or more people.",
         },
         recipientId: {
           type: "string",
-          description: "Required for edit_recipient, wallet_topup and gift_progress. Get it from get_recipients first.",
+          description: "Required for edit_recipient, wallet_topup and gift_progress. Optional for recipient_status (single person). Get it from get_recipients first.",
+        },
+        recipientIds: {
+          type: "array",
+          items: { type: "string" },
+          description: "For recipient_status: the people to show cards for (from get_recipients). Omit to show everyone (capped).",
         },
         name: {
           type: "string",
@@ -338,13 +362,23 @@ type GiftProgress = {
   carrier: string | null;
 };
 
+type RecipientStatusEntry = {
+  recipientId: string;
+  recipientName: string;
+  giftScheduled: boolean;
+  giftTitle: string | null;
+  hasAddress: boolean;
+  hasPreferences: boolean;
+};
+
 type ChatUiModule =
   | { module: "calendar_connect" }
   | { module: "add_recipient"; focus?: UiFocus }
   | { module: "suggest_add_recipient"; name: string }
   | { module: "edit_recipient"; recipientId: string; recipientName: string; focus?: UiFocus }
   | { module: "wallet_topup"; scheduledGiftId: string; recipientName: string; giftTitle: string; needed: number; available: number }
-  | { module: "gift_progress"; recipientId: string; recipientName: string; gifts: GiftProgress[] };
+  | { module: "gift_progress"; recipientId: string; recipientName: string; gifts: GiftProgress[] }
+  | { module: "recipient_status"; recipients: RecipientStatusEntry[] };
 
 const UI_FOCUS_VALUES = new Set<string>(["details", "address", "birthday", "interests"]);
 
@@ -427,6 +461,66 @@ export const buildCalendarConnectDirectiveMessage = (force: boolean): string | n
 
 const CALENDAR_CONNECT_FALLBACK_REPLY =
   "Here's the calendar connect module. Tap connect to link Google Calendar (or another birthday source), and you choose who to add.";
+
+/**
+ * Status / who's-scheduled overviews — keep in sync with src/lib/theaChatUi.ts.
+ * Matches asks like "who has stuff scheduled and who doesn't".
+ */
+export const looksLikeRecipientStatusIntent = (message: string): boolean => {
+  const t = message.trim().toLowerCase();
+  if (!t) return false;
+  if (/\bwho(?:'s| is| are| has| have)\b.{0,48}\b(?:stuff )?scheduled\b/.test(t)) return true;
+  if (/\bwho(?:'s| is| are)\b.{0,40}\b(?:not|without|missing)\b.{0,24}\b(?:gift|scheduled)\b/.test(t)) return true;
+  if (/\b(?:scheduled|not scheduled).{0,24}\b(?:who|anyone|everybody|everyone)\b/.test(t)) return true;
+  if (/\bwho\b.{0,36}\b(?:doesn'?t|does not|don'?t|missing|without)\b.{0,36}\b(?:gift|scheduled|address|preferences?|interests?)\b/.test(t)) return true;
+  if (/\b(?:status|overview|readiness|checklist)\b.{0,28}\b(?:people|recipients|everyone|everybody|folks)\b/.test(t)) return true;
+  if (/\b(?:people|recipients|everyone|everybody)\b.{0,28}\b(?:status|ready|missing|scheduled)\b/.test(t)) return true;
+  if (/\bwho(?:'s| is)\b.{0,24}\bready\b/.test(t)) return true;
+  return false;
+};
+
+export const shouldForceRecipientStatusUi = (
+  latestUserMessage: string,
+  alreadyPresented: ChatUiModule[],
+): boolean => {
+  if (alreadyPresented.some((m) => m.module === "recipient_status")) return false;
+  return looksLikeRecipientStatusIntent(latestUserMessage);
+};
+
+export const buildRecipientStatusDirectiveMessage = (force: boolean): string | null => {
+  if (!force) return null;
+  return 'The user wants a status overview of their people (who has a gift scheduled, who is missing address/preferences, etc.). Call get_recipients if needed, then present_ui with module "recipient_status" and recipientIds for the people you are covering (or omit recipientIds to show everyone). Reply with one short line — the cards carry the checklist, so do not repeat it as a long bullet list.';
+};
+
+/**
+ * Payment / funding asks — keep in sync with src/lib/theaChatUi.ts.
+ * Matches "did we pay for Ulan?", "finish payment", "add funds for …".
+ */
+export const looksLikePaymentIntent = (message: string): boolean => {
+  const t = message.trim().toLowerCase();
+  if (!t) return false;
+  if (/\b(?:did|have|has)\s+(?:we|i|you)\s+pay(?:\s+for)?\b/.test(t)) return true;
+  if (/\b(?:is|was)\s+(?:.+?\s+)?(?:paid|unpaid|funded)\b/.test(t)) return true;
+  if (/\b(?:finish|complete|complete(?:d)?)\s+(?:the\s+)?payment\b/.test(t)) return true;
+  if (/\b(?:add|top[\s-]?up)\s+(?:funds|money|wallet)\b/.test(t)) return true;
+  if (/\b(?:waiting|needs?|need)\s+(?:on\s+)?(?:payment|funds|wallet)\b/.test(t)) return true;
+  if (/\bpayment\b.{0,24}\b(?:incomplete|pending|missing|not\s+done|not\s+finished)\b/.test(t)) return true;
+  if (/\b(?:pay|fund)\s+(?:for\s+)?(?:the\s+)?gift\b/.test(t)) return true;
+  return false;
+};
+
+export const shouldForceWalletTopUpUi = (
+  latestUserMessage: string,
+  alreadyPresented: ChatUiModule[],
+): boolean => {
+  if (alreadyPresented.some((m) => m.module === "wallet_topup")) return false;
+  return looksLikePaymentIntent(latestUserMessage);
+};
+
+export const buildWalletTopUpDirectiveMessage = (force: boolean): string | null => {
+  if (!force) return null;
+  return 'The user is asking about gift payment / funding. Call get_recipients if needed, then present_ui with module "wallet_topup" and the recipientId for the person whose gift is waiting on funds. Reply with one short line — the wallet module is the action, not a long explanation.';
+};
 
 /** Mirrors src/lib/stripe.ts isPaidVip - keep both in sync. */
 const isPaidVip = (profile: { subscription_tier?: string | null; subscription_status?: string | null } | null) => {
@@ -676,7 +770,7 @@ const fetchLastTurnContext = async (
 // turn specifically ended by presenting a review and asking to confirm),
 // which already strongly implies the user's very next short reply is
 // responding to that review, not something else.
-const CONFIRMATION_PATTERN = /\b(yes|yeah|yep|yup|confirm(ed)?|do it|go ahead|sounds good|let'?s do it|book it|that works|proceed|sure)\b/i;
+const CONFIRMATION_PATTERN = /\b(yes|yeah|yep|yup|confirm(ed)?|do it|go ahead|sounds good|let'?s do it|book it|that works|proceed|sure|swap( it| to)?|replace( it)?)\b/i;
 
 /** Detects an explicit confirmation in the user's newest message. Exported
  * for unit testing. */
@@ -1048,6 +1142,8 @@ const toProduct = (product: GoodyProduct & { id: string; name: string; price: nu
     vibe,
   ) > 0 ? vibe : null,
   provider: "goody" as const,
+  shipping_lead_days: product.shipping_lead_days ?? null,
+  estimated_delivery_days: product.estimated_delivery_days ?? null,
 });
 
 /** Fresh, unranked lookup of one product by id - used right before writing a
@@ -1185,7 +1281,97 @@ const RECIPIENT_SELECT_FIELDS = "id, name, relationship, birthday, anniversary, 
 const hasAddress = (r: Pick<RecipientRow, "street" | "city" | "state" | "zip_code">) =>
   Boolean(r.street?.trim() && r.city?.trim() && r.state?.trim() && r.zip_code?.trim());
 
+const CLOSED_GIFT_STATUSES = new Set(["cancelled", "canceled", "expired", "archived"]);
+
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Keep in sync with src/lib/giftTiming.ts.
+ * place-by = occasion − shippingLead − arrival buffer; prefer early (default lead = upper end of ~2–3 weeks).
+ */
+const ARRIVAL_BUFFER_DAYS = 3;
+const DELIVERY_LEAD_DAYS = ARRIVAL_BUFFER_DAYS;
+const DEFAULT_SHIPPING_LEAD_DAYS = 21;
+const SHIPPING_ESTIMATE = "about 2–3 weeks after I place the order";
+
+/** Shift YYYY-MM-DD by whole days in local calendar math (avoids UTC off-by-one). */
+const shiftIsoDate = (isoDate: string, days: number): string => {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const date = new Date(y, (m || 1) - 1, d || 1);
+  date.setDate(date.getDate() + days);
+  const yy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+};
+
+const todayIsoLocal = (now: Date = new Date()): string => {
+  const yy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+};
+
+const daysBetweenIso = (fromIso: string, toIso: string): number => {
+  const [fy, fm, fd] = fromIso.split("-").map(Number);
+  const [ty, tm, td] = toIso.split("-").map(Number);
+  const from = new Date(fy, (fm || 1) - 1, fd || 1);
+  const to = new Date(ty, (tm || 1) - 1, td || 1);
+  return Math.round((to.getTime() - from.getTime()) / 86_400_000);
+};
+
+export const resolveShippingLeadDays = (shippingLeadDays?: number | null): number => {
+  if (typeof shippingLeadDays === "number" && Number.isFinite(shippingLeadDays) && shippingLeadDays > 0) {
+    return Math.min(90, Math.max(1, Math.ceil(shippingLeadDays)));
+  }
+  return DEFAULT_SHIPPING_LEAD_DAYS;
+};
+
+/** Prefer explicit catalog lead fields when Goody/product data exposes them. */
+export const shippingLeadDaysFromProduct = (
+  product?: { shipping_lead_days?: number | null; estimated_delivery_days?: number | null } | null,
+): number | undefined => {
+  const raw = product?.shipping_lead_days ?? product?.estimated_delivery_days;
+  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) return Math.ceil(raw);
+  return undefined;
+};
+
+export const formatShippingEstimate = (shippingLeadDays: number): string => {
+  if (shippingLeadDays === DEFAULT_SHIPPING_LEAD_DAYS) return SHIPPING_ESTIMATE;
+  if (shippingLeadDays % 7 === 0) {
+    const weeks = shippingLeadDays / 7;
+    return weeks === 1
+      ? "about 1 week after I place the order"
+      : `about ${weeks} weeks after I place the order`;
+  }
+  return `about ${shippingLeadDays} days after I place the order`;
+};
+
+type GiftOrderTimingOptions = {
+  shippingLeadDays?: number | null;
+  today?: string;
+};
+
+/** Concrete order / delivery dates for a gift occasion. Exported for unit tests. */
+export const giftOrderTiming = (occasionDate: string, options: GiftOrderTimingOptions = {}) => {
+  if (!ISO_DATE_RE.test(occasionDate)) return null;
+  const shippingLeadDays = resolveShippingLeadDays(options.shippingLeadDays);
+  const today = options.today && ISO_DATE_RE.test(options.today) ? options.today : todayIsoLocal();
+  const deliveryBy = shiftIsoDate(occasionDate, -ARRIVAL_BUFFER_DAYS);
+  const idealPlaceOrderOn = shiftIsoDate(occasionDate, -(shippingLeadDays + ARRIVAL_BUFFER_DAYS));
+  const placeOrderASAP = idealPlaceOrderOn <= today;
+  const placeOrderOn = placeOrderASAP ? today : idealPlaceOrderOn;
+  const feasible = daysBetweenIso(placeOrderOn, deliveryBy) >= shippingLeadDays;
+  return {
+    occasionDate,
+    deliveryBy,
+    placeOrderOn,
+    shippingLeadDays,
+    shippingEstimate: formatShippingEstimate(shippingLeadDays),
+    placeOrderASAP,
+    feasible,
+  };
+};
 
 /** Next occurrence of a recipient's birthday or anniversary (birthday wins if both are set), mirroring ScheduleGiftModal's getDefaultOccasionDate. */
 export const nextOccasionDate = (
@@ -1251,17 +1437,50 @@ const handleGetRecipients = async (
   if (typeof args.name_query === "string" && args.name_query.trim()) {
     query = query.ilike("name", `%${args.name_query.trim().slice(0, 80)}%`);
   }
-  const { data, error } = await query.limit(500);
+  const [{ data, error }, giftsRes] = await Promise.all([
+    query.limit(500),
+    authClient
+      .from("scheduled_gifts")
+      .select("recipient_id, gift_type, occasion_date, status")
+      .eq("user_id", userId)
+      .order("occasion_date", { ascending: true })
+      .limit(200),
+  ]);
   if (error) return { ok: false, error: error.message };
+
+  type GiftMeta = { title: string; occasionDate: string | null };
+  const giftByRecipient = new Map<string, GiftMeta>();
+  for (const g of (giftsRes.data as Array<{ recipient_id?: string; gift_type?: string | null; status?: string | null; occasion_date?: string | null }> | null) || []) {
+    if (!g.recipient_id || giftByRecipient.has(g.recipient_id)) continue;
+    if (CLOSED_GIFT_STATUSES.has((g.status || "").toLowerCase())) continue;
+    giftByRecipient.set(g.recipient_id, {
+      title: (g.gift_type || "Gift").slice(0, 120),
+      occasionDate: g.occasion_date || null,
+    });
+  }
+
   // Soonest next occurrence first (ISO dates sort as strings; a January date sorts after December's).
   const all = (data as RecipientRow[] || []).map((r) => {
     const occasion = nextOccasionDate(r.birthday, r.anniversary);
+    const interests = r.interests || [];
+    const scheduled = giftByRecipient.get(r.id) || null;
+    const timing = scheduled?.occasionDate ? giftOrderTiming(scheduled.occasionDate) : null;
     return {
       recipientId: r.id,
       name: r.name,
       relationship: r.relationship,
-      interests: r.interests || [],
+      interests,
       hasAddress: hasAddress(r),
+      hasPreferences: interests.length > 0,
+      giftScheduled: Boolean(scheduled),
+      scheduledGiftTitle: scheduled?.title || null,
+      scheduledOccasionDate: scheduled?.occasionDate || null,
+      placeOrderOn: timing?.placeOrderOn || null,
+      deliveryBy: timing?.deliveryBy || null,
+      shippingLeadDays: timing?.shippingLeadDays || null,
+      shippingEstimate: timing?.shippingEstimate || null,
+      placeOrderASAP: timing?.placeOrderASAP ?? null,
+      feasible: timing?.feasible ?? null,
       nextOccasion: occasion,
     };
   }).sort((a, b) => (a.nextOccasion?.date ?? "9999").localeCompare(b.nextOccasion?.date ?? "9999"));
@@ -1328,7 +1547,32 @@ const handleCreateRecipient = async (
   return { ok: true, recordId: data.id, saved: { name: data.name, ...payload }, recipientName: data.name };
 };
 
-const ACTIVE_GIFT_STATUSES_BLOCKING = new Set(["cancelled", "expired"]);
+/** Inactive rows do not block scheduling a new gift for the same occasion. */
+const INACTIVE_GIFT_STATUSES = new Set(["cancelled", "canceled", "expired", "archived"]);
+
+type ExistingGiftRow = {
+  id: string;
+  status: string | null;
+  gift_type: string | null;
+  gift_variant_id: string | null;
+  goody_order_id: string | null;
+  wallet_reserved: boolean | null;
+  payment_status: string | null;
+};
+
+/** True when an open gift can still be replaced (not yet ordered / shipped). Exported for unit tests. */
+export const isSwappableExistingGift = (
+  gift: Pick<ExistingGiftRow, "status" | "goody_order_id" | "gift_variant_id">,
+  nextProductId: string,
+): boolean => {
+  if (INACTIVE_GIFT_STATUSES.has((gift.status || "").toLowerCase())) return false;
+  if (gift.goody_order_id) return false;
+  const status = (gift.status || "").toLowerCase();
+  if (["ordered", "shipped", "delivered", "confirmed"].includes(status)) return false;
+  // Same product is already booked — not a swap.
+  if (gift.gift_variant_id && gift.gift_variant_id === nextProductId) return false;
+  return true;
+};
 
 const handleSelectGift = async (
   authClient: ReturnType<typeof createClient>,
@@ -1388,13 +1632,15 @@ const handleSelectGift = async (
   // rather than risk an error from more than one match.
   const { data: existingRows } = await authClient
     .from("scheduled_gifts")
-    .select("id, status, gift_type")
+    .select("id, status, gift_type, gift_variant_id, goody_order_id, wallet_reserved, payment_status")
     .eq("recipient_id", args.recipientId)
     .eq("occasion_date", occasionDate)
     .order("created_at", { ascending: false })
     .limit(1);
-  const existing = existingRows?.[0] ?? null;
-  if (existing && !ACTIVE_GIFT_STATUSES_BLOCKING.has((existing.status || "").toLowerCase())) {
+  const existing = (existingRows?.[0] as ExistingGiftRow | undefined) ?? null;
+
+  // Same gift already booked, or past the point where a swap is safe.
+  if (existing && !INACTIVE_GIFT_STATUSES.has((existing.status || "").toLowerCase()) && !isSwappableExistingGift(existing, product.id)) {
     return {
       ok: true,
       alreadyScheduled: true,
@@ -1403,19 +1649,30 @@ const handleSelectGift = async (
     };
   }
 
+  const timing = giftOrderTiming(occasionDate, {
+    shippingLeadDays: shippingLeadDaysFromProduct(product),
+  });
+  const review: Record<string, unknown> = {
+    recipientId: recipient.id,
+    recipientName: recipient.name,
+    productId: product.id,
+    productTitle: product.title,
+    price: product.price,
+    currency: product.currency,
+    occasionDate,
+    occasion: occasionLabel,
+    hasAddress: hasAddress(recipient),
+    timing,
+  };
+  // Different gift still waiting — offer a confirmable swap instead of dead-ending.
+  if (existing && isSwappableExistingGift(existing, product.id)) {
+    review.replacesGiftId = existing.id;
+    review.replacesGiftTitle = existing.gift_type || "the current gift";
+  }
+
   return {
     ok: true,
-    review: {
-      recipientId: recipient.id,
-      recipientName: recipient.name,
-      productId: product.id,
-      productTitle: product.title,
-      price: product.price,
-      currency: product.currency,
-      occasionDate,
-      occasion: occasionLabel,
-      hasAddress: hasAddress(recipient),
-    },
+    review,
     reviewMarker: `GIFT_REVIEW: ${recipient.id}:${product.id}:${occasionDate}`,
   };
 };
@@ -1507,8 +1764,6 @@ type GiftProgressRow = {
   estimated_cost: number | null;
 };
 
-const CLOSED_GIFT_STATUSES = new Set(["cancelled", "canceled", "expired", "archived"]);
-
 /** Exported for unit tests. */
 export const giftStage = (gift: Pick<GiftProgressRow, "status" | "payment_status" | "wallet_reserved" | "goody_order_id">): GiftStage => {
   const status = (gift.status || "").toLowerCase();
@@ -1561,6 +1816,83 @@ const buildGiftProgressUi = async (
   };
 };
 
+const RECIPIENT_STATUS_LIMIT = 12;
+
+const parseRecipientStatusIds = (args: { recipientId?: unknown; recipientIds?: unknown }): string[] => {
+  const ids: string[] = [];
+  if (Array.isArray(args.recipientIds)) {
+    for (const raw of args.recipientIds) {
+      if (typeof raw === "string" && raw.trim()) ids.push(raw.trim());
+    }
+  }
+  if (typeof args.recipientId === "string" && args.recipientId.trim()) ids.push(args.recipientId.trim());
+  return [...new Set(ids)];
+};
+
+/** Builds recipient_status cards from owned rows + open scheduled gifts. Exported for unit tests. */
+export const buildRecipientStatusEntries = (
+  rows: RecipientRow[],
+  giftTitleByRecipient: Map<string, string>,
+): RecipientStatusEntry[] =>
+  rows.map((r) => {
+    const interests = r.interests || [];
+    const giftTitle = giftTitleByRecipient.get(r.id) || null;
+    return {
+      recipientId: r.id,
+      recipientName: r.name,
+      giftScheduled: Boolean(giftTitle),
+      giftTitle,
+      hasAddress: hasAddress(r),
+      hasPreferences: interests.length > 0,
+    };
+  });
+
+const buildRecipientStatusUi = async (
+  authClient: ReturnType<typeof createClient>,
+  userId: string,
+  args: { recipientId?: unknown; recipientIds?: unknown },
+): Promise<{ ok: true; ui: ChatUiModule } | { ok: false; error: string }> => {
+  const requestedIds = parseRecipientStatusIds(args);
+  let query = authClient.from("recipients").select(RECIPIENT_SELECT_FIELDS).eq("user_id", userId);
+  if (requestedIds.length) query = query.in("id", requestedIds.slice(0, RECIPIENT_STATUS_LIMIT));
+  const [{ data, error }, giftsRes] = await Promise.all([
+    query.order("name", { ascending: true }).limit(RECIPIENT_STATUS_LIMIT),
+    authClient
+      .from("scheduled_gifts")
+      .select("recipient_id, gift_type, occasion_date, status")
+      .eq("user_id", userId)
+      .order("occasion_date", { ascending: true })
+      .limit(200),
+  ]);
+  if (error) return { ok: false, error: error.message };
+
+  const rows = (data as RecipientRow[] | null) || [];
+  if (!rows.length) {
+    return { ok: false, error: requestedIds.length ? "No matching recipients found for those ids." : "No recipients saved yet." };
+  }
+
+  const giftTitleByRecipient = new Map<string, string>();
+  for (const g of (giftsRes.data as Array<{ recipient_id?: string; gift_type?: string | null; status?: string | null }> | null) || []) {
+    if (!g.recipient_id || giftTitleByRecipient.has(g.recipient_id)) continue;
+    if (CLOSED_GIFT_STATUSES.has((g.status || "").toLowerCase())) continue;
+    giftTitleByRecipient.set(g.recipient_id, (g.gift_type || "Gift").slice(0, 120));
+  }
+
+  // Keep the caller's order when they passed ids; otherwise name order from the query.
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const ordered = requestedIds.length
+    ? requestedIds.map((id) => byId.get(id)).filter((r): r is RecipientRow => Boolean(r))
+    : rows;
+
+  return {
+    ok: true,
+    ui: {
+      module: "recipient_status",
+      recipients: buildRecipientStatusEntries(ordered.slice(0, RECIPIENT_STATUS_LIMIT), giftTitleByRecipient),
+    },
+  };
+};
+
 const buildWalletTopUpUi = async (
   authClient: ReturnType<typeof createClient>,
   userId: string,
@@ -1579,6 +1911,45 @@ const buildWalletTopUpUi = async (
       needed: price + SERVICE_FEE,
       available: await getAvailableBalance(authClient, userId),
     },
+  };
+};
+
+/** First open gift still waiting on funds, preferring a name mentioned in the user message. */
+const buildForcedWalletTopUpUi = async (
+  authClient: ReturnType<typeof createClient>,
+  userId: string,
+  latestUserMessage: string,
+): Promise<ChatUiModule | null> => {
+  const { data } = await authClient
+    .from("scheduled_gifts")
+    .select(`${GIFT_PROGRESS_FIELDS}, recipients!inner(id, name)`)
+    .eq("user_id", userId)
+    .order("occasion_date", { ascending: true })
+    .limit(30);
+  type Row = GiftProgressRow & { recipients: { id: string; name: string } | { id: string; name: string }[] | null };
+  const rows = ((data as Row[] | null) || []).filter((g) => !CLOSED_GIFT_STATUSES.has((g.status || "").toLowerCase()));
+  const waiting = rows.filter((g) => giftStage(g) === "scheduled");
+  if (!waiting.length) return null;
+
+  const t = latestUserMessage.trim().toLowerCase();
+  const scored = waiting.map((g) => {
+    const recipient = Array.isArray(g.recipients) ? g.recipients[0] : g.recipients;
+    const name = (recipient?.name || "").toLowerCase();
+    const first = name.split(/\s+/)[0] || "";
+    const nameHit = Boolean(name && (t.includes(name) || (first.length > 2 && t.includes(first))));
+    return { g, recipient, nameHit };
+  });
+  scored.sort((a, b) => Number(b.nameHit) - Number(a.nameHit));
+  const best = scored[0];
+  if (!best?.recipient?.name) return null;
+  const price = Number(best.g.payment_amount ?? best.g.estimated_cost) || 0;
+  return {
+    module: "wallet_topup",
+    scheduledGiftId: best.g.id,
+    recipientName: best.recipient.name,
+    giftTitle: best.g.gift_type || "their gift",
+    needed: price + SERVICE_FEE,
+    available: await getAvailableBalance(authClient, userId),
   };
 };
 
@@ -1620,15 +1991,12 @@ const handleConfirmScheduledGift = async (
 
   const { data: existingRows } = await authClient
     .from("scheduled_gifts")
-    .select("id, status, gift_type")
+    .select("id, status, gift_type, gift_variant_id, goody_order_id, wallet_reserved, payment_status")
     .eq("recipient_id", args.recipientId)
     .eq("occasion_date", args.occasionDate)
     .order("created_at", { ascending: false })
     .limit(1);
-  const existing = existingRows?.[0] ?? null;
-  if (existing && !ACTIVE_GIFT_STATUSES_BLOCKING.has((existing.status || "").toLowerCase())) {
-    return { ok: true, alreadyScheduled: true, recordId: existing.id, saved: { gift_type: existing.gift_type, status: existing.status } };
-  }
+  const existing = (existingRows?.[0] as ExistingGiftRow | undefined) ?? null;
 
   // Price/availability validated fresh right before the write when
   // possible; falls back to this conversation's own known data (this
@@ -1638,29 +2006,76 @@ const handleConfirmScheduledGift = async (
   const product = (await findGoodyProductById(args.productId)) ?? fallbackProduct ?? null;
   if (!product) return { ok: false, error: "That product is no longer available - search again for current options." };
 
+  // Same gift already booked, or already ordered — leave it alone.
+  if (existing && !INACTIVE_GIFT_STATUSES.has((existing.status || "").toLowerCase()) && !isSwappableExistingGift(existing, product.id)) {
+    return { ok: true, alreadyScheduled: true, recordId: existing.id, saved: { gift_type: existing.gift_type, status: existing.status } };
+  }
+
   const occasionType = recipient.birthday === args.occasionDate ? "birthday" : recipient.anniversary === args.occasionDate ? "anniversary" : "custom";
   const occasion = occasionType === "birthday" ? "Birthday" : occasionType === "anniversary" ? "Anniversary" : "Special occasion";
-  const deliveryDate = new Date(new Date(args.occasionDate).getTime() - 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const timing = giftOrderTiming(args.occasionDate, {
+    shippingLeadDays: shippingLeadDaysFromProduct(product),
+  });
+  const deliveryDate = timing?.deliveryBy || shiftIsoDate(args.occasionDate, -DELIVERY_LEAD_DAYS);
+
+  const giftFields = {
+    occasion,
+    occasion_date: args.occasionDate,
+    occasion_type: occasionType,
+    gift_type: product.title,
+    gift_variant_id: product.id,
+    gift_image_url: product.featured_image_url,
+    estimated_cost: product.price,
+    price_range: `$${product.price.toFixed(2)}`,
+    payment_amount: product.price,
+    delivery_date: deliveryDate,
+    // The user approved this exact gift in chat; the lifecycle job charges and orders it in its window.
+    status: "approved",
+    automation_enabled: true,
+    payment_status: "unpaid",
+    wallet_reserved: false,
+  };
+
+  // Swap path: update the open gift in place (release any prior hold first).
+  if (existing && isSwappableExistingGift(existing, product.id)) {
+    if (existing.wallet_reserved) {
+      await authClient
+        .from("wallet_transactions")
+        .update({ status: "cancelled" })
+        .eq("scheduled_gift_id", existing.id)
+        .eq("transaction_type", "reservation")
+        .eq("status", "pending");
+    }
+    const { error: swapError } = await authClient
+      .from("scheduled_gifts")
+      .update(giftFields)
+      .eq("id", existing.id)
+      .eq("user_id", userId);
+    if (swapError) return { ok: false, error: swapError.message };
+
+    return {
+      ok: true,
+      recordId: existing.id,
+      swapped: true,
+      replacedGiftTitle: existing.gift_type || "the previous gift",
+      saved: {
+        recipientName: recipient.name,
+        gift_type: product.title,
+        price: product.price,
+        occasion_date: args.occasionDate,
+        replaced: existing.gift_type,
+      },
+      timing,
+      funding: await holdGiftFunds(authClient, userId, existing.id, product.price),
+    };
+  }
 
   const { data: inserted, error } = await authClient
     .from("scheduled_gifts")
     .insert({
       user_id: userId,
       recipient_id: args.recipientId,
-      occasion,
-      occasion_date: args.occasionDate,
-      occasion_type: occasionType,
-      gift_type: product.title,
-      gift_variant_id: product.id,
-      gift_image_url: product.featured_image_url,
-      estimated_cost: product.price,
-      price_range: `$${product.price.toFixed(2)}`,
-      payment_amount: product.price,
-      delivery_date: deliveryDate,
-      // The user approved this exact gift in chat; the lifecycle job charges and orders it in its window.
-      status: "approved",
-      automation_enabled: true,
-      payment_status: "unpaid",
+      ...giftFields,
     })
     .select("id")
     .single();
@@ -1670,6 +2085,7 @@ const handleConfirmScheduledGift = async (
     ok: true,
     recordId: inserted.id,
     saved: { recipientName: recipient.name, gift_type: product.title, price: product.price, occasion_date: args.occasionDate },
+    timing,
     funding: await holdGiftFunds(authClient, userId, inserted.id, product.price),
   };
 };
@@ -1963,6 +2379,10 @@ Use the whole conversation, not just the last message. Return JSON only:
       [],
     );
     const calendarConnectDirectiveMessage = buildCalendarConnectDirectiveMessage(forceCalendarConnect);
+    const forceRecipientStatus = shouldForceRecipientStatusUi(latestUserMessageContent, []);
+    const recipientStatusDirectiveMessage = buildRecipientStatusDirectiveMessage(forceRecipientStatus);
+    const forceWalletTopUp = shouldForceWalletTopUpUi(latestUserMessageContent, []);
+    const walletTopUpDirectiveMessage = buildWalletTopUpDirectiveMessage(forceWalletTopUp);
 
     const seenProducts = new Map<string, Product>();
     // Product ids returned by a search_gifts call with matchType "fallback"
@@ -2027,6 +2447,8 @@ Use the whole conversation, not just the last message. Return JSON only:
       ...(tappedSelectionMessage ? [{ role: "system", content: tappedSelectionMessage }] : []),
       ...(confirmDirectiveMessage ? [{ role: "system", content: confirmDirectiveMessage }] : []),
       ...(calendarConnectDirectiveMessage ? [{ role: "system", content: calendarConnectDirectiveMessage }] : []),
+      ...(recipientStatusDirectiveMessage ? [{ role: "system", content: recipientStatusDirectiveMessage }] : []),
+      ...(walletTopUpDirectiveMessage ? [{ role: "system", content: walletTopUpDirectiveMessage }] : []),
     ];
 
     // Surfaced to the frontend as top-level `writes` so it can invalidate
@@ -2179,11 +2601,16 @@ Use the whole conversation, not just the last message. Return JSON only:
             const owned = await fetchOwnedRecipient(authClient, user.id, args.recipientId);
             if (owned) recipientLookup = { id: owned.id, name: owned.name };
           }
-          const result = args.module === "wallet_topup" || args.module === "gift_progress"
-            ? recipientLookup
+          let result: { ok: true; ui: ChatUiModule } | { ok: false; error: string };
+          if (args.module === "recipient_status") {
+            result = await buildRecipientStatusUi(authClient, user.id, args as { recipientId?: unknown; recipientIds?: unknown });
+          } else if (args.module === "wallet_topup" || args.module === "gift_progress") {
+            result = recipientLookup
               ? await (args.module === "wallet_topup" ? buildWalletTopUpUi : buildGiftProgressUi)(authClient, user.id, recipientLookup)
-              : { ok: false as const, error: `${args.module} requires a valid recipientId from get_recipients for this user.` }
-            : resolvePresentUi(args, recipientLookup);
+              : { ok: false as const, error: `${args.module} requires a valid recipientId from get_recipients for this user.` };
+          } else {
+            result = resolvePresentUi(args, recipientLookup);
+          }
           if (result.ok) {
             // Dedupe identical modules in one turn (model sometimes double-calls).
             const key = JSON.stringify(result.ui);
@@ -2241,6 +2668,18 @@ Use the whole conversation, not just the last message. Return JSON only:
     )) {
       presentedUi.push({ module: "calendar_connect" });
       if (replyRefusesCalendar(reply) || !reply) reply = CALENDAR_CONNECT_FALLBACK_REPLY;
+    }
+
+    // Deterministic status cards for who's-scheduled / readiness overviews.
+    if (shouldForceRecipientStatusUi(latestUserMessageContent, presentedUi)) {
+      const statusResult = await buildRecipientStatusUi(authClient, user.id, {});
+      if (statusResult.ok) presentedUi.push(statusResult.ui);
+    }
+
+    // Deterministic wallet card for payment / "did we pay" asks.
+    if (shouldForceWalletTopUpUi(latestUserMessageContent, presentedUi)) {
+      const topUp = await buildForcedWalletTopUpUi(authClient, user.id, latestUserMessageContent);
+      if (topUp) presentedUi.push(topUp);
     }
 
     const products = recommendedIds.length > 0
