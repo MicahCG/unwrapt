@@ -27,6 +27,8 @@ import {
   buildWalletTopUpDirectiveMessage,
   isSwappableExistingGift,
   giftOrderTiming,
+  resolveShippingLeadDays,
+  shippingLeadDaysFromProduct,
   buildRecipientStatusEntries,
   buildAccountRosterFromRows,
   formatAccountRosterSection,
@@ -450,11 +452,45 @@ Deno.test("isSwappableExistingGift allows replacing a different pre-order gift",
   assertEquals(isSwappableExistingGift({ ...coffee, status: "cancelled" }, "prod_chocolate"), false);
 });
 
-Deno.test("giftOrderTiming places the order ~28 days before the occasion", () => {
-  const timing = giftOrderTiming("2026-12-02");
-  assertEquals(timing?.placeOrderOn, "2026-11-04");
+Deno.test("giftOrderTiming places the order from occasion minus shipping lead minus buffer", () => {
+  // Default lead 21 + arrival buffer 3 = 24 days before the occasion.
+  const timing = giftOrderTiming("2026-12-02", { today: "2026-10-01" });
+  assertEquals(timing?.placeOrderOn, "2026-11-08");
   assertEquals(timing?.deliveryBy, "2026-11-29");
+  assertEquals(timing?.shippingLeadDays, 21);
+  assertEquals(timing?.placeOrderASAP, false);
+  assertEquals(timing?.feasible, true);
   assert(timing?.shippingEstimate.includes("2–3 weeks"));
+});
+
+Deno.test("giftOrderTiming clamps past place dates to today and marks tight windows infeasible", () => {
+  // Mid-November for a Dec 2 birthday: ideal place (Nov 8) is past; 21-day ship can't hit Nov 29.
+  const timing = giftOrderTiming("2026-12-02", { today: "2026-11-11" });
+  assertEquals(timing?.placeOrderOn, "2026-11-11");
+  assertEquals(timing?.deliveryBy, "2026-11-29");
+  assertEquals(timing?.placeOrderASAP, true);
+  assertEquals(timing?.feasible, false);
+  // Never invent day-before-occasion (Dec 1) when shipping takes weeks.
+  assert(timing?.placeOrderOn !== "2026-12-01");
+});
+
+Deno.test("giftOrderTiming uses per-gift shipping lead when provided", () => {
+  const timing = giftOrderTiming("2026-12-02", { shippingLeadDays: 7, today: "2026-10-01" });
+  assertEquals(timing?.shippingLeadDays, 7);
+  assertEquals(timing?.placeOrderOn, "2026-11-22");
+  assertEquals(timing?.deliveryBy, "2026-11-29");
+  assertEquals(timing?.feasible, true);
+  assert(timing?.shippingEstimate.includes("1 week"));
+});
+
+Deno.test("resolveShippingLeadDays and shippingLeadDaysFromProduct fall back sensibly", () => {
+  assertEquals(resolveShippingLeadDays(undefined), 21);
+  assertEquals(resolveShippingLeadDays(null), 21);
+  assertEquals(resolveShippingLeadDays(0), 21);
+  assertEquals(resolveShippingLeadDays(10.2), 11);
+  assertEquals(shippingLeadDaysFromProduct(null), undefined);
+  assertEquals(shippingLeadDaysFromProduct({ shipping_lead_days: 14 }), 14);
+  assertEquals(shippingLeadDaysFromProduct({ estimated_delivery_days: 5 }), 5);
 });
 
 Deno.test("buildRecipientStatusEntries maps gift/address/preferences checks", () => {

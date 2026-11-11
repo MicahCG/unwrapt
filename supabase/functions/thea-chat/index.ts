@@ -33,6 +33,9 @@ type Product = {
   product_type: string | null;
   gift_vibe: string | null;
   provider: "goody";
+  /** Optional per-item transit days when the catalog exposes them. */
+  shipping_lead_days?: number | null;
+  estimated_delivery_days?: number | null;
 };
 
 type GoodyProduct = {
@@ -45,6 +48,9 @@ type GoodyProduct = {
   brand?: { name?: string | null } | null;
   images?: Array<{ image_large?: { url?: string | null } | null }>;
   variants?: Array<{ image_large?: { url?: string | null } | null }>;
+  /** Present only if Goody starts returning lead-time fields; otherwise ignored. */
+  shipping_lead_days?: number | null;
+  estimated_delivery_days?: number | null;
 };
 
 const json = (body: unknown, status = 200) =>
@@ -135,7 +141,7 @@ Account context (when present) already lists saved people and whether a calendar
 - Never ask for or store a recipient's phone number or email in this chat (see hard boundaries above). For shipping address and structured details, prefer present_ui (edit_recipient / add_recipient) over asking them to type everything into the chat.
 
 ## Choosing and scheduling a specific gift
-When the user picks one specific gift for a specific recipient, whether by tapping a card or naming it in text (match their words to the right id from your most recent search_gifts results, do not search again or repeat the list), call select_gift. It returns a review, not a save - nothing has been scheduled yet. Tell the user, in one short line, exactly what you're about to schedule (recipient, gift, price, occasion date) and ask them to confirm. Use future or conditional phrasing only ("I'll schedule...", "Ready to send...", "Want me to lock this in?") - never past tense or completed-action phrasing ("I've scheduled...", "This is booked...", "Done!") for a review, since nothing is booked until the user confirms and you call confirm_scheduled_gift; claiming otherwise is exactly the kind of invented completed action the hard boundaries above forbid.
+When the user picks one specific gift for a specific recipient, whether by tapping a card or naming it in text (match their words to the right id from your most recent search_gifts results, do not search again or repeat the list), call select_gift. It returns a review, not a save - nothing has been scheduled yet. Tell the user, in one short line, exactly what you're about to schedule (recipient, gift, price, occasion date, and the concrete place/arrive timing from review.timing) and ask them to confirm. If review.timing.feasible is false, lead with that warning and options before asking to confirm. Use future or conditional phrasing only ("I'll schedule...", "Ready to send...", "Want me to lock this in?") - never past tense or completed-action phrasing ("I've scheduled...", "This is booked...", "Done!") for a review, since nothing is booked until the user confirms and you call confirm_scheduled_gift; claiming otherwise is exactly the kind of invented completed action the hard boundaries above forbid.
 If select_gift returns a review with replacesGiftTitle, the recipient already has a different gift scheduled for that occasion that can still be changed - offer the swap in one short line (e.g. "I'll swap Coffee Beans for the French Chocolate box - confirm?") and still include the reviewMarker; do not dead-end or tell them to pick someone else. If select_gift reports alreadyScheduled with no review (same gift already booked, or it's already ordered/shipped), say so plainly instead of asking to confirm again.
 
 This is a hard rule with no exceptions: whenever a select_gift result includes a reviewMarker field, add that exact string, unmodified, on its own new line somewhere in your reply (example: GIFT_REVIEW: abc123:def456:2026-11-01) - before the RECOMMENDED_IDS line if your reply also has one. Do this every time you present that review, including if you repeat or rephrase it later - the user never sees this line, but omitting it permanently breaks their ability to confirm the gift. Do not include this line in any other reply, and never include it when select_gift reported alreadyScheduled instead of a review.
@@ -143,11 +149,20 @@ This is a hard rule with no exceptions: whenever a select_gift result includes a
 Only call confirm_scheduled_gift once the user's own message you are now replying to explicitly confirms (yes, confirm, do it, sounds good, etc.) - never when you are the one presenting the review for the first time in this same reply (they cannot confirm something they have not seen yet), never on an assumption that silence or a different topic means yes.
 You will often no longer have the exact recipientId, productId, and occasionDate in context by the time the user confirms (for example, this is a new message and earlier tool results aren't repeated to you) - if so, call get_recipients and select_gift again first in this reply to re-derive them from the recipient and gift the user is confirming, then call confirm_scheduled_gift right after, in that same reply. This is safe and expected: confirmation is verified against what was already shown to the user earlier, not against which tools you call in this reply.
 confirm_scheduled_gift needs the recipient's delivery address on file. If it fails with addressRequired, say in one line that you need their address first and that they can add it right on the review card; don't open another form.
+## Order timing (hard rules — never improvise dates)
+Place-order timing is computed as: occasion date minus that gift's shipping lead time minus a small arrival buffer (so it arrives on or slightly before the event). Prefer arriving a little early over late.
+- Read timing from select_gift.review.timing, confirm_scheduled_gift.timing, or get_recipients fields (placeOrderOn, deliveryBy, shippingLeadDays, shippingEstimate, placeOrderASAP, feasible). Never invent place dates.
+- When a gift exposes its own shippingLeadDays, use that estimate. Otherwise use the default encoded in timing (about 2–3 weeks). Do not hardcode a different lead time in your reply than timing.shippingEstimate / shippingLeadDays.
+- Quote placeOrderOn and deliveryBy exactly. Never say vague phrases like "closer to the date" / "closer to their birthday". Never invent a day-before-occasion place date (e.g. never "around December 1" for a December 2 birthday when shipping takes multiple weeks).
+- If placeOrderASAP is true and feasible is true: say you'll place it as soon as funds and address are ready so it can arrive by deliveryBy.
+- If feasible is false: do NOT pretend the gift will arrive by the occasion. Say the lead time makes on-time arrival unrealistic, and offer options (place immediately for the soonest delivery, choose a faster gift, or plan an earlier send). Still be honest if they insist on scheduling it anyway.
+
 After confirm_scheduled_gift succeeds, read its funding and timing fields:
-- funding.held true: say it's approved and that funding.amount is set aside in their wallet. Use timing.placeOrderOn and timing.deliveryBy exactly (e.g. "I'll place the order around November 4 so it arrives by November 29; shipping usually takes about 2–3 weeks after I order"). Never say vague phrases like "closer to the date" or "closer to their birthday". Never say it's paid or ordered already.
-- funding.held false: say it's approved but their wallet needs a top-up before you can send it, and that they can add funds right below. The app shows the top-up card automatically; never call it "all set". Still mention timing.placeOrderOn / timing.deliveryBy when present.
+- funding.held true: say it's approved and that funding.amount is set aside in their wallet. Follow the order-timing rules above with timing.* exactly. Never say it's paid or ordered already.
+- funding.held false: say it's approved but their wallet needs a top-up before you can send it, and that they can add funds right below. The app shows the top-up card automatically; never call it "all set". Still follow timing.* when present.
 If the result includes swapped: true, acknowledge the swap in one short line (old gift → new gift) before the funding line.
-When the user asks when you will place the order / when it ships / delivery timing, answer with the concrete placeOrderOn and deliveryBy dates for that gift (from get_recipients timing fields, the last confirm timing, or gift_progress occasion/delivery dates). Shipping estimate is about 2–3 weeks after the order is placed. Never answer with only "closer to the occasion".`;
+When presenting a select_gift review, mention the concrete place/arrive dates from review.timing (and flag infeasibility up front when feasible is false) before asking them to confirm.
+When the user asks when you will place the order / when it ships / delivery timing, answer with the concrete timing fields for that gift. Never answer with only "closer to the occasion".`;
 
 const SEARCH_GIFTS_TOOL = {
   type: "function",
@@ -182,7 +197,7 @@ const GET_RECIPIENTS_TOOL = {
   type: "function",
   function: {
     name: "get_recipients",
-    description: "List this user's saved gift recipients (id, name, relationship, birthday/anniversary, interests, hasAddress, hasPreferences, giftScheduled, scheduledGiftTitle, scheduledOccasionDate, placeOrderOn, deliveryBy, shippingEstimate, next occasion date). Always call this before update_recipient, create_recipient, select_gift, or recipient_status so you have real recipient ids to work with, and to check whether someone the user is describing already exists before creating a duplicate. Use placeOrderOn/deliveryBy when answering when an order will be placed or arrive. Use these fields for who's-scheduled / readiness answers, then present_ui recipient_status cards instead of a long bullet list.",
+    description: "List this user's saved gift recipients (id, name, relationship, birthday/anniversary, interests, hasAddress, hasPreferences, giftScheduled, scheduledGiftTitle, scheduledOccasionDate, placeOrderOn, deliveryBy, shippingLeadDays, shippingEstimate, placeOrderASAP, feasible, next occasion date). Always call this before update_recipient, create_recipient, select_gift, or recipient_status so you have real recipient ids to work with, and to check whether someone the user is describing already exists before creating a duplicate. Use the timing fields when answering when an order will be placed or arrive — placeOrderOn is occasion minus shipping lead minus buffer; if feasible is false, say on-time arrival is unrealistic and offer options. Use these fields for who's-scheduled / readiness answers, then present_ui recipient_status cards instead of a long bullet list.",
     parameters: {
       type: "object",
       properties: {
@@ -248,7 +263,7 @@ const SELECT_GIFT_TOOL = {
   type: "function",
   function: {
     name: "select_gift",
-    description: "Call this the moment the user picks a specific gift for a specific recipient, whether by tapping a card (you'll be given its id) or naming it in text (e.g. 'do the coffee beans by methodical coffee' after you just listed it) - match their description to the right id from your most recent search_gifts results yourself, do not search again or show the list over. This does NOT save anything yet - it returns a review summary. If they already have a different gift scheduled for that occasion that can still be changed, the review includes replacesGiftTitle — offer the swap and ask them to confirm (do not refuse). Read the review back in one line (recipient, gift, price, occasion date, and swap when present) and ask them to confirm before calling confirm_scheduled_gift. Never call confirm_scheduled_gift in the same turn as this - wait for the user's next message.",
+    description: "Call this the moment the user picks a specific gift for a specific recipient, whether by tapping a card (you'll be given its id) or naming it in text (e.g. 'do the coffee beans by methodical coffee' after you just listed it) - match their description to the right id from your most recent search_gifts results yourself, do not search again or show the list over. This does NOT save anything yet - it returns a review summary including timing (placeOrderOn, deliveryBy, shippingLeadDays, placeOrderASAP, feasible). If they already have a different gift scheduled for that occasion that can still be changed, the review includes replacesGiftTitle — offer the swap and ask them to confirm (do not refuse). Read the review back in one line (recipient, gift, price, occasion date, concrete place/arrive timing, and swap when present). If timing.feasible is false, warn that on-time arrival is unrealistic and offer options before asking to confirm. Never call confirm_scheduled_gift in the same turn as this - wait for the user's next message.",
     parameters: {
       type: "object",
       properties: {
@@ -265,7 +280,7 @@ const CONFIRM_SCHEDULED_GIFT_TOOL = {
   type: "function",
   function: {
     name: "confirm_scheduled_gift",
-    description: "Create or swap the scheduled gift. Only call this after select_gift returned a review AND the user has explicitly confirmed in their own message (e.g. 'yes', 'confirm', 'do it', 'swap it') - never on the same turn as select_gift, never on an assumption. Use the exact same recipientId, productId, and occasionDate the review gave you. If that review was a swap (replacesGiftTitle), confirming replaces the prior gift for that occasion. The recipient must have a delivery address on file first. On success it also tries to hold the gift's cost (gift + $7 service fee) from the user's Unwrapt wallet; the result's `funding` says whether the money was set aside or a top-up is needed. Nothing is charged until the order is placed near the delivery date.",
+    description: "Create or swap the scheduled gift. Only call this after select_gift returned a review AND the user has explicitly confirmed in their own message (e.g. 'yes', 'confirm', 'do it', 'swap it') - never on the same turn as select_gift, never on an assumption. Use the exact same recipientId, productId, and occasionDate the review gave you. If that review was a swap (replacesGiftTitle), confirming replaces the prior gift for that occasion. The recipient must have a delivery address on file first. On success it also tries to hold the gift's cost (gift + $7 service fee) from the user's Unwrapt wallet; the result's `funding` says whether the money was set aside or a top-up is needed. Nothing is charged until the order is placed on timing.placeOrderOn (ASAP when placeOrderASAP is true). Read timing.* for exact place/arrive dates and feasibility.",
     parameters: {
       type: "object",
       properties: {
@@ -1076,6 +1091,8 @@ const toProduct = (product: GoodyProduct & { id: string; name: string; price: nu
     vibe,
   ) > 0 ? vibe : null,
   provider: "goody" as const,
+  shipping_lead_days: product.shipping_lead_days ?? null,
+  estimated_delivery_days: product.estimated_delivery_days ?? null,
 });
 
 /** Fresh, unranked lookup of one product by id - used right before writing a
@@ -1194,10 +1211,13 @@ const CLOSED_GIFT_STATUSES = new Set(["cancelled", "canceled", "expired", "archi
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Keep in sync with src/lib/giftTiming.ts and process-automation-lifecycle ORDER_WINDOW_DAYS. */
-const DELIVERY_LEAD_DAYS = 3;
-const ORDER_WINDOW_DAYS = 25;
-const PLACE_ORDER_LEAD_DAYS = ORDER_WINDOW_DAYS + DELIVERY_LEAD_DAYS;
+/**
+ * Keep in sync with src/lib/giftTiming.ts.
+ * place-by = occasion − shippingLead − arrival buffer; prefer early (default lead = upper end of ~2–3 weeks).
+ */
+const ARRIVAL_BUFFER_DAYS = 3;
+const DELIVERY_LEAD_DAYS = ARRIVAL_BUFFER_DAYS;
+const DEFAULT_SHIPPING_LEAD_DAYS = 21;
 const SHIPPING_ESTIMATE = "about 2–3 weeks after I place the order";
 
 /** Shift YYYY-MM-DD by whole days in local calendar math (avoids UTC off-by-one). */
@@ -1211,14 +1231,71 @@ const shiftIsoDate = (isoDate: string, days: number): string => {
   return `${yy}-${mm}-${dd}`;
 };
 
+const todayIsoLocal = (now: Date = new Date()): string => {
+  const yy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+};
+
+const daysBetweenIso = (fromIso: string, toIso: string): number => {
+  const [fy, fm, fd] = fromIso.split("-").map(Number);
+  const [ty, tm, td] = toIso.split("-").map(Number);
+  const from = new Date(fy, (fm || 1) - 1, fd || 1);
+  const to = new Date(ty, (tm || 1) - 1, td || 1);
+  return Math.round((to.getTime() - from.getTime()) / 86_400_000);
+};
+
+export const resolveShippingLeadDays = (shippingLeadDays?: number | null): number => {
+  if (typeof shippingLeadDays === "number" && Number.isFinite(shippingLeadDays) && shippingLeadDays > 0) {
+    return Math.min(90, Math.max(1, Math.ceil(shippingLeadDays)));
+  }
+  return DEFAULT_SHIPPING_LEAD_DAYS;
+};
+
+/** Prefer explicit catalog lead fields when Goody/product data exposes them. */
+export const shippingLeadDaysFromProduct = (
+  product?: { shipping_lead_days?: number | null; estimated_delivery_days?: number | null } | null,
+): number | undefined => {
+  const raw = product?.shipping_lead_days ?? product?.estimated_delivery_days;
+  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) return Math.ceil(raw);
+  return undefined;
+};
+
+export const formatShippingEstimate = (shippingLeadDays: number): string => {
+  if (shippingLeadDays === DEFAULT_SHIPPING_LEAD_DAYS) return SHIPPING_ESTIMATE;
+  if (shippingLeadDays % 7 === 0) {
+    const weeks = shippingLeadDays / 7;
+    return weeks === 1
+      ? "about 1 week after I place the order"
+      : `about ${weeks} weeks after I place the order`;
+  }
+  return `about ${shippingLeadDays} days after I place the order`;
+};
+
+type GiftOrderTimingOptions = {
+  shippingLeadDays?: number | null;
+  today?: string;
+};
+
 /** Concrete order / delivery dates for a gift occasion. Exported for unit tests. */
-export const giftOrderTiming = (occasionDate: string) => {
+export const giftOrderTiming = (occasionDate: string, options: GiftOrderTimingOptions = {}) => {
   if (!ISO_DATE_RE.test(occasionDate)) return null;
+  const shippingLeadDays = resolveShippingLeadDays(options.shippingLeadDays);
+  const today = options.today && ISO_DATE_RE.test(options.today) ? options.today : todayIsoLocal();
+  const deliveryBy = shiftIsoDate(occasionDate, -ARRIVAL_BUFFER_DAYS);
+  const idealPlaceOrderOn = shiftIsoDate(occasionDate, -(shippingLeadDays + ARRIVAL_BUFFER_DAYS));
+  const placeOrderASAP = idealPlaceOrderOn <= today;
+  const placeOrderOn = placeOrderASAP ? today : idealPlaceOrderOn;
+  const feasible = daysBetweenIso(placeOrderOn, deliveryBy) >= shippingLeadDays;
   return {
     occasionDate,
-    deliveryBy: shiftIsoDate(occasionDate, -DELIVERY_LEAD_DAYS),
-    placeOrderOn: shiftIsoDate(occasionDate, -PLACE_ORDER_LEAD_DAYS),
-    shippingEstimate: SHIPPING_ESTIMATE,
+    deliveryBy,
+    placeOrderOn,
+    shippingLeadDays,
+    shippingEstimate: formatShippingEstimate(shippingLeadDays),
+    placeOrderASAP,
+    feasible,
   };
 };
 
@@ -1326,7 +1403,10 @@ const handleGetRecipients = async (
       scheduledOccasionDate: scheduled?.occasionDate || null,
       placeOrderOn: timing?.placeOrderOn || null,
       deliveryBy: timing?.deliveryBy || null,
+      shippingLeadDays: timing?.shippingLeadDays || null,
       shippingEstimate: timing?.shippingEstimate || null,
+      placeOrderASAP: timing?.placeOrderASAP ?? null,
+      feasible: timing?.feasible ?? null,
       nextOccasion: occasion,
     };
   }).sort((a, b) => (a.nextOccasion?.date ?? "9999").localeCompare(b.nextOccasion?.date ?? "9999"));
@@ -1495,6 +1575,9 @@ const handleSelectGift = async (
     };
   }
 
+  const timing = giftOrderTiming(occasionDate, {
+    shippingLeadDays: shippingLeadDaysFromProduct(product),
+  });
   const review: Record<string, unknown> = {
     recipientId: recipient.id,
     recipientName: recipient.name,
@@ -1505,6 +1588,7 @@ const handleSelectGift = async (
     occasionDate,
     occasion: occasionLabel,
     hasAddress: hasAddress(recipient),
+    timing,
   };
   // Different gift still waiting — offer a confirmable swap instead of dead-ending.
   if (existing && isSwappableExistingGift(existing, product.id)) {
@@ -1855,7 +1939,9 @@ const handleConfirmScheduledGift = async (
 
   const occasionType = recipient.birthday === args.occasionDate ? "birthday" : recipient.anniversary === args.occasionDate ? "anniversary" : "custom";
   const occasion = occasionType === "birthday" ? "Birthday" : occasionType === "anniversary" ? "Anniversary" : "Special occasion";
-  const timing = giftOrderTiming(args.occasionDate);
+  const timing = giftOrderTiming(args.occasionDate, {
+    shippingLeadDays: shippingLeadDaysFromProduct(product),
+  });
   const deliveryDate = timing?.deliveryBy || shiftIsoDate(args.occasionDate, -DELIVERY_LEAD_DAYS);
 
   const giftFields = {

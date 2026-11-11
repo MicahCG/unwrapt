@@ -222,6 +222,14 @@ export const ReviewCard: React.FC<{
         <div className="flex justify-between gap-3"><dt>Occasion</dt><dd className="font-medium text-[#2A2520]">{review.occasion} · {formatOccasionDate(review.occasionDate)}</dd></div>
         <div className="flex justify-between gap-3"><dt>Price</dt><dd className="font-medium text-[#2A2520]">{money(review.price, review.currency)}</dd></div>
       </dl>
+      {timing && state !== 'scheduled' && (
+        <p
+          className="mt-2 text-[12.5px] leading-5"
+          style={{ color: timing.feasible ? '#5A5147' : U.accent }}
+        >
+          {formatGiftTimingLine(timing)}
+        </p>
+      )}
       {editing ? (
         <form onSubmit={saveAddress} className="mt-2.5 rounded-[12px] p-3" style={{ background: U.accentSoft }} aria-label={`${first}'s delivery address`}>
           <p className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold text-[#3A332B]">
@@ -495,7 +503,7 @@ const stageLine = (gift: GiftProgress, stage: GiftStage) => {
     case 'funded':
       return timing
         ? `Funds are held. ${formatGiftTimingLine(timing)}`
-        : 'Funds are held. I’ll place the order about 4 weeks before the occasion (~2–3 weeks shipping).';
+        : 'Funds are held. I’ll place the order with enough lead time for shipping so it arrives a few days before the occasion.';
     case 'ordered': return 'Order placed. It ships soon.';
     case 'in_transit': return gift.deliveryDate ? `On its way, due by ${formatOccasionDate(gift.deliveryDate)}.` : 'On its way.';
     case 'delivered': return 'Delivered.';
