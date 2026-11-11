@@ -7,8 +7,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { CreditCard, MapPin, Package, Truck } from 'lucide-react';
-import { format, subDays, parseISO } from 'date-fns';
+import { MapPin, Package, Truck } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { giftOrderTiming } from '@/lib/giftTiming';
+import { getWalletBreakdown } from '@/lib/wallet';
 import { cleanName } from '@/lib/utils';
 import { getGiftRecommendations, type GiftCatalogItem } from '@/lib/giftCatalog';
 import { ProductImage } from '@/components/dashboard/TheaChatCards';
@@ -109,6 +111,12 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     enabled: isOpen && !!user?.id,
   });
   const walletBalance = profile?.gift_wallet_balance || 0;
+  const { data: wallet } = useQuery({
+    queryKey: ['wallet-breakdown', user?.id, walletBalance],
+    queryFn: () => getWalletBreakdown(user!.id),
+    enabled: isOpen && !!user?.id,
+  });
+  const availableBalance = wallet?.available;
 
   const requested = filter === ALL ? savedInterests : [filter];
   const catalog = useQuery({
@@ -150,7 +158,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   const occasionName = occasionType === 'custom' ? 'Special occasion' : defaults.occasion;
   const isPast = Boolean(occasionDate) && occasionDate < format(new Date(), 'yyyy-MM-dd');
   const price = product?.price ?? 0;
-  const payFromWallet = profile?.subscription_tier === 'vip' && walletBalance >= price;
+  const payFromWallet = profile?.subscription_tier === 'vip' && availableBalance != null && availableBalance >= price && price > 0;
   const missing = [
     !payingForGiftId && !product && 'a gift',
     !payingForGiftId && (!occasionDate || isPast) && 'an upcoming date',
@@ -224,7 +232,8 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         return;
       }
 
-      const deliveryDate = format(subDays(parseISO(occasionDate), 3), 'yyyy-MM-dd');
+      const deliveryDate = giftOrderTiming(occasionDate)?.deliveryBy
+        || format(parseISO(occasionDate), 'yyyy-MM-dd');
       const { data: gift, error: giftError } = await supabase
         .from('scheduled_gifts')
         .insert({
@@ -262,7 +271,12 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         markSuccess();
         invalidate();
         void notifyScheduled(product.name, product.price);
-        toast({ title: `Gift scheduled for ${first}`, description: `${money(product.price)} paid from your gift wallet.` });
+        toast({
+          title: `Gift scheduled for ${first}`,
+          description: typeof result?.confirmationCopy === 'string'
+            ? result.confirmationCopy
+            : `${money(product.price)} paid from your gift wallet. Nothing else was charged.`,
+        });
         onClose();
         return;
       }
@@ -314,16 +328,13 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
   // Steps already past for a near date happen right away rather than on a date that's gone.
   const todayIso = format(new Date(), 'yyyy-MM-dd');
-  const when = (d: Date) => (format(d, 'yyyy-MM-dd') <= todayIso ? 'today' : format(d, 'MMM d'));
-  const timeline = occasionDate && !isPast ? (() => {
-    const d = parseISO(occasionDate);
-    return [
-      { icon: CreditCard, text: `Review ${when(subDays(d, 28))}` },
-      { icon: Package, text: `Order ${when(subDays(d, 21))}` },
-      { icon: Truck, text: `Arrives ${format(subDays(d, 3), 'yyyy-MM-dd') <= todayIso ? 'after the date' : format(subDays(d, 3), 'MMM d')}` },
-    ];
-  })() : null;
-  const tooSoon = Boolean(occasionDate) && !isPast && format(subDays(parseISO(occasionDate), 7), 'yyyy-MM-dd') < todayIso;
+  const timing = occasionDate ? giftOrderTiming(occasionDate) : null;
+  const when = (iso: string) => (iso <= todayIso ? 'today' : format(parseISO(iso), 'MMM d'));
+  const timeline = timing && !isPast ? [
+    { icon: Package, text: `Order ${when(timing.placeOrderOn)}` },
+    { icon: Truck, text: `Arrives ${when(timing.deliveryBy)}` },
+  ] : null;
+  const tooSoon = Boolean(timing && !timing.feasible);
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => { if (!open && !submitting) onClose(); }}>
@@ -515,7 +526,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
               {!payingForGiftId && product && (
                 <p className="px-1 text-[12px] leading-5" style={{ color: U.textSecondary }}>
                   {payFromWallet
-                    ? `${money(price)} comes from your gift wallet (balance ${money(walletBalance)}).`
+                    ? `${money(price)} comes from your available gift wallet balance (${money(availableBalance ?? walletBalance)}). Other gifts' holds are not used.`
                     : 'You’ll pay securely at checkout next.'}{' '}
                   Need to cancel? Email <a href="mailto:team@unwrapt.io" className="underline">team@unwrapt.io</a> before it’s ordered.
                 </p>

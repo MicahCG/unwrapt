@@ -7,7 +7,7 @@
 // (index.ts guards its serve() call behind `import.meta.main` so this
 // import doesn't start a live HTTP listener - see the comment there.)
 import { assertEquals } from "https://deno.land/std@0.190.0/testing/asserts.ts";
-import { handleFundReservation } from "./index.ts";
+import { giftDueForAutoOrder, handleFundReservation } from "./index.ts";
 
 // fetchGoodyProduct short-circuits to null with no network call when no
 // Goody API key is configured (supabase/functions/process-automation-lifecycle/index.ts,
@@ -43,6 +43,22 @@ Deno.test("handleFundReservation logs a per-recipient 'error' and returns (does 
   assertEquals(logged[0].table, "automation_logs");
   assertEquals(logged[0].row.action, "error");
   assertEquals(logged[0].row.stage, "fund_reservation");
+});
+
+Deno.test("auto-order uses place-by (occasion minus lead minus buffer), not 25 days before delivery", () => {
+  const gift = {
+    wallet_reserved: true,
+    status: "confirmed",
+    address_confirmed_at: "2026-11-01T00:00:00Z",
+    payment_status: "unpaid",
+    goody_order_id: null,
+    occasion_date: "2026-12-02",
+  };
+  // Nov 4 is inside the old 25-days-before-delivery window (delivery Nov 29) but before place-by Nov 8.
+  assertEquals(giftDueForAutoOrder(gift, new Date(2026, 10, 4)), false);
+  assertEquals(giftDueForAutoOrder(gift, new Date(2026, 10, 8)), true);
+  assertEquals(giftDueForAutoOrder(gift, new Date(2026, 10, 11)), true);
+  assertEquals(giftDueForAutoOrder({ ...gift, place_by_date: "2026-11-20" }, new Date(2026, 10, 11)), false);
 });
 
 Deno.test("handleFundReservation logs 'failed' (not 'error') and returns cleanly when no default gift variant is set at all", async () => {

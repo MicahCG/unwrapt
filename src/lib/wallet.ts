@@ -15,6 +15,7 @@ export type PendingReservation = {
   giftTitle: string;
   recipientName: string;
   occasionDate: string | null;
+  fulfillmentError: string | null;
 };
 
 export type WalletBreakdown = {
@@ -56,19 +57,42 @@ export const listPendingReservations = async (userId: string): Promise<PendingRe
         giftTitle: gift?.gift_type || 'Gift',
         recipientName: recipient?.name || 'Someone',
         occasionDate: gift?.occasion_date || null,
+        fulfillmentError: null,
       };
     });
+};
+
+/** Latest fulfillment failure per gift, so a held gift can show why it did not order. */
+const listFulfillmentIssues = async (userId: string): Promise<Record<string, string>> => {
+  const { data, error } = await supabase
+    .from('automation_logs')
+    .select('scheduled_gift_id, details')
+    .eq('user_id', userId)
+    .eq('stage', 'fulfillment')
+    .in('action', ['error', 'failed'])
+    .order('created_at', { ascending: false })
+    .limit(20);
+  if (error || !data) return {};
+  const issues: Record<string, string> = {};
+  for (const row of data) {
+    if (!row.scheduled_gift_id || issues[row.scheduled_gift_id]) continue;
+    const details = row.details as { error?: string } | null;
+    if (details?.error) issues[row.scheduled_gift_id] = details.error;
+  }
+  return issues;
 };
 
 /** Gross balance, reserved total, available, and per-gift holds. */
 export const getWalletBreakdown = async (userId: string): Promise<WalletBreakdown> => {
   try {
-    const [{ data: profile, error: profileError }, reservations] = await Promise.all([
+    const [{ data: profile, error: profileError }, reservations, issues] = await Promise.all([
       supabase.from('profiles').select('gift_wallet_balance').eq('id', userId).single(),
       listPendingReservations(userId).catch(() => [] as PendingReservation[]),
+      listFulfillmentIssues(userId),
     ]);
     if (profileError) throw profileError;
     const balance = Number(profile?.gift_wallet_balance) || 0;
+    for (const row of reservations) row.fulfillmentError = issues[row.scheduledGiftId] || null;
     const reserved = reservations.reduce((sum, row) => sum + row.amount, 0);
     return {
       balance,

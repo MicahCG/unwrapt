@@ -2,11 +2,14 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
 import { corsHeaders } from "../_shared/cors.ts";
+import { chargeAvailableBalance, executeReservedCharge, restoreLatestWalletCharge } from "../_shared/executeReservedCharge.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const chargeContext: { active: boolean; scheduledGiftId?: string; userId?: string; copy?: string } = { active: false };
 
   try {
     console.log('🎁 Process-gift-fulfillment: Function started');
@@ -205,84 +208,8 @@ serve(async (req) => {
       });
     }
 
-    // For manual triggers, handle wallet charging directly if not already paid
-    if (manualTrigger && giftData.payment_status !== 'paid') {
-      console.log('🎁 Process-gift-fulfillment: Manual trigger - charging wallet directly...');
-      const chargeAmount = giftData.estimated_cost || 42;
-      
-      // Get current wallet balance
-      const { data: profile, error: profileError } = await supabaseService
-        .from('profiles')
-        .select('gift_wallet_balance')
-        .eq('id', giftData.user_id)
-        .single();
-
-      if (profileError || !profile) {
-        console.error('🎁 Process-gift-fulfillment: Could not fetch user profile:', profileError);
-        return new Response(JSON.stringify({ 
-          error: "Could not fetch wallet balance.",
-          success: false
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400,
-        });
-      }
-
-      const currentBalance = profile.gift_wallet_balance || 0;
-      if (currentBalance < chargeAmount) {
-        console.error(`🎁 Process-gift-fulfillment: Insufficient balance: $${currentBalance} < $${chargeAmount}`);
-        return new Response(JSON.stringify({ 
-          error: `Insufficient wallet balance. You have $${currentBalance.toFixed(2)} but need $${chargeAmount.toFixed(2)}.`,
-          success: false
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400,
-        });
-      }
-
-      const newBalance = currentBalance - chargeAmount;
-
-      // Create wallet transaction record
-      const { error: txnError } = await supabaseService
-        .from('wallet_transactions')
-        .insert({
-          user_id: giftData.user_id,
-          amount: -chargeAmount,
-          balance_after: newBalance,
-          transaction_type: 'charge',
-          status: 'completed',
-          scheduled_gift_id: scheduledGiftId,
-        });
-
-      if (txnError) {
-        console.error('🎁 Process-gift-fulfillment: Wallet transaction insert failed:', txnError);
-        return new Response(JSON.stringify({ 
-          error: "Failed to record wallet transaction.",
-          success: false
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 500,
-        });
-      }
-
-      // Deduct from wallet balance
-      const { error: balanceError } = await supabaseService
-        .from('profiles')
-        .update({ gift_wallet_balance: newBalance })
-        .eq('id', giftData.user_id);
-
-      if (balanceError) {
-        console.error('🎁 Process-gift-fulfillment: Balance update failed:', balanceError);
-      }
-
-      // Update gift payment status
-      await supabaseService
-        .from('scheduled_gifts')
-        .update({ payment_status: 'paid', payment_amount: chargeAmount })
-        .eq('id', scheduledGiftId);
-
-      console.log(`🎁 Process-gift-fulfillment: Wallet charged $${chargeAmount}, new balance: $${newBalance}`);
-    }
+    // Wallet charging happens after the address check so a missing address
+    // cannot debit the wallet. See chargeGiftForFulfillment below.
 
     // Then get the recipient data separately to avoid relationship issues
     const { data: recipientData, error: recipientError } = await supabaseService
@@ -348,8 +275,66 @@ serve(async (req) => {
       zip: recipient.zip_code
     });
 
-    // goody-order fetches the recipient's address itself; we only needed the
-    // check above to fail fast (before charging the wallet) if it's missing.
+    // Spend a pending hold when one exists. A brand-new wallet checkout has no
+    // hold and is charged from available balance only (other holds stay put).
+    if (giftData.payment_status !== 'paid') {
+      const reservedCharge = await executeReservedCharge(supabaseService, {
+        scheduledGiftId,
+        actorUserId: userId,
+        recipientName: recipient.name,
+      });
+      if (!reservedCharge.ok && reservedCharge.code === 'no_reservation') {
+        const price = Number(giftData.payment_amount ?? giftData.estimated_cost) || 0;
+        const direct = await chargeAvailableBalance(supabaseService, {
+          scheduledGiftId,
+          userId: giftData.user_id,
+          amount: price,
+        });
+        if (!direct.ok) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: direct.code,
+            code: direct.code,
+            shortfall: direct.shortfall,
+            confirmationCopy: direct.confirmationCopy,
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: direct.status,
+          });
+        }
+        chargeContext.active = true;
+        chargeContext.scheduledGiftId = scheduledGiftId;
+        chargeContext.userId = giftData.user_id;
+        chargeContext.copy = direct.confirmationCopy;
+        giftData.payment_status = 'paid';
+        giftData.payment_amount = direct.chargedAmount;
+      } else if (!reservedCharge.ok) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: reservedCharge.error,
+          code: reservedCharge.code,
+          shortfall: reservedCharge.shortfall,
+          reserved: reservedCharge.reserved,
+          cost: reservedCharge.cost,
+          confirmationCopy: reservedCharge.confirmationCopy,
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: reservedCharge.status,
+        });
+      } else if (!reservedCharge.alreadyCharged) {
+        chargeContext.active = true;
+        chargeContext.scheduledGiftId = scheduledGiftId;
+        chargeContext.userId = giftData.user_id;
+        chargeContext.copy = reservedCharge.confirmationCopy;
+        giftData.payment_status = 'paid';
+        giftData.payment_amount = reservedCharge.chargedAmount;
+      } else {
+        chargeContext.copy = reservedCharge.confirmationCopy;
+      }
+    }
+
+    // goody-order fetches the recipient's address itself; the check above
+    // fails before any wallet debit when the address is missing.
     console.log(`🎁 Process-gift-fulfillment: Calling goody-order via Supabase client`);
 
     const orderResult = await Promise.race([
@@ -365,8 +350,18 @@ serve(async (req) => {
 
     const typedOrderResult = orderResult as { error?: { message?: string }; data?: { success?: boolean; error?: string } };
 
+    const undoCharge = async () => {
+      if (!chargeContext.active || !chargeContext.scheduledGiftId || !chargeContext.userId) return;
+      chargeContext.active = false;
+      await restoreLatestWalletCharge(supabaseService, {
+        scheduledGiftId: chargeContext.scheduledGiftId,
+        userId: chargeContext.userId,
+      });
+    };
+
     if (typedOrderResult.error) {
       console.error('🎁 Process-gift-fulfillment: Goody order function error:', typedOrderResult.error);
+      await undoCharge();
       return new Response(JSON.stringify({
         error: `Order creation failed: ${typedOrderResult.error}`,
         success: false
@@ -378,6 +373,7 @@ serve(async (req) => {
 
     if (!typedOrderResult.data || !typedOrderResult.data.success) {
       console.error('🎁 Process-gift-fulfillment: Goody order creation failed:', typedOrderResult.data?.error);
+      await undoCharge();
       return new Response(JSON.stringify({
         error: `Order creation failed: ${typedOrderResult.data?.error || 'Unknown error'}`,
         success: false
@@ -391,9 +387,15 @@ serve(async (req) => {
     // success, so there's nothing left to update here.
     console.log(`🎁 Process-gift-fulfillment: Gift fulfillment processed successfully for ${scheduledGiftId}`);
 
+    await supabaseService
+      .from('scheduled_gifts')
+      .update({ fulfillment_error: null, fulfillment_error_at: null })
+      .eq('id', scheduledGiftId);
+
     return new Response(JSON.stringify({
       success: true,
       message: "Gift fulfillment processed successfully",
+      confirmationCopy: chargeContext.copy,
       orderDetails: typedOrderResult.data
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -401,6 +403,21 @@ serve(async (req) => {
     });
 
   } catch (error) {
+    if (chargeContext.active && chargeContext.scheduledGiftId && chargeContext.userId) {
+      try {
+        const supabaseService = createClient(
+          Deno.env.get("SUPABASE_URL") ?? "",
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+          { auth: { persistSession: false } }
+        );
+        await restoreLatestWalletCharge(supabaseService, {
+          scheduledGiftId: chargeContext.scheduledGiftId,
+          userId: chargeContext.userId,
+        });
+      } catch (restoreError) {
+        console.error('🎁 Process-gift-fulfillment: Failed to restore wallet after error', restoreError);
+      }
+    }
     console.error('🎁 Process-gift-fulfillment: Error processing gift fulfillment:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const errorStack = error instanceof Error ? error.stack : undefined;

@@ -17,7 +17,9 @@ import {
   Truck,
   Calendar
 } from 'lucide-react';
-import { format, subDays } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { formatHeldFundsStatus, giftOrderTiming } from '@/lib/giftTiming';
+import { assessReservation } from '@/lib/reservedFunds';
 import { getNextOccurrence } from '@/lib/dateUtils';
 import { cleanName } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -42,8 +44,11 @@ interface AutomationDetailModalProps {
       automation_enabled: boolean;
       wallet_reserved: boolean;
       estimated_cost: number | null;
+      payment_amount?: number | null;
+      wallet_reservation_amount?: number | null;
       occasion_date: string;
       shopify_order_id: string | null;
+      goody_order_id?: string | null;
       status: string | null;
       payment_status: string | null;
     }>;
@@ -71,14 +76,28 @@ export const AutomationDetailModal: React.FC<AutomationDetailModalProps> = ({
   const occasionType = recipient.birthday ? 'Birthday' : 'Anniversary';
   const nextOccurrence = occasionDate ? getNextOccurrence(occasionDate) : new Date();
   
-  const reserveDate = subDays(nextOccurrence, 28);
-  const shipDate = subDays(nextOccurrence, 21);
+  const occasionIso = format(nextOccurrence, 'yyyy-MM-dd');
+  const timing = giftOrderTiming(occasionIso);
   
   const automatedGift = recipient.scheduled_gifts?.find(g => g.automation_enabled);
   const isReserved = automatedGift?.wallet_reserved || automatedGift?.payment_status === 'paid';
-  const isOrdered = !!automatedGift?.shopify_order_id || automatedGift?.status === 'ordered';
+  const isOrdered = !!automatedGift?.shopify_order_id || !!automatedGift?.goody_order_id || automatedGift?.status === 'ordered';
   const isDelivered = automatedGift?.status === 'delivered';
-  const estimatedCost = automatedGift?.estimated_cost || 42;
+  const productPrice = Number(automatedGift?.payment_amount ?? automatedGift?.estimated_cost) || 0;
+  const reservedAmount = Number(automatedGift?.wallet_reservation_amount) || 0;
+  const assessment = assessReservation({
+    productPrice,
+    pendingReserved: reservedAmount,
+    paymentStatus: automatedGift?.payment_status,
+  });
+  const canOrderNow = Boolean(automatedGift) && !isOrdered && (assessment.covered || automatedGift?.payment_status === 'paid');
+  const holdLine = reservedAmount > 0
+    ? formatHeldFundsStatus({
+        amount: reservedAmount,
+        recipientName: recipient.name,
+        occasionDate: automatedGift?.occasion_date || occasionIso,
+      })
+    : null;
 
   const handleOrderNow = async () => {
     if (!automatedGift) {
@@ -205,7 +224,7 @@ export const AutomationDetailModal: React.FC<AutomationDetailModalProps> = ({
                       {isReserved ? 'Funds reserved ✓' : 'Funds will be reserved'}
                     </p>
                     <p className="text-xs text-[#1A1A1A]/60">
-                      {isReserved ? 'Completed' : format(reserveDate, 'MMM d, yyyy')}
+                      {isReserved ? 'Completed' : timing ? format(parseISO(timing.placeOrderOn), 'MMM d, yyyy') : 'When the order is placed'}
                     </p>
                   </div>
                 </div>
@@ -219,7 +238,7 @@ export const AutomationDetailModal: React.FC<AutomationDetailModalProps> = ({
                       {isOrdered ? 'Order placed ✓' : 'Order will be placed'}
                     </p>
                     <p className="text-xs text-[#1A1A1A]/60">
-                      {isOrdered ? 'Completed' : format(shipDate, 'MMM d, yyyy')}
+                      {isOrdered ? 'Completed' : timing ? format(parseISO(timing.placeOrderOn), 'MMM d, yyyy') : 'On the place-by date'}
                     </p>
                   </div>
                 </div>
@@ -242,14 +261,20 @@ export const AutomationDetailModal: React.FC<AutomationDetailModalProps> = ({
           )}
 
           {/* Cost & Action */}
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center justify-between pt-2 gap-3">
             <div className="text-sm text-[#1A1A1A]/70">
-              <span className="font-medium">${estimatedCost.toFixed(2)}</span> will be deducted
+              {holdLine ? (
+                <span>{holdLine}. Nothing new will be charged.</span>
+              ) : assessment.shortfall > 0 ? (
+                <span>${assessment.shortfall.toFixed(2)} more is needed before this can be ordered.</span>
+              ) : (
+                <span>Order uses the wallet hold when one is set aside.</span>
+              )}
             </div>
             {isReady && (
               <Button
                 onClick={handleOrderNow}
-                disabled={isOrdering || walletBalance < estimatedCost}
+                disabled={isOrdering || !canOrderNow}
                 className="bg-[#D2B887] hover:bg-[#D2B887]/90 text-[#1A1A1A]"
               >
                 {isOrdering ? (

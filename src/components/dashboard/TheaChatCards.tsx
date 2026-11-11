@@ -4,7 +4,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import CalendarSyncButton from '@/components/CalendarSyncButton';
 import { U } from '@/components/unwrapt2/theme';
 import { formatOccasionDate } from '@/lib/dateUtils';
-import { formatGiftTimingLine, giftOrderTiming } from '@/lib/giftTiming';
+import { formatGiftTimingLine, formatHeldFundsStatus, giftOrderTiming } from '@/lib/giftTiming';
 import { TOP_UP_AMOUNTS, topUpFor } from '@/lib/wallet';
 
 /** Modules thea-chat returns in top-level `ui` from present_ui. */
@@ -21,6 +21,8 @@ export type GiftProgress = {
   deliveryDate: string | null;
   stage: GiftStage;
   carrier: string | null;
+  reservedAmount?: number | null;
+  fulfillmentError?: string | null;
 };
 
 /** One person's readiness snapshot for status overviews ("who's scheduled?"). */
@@ -496,11 +498,19 @@ const STAGES: { key: GiftStage; label: string }[] = [
   { key: 'delivered', label: 'Delivered' },
 ];
 
-const stageLine = (gift: GiftProgress, stage: GiftStage) => {
+const stageLine = (gift: GiftProgress, stage: GiftStage, recipientName: string) => {
   const timing = gift.occasionDate ? giftOrderTiming(gift.occasionDate) : null;
   switch (stage) {
     case 'scheduled': return 'Waiting on wallet funds before I can order it.';
     case 'funded':
+      if (gift.reservedAmount != null) {
+        return formatHeldFundsStatus({
+          amount: gift.reservedAmount,
+          recipientName,
+          occasionDate: gift.occasionDate,
+          fulfillmentError: gift.fulfillmentError,
+        });
+      }
       return timing
         ? `Funds are held. ${formatGiftTimingLine(timing)}`
         : 'Funds are held. I’ll place the order with enough lead time for shipping so it arrives a few days before the occasion.';
@@ -564,7 +574,7 @@ export const GiftProgressCard: React.FC<{
                   })}
                 </ol>
               </div>
-              <p className="mt-2 text-[12px] leading-5 text-[#5A5147]">{stageLine(gift, stage)}</p>
+              <p className="mt-2 text-[12px] leading-5 text-[#5A5147]">{stageLine(gift, stage, mod.recipientName)}</p>
             </div>
           );
         })}

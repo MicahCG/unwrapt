@@ -1,9 +1,15 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
+import { shouldAutoOrderGift, isGiftPlaceByReached, todayIsoLocal, type AutoOrderGift } from "../_shared/giftTiming.ts";
+import { restoreLatestWalletCharge } from "../_shared/executeReservedCharge.ts";
 
 const SERVICE_FEE = 0; // No service fee
-// Gifts are confirmed and ordered at most this many days before delivery (reservation + 3-day wait from 28 days).
-const ORDER_WINDOW_DAYS = 25;
+// Address chase still starts a few days before the default place-by. Ordering itself uses place-by
+// (occasion − shipping lead − arrival buffer), the same rule Thea quotes.
+
+export function giftDueForAutoOrder(gift: AutoOrderGift, today: Date = new Date()): boolean {
+  return shouldAutoOrderGift(gift, todayIsoLocal(today));
+}
 
 type GoodyProductLookup = { price?: number | null; images?: Array<{ image_large?: { url?: string | null } | null }> };
 
@@ -132,8 +138,10 @@ serve(async (req) => {
 async function processGiftStage(supabaseClient: any, gift: any, recipient: any, today: Date) {
   const deliveryDate = new Date(gift.delivery_date);
   const daysUntilDelivery = Math.ceil((deliveryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const todayIso = todayIsoLocal(today);
+  const placeByReached = isGiftPlaceByReached(gift, todayIso);
 
-  console.log(`  🎁 Gift: ${gift.occasion} - ${daysUntilDelivery} days until delivery`);
+  console.log(`  🎁 Gift: ${gift.occasion} - ${daysUntilDelivery} days until delivery, place-by reached: ${placeByReached}`);
 
   // STAGE 6: Cleanup expired gifts
   if (new Date(gift.occasion_date) < today && gift.payment_status === "unpaid") {
@@ -147,15 +155,21 @@ async function processGiftStage(supabaseClient: any, gift: any, recipient: any, 
     return;
   }
 
-  // STAGE 2: Auto-confirm gift (3 days after reservation if address exists), only once it's inside
-  // the order window so funds held early (e.g. at approval in Thea's chat) aren't ordered months ahead.
-  // A gift the user already approved skips the 3-day wait.
-  if (gift.wallet_reserved && gift.status !== 'confirmed' && isAddressComplete(recipient) && daysUntilDelivery <= ORDER_WINDOW_DAYS) {
+  // STAGE 2: Auto-confirm once place-by has arrived (occasion − lead − buffer), not a fixed
+  // 25-days-before-delivery window. A gift the user already approved skips the 3-day wait.
+  if (gift.wallet_reserved && gift.status !== 'confirmed' && isAddressComplete(recipient) && placeByReached) {
     const reservationDate = new Date(gift.wallet_reservation_date || gift.updated_at);
     const daysSinceReservation = Math.ceil((today.getTime() - reservationDate.getTime()) / (1000 * 60 * 60 * 24));
 
     if (daysSinceReservation >= 3 || gift.status === 'approved') {
-      await handleGiftAutoConfirmation(supabaseClient, gift, recipient);
+      const confirmed = await handleGiftAutoConfirmation(supabaseClient, gift, recipient);
+      if (confirmed) {
+        await handleOrderFulfillment(supabaseClient, {
+          ...gift,
+          status: "confirmed",
+          address_confirmed_at: gift.address_confirmed_at || new Date().toISOString(),
+        }, recipient);
+      }
       return;
     }
   }
@@ -220,8 +234,8 @@ async function processGiftStage(supabaseClient: any, gift: any, recipient: any, 
     }
   }
 
-  // STAGE 4: Order fulfillment (when gift is confirmed and address is confirmed)
-  if (gift.wallet_reserved && gift.status === 'confirmed' && gift.address_confirmed_at && gift.payment_status === "unpaid" && daysUntilDelivery > 0) {
+  // STAGE 4: Place the order on place-by, using the same rule Thea quotes.
+  if (giftDueForAutoOrder(gift, today)) {
     await handleOrderFulfillment(supabaseClient, gift, recipient);
     return;
   }
@@ -509,56 +523,81 @@ async function handleAddressReminder(supabaseClient: any, gift: any, recipient: 
   }
 }
 
+async function surfaceFulfillmentProblem(supabaseClient: any, gift: any, recipient: any, message: string) {
+  const trimmed = String(message || "Order could not be placed").slice(0, 500);
+  const { error: updateError } = await supabaseClient
+    .from("scheduled_gifts")
+    .update({ fulfillment_error: trimmed, fulfillment_error_at: new Date().toISOString() })
+    .eq("id", gift.id);
+  if (updateError) console.error("    fulfillment_error not saved", updateError);
+
+  const { data: prior } = await supabaseClient
+    .from("automation_logs")
+    .select("details")
+    .eq("scheduled_gift_id", gift.id)
+    .eq("stage", "fulfillment")
+    .in("action", ["error", "failed"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const priorError = prior?.details && typeof prior.details === "object" ? prior.details.error : null;
+  const alreadySurfaced = priorError === trimmed;
+
+  await logAutomation(supabaseClient, gift.user_id, recipient.id, gift.id, "fulfillment", "error", {
+    error: trimmed,
+  });
+
+  if (alreadySurfaced || !recipient?.profiles?.email) return;
+  await supabaseClient.functions.invoke("send-notification-email", {
+    body: {
+      type: "automation_failed",
+      recipientEmail: recipient.profiles.email,
+      userName: recipient.profiles.full_name,
+      data: {
+        recipientName: recipient.name,
+        occasion: gift.occasion,
+        error: trimmed,
+      },
+    },
+  });
+}
+
 async function handleOrderFulfillment(supabaseClient: any, gift: any, recipient: any) {
   console.log("    🚀 STAGE 4: Order Fulfillment");
 
   try {
-    // Step 1: Charge wallet (convert reservation to charge)
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const chargeResponse = await supabaseClient.functions.invoke("wallet-charge-reserved", {
-      body: { scheduledGiftId: gift.id },
-      headers: {
-        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`
-      }
+      body: { scheduledGiftId: gift.id, recipientName: recipient?.name },
+      headers: { Authorization: `Bearer ${serviceKey}` },
     });
-
-    if (chargeResponse.error) {
-      throw new Error(`Wallet charge failed: ${chargeResponse.error.message}`);
+    const chargeData = chargeResponse.data as { success?: boolean; error?: string; confirmationCopy?: string } | null;
+    if (chargeResponse.error || chargeData?.success === false) {
+      const message = chargeData?.confirmationCopy || chargeData?.error || chargeResponse.error?.message || "Wallet charge failed";
+      await surfaceFulfillmentProblem(supabaseClient, gift, recipient, message);
+      return;
     }
 
     console.log("    💳 Wallet charged successfully");
 
-    // Step 2: Process gift fulfillment (place the order via process-gift-fulfillment)
     const fulfillmentResponse = await supabaseClient.functions.invoke("process-gift-fulfillment", {
       body: { scheduledGiftId: gift.id },
-      headers: {
-        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`
-      }
+      headers: { Authorization: `Bearer ${serviceKey}` },
     });
-
-    if (fulfillmentResponse.error) {
-      // Fulfillment failed, refund wallet
-      console.error("    ❌ Fulfillment failed, refunding wallet");
-      await refundWallet(supabaseClient, gift);
-
-      await supabaseClient.functions.invoke("send-notification-email", {
-        body: {
-          type: "automation_failed",
-          recipientEmail: recipient.profiles.email,
-          data: {
-            recipientName: recipient.name,
-            occasion: gift.occasion,
-            error: fulfillmentResponse.error.message
-          }
-        }
-      });
-
-      await logAutomation(supabaseClient, gift.user_id, recipient.id, gift.id, "fulfillment", "failed", {
-        error: fulfillmentResponse.error.message
-      });
+    const fulfillmentData = fulfillmentResponse.data as { success?: boolean; error?: string; orderId?: string; trackingNumber?: string } | null;
+    if (fulfillmentResponse.error || fulfillmentData?.success === false) {
+      console.error("    ❌ Fulfillment failed, restoring the wallet hold");
+      await restoreLatestWalletCharge(supabaseClient, { scheduledGiftId: gift.id, userId: gift.user_id });
+      const message = fulfillmentData?.error || fulfillmentResponse.error?.message || "Order could not be placed";
+      await surfaceFulfillmentProblem(supabaseClient, gift, recipient, message);
       return;
     }
 
-    // Success! Send confirmation
+    await supabaseClient
+      .from("scheduled_gifts")
+      .update({ fulfillment_error: null, fulfillment_error_at: null })
+      .eq("id", gift.id);
+
     await supabaseClient.functions.invoke("send-notification-email", {
       body: {
         type: "gift_sent",
@@ -566,25 +605,22 @@ async function handleOrderFulfillment(supabaseClient: any, gift: any, recipient:
         data: {
           recipientName: recipient.name,
           occasion: gift.occasion,
-          trackingNumber: fulfillmentResponse.data?.trackingNumber
+          trackingNumber: fulfillmentData?.trackingNumber
         }
       }
     });
 
     await logAutomation(supabaseClient, gift.user_id, recipient.id, gift.id, "fulfillment", "success", {
-      orderId: fulfillmentResponse.data?.orderId
+      orderId: fulfillmentData?.orderId
     });
 
-    // Check if auto-reload needed after charge
     await supabaseClient.rpc("check_auto_reload", { p_user_id: gift.user_id });
 
     console.log("    ✅ Gift fulfilled successfully");
   } catch (error) {
     console.error("    ❌ Fulfillment error:", error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    await logAutomation(supabaseClient, gift.user_id, recipient.id, gift.id, "fulfillment", "error", {
-      error: errorMessage
-    });
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    await surfaceFulfillmentProblem(supabaseClient, gift, recipient, errorMessage);
   }
 }
 
@@ -627,7 +663,7 @@ async function handleEscalation(supabaseClient: any, gift: any, recipient: any) 
   }
 }
 
-async function handleGiftAutoConfirmation(supabaseClient: any, gift: any, recipient: any) {
+async function handleGiftAutoConfirmation(supabaseClient: any, gift: any, recipient: any): Promise<boolean> {
   console.log("    ✅ STAGE 2: Auto-Confirm Gift");
 
   try {
@@ -674,12 +710,14 @@ async function handleGiftAutoConfirmation(supabaseClient: any, gift: any, recipi
     }
 
     console.log("    ✅ Gift auto-confirmed successfully");
+    return true;
   } catch (error) {
     console.error("    ❌ Auto-confirmation error:", error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     await logAutomation(supabaseClient, gift.user_id, recipient.id, gift.id, "gift_confirmation", "error", {
       error: errorMessage
     });
+    return false;
   }
 }
 
@@ -750,45 +788,6 @@ async function unreserveWalletFunds(supabaseClient: any, gift: any) {
     .from("scheduled_gifts")
     .update({ wallet_reserved: false })
     .eq("id", gift.id);
-}
-
-async function refundWallet(supabaseClient: any, gift: any) {
-  // Find the completed charge transaction
-  const { data: transaction } = await supabaseClient
-    .from("wallet_transactions")
-    .select("*")
-    .eq("scheduled_gift_id", gift.id)
-    .eq("transaction_type", "charge")
-    .eq("status", "completed")
-    .single();
-
-  if (!transaction) return;
-
-  // Create refund transaction
-  await supabaseClient
-    .from("wallet_transactions")
-    .insert({
-      user_id: gift.user_id,
-      amount: Math.abs(transaction.amount),
-      balance_after: transaction.balance_after + Math.abs(transaction.amount),
-      transaction_type: "refund",
-      status: "completed",
-      scheduled_gift_id: gift.id
-    });
-
-  // Update user balance
-  const { data: profile } = await supabaseClient
-    .from("profiles")
-    .select("gift_wallet_balance")
-    .eq("id", gift.user_id)
-    .single();
-
-  await supabaseClient
-    .from("profiles")
-    .update({
-      gift_wallet_balance: profile.gift_wallet_balance + Math.abs(transaction.amount)
-    })
-    .eq("id", gift.user_id);
 }
 
 async function logAutomation(

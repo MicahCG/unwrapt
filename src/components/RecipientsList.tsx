@@ -38,6 +38,12 @@ const RecipientsList = () => {
             price_range,
             status,
             payment_status,
+            payment_amount,
+            estimated_cost,
+            wallet_reserved,
+            wallet_reservation_amount,
+            shopify_order_id,
+            goody_order_id,
             created_at,
             updated_at
           )
