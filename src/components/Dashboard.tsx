@@ -18,10 +18,7 @@ import RecipientDetailSheet from '@/components/RecipientDetailSheet';
 import CatalogPreviewSheet from '@/components/CatalogPreviewSheet';
 import { type RecipientRecord, type GiftRecord } from '@/lib/giftStatus';
 import { findResumableGift, resumeGiftPayment, hasCompleteShippingAddress } from '@/lib/giftPayment';
-import TheaHomeTab, {
-  TheaIdentityChip,
-  type TheaHeaderChrome,
-} from '@/components/dashboard/TheaHomeTab';
+import TheaHomeTab from '@/components/dashboard/TheaHomeTab';
 import ManualHomeTab from '@/components/dashboard/ManualHomeTab';
 import AccountMenu from '@/components/dashboard/AccountMenu';
 import { AUTOPILOT_THRESHOLDS, type BriefingItem } from '@/lib/dashboardBriefing';
@@ -54,17 +51,6 @@ const Dashboard = () => {
   const [approval, setApproval] = useState<{ gift: any; recipient: any } | null>(null);
   const [theaQueue, setTheaQueue] = useState<{ id: number; text: string } | null>(null);
   const [composerFocused, setComposerFocused] = useState(false);
-  const [theaChrome, setTheaChrome] = useState<TheaHeaderChrome | null>(null);
-  const handleTheaChromeChange = useCallback((chrome: TheaHeaderChrome) => {
-    setTheaChrome((prev) => (
-      prev
-      && prev.pose === chrome.pose
-      && prev.lively === chrome.lively
-      && prev.status === chrome.status
-        ? prev
-        : chrome
-    ));
-  }, []);
   // Match MobileShell's `lg:hidden` tab bar — phones/tablets, not the side-by-side desktop layout.
   const [compactChrome, setCompactChrome] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches,
@@ -465,13 +451,8 @@ const Dashboard = () => {
           )
         }
       >
-        <div className={`mb-2 flex shrink-0 items-center gap-2 ${pinToKeyboard ? 'hidden' : ''}`}>
-          {/* Thea chip + account pill share one top row so the chat viewport stays taller. */}
-          <div className="min-w-0 flex-1">
-            {theaChrome && (activeTab === 'thea' || !compactChrome) ? (
-              <TheaIdentityChip chrome={theaChrome} />
-            ) : null}
-          </div>
+        <div className={`mb-1 flex shrink-0 items-center justify-end ${pinToKeyboard ? 'hidden' : ''}`}>
+          {/* Account pill stays top-right; Thea’s centered island floats over chat in TheaHomeTab. */}
           <AccountMenu
             displayName={displayName}
             planLabel={planLabel}
@@ -504,7 +485,6 @@ const Dashboard = () => {
               queuedMessage={theaQueue}
               recipientsLoaded={recipientsLoaded}
               onComposerFocusChange={setComposerFocused}
-              onHeaderChromeChange={handleTheaChromeChange}
             />
           </div>
           <div className={`${activeTab === 'manual' ? 'h-full' : 'hidden'} lg:block lg:h-full lg:min-h-0 lg:rounded-[24px] lg:border lg:border-[rgba(42,37,32,0.09)] lg:bg-[rgba(250,246,238,0.6)] lg:px-5 lg:pt-5`}>

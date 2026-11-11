@@ -1,9 +1,17 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Send } from 'lucide-react';
+import { Send, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { TheaAvatar } from '@/components/unwrapt2/TheaAvatar';
+import { TheaCharacter } from '@/components/unwrapt2/TheaCharacter';
 import { U } from '@/components/unwrapt2/theme';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   ChatUiModules,
   ProductCards,
@@ -59,38 +67,89 @@ export type TheaHeaderChrome = {
   status: string;
 };
 
+const THEA_REACTIONS = new Set<string>(['thumbsup', 'sparkle', 'clap', 'toss', 'magnify', 'laugh', 'upset']);
+
+function splitChromePose(pose: TheaPose | TheaReaction): { pose: TheaPose; reaction: TheaReaction | null } {
+  if (THEA_REACTIONS.has(pose)) return { pose: 'basic', reaction: pose as TheaReaction };
+  return { pose: pose as TheaPose, reaction: null };
+}
+
+/**
+ * Centered frosted island (ChatGPT-style): figure above the name, floating over chat.
+ * Tap opens a larger frosted presence modal with her full animation.
+ */
 export const TheaIdentityChip: React.FC<{ chrome: TheaHeaderChrome; className?: string }> = ({
   chrome,
   className = '',
-}) => (
-  <div
-    className={`u-thea-identity-chip min-w-0${chrome.lively ? ' u-thea-identity-chip--lively' : ''}${className ? ` ${className}` : ''}`}
-    aria-label="Thea, your gifting agent"
-  >
-    <TheaAvatar size={34} pose={chrome.pose} />
-    <div className="u-thea-identity-chip__copy">
-      <div className="truncate text-[9px] font-semibold uppercase tracking-[0.14em]" style={{ color: U.accent }}>
-        Your gifting agent
-      </div>
-      <div className="font-display truncate text-[17px] leading-tight" style={{ color: U.ink }}>
-        Thea
-      </div>
-      <span className="sr-only" aria-live="polite">
-        {chrome.status}
-      </span>
-    </div>
-  </div>
-);
+}) => {
+  const [open, setOpen] = useState(false);
+  const { pose, reaction } = splitChromePose(chrome.pose);
 
-/** Reports chip state upward without putting a hook after late render math in TheaHomeTab. */
-const TheaChromeReporter: React.FC<{
-  chrome: TheaHeaderChrome;
-  onChange: (chrome: TheaHeaderChrome) => void;
-}> = ({ chrome, onChange }) => {
-  useEffect(() => {
-    onChange(chrome);
-  }, [chrome.pose, chrome.lively, chrome.status, onChange]);
-  return null;
+  return (
+    <>
+      <button
+        type="button"
+        className={`u-thea-identity-chip u-press${chrome.lively ? ' u-thea-identity-chip--lively' : ''}${className ? ` ${className}` : ''}`}
+        aria-label="Thea, your gifting agent. Open to see her."
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen(true)}
+      >
+        <TheaCharacter
+          size="chip"
+          pose={pose}
+          reaction={reaction}
+          speaking={false}
+          className="u-thea-character--chip-inline"
+        />
+        <div className="u-thea-identity-chip__copy">
+          <div className="font-display text-[18px] leading-none" style={{ color: U.ink }}>
+            Thea
+          </div>
+          <div className="mt-1 text-[9px] font-semibold uppercase tracking-[0.14em]" style={{ color: U.accent }}>
+            Your gifting agent
+          </div>
+          <span className="sr-only" aria-live="polite">
+            {chrome.status}
+          </span>
+        </div>
+      </button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="u-thea-presence-modal max-w-[min(400px,calc(100vw-1.5rem))] gap-0 overflow-hidden rounded-[28px] border p-0 shadow-[0_24px_60px_rgba(42,37,32,0.18)] sm:rounded-[28px]">
+          <DialogClose
+            className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border opacity-100"
+            style={{ background: 'rgba(250,246,238,0.85)', borderColor: 'rgba(42,37,32,0.1)', color: U.ink }}
+          >
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
+          <div className="flex flex-col items-center px-5 pb-6 pt-8">
+            <TheaCharacter
+              size="large"
+              pose={pose}
+              reaction={reaction}
+              speaking
+              bubble={chrome.lively ? undefined : 'Here when you need me'}
+              className="u-thea-character--presence"
+            />
+            <DialogTitle className="mt-1 font-display text-[28px] font-normal leading-tight" style={{ color: U.ink }}>
+              Thea
+            </DialogTitle>
+            <DialogDescription
+              className="mt-1 text-[11px] font-semibold uppercase tracking-[0.16em]"
+              style={{ color: U.accent }}
+            >
+              Your gifting agent
+            </DialogDescription>
+            <p className="mt-2 text-center text-[13px] leading-5" style={{ color: U.textSecondary }}>
+              {chrome.status}
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 };
 
 /** Per user+gift: unpaid return nudge already shown this browser session. */
@@ -179,8 +238,6 @@ interface TheaHomeTabProps {
   recipientsLoaded?: boolean;
   /** Lets the dashboard hide the Thea/Manual tab bar and pin to the visual viewport while typing. */
   onComposerFocusChange?: (focused: boolean) => void;
-  /** Keeps Thea's frosted identity chip in the shared dashboard header beside the account pill. */
-  onHeaderChromeChange?: (chrome: TheaHeaderChrome) => void;
 }
 
 const STATUS_LINE: Partial<Record<TheaPose, string>> = {
@@ -201,7 +258,6 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   queuedMessage,
   recipientsLoaded = true,
   onComposerFocusChange,
-  onHeaderChromeChange,
 }) => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -887,26 +943,32 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   // Soft expand while she reacts, thinks, or a send is in flight — then settle.
   const chipLively = sending || Boolean(reaction) || pose === 'thinking' || pose === 'listening';
   const headerStatus = STATUS_LINE[pose] || 'Here when you need me';
+  const islandChrome: TheaHeaderChrome = {
+    pose: reaction ?? pose,
+    lively: chipLively,
+    status: headerStatus,
+  };
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
-      {onHeaderChromeChange && (
-        <TheaChromeReporter
-          chrome={{ pose: reaction ?? pose, lively: chipLively, status: headerStatus }}
-          onChange={onHeaderChromeChange}
-        />
-      )}
-      <div
-        ref={scrollRef}
-        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto pt-1 pr-1"
-        style={{ scrollPaddingBottom: listPadBottom }}
-        aria-live="polite"
-      >
+      <div className="relative min-h-0 flex-1">
+        {/* Centered frosted island floats over the transcript (ChatGPT agent-chip pattern). */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center px-2 pt-0.5">
+          <div className="pointer-events-auto">
+            <TheaIdentityChip chrome={islandChrome} />
+          </div>
+        </div>
         <div
-          ref={chatContentRef}
-          className="space-y-3"
-          style={{ paddingBottom: listPadBottom }}
+          ref={scrollRef}
+          className="h-full min-h-0 overflow-x-hidden overflow-y-auto pt-[9.75rem] pr-1"
+          style={{ scrollPaddingBottom: listPadBottom }}
+          aria-live="polite"
         >
+          <div
+            ref={chatContentRef}
+            className="space-y-3"
+            style={{ paddingBottom: listPadBottom }}
+          >
           {history === 'loading' && (
             <p className="text-center text-[12.5px]" style={{ color: U.muted }}>Loading your conversation…</p>
           )}
@@ -996,6 +1058,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
 

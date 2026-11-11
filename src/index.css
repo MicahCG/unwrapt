@@ -628,23 +628,26 @@
   .u-intel-composer { animation: none; background-image: none; }
 }
 
-/* Compact frosted identity chip above Thea chat — beige glass, not a dark Cursor clone. */
+/* Centered ChatGPT-style frosted island: figure above name, floats over chat. */
 .u-thea-identity-chip {
   display: inline-flex;
-  max-width: 100%;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 5px 12px 5px 5px;
-  border-radius: 999px;
+  justify-content: flex-end;
+  gap: 2px;
+  min-width: 118px;
+  padding: 8px 18px 10px;
+  border-radius: 28px;
   border: 1px solid rgba(42, 37, 32, 0.1);
-  background: rgba(250, 246, 238, 0.72);
-  -webkit-backdrop-filter: blur(16px) saturate(1.15);
-  backdrop-filter: blur(16px) saturate(1.15);
+  background: rgba(250, 246, 238, 0.78);
+  -webkit-backdrop-filter: blur(18px) saturate(1.15);
+  backdrop-filter: blur(18px) saturate(1.15);
   box-shadow:
-    0 1px 0 rgba(255, 252, 245, 0.65) inset,
-    0 8px 22px rgba(42, 37, 32, 0.06);
+    0 1px 0 rgba(255, 252, 245, 0.7) inset,
+    0 10px 28px rgba(42, 37, 32, 0.08);
   transform: scale(1);
-  transform-origin: left center;
+  transform-origin: center top;
+  overflow: visible;
   transition:
     transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
     padding 320ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -652,16 +655,40 @@
     background-color 220ms ease;
 }
 .u-thea-identity-chip--lively {
-  padding: 7px 14px 7px 7px;
-  background: rgba(251, 239, 229, 0.8);
+  padding: 10px 20px 12px;
+  background: rgba(251, 239, 229, 0.86);
   box-shadow:
-    0 1px 0 rgba(255, 252, 245, 0.75) inset,
-    0 12px 28px rgba(42, 37, 32, 0.09);
+    0 1px 0 rgba(255, 252, 245, 0.8) inset,
+    0 14px 32px rgba(42, 37, 32, 0.11);
   transform: scale(1.03);
 }
 .u-thea-identity-chip__copy {
-  min-width: 0;
-  text-align: left;
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+.u-thea-character--chip {
+  /* Tall enough for whole figure (not chin-cropped); still far smaller than the old hero. */
+  height: 108px;
+  max-width: 96px;
+  width: 96px;
+  margin-inline: auto;
+  margin-bottom: -2px;
+}
+.u-thea-character--chip-inline {
+  pointer-events: none;
+  flex-shrink: 0;
+}
+.u-thea-character--chip .u-thea-character__glow {
+  width: 88%;
+  bottom: 2%;
+  opacity: 0.9;
+}
+.u-thea-character--presence {
+  height: clamp(210px, 38dvh, 300px);
+  max-width: 280px;
+  width: 100%;
+  margin-inline: auto;
 }
 .u-account-glass-pill {
   border: 1px solid rgba(42, 37, 32, 0.1);
@@ -673,6 +700,26 @@
     0 1px 0 rgba(255, 252, 245, 0.55) inset,
     0 6px 16px rgba(42, 37, 32, 0.05);
 }
+/* Frosted presence modal (beige glass over the chat). */
+.dialog-overlay:has(+ .u-thea-presence-modal) {
+  background-color: rgba(42, 37, 32, 0.28) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(1.05);
+  backdrop-filter: blur(10px) saturate(1.05);
+}
+.u-thea-presence-modal.modal-content {
+  background: rgba(250, 246, 238, 0.82) !important;
+  border-color: rgba(42, 37, 32, 0.1) !important;
+  color: #2A2520 !important;
+  -webkit-backdrop-filter: blur(22px) saturate(1.15);
+  backdrop-filter: blur(22px) saturate(1.15);
+  box-shadow:
+    0 1px 0 rgba(255, 252, 245, 0.7) inset,
+    0 24px 60px rgba(42, 37, 32, 0.16);
+}
+/* Prefer the frosted close control; hide DialogContent’s default X. */
+.u-thea-presence-modal > button.absolute.right-4.top-4 {
+  display: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .u-thea-identity-chip {
     transition: none;
@@ -680,7 +727,7 @@
   }
   .u-thea-identity-chip--lively {
     transform: none;
-    padding: 5px 12px 5px 5px;
+    padding: 8px 18px 10px;
   }
 }
 
