@@ -82,6 +82,11 @@ const THEA_GUIDE = await readGuide("THEA_GUIDE.md");
 const CHAT_GUIDE = await readGuide("THEA_GUIDE_CHAT.md");
 const ONBOARDING_GUIDE = await readGuide("THEA_GUIDE_ONBOARDING.md");
 
+export const ADDRESS_FORM_RULES = `## Delivery address
+Never say an address is missing, unconfirmed, or still needed when get_recipients shows hasAddress true or addressConfirmed true for that person. Do not invent that blocker.
+When hasAddress is false and addressConfirmed is not true, or place_order_now / confirm_scheduled_gift returns addressRequired, call present_ui with module "edit_recipient", that recipientId, and focus "address" in the same turn. The in-chat form is required. Do not only ask in text, and do not tell them to add it on a review card (a scheduled gift may not have one).
+If the user agrees to add or update an address, call that same present_ui even if you already asked in a previous turn. An update is allowed when an address is already on file.`;
+
 export const RESERVED_ORDER_RULES = `## Ordering a gift that already has funds held
 place_order_now is the only way to place an order. Never say you will place, send, or ship a gift immediately unless you call place_order_now in this same turn.
 - When the user asks to order, send, or ship an existing gift now, call place_order_now. Do not open wallet_topup for that request.
@@ -159,13 +164,13 @@ Account context (when present) already lists saved people and whether a calendar
 
 ## Choosing and scheduling a specific gift
 When the user picks one specific gift for a specific recipient, whether by tapping a card or naming it in text (match their words to the right id from your most recent search_gifts results, do not search again or repeat the list), call select_gift. It returns a review, not a save - nothing has been scheduled yet. Tell the user, in one short line, exactly what you're about to schedule (recipient, gift, price, occasion date, and the concrete place/arrive timing from review.timing) and ask them to confirm. If review.timing.feasible is false, lead with that warning and options before asking to confirm. Use future or conditional phrasing only ("I'll schedule...", "Ready to send...", "Want me to lock this in?") - never past tense or completed-action phrasing ("I've scheduled...", "This is booked...", "Done!") for a review, since nothing is booked until the user confirms and you call confirm_scheduled_gift; claiming otherwise is exactly the kind of invented completed action the hard boundaries above forbid.
-If select_gift returns a review with replacesGiftTitle, the recipient already has a different gift scheduled for that occasion that can still be changed - offer the swap in one short line (e.g. "I'll swap Coffee Beans for the French Chocolate box - confirm?") and still include the reviewMarker; do not dead-end or tell them to pick someone else. If select_gift reports alreadyScheduled with no review (same gift already booked, or it's already ordered/shipped), say so plainly instead of asking to confirm again.
+If select_gift returns a review with replacesGiftTitle, the recipient already has a different gift scheduled for that occasion that can still be changed - offer the swap in one short line (e.g. "I'll swap Coffee Beans for the French Chocolate box - confirm?") and still include the reviewMarker; do not dead-end or tell them to pick someone else. A status of confirmed or approved with no goody order is still swappable. When they say yes, call confirm_scheduled_gift — that replaces the gift and moves the wallet hold to the new price. Never offer a swap and then refuse it. If select_gift reports alreadyScheduled with no review (same gift already booked, or it's already ordered/shipped), say that in this same turn and do not ask if they want to swap.
 
 This is a hard rule with no exceptions: whenever a select_gift result includes a reviewMarker field, add that exact string, unmodified, on its own new line somewhere in your reply (example: GIFT_REVIEW: abc123:def456:2026-11-01) - before the RECOMMENDED_IDS line if your reply also has one. Do this every time you present that review, including if you repeat or rephrase it later - the user never sees this line, but omitting it permanently breaks their ability to confirm the gift. Do not include this line in any other reply, and never include it when select_gift reported alreadyScheduled instead of a review.
 
 Only call confirm_scheduled_gift once the user's own message you are now replying to explicitly confirms (yes, confirm, do it, sounds good, etc.) - never when you are the one presenting the review for the first time in this same reply (they cannot confirm something they have not seen yet), never on an assumption that silence or a different topic means yes.
 You will often no longer have the exact recipientId, productId, and occasionDate in context by the time the user confirms (for example, this is a new message and earlier tool results aren't repeated to you) - if so, call get_recipients and select_gift again first in this reply to re-derive them from the recipient and gift the user is confirming, then call confirm_scheduled_gift right after, in that same reply. This is safe and expected: confirmation is verified against what was already shown to the user earlier, not against which tools you call in this reply.
-confirm_scheduled_gift needs the recipient's delivery address on file. If it fails with addressRequired, say in one line that you need their address first and that they can add it right on the review card; don't open another form.
+confirm_scheduled_gift and place_order_now need a delivery address on the recipient. Follow the delivery address rules below.
 ## Order timing (hard rules — never improvise dates)
 Place-order timing is computed as: occasion date minus that gift's shipping lead time minus a small arrival buffer (so it arrives on or slightly before the event). Prefer arriving a little early over late.
 - Read timing from select_gift.review.timing, confirm_scheduled_gift.timing, or get_recipients fields (placeOrderOn, deliveryBy, shippingLeadDays, shippingEstimate, placeOrderASAP, feasible). Never invent place dates.
@@ -181,7 +186,9 @@ If the result includes swapped: true, acknowledge the swap in one short line (ol
 When presenting a select_gift review, mention the concrete place/arrive dates from review.timing (and flag infeasibility up front when feasible is false) before asking them to confirm.
 When the user asks when you will place the order / when it ships / delivery timing, answer with the concrete timing fields for that gift. Never answer with only "closer to the occasion".
 
-${RESERVED_ORDER_RULES}`;
+${RESERVED_ORDER_RULES}
+
+${ADDRESS_FORM_RULES}`;
 
 const SEARCH_GIFTS_TOOL = {
   type: "function",
@@ -216,7 +223,7 @@ const GET_RECIPIENTS_TOOL = {
   type: "function",
   function: {
     name: "get_recipients",
-    description: "List this user's saved gift recipients (id, name, relationship, birthday/anniversary, interests, hasAddress, hasPreferences, giftScheduled, scheduledGiftId, scheduledGiftTitle, scheduledOccasionDate, walletReserved, reservedAmount, alreadyOrdered, placeOrderOn, deliveryBy, shippingLeadDays, shippingEstimate, placeOrderASAP, feasible, next occasion date). Always call this before update_recipient, create_recipient, select_gift, or recipient_status so you have real recipient ids to work with, and to check whether someone the user is describing already exists before creating a duplicate. Use the timing fields when answering when an order will be placed or arrive — placeOrderOn is occasion minus shipping lead minus buffer; if feasible is false, say on-time arrival is unrealistic and offer options. Use these fields for who's-scheduled / readiness answers, then present_ui recipient_status cards instead of a long bullet list.",
+    description: "List this user's saved gift recipients (id, name, relationship, birthday/anniversary, interests, hasAddress, addressConfirmed, hasPreferences, giftScheduled, scheduledGiftId, scheduledGiftTitle, scheduledOccasionDate, walletReserved, reservedAmount, alreadyOrdered, placeOrderOn, deliveryBy, shippingLeadDays, shippingEstimate, placeOrderASAP, feasible, next occasion date). Always call this before update_recipient, create_recipient, select_gift, or recipient_status so you have real recipient ids to work with, and to check whether someone the user is describing already exists before creating a duplicate. Never say an address is missing when hasAddress or addressConfirmed is true. Use the timing fields when answering when an order will be placed or arrive — placeOrderOn is occasion minus shipping lead minus buffer; if feasible is false, say on-time arrival is unrealistic and offer options. Use these fields for who's-scheduled / readiness answers, then present_ui recipient_status cards instead of a long bullet list.",
     parameters: {
       type: "object",
       properties: {
@@ -299,7 +306,7 @@ const CONFIRM_SCHEDULED_GIFT_TOOL = {
   type: "function",
   function: {
     name: "confirm_scheduled_gift",
-    description: "Create or swap the scheduled gift. Only call this after select_gift returned a review AND the user has explicitly confirmed in their own message (e.g. 'yes', 'confirm', 'do it', 'swap it') - never on the same turn as select_gift, never on an assumption. Use the exact same recipientId, productId, and occasionDate the review gave you. If that review was a swap (replacesGiftTitle), confirming replaces the prior gift for that occasion. The recipient must have a delivery address on file first. On success it also tries to hold the gift's cost (gift + $7 service fee) from the user's Unwrapt wallet; the result's `funding` says whether the money was set aside or a top-up is needed. Nothing is charged until the order is placed on timing.placeOrderOn (ASAP when placeOrderASAP is true). Read timing.* for exact place/arrive dates and feasibility.",
+    description: "Create or swap the scheduled gift. Only call this after select_gift returned a review AND the user has explicitly confirmed in their own message (e.g. 'yes', 'confirm', 'do it', 'swap it') - never on the same turn as select_gift, never on an assumption. Use the exact same recipientId, productId, and occasionDate the review gave you. If that review was a swap (replacesGiftTitle), confirming replaces the prior gift for that occasion and moves the wallet hold to the new price. Do that even when the existing gift's status is confirmed or approved, as long as it has no goody order. The recipient must have a delivery address on file first. If the result is addressRequired, the address form opens in that same turn — do not only ask in chat. On success it also tries to hold the gift's cost (gift + $7 service fee) from the user's Unwrapt wallet; the result's `funding` says whether the money was set aside or a top-up is needed. Nothing is charged until the order is placed on timing.placeOrderOn (ASAP when placeOrderASAP is true). Read timing.* for exact place/arrive dates and feasibility.",
     parameters: {
       type: "object",
       properties: {
@@ -541,7 +548,7 @@ export const looksLikeOrderNowIntent = (message: string): boolean => {
 
 export const buildOrderNowDirectiveMessage = (force: boolean): string | null => {
   if (!force) return null;
-  return 'The user wants an existing gift ordered now. Call get_recipients if you need an id, then place_order_now with scheduledGiftId or recipientId. Reply with the tool confirmationCopy only. If that copy says nothing new will be charged, do not ask for a top-up or any other funds. If it states a shortfall, ask for exactly that difference.';
+  return 'The user wants an existing gift ordered now. Call get_recipients if you need an id, then place_order_now with scheduledGiftId or recipientId. Reply with the tool confirmationCopy only. If that copy says nothing new will be charged, do not ask for a top-up or any other funds. If it states a shortfall, ask for exactly that difference. If hasAddress or addressConfirmed is true, never say the address is missing. If place_order_now returns addressRequired, the address form opens in this turn — tell them to fill it in. Do not only ask in chat.';
 };
 
 export const shouldForceWalletTopUpUi = (
@@ -555,9 +562,247 @@ export const shouldForceWalletTopUpUi = (
 
 export const systemPromptIncludesReservedOrderRules = (): boolean => SYSTEM_PROMPT.includes(RESERVED_ORDER_RULES);
 
+export const systemPromptIncludesAddressFormRules = (): boolean => SYSTEM_PROMPT.includes(ADDRESS_FORM_RULES);
+
 export const buildWalletTopUpDirectiveMessage = (force: boolean): string | null => {
   if (!force) return null;
   return 'The user is asking about gift payment / funding. Call get_recipients if needed, then present_ui with module "wallet_topup" and the recipientId for the person whose gift is waiting on funds. Reply with one short line — the wallet module is the action, not a long explanation.';
+};
+
+export type AddressPerson = {
+  id: string;
+  name: string;
+  hasAddress: boolean;
+  addressConfirmed: boolean;
+};
+
+/** Street fields or a confirmed-address timestamp. Either one means the address is on file. */
+export const addressIsOnFile = (
+  facts: { hasAddress?: boolean; addressConfirmed?: boolean } | null | undefined,
+): boolean => Boolean(facts && (facts.hasAddress === true || facts.addressConfirmed === true));
+
+/**
+ * The model invented a missing-address blocker. Status questions ("who's missing an address")
+ * are not this. Keep in sync with src/lib/theaChatUi.ts.
+ */
+export const replyClaimsMissingAddress = (text: string): boolean => {
+  const t = text.trim();
+  if (!t) return false;
+  if (/\baddress\b.{0,32}\b(?:is|was|'s)\b.{0,20}\b(?:still\s+)?(?:missing|needed|required|incomplete|unconfirmed)\b/i.test(t)) return true;
+  if (/\b(?:still\s+)?missing\b.{0,20}\b(?:an?\s+)?(?:delivery\s+|shipping\s+)?address\b/i.test(t) && !/\bwho\b/i.test(t)) return true;
+  if (/\bno (?:delivery |shipping )?address\b/i.test(t)) return true;
+  if (/\baddress\b.{0,24}\b(?:isn'?t|is not)\b.{0,24}\b(?:on file|confirmed|complete)\b/i.test(t)) return true;
+  if (/\buntil (?:i|we) confirm the address\b/i.test(t)) return true;
+  if (/\bcan'?t\b.{0,80}\baddress\b/i.test(t) && /\b(?:place|order|send|ship|proceed)\b/i.test(t)) return true;
+  if (/\bneeds? (?:a |their |her |his )?address\b/i.test(t) && !/\bwho\b/i.test(t)) return true;
+  return false;
+};
+
+/** The model asked them to add an address instead of opening the form. */
+export const replyAsksToAddAddress = (text: string): boolean =>
+  /\b(?:would you like|want) to (?:add|enter|update|provide)\b.{0,40}\baddress\b/i.test(text)
+  || /\badd (?:her|his|their|the|an) address\b/i.test(text);
+
+/** Explicit add/update address request. Not a bare "yes". */
+export const looksLikeAddressFormIntent = (message: string): boolean => {
+  const t = message.trim().toLowerCase();
+  if (!t) return false;
+  if (/\b(?:add|update|edit|change|enter|fix|provide|save|put)\b.{0,48}\baddress\b/.test(t)) return true;
+  if (/\baddress\b.{0,40}\b(?:add|update|edit|change|enter|fix|form)\b/.test(t)) return true;
+  return false;
+};
+
+const ADDRESS_AGREEMENT = /^(yes|yeah|yep|yup|sure|ok|okay|please|do it|go ahead|let'?s do it|sounds good)\.?!?$/i;
+
+export const looksLikeAddressFormAgreement = (message: string): boolean => {
+  const t = message.trim();
+  if (!t || t.length > 80) return false;
+  return ADDRESS_AGREEMENT.test(t);
+};
+
+export const priorTurnAskedToAddAddress = (
+  recent: Array<{ role?: string; content?: string }>,
+): boolean => recent.slice(-8).some((m) =>
+  m.role === "assistant" && typeof m.content === "string" && (
+    replyClaimsMissingAddress(m.content) || replyAsksToAddAddress(m.content)
+  ));
+
+/** True when this turn's directive should tell the model to open the address form. */
+export const shouldDirectAddressForm = (
+  latestUserMessage: string,
+  recentMessages: Array<{ role?: string; content?: string }>,
+): boolean =>
+  looksLikeAddressFormIntent(latestUserMessage)
+  || (looksLikeAddressFormAgreement(latestUserMessage) && priorTurnAskedToAddAddress(recentMessages));
+
+export const buildAddressFormDirectiveMessage = (force: boolean): string | null => {
+  if (!force) return null;
+  return 'The user wants to add or update a delivery address. Call get_recipients if you need an id. If hasAddress is true or addressConfirmed is true, do not say the address is missing. Call present_ui with module "edit_recipient", focus "address", and that recipientId in this turn. Do not only ask in chat.';
+};
+
+export type AddressFormDecision = {
+  force: boolean;
+  suppressMissingClaim: boolean;
+};
+
+/**
+ * Whether this turn must show edit_recipient focused on address, and whether a
+ * missing-address sentence has to come out of the reply. Exported for unit tests.
+ */
+export const decideAddressForm = (args: {
+  latestUserMessage: string;
+  recentMessages: Array<{ role?: string; content?: string }>;
+  modelReply: string;
+  alreadyPresented: Array<{ module: string; focus?: string }>;
+  addressFacts: { hasAddress?: boolean; addressConfirmed?: boolean } | null;
+  addressRequired: boolean;
+}): AddressFormDecision => {
+  if (looksLikeRecipientStatusIntent(args.latestUserMessage)) {
+    return { force: false, suppressMissingClaim: false };
+  }
+  const already = args.alreadyPresented.some((m) =>
+    m.module === "edit_recipient" && (m.focus === "address" || m.focus == null));
+  if (args.addressRequired) return { force: !already, suppressMissingClaim: false };
+
+  const onFile = addressIsOnFile(args.addressFacts);
+  const explicitUpdate = looksLikeAddressFormIntent(args.latestUserMessage);
+  const agreed = looksLikeAddressFormAgreement(args.latestUserMessage)
+    && priorTurnAskedToAddAddress(args.recentMessages);
+  if (!args.addressFacts) return { force: false, suppressMissingClaim: false };
+
+  if (onFile) {
+    return { force: !already && (explicitUpdate || agreed), suppressMissingClaim: true };
+  }
+
+  const missing = args.addressFacts.hasAddress === false && args.addressFacts.addressConfirmed !== true;
+  const wantsForm = explicitUpdate || agreed
+    || replyClaimsMissingAddress(args.modelReply)
+    || replyAsksToAddAddress(args.modelReply);
+  return { force: !already && missing && wantsForm, suppressMissingClaim: false };
+};
+
+/** Drop a false missing-address claim when the address is already on file. */
+export const clearMissingAddressClaim = (reply: string, recipientName?: string): string => {
+  if (!replyClaimsMissingAddress(reply) && !replyAsksToAddAddress(reply)) return reply;
+  const kept = reply
+    .split(/(?<=[.!?])\s+/)
+    .filter((sentence) => !replyClaimsMissingAddress(sentence) && !replyAsksToAddAddress(sentence))
+    .join(" ")
+    .trim();
+  const who = (recipientName || "").trim().split(/\s+/)[0] || "Their";
+  const note = `${who}'s address is already on file.`;
+  if (!kept || replyClaimsMissingAddress(kept) || replyAsksToAddAddress(kept)) return note;
+  return `${kept} ${note}`;
+};
+
+export const pickRecipientForAddress = (
+  people: AddressPerson[],
+  texts: string[],
+  activeId?: string | null,
+): AddressPerson | null => {
+  if (!people.length) return null;
+  const blob = texts.join("\n").toLowerCase();
+  const named = people.filter((person) => {
+    const name = person.name.toLowerCase();
+    const first = name.split(/\s+/)[0] || "";
+    return (name.length > 1 && blob.includes(name)) || (first.length > 2 && blob.includes(first));
+  });
+  if (named.length === 1) return named[0];
+  if (named.length > 1) {
+    const full = named.filter((person) => blob.includes(person.name.toLowerCase()));
+    if (full.length === 1) return full[0];
+    if (activeId) {
+      const active = named.find((person) => person.id === activeId);
+      if (active) return active;
+    }
+    return null;
+  }
+  if (activeId) {
+    const active = people.find((person) => person.id === activeId);
+    if (active) return active;
+  }
+  if (people.length === 1) return people[0];
+  return null;
+};
+
+export const editRecipientAddressUi = (result: {
+  ok?: boolean;
+  addressRequired?: unknown;
+  recipientId?: unknown;
+  recipientName?: unknown;
+}): Extract<ChatUiModule, { module: "edit_recipient" }> | null => {
+  if (result.ok !== false || result.addressRequired !== true) return null;
+  if (typeof result.recipientId !== "string" || !result.recipientId) return null;
+  const recipientName = typeof result.recipientName === "string" && result.recipientName.trim()
+    ? result.recipientName
+    : "them";
+  return {
+    module: "edit_recipient",
+    recipientId: result.recipientId,
+    recipientName,
+    focus: "address",
+  };
+};
+
+export const replyOffersSwap = (text: string): boolean => {
+  const t = text.trim();
+  if (!t) return false;
+  if (/\b(?:want|like|wish)(?:\s+\w+){0,4}\s+to swap\b/i.test(t)) return true;
+  if (/\bswap\b/i.test(t) && /\?/.test(t)) return true;
+  return false;
+};
+
+export const replyRefusesSwap = (text: string): boolean =>
+  /can'?t (?:be )?swap/i.test(text)
+  || /cannot (?:be )?swap/i.test(text)
+  || /not able to swap/i.test(text)
+  || /unable to swap/i.test(text)
+  || /isn'?t swappable/i.test(text);
+
+/** If the gift is already ordered, don't leave a "want to swap?" question in the reply. */
+export const guardUnswappableSwapReply = (
+  reply: string,
+  reason: "already_ordered" | "same_gift" | null,
+  giftTitle: string | null,
+): string => {
+  if (!reason || !replyOffersSwap(reply)) return reply;
+  const title = giftTitle?.trim() || "That gift";
+  if (reason === "same_gift") return `${title} is already the gift scheduled for that occasion.`;
+  return `${title} is already ordered, so it can't be swapped.`;
+};
+
+export const swapSuccessCopy = (args: {
+  replaced: string;
+  gift: string;
+  recipientName?: string;
+  heldAmount?: number | null;
+}): string => {
+  const who = args.recipientName?.trim().split(/\s+/)[0];
+  const forWhom = who ? ` for ${who}` : "";
+  const amount = typeof args.heldAmount === "number" && args.heldAmount > 0 ? args.heldAmount : null;
+  const hold = amount == null
+    ? " The wallet hold is updated for the new price."
+    : ` $${Number.isInteger(amount) ? amount : amount.toFixed(2)} is now held for it.`;
+  return `Done. ${args.replaced} is now ${args.gift}${forWhom}.${hold}`;
+};
+
+export const reviewReplacesGift = (review: unknown): boolean => {
+  if (!review || typeof review !== "object") return false;
+  const title = (review as { replacesGiftTitle?: unknown }).replacesGiftTitle;
+  return typeof title === "string" && title.trim().length > 0;
+};
+
+/** Persist a swap review marker even when the model forgets the GIFT_REVIEW line, so "yes" can confirm. */
+export const markerToPersist = (
+  reviewMarker: string | null,
+  finalContent: string,
+  recommendedIds: string[],
+  review: unknown,
+): string | null => {
+  if (!reviewMarker) return null;
+  if (shouldPersistReviewMarker(reviewMarker, finalContent, recommendedIds)) return reviewMarker;
+  if (reviewReplacesGift(review)) return reviewMarker;
+  return null;
 };
 
 /** Mirrors src/lib/stripe.ts isPaidVip - keep both in sync. */
@@ -1333,7 +1578,7 @@ const handleGetRecipients = async (
     query.limit(500),
     authClient
       .from("scheduled_gifts")
-      .select("id, recipient_id, gift_type, occasion_date, status, wallet_reserved, wallet_reservation_amount, payment_status, goody_order_id")
+      .select("id, recipient_id, gift_type, occasion_date, status, wallet_reserved, wallet_reservation_amount, payment_status, goody_order_id, address_confirmed_at")
       .eq("user_id", userId)
       .order("occasion_date", { ascending: true })
       .limit(200),
@@ -1348,6 +1593,7 @@ const handleGetRecipients = async (
     reservedAmount: number | null;
     paymentStatus: string | null;
     ordered: boolean;
+    addressConfirmed: boolean;
   };
   const giftByRecipient = new Map<string, GiftMeta>();
   for (const g of (giftsRes.data as Array<{
@@ -1360,9 +1606,15 @@ const handleGetRecipients = async (
     wallet_reservation_amount?: number | null;
     payment_status?: string | null;
     goody_order_id?: string | null;
+    address_confirmed_at?: string | null;
   }> | null) || []) {
-    if (!g.recipient_id || !g.id || giftByRecipient.has(g.recipient_id)) continue;
+    if (!g.recipient_id || !g.id) continue;
     if (CLOSED_GIFT_STATUSES.has((g.status || "").toLowerCase())) continue;
+    const existing = giftByRecipient.get(g.recipient_id);
+    if (existing) {
+      existing.addressConfirmed = existing.addressConfirmed || Boolean(g.address_confirmed_at);
+      continue;
+    }
     const ordered = Boolean(g.goody_order_id) || ["ordered", "shipped", "delivered", "fulfilled"].includes((g.status || "").toLowerCase());
     giftByRecipient.set(g.recipient_id, {
       id: g.id,
@@ -1372,6 +1624,7 @@ const handleGetRecipients = async (
       reservedAmount: g.wallet_reservation_amount == null ? null : Number(g.wallet_reservation_amount),
       paymentStatus: g.payment_status || null,
       ordered,
+      addressConfirmed: Boolean(g.address_confirmed_at),
     });
   }
 
@@ -1387,6 +1640,7 @@ const handleGetRecipients = async (
       relationship: r.relationship,
       interests,
       hasAddress: hasAddress(r),
+      addressConfirmed: scheduled?.addressConfirmed || false,
       hasPreferences: interests.length > 0,
       giftScheduled: Boolean(scheduled),
       scheduledGiftId: scheduled?.id || null,
@@ -1479,9 +1733,17 @@ type ExistingGiftRow = {
   goody_order_id: string | null;
   wallet_reserved: boolean | null;
   payment_status: string | null;
+  address_confirmed_at?: string | null;
 };
 
-/** True when an open gift can still be replaced (not yet ordered / shipped). Exported for unit tests. */
+/** Goody has the order. "confirmed" is not in this set: it means the gift was approved. */
+const ORDERED_GIFT_STATUSES = new Set(["ordered", "shipped", "delivered", "fulfilled"]);
+
+/**
+ * True when an open gift can still be replaced. Safe until Goody has an order.
+ * status "confirmed" / "approved" only means the gift was approved, not that it shipped.
+ * Exported for unit tests.
+ */
 export const isSwappableExistingGift = (
   gift: Pick<ExistingGiftRow, "status" | "goody_order_id" | "gift_variant_id">,
   nextProductId: string,
@@ -1489,10 +1751,32 @@ export const isSwappableExistingGift = (
   if (INACTIVE_GIFT_STATUSES.has((gift.status || "").toLowerCase())) return false;
   if (gift.goody_order_id) return false;
   const status = (gift.status || "").toLowerCase();
-  if (["ordered", "shipped", "delivered", "confirmed"].includes(status)) return false;
+  if (ORDERED_GIFT_STATUSES.has(status)) return false;
   // Same product is already booked — not a swap.
   if (gift.gift_variant_id && gift.gift_variant_id === nextProductId) return false;
   return true;
+};
+
+export const unswappableGiftReason = (
+  gift: Pick<ExistingGiftRow, "status" | "goody_order_id" | "gift_variant_id">,
+  nextProductId: string,
+): "ordered" | "same_gift" | "inactive" | null => {
+  if (isSwappableExistingGift(gift, nextProductId)) return null;
+  const status = (gift.status || "").toLowerCase();
+  if (INACTIVE_GIFT_STATUSES.has(status)) return "inactive";
+  if (gift.goody_order_id || ORDERED_GIFT_STATUSES.has(status)) return "ordered";
+  if (gift.gift_variant_id && gift.gift_variant_id === nextProductId) return "same_gift";
+  return "ordered";
+};
+
+const alreadyScheduledReason = (
+  gift: Pick<ExistingGiftRow, "status" | "goody_order_id" | "gift_variant_id">,
+  nextProductId: string,
+): "already_ordered" | "same_gift" | "not_swappable" => {
+  const reason = unswappableGiftReason(gift, nextProductId);
+  if (reason === "ordered") return "already_ordered";
+  if (reason === "same_gift") return "same_gift";
+  return "not_swappable";
 };
 
 const handleSelectGift = async (
@@ -1553,7 +1837,7 @@ const handleSelectGift = async (
   // rather than risk an error from more than one match.
   const { data: existingRows } = await authClient
     .from("scheduled_gifts")
-    .select("id, status, gift_type, gift_variant_id, goody_order_id, wallet_reserved, payment_status")
+    .select("id, status, gift_type, gift_variant_id, goody_order_id, wallet_reserved, payment_status, address_confirmed_at")
     .eq("recipient_id", args.recipientId)
     .eq("occasion_date", occasionDate)
     .order("created_at", { ascending: false })
@@ -1565,6 +1849,8 @@ const handleSelectGift = async (
     return {
       ok: true,
       alreadyScheduled: true,
+      canSwap: false,
+      reason: alreadyScheduledReason(existing, product.id),
       recordId: existing.id,
       saved: { gift_type: existing.gift_type, status: existing.status },
     };
@@ -1583,6 +1869,7 @@ const handleSelectGift = async (
     occasionDate,
     occasion: occasionLabel,
     hasAddress: hasAddress(recipient),
+    addressConfirmed: Boolean(existing?.address_confirmed_at),
     timing,
   };
   // Different gift still waiting — offer a confirmable swap instead of dead-ending.
@@ -1923,7 +2210,13 @@ const handleConfirmScheduledGift = async (
   const recipient = await fetchOwnedRecipient(authClient, userId, args.recipientId);
   if (!recipient) return { ok: false, error: "Recipient not found for this user." };
   if (!hasAddress(recipient)) {
-    return { ok: false, addressRequired: true, error: `${recipient.name} needs a delivery address before this gift can be confirmed. The user can add it on the review card.` };
+    return {
+      ok: false,
+      addressRequired: true,
+      recipientId: recipient.id,
+      recipientName: recipient.name,
+      error: `${recipient.name} needs a delivery address before this gift can be confirmed. The address form is opening in this turn. Tell them to use it. Do not only ask in chat, and do not mention a review card.`,
+    };
   }
 
   const { data: existingRows } = await authClient
@@ -1945,7 +2238,14 @@ const handleConfirmScheduledGift = async (
 
   // Same gift already booked, or already ordered — leave it alone.
   if (existing && !INACTIVE_GIFT_STATUSES.has((existing.status || "").toLowerCase()) && !isSwappableExistingGift(existing, product.id)) {
-    return { ok: true, alreadyScheduled: true, recordId: existing.id, saved: { gift_type: existing.gift_type, status: existing.status } };
+    return {
+      ok: true,
+      alreadyScheduled: true,
+      canSwap: false,
+      reason: alreadyScheduledReason(existing, product.id),
+      recordId: existing.id,
+      saved: { gift_type: existing.gift_type, status: existing.status },
+    };
   }
 
   const occasionType = recipient.birthday === args.occasionDate ? "birthday" : recipient.anniversary === args.occasionDate ? "anniversary" : "custom";
@@ -2066,6 +2366,7 @@ const handlePlaceOrderNow = async (
   if (error) return { ok: false, error: error.message };
   type GiftRow = {
     id: string;
+    recipient_id?: string | null;
     status: string | null;
     payment_status: string | null;
     payment_amount: number | null;
@@ -2085,6 +2386,16 @@ const handlePlaceOrderNow = async (
   }
   const recipient = Array.isArray(gift.recipients) ? gift.recipients[0] : gift.recipients;
   const recipientName = recipient?.name || "them";
+  const recipientId = recipient?.id || gift.recipient_id || null;
+  if (!recipient || !hasAddress(recipient)) {
+    return {
+      ok: false,
+      addressRequired: true,
+      recipientId,
+      recipientName,
+      error: `${recipientName} needs a delivery address before this can be ordered. The address form is opening in this turn. Tell them to use it. Do not only ask in chat.`,
+    };
+  }
   const { data: reservation } = await authClient
     .from("wallet_transactions")
     .select("amount")
@@ -2121,22 +2432,52 @@ const handlePlaceOrderNow = async (
   });
   if (placeError || placed?.success === false) {
     const copy = typeof placed?.confirmationCopy === "string" ? placed.confirmationCopy : null;
+    const message = copy || placed?.error || placeError?.message || "The order could not be placed.";
+    const addressMissing = /address/i.test(String(message));
     return {
       ok: false,
-      error: copy || placed?.error || placeError?.message || "The order could not be placed.",
+      error: message,
       confirmationCopy: copy,
       code: placed?.code,
       shortfall: placed?.shortfall,
+      ...(addressMissing ? { addressRequired: true, recipientId, recipientName } : {}),
     };
   }
   return {
     ok: true,
     recordId: gift.id,
+    recipientId,
+    recipientName,
+    hasAddress: true,
     confirmationCopy: decision.confirmationCopy,
     chargedFromReservation: decision.usesHold,
     chargedAmount: decision.chargeAmount,
     saved: { recipientName, gift_type: gift.gift_type },
   };
+};
+
+/** Recipient address facts for the post-turn missing-address check. A failed gift query still returns street facts. */
+const loadAddressPeople = async (
+  authClient: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<AddressPerson[]> => {
+  const [{ data: recipients, error }, giftsRes] = await Promise.all([
+    authClient.from("recipients").select("id, name, street, city, state, zip_code").eq("user_id", userId).limit(60),
+    authClient.from("scheduled_gifts").select("recipient_id, address_confirmed_at, status").eq("user_id", userId).limit(200),
+  ]);
+  if (error || !recipients) return [];
+  const confirmed = new Set<string>();
+  for (const gift of (giftsRes.data as Array<{ recipient_id?: string | null; address_confirmed_at?: string | null; status?: string | null }> | null) || []) {
+    if (!gift.recipient_id || !gift.address_confirmed_at) continue;
+    if (CLOSED_GIFT_STATUSES.has((gift.status || "").toLowerCase())) continue;
+    confirmed.add(gift.recipient_id);
+  }
+  return (recipients as Array<Pick<RecipientRow, "id" | "name" | "street" | "city" | "state" | "zip_code">>).map((row) => ({
+    id: row.id,
+    name: row.name,
+    hasAddress: hasAddress(row),
+    addressConfirmed: confirmed.has(row.id),
+  }));
 };
 
 // ---------------------------------------------------------------------------
@@ -2434,6 +2775,11 @@ Use the whole conversation, not just the last message. Return JSON only:
     const orderNowDirectiveMessage = buildOrderNowDirectiveMessage(forceOrderNow);
     const forceWalletTopUp = shouldForceWalletTopUpUi(latestUserMessageContent, []);
     const walletTopUpDirectiveMessage = buildWalletTopUpDirectiveMessage(forceWalletTopUp);
+    const forceAddressForm = shouldDirectAddressForm(
+      latestUserMessageContent,
+      messages as Array<{ role?: string; content?: string }>,
+    );
+    const addressFormDirectiveMessage = buildAddressFormDirectiveMessage(forceAddressForm);
 
     const seenProducts = new Map<string, Product>();
     // Seed from the prior turn's carried-over recommendations (CC-02) so
@@ -2495,6 +2841,7 @@ Use the whole conversation, not just the last message. Return JSON only:
       ...(recipientStatusDirectiveMessage ? [{ role: "system", content: recipientStatusDirectiveMessage }] : []),
       ...(orderNowDirectiveMessage ? [{ role: "system", content: orderNowDirectiveMessage }] : []),
       ...(walletTopUpDirectiveMessage ? [{ role: "system", content: walletTopUpDirectiveMessage }] : []),
+      ...(addressFormDirectiveMessage ? [{ role: "system", content: addressFormDirectiveMessage }] : []),
     ];
 
     // Surfaced to the frontend as top-level `writes` so it can invalidate
@@ -2517,6 +2864,99 @@ Use the whole conversation, not just the last message. Return JSON only:
     let lastReview: unknown = null;
     // In-chat modules from present_ui this turn (calendar connect, add/edit recipient forms).
     const presentedUi: ChatUiModule[] = [];
+    const addressPeople = new Map<string, AddressPerson>();
+    let orderedSwapBlock: { title: string | null; reason: "already_ordered" | "same_gift" } | null = null;
+    let completedSwap: { replaced: string; gift: string; recipientName?: string; heldAmount?: number | null } | null = null;
+    let placedOrderCopy: string | null = null;
+    let addressRequiredThisTurn = false;
+
+    const rememberPerson = (person: AddressPerson) => {
+      const prev = addressPeople.get(person.id);
+      addressPeople.set(person.id, {
+        id: person.id,
+        name: person.name || prev?.name || "them",
+        hasAddress: person.hasAddress || prev?.hasAddress === true,
+        addressConfirmed: person.addressConfirmed || prev?.addressConfirmed === true,
+      });
+    };
+
+    const showAddressForm = (mod: Extract<ChatUiModule, { module: "edit_recipient" }>) => {
+      const existing = presentedUi.find((m) => m.module === "edit_recipient" && m.recipientId === mod.recipientId);
+      if (existing && existing.module === "edit_recipient") {
+        existing.focus = "address";
+        return;
+      }
+      presentedUi.push(mod);
+    };
+
+    const recordToolSideEffects = (toolName: string, result: ToolResult) => {
+      if (toolName === "get_recipients" && result.ok && Array.isArray(result.recipients)) {
+        for (const raw of result.recipients as Array<Record<string, unknown>>) {
+          if (typeof raw.recipientId !== "string" || typeof raw.name !== "string") continue;
+          rememberPerson({
+            id: raw.recipientId,
+            name: raw.name,
+            hasAddress: raw.hasAddress === true,
+            addressConfirmed: raw.addressConfirmed === true,
+          });
+        }
+      }
+      if (result.review && typeof result.review === "object") {
+        const review = result.review as Record<string, unknown>;
+        if (typeof review.recipientId === "string" && typeof review.recipientName === "string") {
+          rememberPerson({
+            id: review.recipientId,
+            name: review.recipientName,
+            hasAddress: review.hasAddress === true,
+            addressConfirmed: review.addressConfirmed === true,
+          });
+        }
+      }
+      if ((toolName === "select_gift" || toolName === "confirm_scheduled_gift") && result.alreadyScheduled === true) {
+        const reason = result.reason === "already_ordered" || result.reason === "same_gift" ? result.reason : null;
+        if (reason) {
+          const saved = result.saved as { gift_type?: unknown } | undefined;
+          orderedSwapBlock = {
+            title: typeof saved?.gift_type === "string" ? saved.gift_type : null,
+            reason,
+          };
+        }
+      }
+      if (toolName === "place_order_now" && result.ok === true && typeof result.recipientId === "string") {
+        rememberPerson({
+          id: result.recipientId,
+          name: typeof result.recipientName === "string" ? result.recipientName : "them",
+          hasAddress: true,
+          addressConfirmed: false,
+        });
+        if (typeof result.confirmationCopy === "string" && result.confirmationCopy.trim()) {
+          placedOrderCopy = result.confirmationCopy;
+        }
+      }
+      const addressUi = editRecipientAddressUi(result);
+      if (addressUi) {
+        addressRequiredThisTurn = true;
+        showAddressForm(addressUi);
+        rememberPerson({
+          id: addressUi.recipientId,
+          name: addressUi.recipientName,
+          hasAddress: false,
+          addressConfirmed: false,
+        });
+      }
+      if (toolName === "confirm_scheduled_gift" && result.swapped === true) {
+        const saved = result.saved as { recipientName?: unknown; gift_type?: unknown; replaced?: unknown } | undefined;
+        const funding = result.funding as { held?: boolean; amount?: number } | undefined;
+        completedSwap = {
+          replaced: typeof result.replacedGiftTitle === "string"
+            ? result.replacedGiftTitle
+            : typeof saved?.replaced === "string" ? saved.replaced : "the previous gift",
+          gift: typeof saved?.gift_type === "string" ? saved.gift_type : "the new gift",
+          recipientName: typeof saved?.recipientName === "string" ? saved.recipientName : undefined,
+          heldAmount: funding?.held ? Number(funding.amount) || null : null,
+        };
+      }
+    };
 
     if (preAppliedCall) {
       const syntheticToolCallId = `server_${preAppliedCall.name}_${Date.now()}`;
@@ -2543,6 +2983,7 @@ Use the whole conversation, not just the last message. Return JSON only:
         const topUp = topUpUiFromConfirm(preAppliedCall.result);
         if (topUp) presentedUi.push(topUp);
       }
+      recordToolSideEffects(preAppliedCall.name, preAppliedCall.result);
     }
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
@@ -2596,6 +3037,7 @@ Use the whole conversation, not just the last message. Return JSON only:
         } else if (toolName === "get_recipients") {
           const result = await handleGetRecipients(authClient, user.id, args as { name_query?: string });
           if (result.ok && result.singleMatch) lastActiveRecipient = result.singleMatch as { id: string; name: string };
+          recordToolSideEffects(toolName, result);
           toolContent = result;
         } else if (toolName === "update_recipient") {
           const result = await handleUpdateRecipient(authClient, user.id, args as Parameters<typeof handleUpdateRecipient>[2]);
@@ -2623,6 +3065,7 @@ Use the whole conversation, not just the last message. Return JSON only:
           if (review?.recipientId && review?.recipientName) {
             lastActiveRecipient = { id: review.recipientId, name: review.recipientName };
           }
+          recordToolSideEffects(toolName, result);
           toolContent = result;
         } else if (toolName === "confirm_scheduled_gift") {
           const confirmProductIdArg = (args as { productId?: unknown }).productId;
@@ -2631,10 +3074,12 @@ Use the whole conversation, not just the last message. Return JSON only:
           writes.push({ tool: toolName, ...result });
           const topUp = topUpUiFromConfirm(result);
           if (topUp) presentedUi.push(topUp);
+          recordToolSideEffects(toolName, result);
           toolContent = result;
         } else if (toolName === "place_order_now") {
           const result = await handlePlaceOrderNow(authClient, user.id, args as { scheduledGiftId?: string; recipientId?: string });
           writes.push({ tool: toolName, ...result });
+          recordToolSideEffects(toolName, result);
           toolContent = result;
         } else if (toolName === "present_ui") {
           let recipientLookup: { id: string; name: string } | null = null;
@@ -2723,11 +3168,60 @@ Use the whole conversation, not just the last message. Return JSON only:
       if (topUp) presentedUi.push(topUp);
     }
 
+    // An already-ordered gift must not be offered as a swap. A successful swap must not be walked back.
+    if (orderedSwapBlock) reply = guardUnswappableSwapReply(reply, orderedSwapBlock.reason, orderedSwapBlock.title);
+    if (completedSwap && replyRefusesSwap(reply)) reply = swapSuccessCopy(completedSwap);
+
+    // Address form: never claim one is missing when it is on file, and open edit_recipient
+    // when it is actually missing or the user agreed to add or update it.
+    const addressHistory = messages as Array<{ role?: string; content?: string }>;
+    const addressIntent = addressRequiredThisTurn
+      || replyClaimsMissingAddress(reply)
+      || replyAsksToAddAddress(reply)
+      || shouldDirectAddressForm(latestUserMessageContent, addressHistory);
+    if (addressIntent && addressPeople.size === 0) {
+      for (const person of await loadAddressPeople(authClient, user.id)) rememberPerson(person);
+    }
+    let addressPick = pickRecipientForAddress(
+      [...addressPeople.values()],
+      [latestUserMessageContent, reply],
+      lastActiveRecipient?.id,
+    );
+    if (addressIntent && !addressPick) {
+      for (const person of await loadAddressPeople(authClient, user.id)) rememberPerson(person);
+      addressPick = pickRecipientForAddress(
+        [...addressPeople.values()],
+        [latestUserMessageContent, reply],
+        lastActiveRecipient?.id,
+      );
+    }
+    const addressDecision = decideAddressForm({
+      latestUserMessage: latestUserMessageContent,
+      recentMessages: addressHistory,
+      modelReply: reply,
+      alreadyPresented: presentedUi,
+      addressFacts: addressPick,
+      addressRequired: addressRequiredThisTurn,
+    });
+    if (addressDecision.suppressMissingClaim && addressPick && addressIsOnFile(addressPick)) {
+      const cleared = clearMissingAddressClaim(reply, addressPick.name);
+      const wipedToOnFileNote = /address is already on file\.?$/i.test(cleared);
+      reply = placedOrderCopy && wipedToOnFileNote ? placedOrderCopy : cleared;
+    }
+    if (addressDecision.force && addressPick) {
+      showAddressForm({
+        module: "edit_recipient",
+        recipientId: addressPick.id,
+        recipientName: addressPick.name,
+        focus: "address",
+      });
+    }
+
     const products = recommendedIds.length > 0
       ? recommendedIds.map((id) => seenProducts.get(id)).filter((p): p is Product => Boolean(p))
       : [];
 
-    const confirmedReviewMarker = shouldPersistReviewMarker(lastReviewMarker, finalContent, recommendedIds) ? lastReviewMarker : null;
+    const confirmedReviewMarker = markerToPersist(lastReviewMarker, finalContent, recommendedIds, lastReview);
 
     // Persist this turn: the user's newest message (always the last entry
     // in the client-sent `messages`, since both TheaHomeTab and TheaAgent

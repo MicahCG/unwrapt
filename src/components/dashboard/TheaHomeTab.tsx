@@ -50,6 +50,7 @@ import CalendarSyncButton from '@/components/CalendarSyncButton';
 import { cleanTheaText, hideProductIds, renderTheaText } from '@/lib/theaText';
 import { theaChatPose } from '@/lib/theaState';
 import {
+  ensureAddressFormUi,
   ensureCalendarConnectUi,
   ensureRecipientStatusUi,
   ensureWalletTopUpUi,
@@ -804,12 +805,14 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
         const available = user?.id ? await getAvailableBalance(user.id).catch(() => 0) : 0;
         ensured = ensureWalletTopUpUi(trimmed, statusEnsured.reply, statusEnsured.ui, recipients, available);
       }
-      const ui = ensured.ui;
+      // Same safety net for a missing address: open the form, and don't repeat a false "address is missing".
+      const addressEnsured = ensureAddressFormUi(trimmed, nextMessages.slice(0, -1), ensured.reply, ensured.ui, recipients);
+      const ui = addressEnsured.ui;
       setMessages([
         ...nextMessages,
         {
           role: 'assistant',
-          content: ensured.reply,
+          content: addressEnsured.reply,
           products: (data.products || []) as ChatProduct[],
           review: (data.review || null) as GiftReview | null,
           ui: ui.length ? ui : undefined,

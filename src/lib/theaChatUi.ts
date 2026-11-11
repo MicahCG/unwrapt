@@ -7,6 +7,7 @@ import {
   type RecipientRecord,
 } from '@/lib/giftStatus';
 import { calculateGiftCost } from '@/lib/wallet';
+import { ensureAddressFormForPeople, type AddressPerson } from '@/lib/theaAddressForm';
 
 /**
  * User is asking to connect/sync/import a calendar — not merely mentioning one.
@@ -193,4 +194,34 @@ export const ensureWalletTopUpUi = (
       available,
     }],
   };
+};
+
+const addressPerson = (recipient: RecipientRecord): AddressPerson => ({
+  id: recipient.id,
+  name: recipient.name,
+  hasAddress: hasRecipientAddress(recipient),
+  addressConfirmed: (recipient.scheduled_gifts || []).some((gift) =>
+    Boolean((gift as { address_confirmed_at?: string | null }).address_confirmed_at)),
+});
+
+/**
+ * Safety net for a stale edge function or a model that only asks in text.
+ * Lives on live recipient rows; the decision itself is in theaAddressForm.
+ */
+export const ensureAddressFormUi = (
+  userMessage: string,
+  priorMessages: ChatTurn[],
+  reply: string,
+  ui: ChatUiModule[],
+  recipients: RecipientRecord[],
+): { reply: string; ui: ChatUiModule[] } => {
+  const result = ensureAddressFormForPeople(
+    userMessage,
+    priorMessages,
+    reply,
+    ui,
+    recipients.map(addressPerson),
+    looksLikeRecipientStatusIntent(userMessage),
+  );
+  return { reply: result.reply, ui: result.ui as ChatUiModule[] };
 };

@@ -32,8 +32,26 @@ import {
   looksLikeOrderNowIntent,
   buildOrderNowDirectiveMessage,
   systemPromptIncludesReservedOrderRules,
+  systemPromptIncludesAddressFormRules,
   RESERVED_ORDER_RULES,
+  ADDRESS_FORM_RULES,
   decideReservedOrder,
+  addressIsOnFile,
+  replyClaimsMissingAddress,
+  replyAsksToAddAddress,
+  looksLikeAddressFormIntent,
+  looksLikeAddressFormAgreement,
+  shouldDirectAddressForm,
+  decideAddressForm,
+  clearMissingAddressClaim,
+  pickRecipientForAddress,
+  editRecipientAddressUi,
+  guardUnswappableSwapReply,
+  replyRefusesSwap,
+  swapSuccessCopy,
+  reviewReplacesGift,
+  markerToPersist,
+  unswappableGiftReason,
   buildRecipientStatusEntries,
   buildAccountRosterFromRows,
   formatAccountRosterSection,
@@ -457,6 +475,48 @@ Deno.test("isSwappableExistingGift allows replacing a different pre-order gift",
   assertEquals(isSwappableExistingGift({ ...coffee, status: "cancelled" }, "prod_chocolate"), false);
 });
 
+Deno.test("a confirmed unpaid gift with no order can be swapped, and an ordered gift cannot", () => {
+  const coffee = {
+    status: "confirmed",
+    goody_order_id: null,
+    gift_variant_id: "prod_coffee",
+    payment_status: "unpaid",
+    wallet_reserved: true,
+  };
+  assert(isSwappableExistingGift(coffee, "prod_wine"));
+  assertEquals(unswappableGiftReason(coffee, "prod_wine"), null);
+  assertEquals(isSwappableExistingGift({ ...coffee, status: "approved" }, "prod_wine"), true);
+  assertEquals(isSwappableExistingGift({ ...coffee, status: "ordered" }, "prod_wine"), false);
+  assertEquals(isSwappableExistingGift({ ...coffee, status: "shipped" }, "prod_wine"), false);
+  assertEquals(isSwappableExistingGift({ ...coffee, status: "delivered" }, "prod_wine"), false);
+  assertEquals(isSwappableExistingGift({ ...coffee, goody_order_id: "goody_1" }, "prod_wine"), false);
+  assertEquals(unswappableGiftReason({ ...coffee, status: "ordered", goody_order_id: "goody_1" }, "prod_wine"), "ordered");
+  assertEquals(unswappableGiftReason({ ...coffee, status: "confirmed", gift_variant_id: "prod_wine" }, "prod_wine"), "same_gift");
+
+  const offer = "Aunty already has Coffee O'Clock scheduled. Want to swap to the Layla Red Wine Glasses?";
+  assertEquals(
+    guardUnswappableSwapReply(offer, "already_ordered", "Coffee O'Clock"),
+    "Coffee O'Clock is already ordered, so it can't be swapped.",
+  );
+  assertEquals(guardUnswappableSwapReply(offer, null, "Coffee O'Clock"), offer);
+  assert(replyRefusesSwap("It can't be swapped for the Layla Red Wine Glasses."));
+  assertEquals(swapSuccessCopy({
+    replaced: "Coffee O'Clock",
+    gift: "Layla Red Wine Glasses, Set of 4",
+    recipientName: "Aunty",
+    heldAmount: 41,
+  }), "Done. Coffee O'Clock is now Layla Red Wine Glasses, Set of 4 for Aunty. $41 is now held for it.");
+});
+
+Deno.test("a swap review marker is persisted so yes can confirm, even without GIFT_REVIEW in the reply", () => {
+  const marker = "rec_aunty:prod_wine:2026-12-02";
+  const swapReview = { replacesGiftTitle: "Coffee O'Clock", productTitle: "Layla Red Wine Glasses" };
+  assert(reviewReplacesGift(swapReview));
+  assertEquals(markerToPersist(marker, "Want me to swap Coffee O'Clock for the wine glasses?", [], swapReview), marker);
+  assertEquals(markerToPersist(marker, "Want me to schedule the wine glasses?", [], { productTitle: "Layla Red Wine Glasses" }), null);
+  assertEquals(markerToPersist(marker, "GIFT_REVIEW: rec_aunty:prod_wine:2026-12-02", [], { productTitle: "Layla" }), marker);
+});
+
 Deno.test("giftOrderTiming places the order from occasion minus shipping lead minus buffer", () => {
   // Default lead 21 + arrival buffer 3 = 24 days before the occasion.
   const timing = giftOrderTiming("2026-12-02", { today: "2026-10-01" });
@@ -590,4 +650,107 @@ Deno.test("a fully reserved gift never gets top-up wording, and a short hold sta
   const directive = buildOrderNowDirectiveMessage(true) || "";
   assert(directive.includes("place_order_now"));
   assert(/do not ask for a top-up/i.test(directive));
+  assert(/never say the address is missing/i.test(directive));
+});
+
+const AUNTY_ON_FILE = { id: "rec_aunty", name: "Aunty", hasAddress: true, addressConfirmed: true };
+const AUNTY_MISSING = { id: "rec_aunty", name: "Aunty", hasAddress: false, addressConfirmed: false };
+const MISSING_ADDRESS_REPLY = "I can't place the order until I confirm the address. Aunty's address is still missing. Would you like to add her address so we can proceed?";
+
+Deno.test("hasAddress true does not claim the address is missing and does not force the form", () => {
+  assert(systemPromptIncludesAddressFormRules());
+  assert(/never say an address is missing/i.test(ADDRESS_FORM_RULES));
+  assert(!/don't open another form/i.test(ADDRESS_FORM_RULES));
+  assert(/do not tell them to add it on a review card/i.test(ADDRESS_FORM_RULES));
+  assert(addressIsOnFile({ hasAddress: true, addressConfirmed: false }));
+  assert(addressIsOnFile({ hasAddress: false, addressConfirmed: true }));
+  assertEquals(addressIsOnFile({ hasAddress: false, addressConfirmed: false }), false);
+  assert(replyClaimsMissingAddress(MISSING_ADDRESS_REPLY));
+
+  const decision = decideAddressForm({
+    latestUserMessage: "Please place Aunty's gift",
+    recentMessages: [],
+    modelReply: MISSING_ADDRESS_REPLY,
+    alreadyPresented: [],
+    addressFacts: AUNTY_ON_FILE,
+    addressRequired: false,
+  });
+  assertEquals(decision.force, false);
+  assertEquals(decision.suppressMissingClaim, true);
+  const confirmedOnly = decideAddressForm({
+    latestUserMessage: "Please place Aunty's gift",
+    recentMessages: [],
+    modelReply: MISSING_ADDRESS_REPLY,
+    alreadyPresented: [],
+    addressFacts: { hasAddress: false, addressConfirmed: true },
+    addressRequired: false,
+  });
+  assertEquals(confirmedOnly.force, false);
+  assertEquals(confirmedOnly.suppressMissingClaim, true);
+  const cleared = clearMissingAddressClaim(MISSING_ADDRESS_REPLY, "Aunty");
+  assert(!replyClaimsMissingAddress(cleared));
+  assert(!replyAsksToAddAddress(cleared));
+  assert(cleared.includes("Aunty's address is already on file"));
+  assertEquals(editRecipientAddressUi({ ok: true, hasAddress: true, recipientId: "rec_aunty", recipientName: "Aunty" }), null);
+});
+
+Deno.test("a missing address or addressRequired presents the address form", () => {
+  const missing = decideAddressForm({
+    latestUserMessage: "Please place Aunty's gift",
+    recentMessages: [],
+    modelReply: MISSING_ADDRESS_REPLY,
+    alreadyPresented: [],
+    addressFacts: AUNTY_MISSING,
+    addressRequired: false,
+  });
+  assertEquals(missing.force, true);
+  assertEquals(missing.suppressMissingClaim, false);
+
+  const required = decideAddressForm({
+    latestUserMessage: "yes",
+    recentMessages: [],
+    modelReply: "Aunty needs a delivery address before this can be ordered.",
+    alreadyPresented: [],
+    addressFacts: AUNTY_MISSING,
+    addressRequired: true,
+  });
+  assertEquals(required.force, true);
+  assertEquals(
+    editRecipientAddressUi({
+      ok: false,
+      addressRequired: true,
+      recipientId: "rec_aunty",
+      recipientName: "Aunty",
+    }),
+    { module: "edit_recipient", recipientId: "rec_aunty", recipientName: "Aunty", focus: "address" },
+  );
+  assertEquals(editRecipientAddressUi({ ok: false, error: "nope" }), null);
+
+  assert(looksLikeAddressFormIntent("please add her address"));
+  assert(shouldDirectAddressForm("yes", [
+    { role: "assistant", content: "Would you like to add her address so we can proceed?" },
+  ]));
+  assertEquals(looksLikeAddressFormAgreement("yes, swap to the wine glasses"), false);
+  const agreed = decideAddressForm({
+    latestUserMessage: "yes",
+    recentMessages: [{ role: "assistant", content: "Aunty's address is still missing. Want to add her address?" }],
+    modelReply: "Great.",
+    alreadyPresented: [],
+    addressFacts: AUNTY_MISSING,
+    addressRequired: false,
+  });
+  assertEquals(agreed.force, true);
+
+  assertEquals(pickRecipientForAddress([AUNTY_MISSING, { id: "rec_2", name: "Jordan", hasAddress: true, addressConfirmed: false }], ["place it for Aunty"], null)?.id, "rec_aunty");
+  assertEquals(
+    decideAddressForm({
+      latestUserMessage: "who is missing an address",
+      recentMessages: [],
+      modelReply: "Brianna is missing an address.",
+      alreadyPresented: [],
+      addressFacts: AUNTY_MISSING,
+      addressRequired: false,
+    }).force,
+    false,
+  );
 });
