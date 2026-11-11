@@ -41,8 +41,15 @@ const AccountMenu: React.FC<AccountMenuProps> = ({
     then();
   };
 
+  // Load Available (balance − reserved) as soon as the wallet is known — never wait for the
+  // dropdown. Falling back to gross `walletBalance` made the header pill flash the total.
   useEffect(() => {
-    if (!open || !hasWallet || !user?.id) return;
+    if (!hasWallet || !user?.id) {
+      setReserved(0);
+      setAvailable(null);
+      setReservations([]);
+      return;
+    }
     let cancelled = false;
     void (async () => {
       const breakdown = await getWalletBreakdown(user.id);
@@ -52,9 +59,9 @@ const AccountMenu: React.FC<AccountMenuProps> = ({
       setReservations(breakdown.reservations);
     })();
     return () => { cancelled = true; };
-  }, [open, hasWallet, user?.id, walletBalance]);
+  }, [hasWallet, user?.id, walletBalance]);
 
-  const shownAvailable = available ?? walletBalance ?? 0;
+  const availableLabel = available != null ? money(available) : null;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -64,13 +71,15 @@ const AccountMenu: React.FC<AccountMenuProps> = ({
           className="u-press u-account-glass-pill flex min-h-11 items-center gap-2 rounded-full py-1 pl-3 pr-1"
           aria-label={
             hasWallet
-              ? `VIP account and gift wallet, available ${money(shownAvailable)}`
+              ? `VIP account and gift wallet${availableLabel ? `, available ${availableLabel}` : ''}`
               : tier === 'vip'
                 ? 'VIP account'
                 : 'Account'
           }
         >
-          {hasWallet && <span className="font-mono text-[12px] font-semibold">{money(shownAvailable)}</span>}
+          {hasWallet && availableLabel && (
+            <span className="font-mono text-[12px] font-semibold">{availableLabel}</span>
+          )}
           <span className="relative flex h-[34px] w-[34px] shrink-0 items-center justify-center">
             <span
               className="flex h-full w-full items-center justify-center rounded-full"
@@ -108,7 +117,7 @@ const AccountMenu: React.FC<AccountMenuProps> = ({
               <dl className="mt-2 grid gap-1 text-[12px]">
                 <div className="flex justify-between gap-3">
                   <dt style={{ color: availableTone }}>Available</dt>
-                  <dd className="font-mono font-semibold" style={{ color: availableTone }}>{money(shownAvailable)}</dd>
+                  <dd className="font-mono font-semibold" style={{ color: availableTone }}>{availableLabel ?? '—'}</dd>
                 </div>
                 <div className="flex justify-between gap-3">
                   <dt style={{ color: reservedTone }}>Reserved</dt>
