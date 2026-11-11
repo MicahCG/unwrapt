@@ -11,9 +11,9 @@ import EditRecipientModal from '@/components/EditRecipientModal';
 import { AddFundsModal } from '@/components/wallet/AddFundsModal';
 import { VIPWelcomeModal } from '@/components/onboarding/VIPWelcomeModal';
 import { MobileShell } from '@/components/unwrapt2/MobileShell';
-import { TheaAvatar } from '@/components/unwrapt2/TheaAvatar';
 import { ApprovalScreen } from '@/components/unwrapt2/ApprovalScreen';
 import { U } from '@/components/unwrapt2/theme';
+import { Settings } from 'lucide-react';
 import RecipientDetailSheet from '@/components/RecipientDetailSheet';
 import CatalogPreviewSheet from '@/components/CatalogPreviewSheet';
 import { type RecipientRecord, type GiftRecord } from '@/lib/giftStatus';
@@ -404,60 +404,29 @@ const Dashboard = () => {
         />
       )}
 
-      {/* Phones and tablets switch between Thea and Manual with tabs. From 1024px both sit side by
-          side, each with its own single scroll area, so desktop uses its width instead of a phone column. */}
+      {/* Phones: gear opens Manual; desktop still shows Thea + Manual side by side. No bottom tab bar. */}
       <MobileShell
         maxWidthClassName="max-w-[440px] md:max-w-[680px] lg:max-w-[1180px] xl:max-w-[1400px]"
         contentClassName={`relative flex min-h-0 flex-col px-5 pb-2 md:px-8 lg:overflow-hidden lg:pb-6 ${
           pinToKeyboard ? 'overflow-hidden pt-3' : 'pt-3'
         } ${activeTab === 'thea' ? 'overflow-hidden' : 'overflow-y-auto'}`}
-        footerClassName="lg:hidden"
-        footer={
-          // Hide Thea/Manual while typing — the keyboard needs that space, and a modern
-          // agent composer shouldn't compete with a tab bar.
-          pinToKeyboard ? undefined : (
-          <nav
-            aria-label="Dashboard tabs"
-            className="grid grid-cols-2 items-center gap-1.5 rounded-[22px] border p-1.5 shadow-[0_12px_30px_rgba(42,37,32,0.08)] backdrop-blur"
-            style={{ borderColor: '#D9CDBD', background: 'rgba(250,246,238,0.95)' }}
-          >
-            <button
-              type="button"
-              onClick={() => setActiveTab('thea')}
-              aria-current={activeTab === 'thea' ? 'page' : undefined}
-              className="u-touch-card flex items-center justify-center gap-2 rounded-[16px] px-3 py-3 text-[13px] font-semibold"
-              style={{
-                background: activeTab === 'thea' ? U.ink : 'transparent',
-                color: activeTab === 'thea' ? U.buttonText : '#5A5147',
-              }}
-            >
-              <TheaAvatar size={28} />
-              Thea
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('manual')}
-              aria-current={activeTab === 'manual' ? 'page' : undefined}
-              className="u-touch-card flex items-center justify-center gap-2 rounded-[16px] px-3 py-3 text-[13px] font-semibold"
-              style={{
-                background: activeTab === 'manual' ? U.ink : 'transparent',
-                color: activeTab === 'manual' ? U.buttonText : '#5A5147',
-              }}
-            >
-              <span aria-hidden="true" className="text-[15px]">▦</span>
-              Manual
-            </button>
-          </nav>
-          )
-        }
       >
-        {/* Cursor-style frost fades into chat; account pill stays top-right. Thea is freestanding in TheaHomeTab. */}
+        {/* Cursor-style frost fades into chat; gear left, account pill right. */}
         <div
           className={`u-dashboard-frost-nav pointer-events-none absolute inset-x-0 top-0 z-20 -mx-5 px-5 md:-mx-8 md:px-8 ${
             pinToKeyboard ? 'hidden' : ''
           }`}
         >
-          <div className="pointer-events-auto flex justify-end pt-0.5">
+          <div className="pointer-events-auto flex items-center justify-between gap-2 pt-0.5">
+            <button
+              type="button"
+              className="u-press u-account-glass-pill flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+              aria-label={activeTab === 'manual' ? 'Back to Thea' : 'Open Manual'}
+              aria-current={activeTab === 'manual' ? 'page' : undefined}
+              onClick={() => setActiveTab(activeTab === 'manual' ? 'thea' : 'manual')}
+            >
+              <Settings className="h-[18px] w-[18px]" aria-hidden="true" style={{ color: U.inkSoft }} />
+            </button>
             <AccountMenu
               displayName={displayName}
               planLabel={planLabel}
@@ -471,7 +440,7 @@ const Dashboard = () => {
         </div>
 
         <div className="min-h-0 flex-1 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(360px,480px)] lg:gap-6">
-          {/* Both tabs stay mounted so switching never loses Thea's conversation or Manual's place. */}
+          {/* Both panels stay mounted so switching never loses Thea's conversation or Manual's place. */}
           <div className={`${activeTab === 'thea' ? 'h-full' : 'hidden'} lg:block lg:h-full lg:min-h-0`}>
             <TheaHomeTab
               displayName={displayName}
