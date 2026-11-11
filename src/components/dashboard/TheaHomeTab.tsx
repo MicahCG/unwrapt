@@ -951,7 +951,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
       <div className="relative min-h-0 flex-1">
         {!hidePresenceOrb && (
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-[25] flex justify-center pt-0.5">
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-[25] flex justify-center pt-2 md:pt-2.5">
             <div className="pointer-events-auto">
               <TheaIdentityChip chrome={orbChrome} />
             </div>
@@ -959,7 +959,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
         )}
         <div
           ref={scrollRef}
-          className={`h-full min-h-0 overflow-x-hidden overflow-y-auto pr-1 ${hidePresenceOrb ? 'pt-1' : 'pt-[9rem]'}`}
+          className={`h-full min-h-0 overflow-x-hidden overflow-y-auto pr-1 ${hidePresenceOrb ? 'pt-1' : 'pt-[10.25rem]'}`}
           style={{ scrollPaddingBottom: listPadBottom }}
           aria-live="polite"
         >
