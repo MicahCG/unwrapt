@@ -27,11 +27,16 @@ import {
   buildWalletTopUpDirectiveMessage,
   isSwappableExistingGift,
   giftOrderTiming,
+  decidePlaceBy,
+  timingForStoredGift,
   resolveShippingLeadDays,
   shippingLeadDaysFromProduct,
   looksLikeOrderNowIntent,
   buildOrderNowDirectiveMessage,
   systemPromptIncludesReservedOrderRules,
+  systemPromptIncludesPlaceDateAsk,
+  looksLikePlaceDateChange,
+  handleSetPlaceDate,
   RESERVED_ORDER_RULES,
   decideReservedOrder,
   buildRecipientStatusEntries,
@@ -498,6 +503,210 @@ Deno.test("resolveShippingLeadDays and shippingLeadDaysFromProduct fall back sen
   assertEquals(shippingLeadDaysFromProduct(null), undefined);
   assertEquals(shippingLeadDaysFromProduct({ shipping_lead_days: 14 }), 14);
   assertEquals(shippingLeadDaysFromProduct({ estimated_delivery_days: 5 }), 5);
+});
+
+Deno.test("default confirm stores the computed place-by for that gift's shipping lead", () => {
+  assert(systemPromptIncludesPlaceDateAsk());
+  const decision = decidePlaceBy({ occasionDate: "2026-12-02", today: "2026-10-01" });
+  assert(decision.ok);
+  if (!decision.ok) return;
+  assertEquals(decision.saved, true);
+  assertEquals(decision.usedOverride, false);
+  assertEquals(decision.placeByDate, "2026-11-08");
+  assertEquals(decision.shippingLeadDays, 21);
+  assertEquals(decision.timing.placeOrderOn, "2026-11-08");
+  assertEquals(decision.timing.expectedArrival, "2026-11-29");
+  assert(decision.confirmationCopy.includes("about 21 days"));
+  assert(decision.confirmationCopy.includes("November 8, 2026"));
+  assert(decision.confirmationCopy.includes("Does that work?"));
+
+  const faster = decidePlaceBy({ occasionDate: "2026-12-02", shippingLeadDays: 7, today: "2026-10-01" });
+  assert(faster.ok);
+  if (!faster.ok) return;
+  assertEquals(faster.placeByDate, "2026-11-22");
+  assertEquals(faster.timing.shippingLeadDays, 7);
+});
+
+Deno.test("a user place-date override is saved and a too-late one is not", () => {
+  const today = "2026-11-11";
+  const saved = decidePlaceBy({
+    occasionDate: "2026-12-02",
+    shippingLeadDays: 7,
+    requestedPlaceOn: "place it on Nov 15",
+    today,
+  });
+  assert(saved.ok);
+  if (!saved.ok) return;
+  assertEquals(saved.saved, true);
+  assertEquals(saved.feasible, true);
+  assertEquals(saved.placeByDate, "2026-11-15");
+  assertEquals(saved.timing.placeOrderOn, "2026-11-15");
+  assertEquals(saved.timing.expectedArrival, "2026-11-22");
+  assertEquals(saved.shippingLeadDays, 7);
+  assert(saved.confirmationCopy.includes("about 7 days"));
+  assert(saved.confirmationCopy.includes("November 15, 2026"));
+  assert(saved.confirmationCopy.includes("November 22, 2026"));
+
+  const sooner = decidePlaceBy({
+    occasionDate: "2026-12-02",
+    shippingLeadDays: 7,
+    requestedPlaceOn: "place it sooner",
+    today,
+  });
+  assert(sooner.ok);
+  if (!sooner.ok) return;
+  assertEquals(sooner.placeByDate, "2026-11-11");
+  assertEquals(sooner.feasible, true);
+
+  const nextWeek = decidePlaceBy({
+    occasionDate: "2026-12-02",
+    shippingLeadDays: 7,
+    requestedPlaceOn: "wait until next week",
+    today,
+  });
+  assert(nextWeek.ok);
+  if (!nextWeek.ok) return;
+  assertEquals(nextWeek.placeByDate, "2026-11-18");
+
+  const the20th = decidePlaceBy({
+    occasionDate: "2026-12-02",
+    shippingLeadDays: 7,
+    requestedPlaceOn: "place it on the 20th instead",
+    today,
+  });
+  assert(the20th.ok);
+  if (!the20th.ok) return;
+  assertEquals(the20th.placeByDate, "2026-11-20");
+  assertEquals(the20th.timing.expectedArrival, "2026-11-27");
+
+  const late = decidePlaceBy({
+    occasionDate: "2026-12-02",
+    shippingLeadDays: 21,
+    requestedPlaceOn: "place it on Nov 20",
+    today,
+  });
+  assert(late.ok);
+  if (!late.ok) return;
+  assertEquals(late.saved, false);
+  assertEquals(late.feasible, false);
+  assertEquals(late.tooLate, true);
+  assertEquals(late.placeByDate, null);
+  assertEquals(late.timing.placeOrderOn, "2026-11-20");
+  assertEquals(late.timing.expectedArrival, "2026-12-11");
+  assert(late.confirmationCopy.toLowerCase().includes("didn't change"));
+  assertEquals(late.options, ["place_asap", "pick_earlier_date", "accept_late_arrival"]);
+
+  const accepted = decidePlaceBy({
+    occasionDate: "2026-12-02",
+    shippingLeadDays: 21,
+    requestedPlaceOn: "Nov 20",
+    acceptLate: true,
+    today,
+  });
+  assert(accepted.ok);
+  if (!accepted.ok) return;
+  assertEquals(accepted.saved, true);
+  assertEquals(accepted.feasible, false);
+  assertEquals(accepted.placeByDate, "2026-11-20");
+
+  const past = decidePlaceBy({
+    occasionDate: "2026-12-02",
+    shippingLeadDays: 7,
+    requestedPlaceOn: "Nov 1",
+    today,
+  });
+  assertEquals(past.ok, false);
+
+  const stored = timingForStoredGift("2026-12-02", {
+    shippingLeadDays: 7,
+    placeByDate: "2026-11-15",
+    today,
+  });
+  assertEquals(stored?.placeOrderOn, "2026-11-15");
+  assertEquals(stored?.expectedArrival, "2026-11-22");
+  assertEquals(stored?.shippingLeadDays, 7);
+
+  assert(looksLikePlaceDateChange("place it on Nov 15"));
+  assert(looksLikePlaceDateChange("place it sooner"));
+  assert(looksLikePlaceDateChange("wait until next week"));
+  assert(looksLikePlaceDateChange("place it on the 20th instead"));
+  assertEquals(looksLikePlaceDateChange("yes"), false);
+  assertEquals(looksLikePlaceDateChange("please order it now"), false);
+});
+
+Deno.test("set_place_date writes the override and refuses a date that cannot arrive in time", async () => {
+  const rows = [{
+    id: "gift_coffee",
+    user_id: "user_1",
+    recipient_id: "rec_aunty",
+    occasion_date: "2026-12-02",
+    status: "confirmed",
+    goody_order_id: null,
+    shipping_lead_days: 7,
+    place_by_date: "2026-11-22",
+    gift_type: "Coffee O'Clock",
+  }];
+  const updates: Array<{ row: Record<string, unknown>; filters: Record<string, unknown> }> = [];
+  const client = {
+    from() {
+      const filters: Record<string, unknown> = {};
+      const builder = {
+        select() { return builder; },
+        eq(col: string, val: unknown) {
+          filters[col] = val;
+          return builder;
+        },
+        order() { return builder; },
+        limit() { return builder; },
+        update(row: Record<string, unknown>) {
+          const updateFilters: Record<string, unknown> = {};
+          const updater = {
+            eq(col: string, val: unknown) {
+              updateFilters[col] = val;
+              return updater;
+            },
+            then(resolve: (value: { error: null }) => unknown) {
+              updates.push({ row, filters: { ...updateFilters } });
+              return Promise.resolve({ error: null }).then(resolve);
+            },
+          };
+          return updater;
+        },
+        then(resolve: (value: { data: unknown[]; error: null }) => unknown) {
+          const matched = rows.filter((row) => Object.entries(filters).every(([col, val]) => row[col as keyof typeof row] === val));
+          return Promise.resolve({ data: matched, error: null }).then(resolve);
+        },
+      };
+      return builder;
+    },
+  };
+
+  const saved = await handleSetPlaceDate(client as never, "user_1", {
+    recipientId: "rec_aunty",
+    placeOn: "place it on Nov 15",
+  }, { today: "2026-11-11" });
+  assertEquals(saved.ok, true);
+  assertEquals(saved.saved, true);
+  assertEquals((saved.timing as { placeOrderOn: string }).placeOrderOn, "2026-11-15");
+  assertEquals((saved.timing as { expectedArrival: string }).expectedArrival, "2026-11-22");
+  assertEquals((saved.timing as { shippingLeadDays: number }).shippingLeadDays, 7);
+  assertEquals(saved.feasible, true);
+  assertEquals(updates.length, 1);
+  assertEquals(updates[0].row.place_by_date, "2026-11-15");
+  assertEquals(updates[0].row.shipping_lead_days, 7);
+  assertEquals(updates[0].filters.id, "gift_coffee");
+
+  const late = await handleSetPlaceDate(client as never, "user_1", {
+    scheduledGiftId: "gift_coffee",
+    placeOn: "Nov 28",
+  }, { today: "2026-11-11" });
+  assertEquals(late.ok, true);
+  assertEquals(late.saved, false);
+  assertEquals(late.feasible, false);
+  assertEquals(late.tooLate, true);
+  assertEquals(updates.length, 1);
+  assert(String(late.confirmationCopy).includes("about 7 days"));
+  assert(String(late.confirmationCopy).includes("November 28, 2026"));
 });
 
 Deno.test("buildRecipientStatusEntries maps gift/address/preferences checks", () => {

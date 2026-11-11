@@ -59,6 +59,9 @@ Deno.test("auto-order uses place-by (occasion minus lead minus buffer), not 25 d
   assertEquals(giftDueForAutoOrder(gift, new Date(2026, 10, 8)), true);
   assertEquals(giftDueForAutoOrder(gift, new Date(2026, 10, 11)), true);
   assertEquals(giftDueForAutoOrder({ ...gift, place_by_date: "2026-11-20" }, new Date(2026, 10, 11)), false);
+  // A stored place_by_date is what the job waits for, even when it is earlier than the computed ideal (Nov 8).
+  assertEquals(giftDueForAutoOrder({ ...gift, place_by_date: "2026-11-04" }, new Date(2026, 10, 4)), true);
+  assertEquals(giftDueForAutoOrder({ ...gift, place_by_date: "2026-11-20" }, new Date(2026, 10, 8)), false);
 });
 
 Deno.test("handleFundReservation logs 'failed' (not 'error') and returns cleanly when no default gift variant is set at all", async () => {

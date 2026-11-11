@@ -1,15 +1,16 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import {
-  DELIVERY_LEAD_DAYS,
+  decidePlaceBy,
   giftOrderTiming,
   resolveShippingLeadDays,
   shippingLeadDaysFromProduct,
-  shiftIsoDate,
+  timingForStoredGift,
+  type PlaceByDecision,
 } from "../_shared/giftTiming.ts";
 import { decideReservedOrder } from "../_shared/reservedFunds.ts";
 
-export { giftOrderTiming, resolveShippingLeadDays, shippingLeadDaysFromProduct, decideReservedOrder };
+export { giftOrderTiming, resolveShippingLeadDays, shippingLeadDaysFromProduct, decidePlaceBy, timingForStoredGift, decideReservedOrder };
 
 // Inlined rather than imported from ../_shared/cors.ts so this function only
 // needs its own folder: index.ts plus the THEA_GUIDE*.md files.
@@ -168,11 +169,13 @@ You will often no longer have the exact recipientId, productId, and occasionDate
 confirm_scheduled_gift needs the recipient's delivery address on file. If it fails with addressRequired, say in one line that you need their address first and that they can add it right on the review card; don't open another form.
 ## Order timing (hard rules — never improvise dates)
 Place-order timing is computed as: occasion date minus that gift's shipping lead time minus a small arrival buffer (so it arrives on or slightly before the event). Prefer arriving a little early over late.
-- Read timing from select_gift.review.timing, confirm_scheduled_gift.timing, or get_recipients fields (placeOrderOn, deliveryBy, shippingLeadDays, shippingEstimate, placeOrderASAP, feasible). Never invent place dates.
-- When a gift exposes its own shippingLeadDays, use that estimate. Otherwise use the default encoded in timing (about 2–3 weeks). Do not hardcode a different lead time in your reply than timing.shippingEstimate / shippingLeadDays.
-- Quote placeOrderOn and deliveryBy exactly. Never say vague phrases like "closer to the date" / "closer to their birthday". Never invent a day-before-occasion place date (e.g. never "around December 1" for a December 2 birthday when shipping takes multiple weeks).
-- If placeOrderASAP is true and feasible is true: say you'll place it as soon as funds and address are ready so it can arrive by deliveryBy.
-- If feasible is false: do NOT pretend the gift will arrive by the occasion. Say the lead time makes on-time arrival unrealistic, and offer options (call place_order_now if that gift is already funded, choose a faster gift, or plan an earlier send). Never offer to place it immediately unless you call place_order_now. Still be honest if they insist on scheduling it anyway.
+- Read timing from select_gift.review.timing, confirm_scheduled_gift.timing, set_place_date.timing, or get_recipients fields (placeOrderOn, deliveryBy, expectedArrival, shippingLeadDays, shippingEstimate, placeOrderASAP, feasible). Never invent place dates. Never say a day you did not just read off one of those results.
+- When proposing a schedule (select_gift) and when confirming one (confirm_scheduled_gift), if timing.feasible is true, say confirmationCopy when the tool gives it. Otherwise say exactly: "Expected delivery is about X days, so I'm placing this on [date]. Does that work?" X is that gift's timing.shippingLeadDays (a number of days, not a vibe and not "the day before"). The date is timing.placeOrderOn, the same day the tool returned. Then wait. Do not say "around" or "closer to the occasion".
+- A plain yes keeps the computed place-by. Do not pass a place date of your own. If they name a different day ("place it on Nov 15", "place it sooner", "wait until next week", "place it on the 20th instead"), call set_place_date with their words as placeOn. Do not convert the date yourself. For a gift that is already scheduled, pass scheduledGiftId or recipientId so place_by_date is updated. Then say the new timing.placeOrderOn and timing.expectedArrival from that result, using that gift's shippingLeadDays.
+- If set_place_date or confirm_scheduled_gift returns saved false or feasible false for a date they asked for, say so in the tool's words. Offer place ASAP (place_order_now only when they want an already-funded gift ordered now), an earlier date, or accepting a late arrival. Call set_place_date again with acceptLate true only after they explicitly accept arriving late. Never store or pretend to accept a date the tool flagged, and never invent a last-minute place date.
+- Quote placeOrderOn, expectedArrival, and deliveryBy exactly. Never invent a day-before-occasion place date (e.g. never "around December 1" for a December 2 birthday when shipping takes multiple weeks).
+- If placeOrderASAP is true and feasible is true: say you'll place it on placeOrderOn, as soon as funds and address are ready, so it can arrive by deliveryBy. Still use the "about X days" sentence.
+- If feasible is false on the computed schedule: do NOT pretend the gift will arrive by the occasion. Say the lead time makes on-time arrival unrealistic, and offer options (call place_order_now if that gift is already funded, choose a faster gift, or accept a late arrival). Never offer to place it immediately unless you call place_order_now.
 
 After confirm_scheduled_gift succeeds, read its funding and timing fields:
 - funding.held true: say it's approved and that funding.amount is set aside in their wallet. Follow the order-timing rules above with timing.* exactly. Never say it's paid or ordered already. If they then ask to order it now, call place_order_now — the hold is the payment, so never request a top-up when that hold covers the gift.
@@ -216,7 +219,7 @@ const GET_RECIPIENTS_TOOL = {
   type: "function",
   function: {
     name: "get_recipients",
-    description: "List this user's saved gift recipients (id, name, relationship, birthday/anniversary, interests, hasAddress, hasPreferences, giftScheduled, scheduledGiftId, scheduledGiftTitle, scheduledOccasionDate, walletReserved, reservedAmount, alreadyOrdered, placeOrderOn, deliveryBy, shippingLeadDays, shippingEstimate, placeOrderASAP, feasible, next occasion date). Always call this before update_recipient, create_recipient, select_gift, or recipient_status so you have real recipient ids to work with, and to check whether someone the user is describing already exists before creating a duplicate. Use the timing fields when answering when an order will be placed or arrive — placeOrderOn is occasion minus shipping lead minus buffer; if feasible is false, say on-time arrival is unrealistic and offer options. Use these fields for who's-scheduled / readiness answers, then present_ui recipient_status cards instead of a long bullet list.",
+    description: "List this user's saved gift recipients (id, name, relationship, birthday/anniversary, interests, hasAddress, hasPreferences, giftScheduled, scheduledGiftId, scheduledGiftTitle, scheduledOccasionDate, walletReserved, reservedAmount, alreadyOrdered, placeOrderOn, deliveryBy, expectedArrival, shippingLeadDays, shippingEstimate, placeOrderASAP, feasible, next occasion date). Always call this before update_recipient, create_recipient, select_gift, or recipient_status so you have real recipient ids to work with, and to check whether someone the user is describing already exists before creating a duplicate. Use the timing fields when answering when an order will be placed or arrive. placeOrderOn is the stored place date when one is set, otherwise occasion minus that gift's shipping lead minus buffer. If feasible is false, say on-time arrival is unrealistic and offer options. Use these fields for who's-scheduled / readiness answers, then present_ui recipient_status cards instead of a long bullet list.",
     parameters: {
       type: "object",
       properties: {
@@ -282,7 +285,7 @@ const SELECT_GIFT_TOOL = {
   type: "function",
   function: {
     name: "select_gift",
-    description: "Call this the moment the user picks a specific gift for a specific recipient, whether by tapping a card (you'll be given its id) or naming it in text (e.g. 'do the coffee beans by methodical coffee' after you just listed it) - match their description to the right id from your most recent search_gifts results yourself, do not search again or show the list over. This does NOT save anything yet - it returns a review summary including timing (placeOrderOn, deliveryBy, shippingLeadDays, placeOrderASAP, feasible). If they already have a different gift scheduled for that occasion that can still be changed, the review includes replacesGiftTitle — offer the swap and ask them to confirm (do not refuse). Read the review back in one line (recipient, gift, price, occasion date, concrete place/arrive timing, and swap when present). If timing.feasible is false, warn that on-time arrival is unrealistic and offer options before asking to confirm. Never call confirm_scheduled_gift in the same turn as this - wait for the user's next message.",
+    description: "Call this the moment the user picks a specific gift for a specific recipient, whether by tapping a card (you'll be given its id) or naming it in text (e.g. 'do the coffee beans by methodical coffee' after you just listed it) - match their description to the right id from your most recent search_gifts results yourself, do not search again or show the list over. This does NOT save anything yet - it returns a review summary including timing (placeOrderOn, deliveryBy, expectedArrival, shippingLeadDays, placeOrderASAP, feasible) and confirmationCopy. If they already have a different gift scheduled for that occasion that can still be changed, the review includes replacesGiftTitle — offer the swap and ask them to confirm (do not refuse). Say confirmationCopy (expected delivery is about shippingLeadDays days, so you're placing it on placeOrderOn, does that work?). If timing.feasible is false, say that copy's warning and offer options before asking to confirm. Never call confirm_scheduled_gift in the same turn as this - wait for the user's next message.",
     parameters: {
       type: "object",
       properties: {
@@ -306,6 +309,14 @@ const CONFIRM_SCHEDULED_GIFT_TOOL = {
         recipientId: { type: "string" },
         productId: { type: "string" },
         occasionDate: { type: "string", description: "ISO date YYYY-MM-DD, exactly as shown in the review." },
+        placeByDate: {
+          type: "string",
+          description: "Only when the user chose a different place date. Pass their words or timing.placeOrderOn from set_place_date. Omit to store the computed place-by (occasion minus this gift's shipping lead minus the 3-day buffer). A date the tool flags as too late is not saved.",
+        },
+        acceptLate: {
+          type: "boolean",
+          description: "True only after the user explicitly accepts a late arrival for placeByDate.",
+        },
       },
       required: ["recipientId", "productId", "occasionDate"],
     },
@@ -345,6 +356,29 @@ const PRESENT_UI_TOOL = {
   },
 } as const;
 
+const SET_PLACE_DATE_TOOL = {
+  type: "function",
+  function: {
+    name: "set_place_date",
+    description: "Set or change scheduled_gifts.place_by_date. Call when the user wants a different place date, including a gift that is already scheduled (\"place it on Nov 15\", \"place it sooner\", \"wait until next week\", \"place it on the 20th instead\"). Pass their words as placeOn. Do not convert or invent the date. The result resolves the day, recomputes expected arrival from that gift's shipping_lead_days, and returns timing plus feasible. Quote confirmationCopy or timing.placeOrderOn, timing.expectedArrival, and timing.shippingLeadDays. If saved is false or feasible is false, the date was not stored: say it cannot arrive by the occasion and offer place ASAP, an earlier date, or accepting a late arrival. Pass acceptLate true only after they explicitly accept arriving late. During a review, before the gift is saved, pass occasionDate and shippingLeadDays from the review to preview, then confirm_scheduled_gift with placeByDate set to timing.placeOrderOn only if saved would be allowed (feasible, or acceptLate).",
+    parameters: {
+      type: "object",
+      properties: {
+        placeOn: {
+          type: "string",
+          description: "The user's requested place date in their own words, or YYYY-MM-DD copied from a previous tool result. Examples: \"Nov 15\", \"the 20th\", \"sooner\", \"next week\".",
+        },
+        scheduledGiftId: { type: "string", description: "From get_recipients.scheduledGiftId when the gift is already scheduled." },
+        recipientId: { type: "string", description: "Use when you know the person but not the gift id. Updates their open gift." },
+        occasionDate: { type: "string", description: "YYYY-MM-DD from the select_gift review, only to preview a date before the gift is saved." },
+        shippingLeadDays: { type: "number", description: "From review.timing.shippingLeadDays when previewing before confirm." },
+        acceptLate: { type: "boolean", description: "True only after the user explicitly accepts a late arrival for this placeOn." },
+      },
+      required: ["placeOn"],
+    },
+  },
+} as const;
+
 const PLACE_ORDER_NOW_TOOL = {
   type: "function",
   function: {
@@ -367,6 +401,7 @@ const ALL_TOOLS = [
   CREATE_RECIPIENT_TOOL,
   SELECT_GIFT_TOOL,
   CONFIRM_SCHEDULED_GIFT_TOOL,
+  SET_PLACE_DATE_TOOL,
   PLACE_ORDER_NOW_TOOL,
   PRESENT_UI_TOOL,
 ] as const;
@@ -813,6 +848,35 @@ const CONFIRMATION_PATTERN = /\b(yes|yeah|yep|yup|confirm(ed)?|do it|go ahead|so
 /** Detects an explicit confirmation in the user's newest message. Exported
  * for unit testing. */
 export const looksLikeConfirmation = (message: string): boolean => CONFIRMATION_PATTERN.test(message.trim());
+
+const PLACE_DATE_TOKEN =
+  /\b\d{4}-\d{2}-\d{2}\b|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}\b|\bthe\s+\d{1,2}(?:st|nd|rd|th)\b|\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/i;
+
+/** User is choosing when to place the order, not asking to order it this moment. */
+export const looksLikePlaceDateChange = (message: string): boolean => {
+  const t = message.trim();
+  if (!t || looksLikeOrderNowIntent(t)) return false;
+  if (/\bwait\s+until\b/i.test(t)) return true;
+  if (/\bplace\b/i.test(t) && /\b(sooner|earlier)\b/i.test(t)) return true;
+  if (/\bplace\b/i.test(t) && PLACE_DATE_TOKEN.test(t)) return true;
+  if (/\b(place|order|date)\b/i.test(t) && /\bnext\s+week\b/i.test(t)) return true;
+  if (/\binstead\b/i.test(t) && /\b(place|date|order)\b/i.test(t) && PLACE_DATE_TOKEN.test(t)) return true;
+  return false;
+};
+
+/** They already heard the date is too late and are keeping it anyway. */
+export const looksLikeAcceptLateArrival = (message: string): boolean =>
+  /\b(accept(?:ing)? (?:a |the )?late|late arrival|arriv(?:e|es|ing) late|even if (?:it(?:'s| is) )?late|place it anyway)\b/i.test(message);
+
+export const buildPlaceDateDirectiveMessage = (force: boolean): string | null => {
+  if (!force) return null;
+  return "The user wants the order placed on a different date. Use the set_place_date or confirm_scheduled_gift result already in this conversation if one is there. Say its confirmationCopy, or quote timing.shippingLeadDays, timing.placeOrderOn, and timing.expectedArrival exactly. If saved is false or feasible is false, do not say the date was saved and do not call confirm_scheduled_gift with a date of your own. Offer place ASAP, an earlier date, or accepting a late arrival. If no tool result is present, call set_place_date now with placeOn set to their words and scheduledGiftId or recipientId. Do not convert the date yourself.";
+};
+
+export const systemPromptIncludesPlaceDateAsk = (): boolean =>
+  SYSTEM_PROMPT.includes("Expected delivery is about") &&
+  SYSTEM_PROMPT.includes("set_place_date") &&
+  SYSTEM_PROMPT.includes("Does that work?");
 
 /** Builds a directive instruction for a turn where the user's message
  * confirms a pending review carried over from the prior turn (see
@@ -1333,7 +1397,7 @@ const handleGetRecipients = async (
     query.limit(500),
     authClient
       .from("scheduled_gifts")
-      .select("id, recipient_id, gift_type, occasion_date, status, wallet_reserved, wallet_reservation_amount, payment_status, goody_order_id")
+      .select("id, recipient_id, gift_type, occasion_date, status, wallet_reserved, wallet_reservation_amount, payment_status, goody_order_id, shipping_lead_days, place_by_date")
       .eq("user_id", userId)
       .order("occasion_date", { ascending: true })
       .limit(200),
@@ -1348,6 +1412,8 @@ const handleGetRecipients = async (
     reservedAmount: number | null;
     paymentStatus: string | null;
     ordered: boolean;
+    shippingLeadDays: number | null;
+    placeByDate: string | null;
   };
   const giftByRecipient = new Map<string, GiftMeta>();
   for (const g of (giftsRes.data as Array<{
@@ -1360,6 +1426,8 @@ const handleGetRecipients = async (
     wallet_reservation_amount?: number | null;
     payment_status?: string | null;
     goody_order_id?: string | null;
+    shipping_lead_days?: number | null;
+    place_by_date?: string | null;
   }> | null) || []) {
     if (!g.recipient_id || !g.id || giftByRecipient.has(g.recipient_id)) continue;
     if (CLOSED_GIFT_STATUSES.has((g.status || "").toLowerCase())) continue;
@@ -1372,6 +1440,8 @@ const handleGetRecipients = async (
       reservedAmount: g.wallet_reservation_amount == null ? null : Number(g.wallet_reservation_amount),
       paymentStatus: g.payment_status || null,
       ordered,
+      shippingLeadDays: typeof g.shipping_lead_days === "number" ? g.shipping_lead_days : null,
+      placeByDate: g.place_by_date || null,
     });
   }
 
@@ -1380,7 +1450,12 @@ const handleGetRecipients = async (
     const occasion = nextOccasionDate(r.birthday, r.anniversary);
     const interests = r.interests || [];
     const scheduled = giftByRecipient.get(r.id) || null;
-    const timing = scheduled?.occasionDate ? giftOrderTiming(scheduled.occasionDate) : null;
+    const timing = scheduled?.occasionDate
+      ? timingForStoredGift(scheduled.occasionDate, {
+        shippingLeadDays: scheduled.shippingLeadDays,
+        placeByDate: scheduled.placeByDate,
+      })
+      : null;
     return {
       recipientId: r.id,
       name: r.name,
@@ -1398,6 +1473,7 @@ const handleGetRecipients = async (
       alreadyOrdered: scheduled?.ordered || false,
       placeOrderOn: timing?.placeOrderOn || null,
       deliveryBy: timing?.deliveryBy || null,
+      expectedArrival: timing?.expectedArrival || null,
       shippingLeadDays: timing?.shippingLeadDays || null,
       shippingEstimate: timing?.shippingEstimate || null,
       placeOrderASAP: timing?.placeOrderASAP ?? null,
@@ -1570,9 +1646,11 @@ const handleSelectGift = async (
     };
   }
 
-  const timing = giftOrderTiming(occasionDate, {
+  const placeProposal = decidePlaceBy({
+    occasionDate,
     shippingLeadDays: shippingLeadDaysFromProduct(product),
   });
+  const timing = placeProposal.ok ? placeProposal.timing : null;
   const review: Record<string, unknown> = {
     recipientId: recipient.id,
     recipientName: recipient.name,
@@ -1584,6 +1662,7 @@ const handleSelectGift = async (
     occasion: occasionLabel,
     hasAddress: hasAddress(recipient),
     timing,
+    confirmationCopy: placeProposal.ok ? placeProposal.confirmationCopy : undefined,
   };
   // Different gift still waiting — offer a confirmable swap instead of dead-ending.
   if (existing && isSwappableExistingGift(existing, product.id)) {
@@ -1908,7 +1987,7 @@ const topUpUiFromConfirm = (result: ToolResult): ChatUiModule | null => {
 const handleConfirmScheduledGift = async (
   authClient: ReturnType<typeof createClient>,
   userId: string,
-  args: { recipientId?: string; productId?: string; occasionDate?: string },
+  args: { recipientId?: string; productId?: string; occasionDate?: string; placeByDate?: string; acceptLate?: boolean },
   conversationId: string | null,
   fallbackProduct?: Product | null,
 ): Promise<ToolResult> => {
@@ -1943,17 +2022,74 @@ const handleConfirmScheduledGift = async (
   const product = (await findGoodyProductById(args.productId)) ?? fallbackProduct ?? null;
   if (!product) return { ok: false, error: "That product is no longer available - search again for current options." };
 
-  // Same gift already booked, or already ordered — leave it alone.
+  // Same gift already booked, or already ordered — leave the product alone.
+  // A place-date change on that open gift still has to be stored.
   if (existing && !INACTIVE_GIFT_STATUSES.has((existing.status || "").toLowerCase()) && !isSwappableExistingGift(existing, product.id)) {
+    const requestedPlaceOn = typeof args.placeByDate === "string" && args.placeByDate.trim() ? args.placeByDate.trim() : null;
+    const status = (existing.status || "").toLowerCase();
+    const ordered = Boolean(existing.goody_order_id) || ["ordered", "shipped", "delivered", "fulfilled"].includes(status);
+    if (requestedPlaceOn && !ordered) {
+      const placeDecision = decidePlaceBy({
+        occasionDate: args.occasionDate,
+        shippingLeadDays: shippingLeadDaysFromProduct(product),
+        requestedPlaceOn,
+        acceptLate: args.acceptLate === true,
+      });
+      if (!placeDecision.ok) return { ok: false, error: placeDecision.error };
+      if (!placeDecision.saved) {
+        return {
+          ok: false,
+          saved: false,
+          confirmed: false,
+          feasible: false,
+          tooLate: true,
+          recordId: existing.id,
+          timing: placeDecision.timing,
+          options: placeDecision.options,
+          confirmationCopy: placeDecision.confirmationCopy,
+          error: "That place date is too late for this gift's shipping time. Nothing was changed. Say confirmationCopy. Do not invent a different place date.",
+        };
+      }
+      await savePlaceByDate(authClient, userId, existing.id, placeDecision);
+      return {
+        ok: true,
+        saved: true,
+        recordId: existing.id,
+        alreadyScheduled: true,
+        placeDateUpdated: true,
+        timing: placeDecision.timing,
+        feasible: placeDecision.feasible,
+        confirmationCopy: placeDecision.confirmationCopy,
+      };
+    }
     return { ok: true, alreadyScheduled: true, recordId: existing.id, saved: { gift_type: existing.gift_type, status: existing.status } };
   }
 
   const occasionType = recipient.birthday === args.occasionDate ? "birthday" : recipient.anniversary === args.occasionDate ? "anniversary" : "custom";
   const occasion = occasionType === "birthday" ? "Birthday" : occasionType === "anniversary" ? "Anniversary" : "Special occasion";
-  const timing = giftOrderTiming(args.occasionDate, {
+  const requestedPlaceOn = typeof args.placeByDate === "string" && args.placeByDate.trim() ? args.placeByDate.trim() : null;
+  const placeDecision = decidePlaceBy({
+    occasionDate: args.occasionDate,
     shippingLeadDays: shippingLeadDaysFromProduct(product),
+    requestedPlaceOn,
+    acceptLate: args.acceptLate === true,
   });
-  const deliveryDate = timing?.deliveryBy || shiftIsoDate(args.occasionDate, -DELIVERY_LEAD_DAYS);
+  if (!placeDecision.ok) return { ok: false, error: placeDecision.error };
+  if (requestedPlaceOn && !placeDecision.saved) {
+    return {
+      ok: false,
+      saved: false,
+      confirmed: false,
+      feasible: false,
+      tooLate: true,
+      timing: placeDecision.timing,
+      options: placeDecision.options,
+      confirmationCopy: placeDecision.confirmationCopy,
+      error: "That place date is too late for this gift's shipping time. Nothing was scheduled. Say confirmationCopy. Do not invent a different place date.",
+    };
+  }
+  const timing = placeDecision.timing;
+  const deliveryDate = timing.deliveryBy;
 
   const giftFields = {
     occasion,
@@ -1989,7 +2125,7 @@ const handleConfirmScheduledGift = async (
       .eq("id", existing.id)
       .eq("user_id", userId);
     if (swapError) return { ok: false, error: swapError.message };
-    await savePlaceByDate(authClient, userId, existing.id, timing);
+    await savePlaceByDate(authClient, userId, existing.id, placeDecision);
 
     return {
       ok: true,
@@ -2004,6 +2140,8 @@ const handleConfirmScheduledGift = async (
         replaced: existing.gift_type,
       },
       timing,
+      confirmationCopy: placeDecision.confirmationCopy,
+      feasible: placeDecision.feasible,
       funding: await holdGiftFunds(authClient, userId, existing.id, product.price),
     };
   }
@@ -2018,13 +2156,15 @@ const handleConfirmScheduledGift = async (
     .select("id")
     .single();
   if (error) return { ok: false, error: error.message };
-  await savePlaceByDate(authClient, userId, inserted.id, timing);
+  await savePlaceByDate(authClient, userId, inserted.id, placeDecision);
 
   return {
     ok: true,
     recordId: inserted.id,
     saved: { recipientName: recipient.name, gift_type: product.title, price: product.price, occasion_date: args.occasionDate },
     timing,
+    confirmationCopy: placeDecision.confirmationCopy,
+    feasible: placeDecision.feasible,
     funding: await holdGiftFunds(authClient, userId, inserted.id, product.price),
   };
 };
@@ -2034,15 +2174,144 @@ const savePlaceByDate = async (
   authClient: ReturnType<typeof createClient>,
   userId: string,
   giftId: string,
-  timing: ReturnType<typeof giftOrderTiming>,
+  decision: Extract<PlaceByDecision, { ok: true }>,
 ) => {
-  if (!timing) return;
+  if (!decision.saved || !decision.placeByDate) return;
   const { error } = await authClient
     .from("scheduled_gifts")
-    .update({ place_by_date: timing.idealPlaceOrderOn, shipping_lead_days: timing.shippingLeadDays })
+    .update({ place_by_date: decision.placeByDate, shipping_lead_days: decision.shippingLeadDays })
     .eq("id", giftId)
     .eq("user_id", userId);
   if (error) console.error("thea-chat: place_by_date not saved", error.message);
+};
+
+const ORDERED_PLACE_DATE_STATUSES = new Set(["ordered", "shipped", "delivered", "fulfilled"]);
+
+type PlaceDateGiftRow = {
+  id: string;
+  recipient_id?: string;
+  occasion_date?: string | null;
+  status?: string | null;
+  goody_order_id?: string | null;
+  shipping_lead_days?: number | null;
+  place_by_date?: string | null;
+  gift_type?: string | null;
+};
+
+/** Update place_by_date on an open gift, or preview a date before the gift exists. */
+export const handleSetPlaceDate = async (
+  authClient: ReturnType<typeof createClient>,
+  userId: string,
+  args: {
+    scheduledGiftId?: string;
+    recipientId?: string;
+    placeOn?: string;
+    occasionDate?: string;
+    shippingLeadDays?: number;
+    acceptLate?: boolean;
+  },
+  options: { today?: string } = {},
+): Promise<ToolResult> => {
+  const placeOn = typeof args.placeOn === "string" ? args.placeOn.trim() : "";
+  if (!placeOn) {
+    return { ok: false, error: "placeOn is required. Pass the user's words, like \"Nov 15\" or \"next week\". Do not invent a date." };
+  }
+  const acceptLate = args.acceptLate === true;
+  const today = options.today;
+
+  const preview = (occasionDate: string, shippingLeadDays?: number | null): ToolResult => {
+    const decision = decidePlaceBy({
+      occasionDate,
+      shippingLeadDays,
+      requestedPlaceOn: placeOn,
+      acceptLate,
+      today,
+    });
+    if (!decision.ok) return { ok: false, error: decision.error };
+    return {
+      ok: true,
+      saved: false,
+      preview: true,
+      confirmed: false,
+      feasible: decision.feasible,
+      tooLate: decision.tooLate,
+      acceptedLate: decision.acceptedLate,
+      timing: decision.timing,
+      options: decision.options,
+      confirmationCopy: decision.confirmationCopy,
+      note: decision.saved
+        ? "No scheduled gift was updated. If the user is confirming this gift, call confirm_scheduled_gift with placeByDate set to timing.placeOrderOn."
+        : "This place date was not saved. Say confirmationCopy and offer the options.",
+    };
+  };
+
+  const scheduledGiftId = typeof args.scheduledGiftId === "string" ? args.scheduledGiftId : "";
+  const recipientId = typeof args.recipientId === "string" ? args.recipientId : "";
+  if (!scheduledGiftId && !recipientId) {
+    if (typeof args.occasionDate === "string" && ISO_DATE_RE.test(args.occasionDate)) {
+      return preview(args.occasionDate, args.shippingLeadDays);
+    }
+    return { ok: false, error: "scheduledGiftId or recipientId is required for a saved gift. During a review, pass occasionDate and shippingLeadDays to preview." };
+  }
+
+  let query = authClient
+    .from("scheduled_gifts")
+    .select("id, recipient_id, occasion_date, status, goody_order_id, shipping_lead_days, place_by_date, gift_type")
+    .eq("user_id", userId);
+  if (scheduledGiftId) query = query.eq("id", scheduledGiftId);
+  else query = query.eq("recipient_id", recipientId);
+
+  const { data, error } = await query.order("occasion_date", { ascending: true }).limit(8);
+  if (error) return { ok: false, error: error.message };
+  const rows = ((data as PlaceDateGiftRow[] | null) || []).filter((gift) => {
+    const status = (gift.status || "").toLowerCase();
+    return !CLOSED_GIFT_STATUSES.has(status);
+  });
+  const open = rows.filter((gift) => {
+    const status = (gift.status || "").toLowerCase();
+    return !gift.goody_order_id && !ORDERED_PLACE_DATE_STATUSES.has(status);
+  });
+  if (!open.length) {
+    if (rows.length) return { ok: false, error: "This gift is already ordered, so the place date can't change." };
+    if (typeof args.occasionDate === "string" && ISO_DATE_RE.test(args.occasionDate)) {
+      return preview(args.occasionDate, args.shippingLeadDays);
+    }
+    return { ok: false, error: "No open scheduled gift matches that request." };
+  }
+  const gift = open[0];
+  if (!gift.occasion_date || !ISO_DATE_RE.test(gift.occasion_date)) {
+    return { ok: false, error: "That gift has no occasion date, so I can't check whether the place date works." };
+  }
+
+  const decision = decidePlaceBy({
+    occasionDate: gift.occasion_date,
+    shippingLeadDays: gift.shipping_lead_days,
+    requestedPlaceOn: placeOn,
+    acceptLate,
+    today,
+  });
+  if (!decision.ok) return { ok: false, error: decision.error };
+  if (decision.saved && decision.placeByDate) {
+    const { error: updateError } = await authClient
+      .from("scheduled_gifts")
+      .update({ place_by_date: decision.placeByDate, shipping_lead_days: decision.shippingLeadDays })
+      .eq("id", gift.id)
+      .eq("user_id", userId);
+    if (updateError) return { ok: false, error: updateError.message };
+  }
+
+  return {
+    ok: true,
+    saved: decision.saved,
+    recordId: gift.id,
+    giftTitle: gift.gift_type || "Gift",
+    feasible: decision.feasible,
+    tooLate: decision.tooLate,
+    acceptedLate: decision.acceptedLate,
+    timing: decision.timing,
+    options: decision.options,
+    confirmationCopy: decision.confirmationCopy,
+  };
 };
 
 const handlePlaceOrderNow = async (
@@ -2415,7 +2684,13 @@ Use the whole conversation, not just the last message. Return JSON only:
     // select_gift call instead of confirm_scheduled_gift in practice (and a
     // falsely-worded "I've scheduled..." reply along with it) - force it
     // deterministically rather than relying on the model's own judgment.
-    const confirmDirectiveMessage = buildConfirmDirectiveMessage(turnContext?.pendingReview, looksLikeConfirmation(latestUserMessageContent));
+    const placeDateChange = looksLikePlaceDateChange(latestUserMessageContent);
+    const acceptLatePlaceDate = looksLikeAcceptLateArrival(latestUserMessageContent);
+    const confirmDirectiveMessage = buildConfirmDirectiveMessage(
+      turnContext?.pendingReview,
+      looksLikeConfirmation(latestUserMessageContent) && !placeDateChange,
+    );
+    const placeDateDirectiveMessage = buildPlaceDateDirectiveMessage(placeDateChange);
     // Calendar connect must not depend on the model alone: poisoned history
     // from pre-present_ui refusals still produces "I can't connect calendars"
     // even with the updated system prompt. Detect intent (and short follow-ups
@@ -2466,7 +2741,7 @@ Use the whole conversation, not just the last message. Return JSON only:
     // via a synthetic tool-call/tool-result exchange injected into the
     // conversation below - the model still decides HOW to say it, never
     // WHETHER the action happened.
-    let preAppliedCall: { name: "select_gift" | "confirm_scheduled_gift"; args: Record<string, unknown>; result: ToolResult } | null = null;
+    let preAppliedCall: { name: "select_gift" | "confirm_scheduled_gift" | "set_place_date"; args: Record<string, unknown>; result: ToolResult } | null = null;
     if (tappedProductId && turnContext?.activeRecipient?.id) {
       const result = await handleSelectGift(
         authClient, user.id,
@@ -2474,6 +2749,30 @@ Use the whole conversation, not just the last message. Return JSON only:
         seenProducts.get(tappedProductId) ?? null,
       );
       preAppliedCall = { name: "select_gift", args: { recipientId: turnContext.activeRecipient.id, productId: tappedProductId }, result };
+    } else if (placeDateChange && turnContext?.pendingReview) {
+      const { recipientId, productId, occasionDate } = turnContext.pendingReview;
+      const result = await handleConfirmScheduledGift(
+        authClient, user.id,
+        { recipientId, productId, occasionDate, placeByDate: latestUserMessageContent, acceptLate: acceptLatePlaceDate },
+        conversationId,
+        seenProducts.get(productId) ?? null,
+      );
+      preAppliedCall = {
+        name: "confirm_scheduled_gift",
+        args: { recipientId, productId, occasionDate, placeByDate: latestUserMessageContent, acceptLate: acceptLatePlaceDate },
+        result,
+      };
+    } else if (placeDateChange && turnContext?.activeRecipient?.id) {
+      const result = await handleSetPlaceDate(authClient, user.id, {
+        recipientId: turnContext.activeRecipient.id,
+        placeOn: latestUserMessageContent,
+        acceptLate: acceptLatePlaceDate,
+      });
+      preAppliedCall = {
+        name: "set_place_date",
+        args: { recipientId: turnContext.activeRecipient.id, placeOn: latestUserMessageContent, acceptLate: acceptLatePlaceDate },
+        result,
+      };
     } else if (looksLikeConfirmation(latestUserMessageContent) && turnContext?.pendingReview) {
       const { recipientId, productId, occasionDate } = turnContext.pendingReview;
       const result = await handleConfirmScheduledGift(
@@ -2491,6 +2790,7 @@ Use the whole conversation, not just the last message. Return JSON only:
       ...(directSelectionMessage ? [{ role: "system", content: directSelectionMessage }] : []),
       ...(tappedSelectionMessage ? [{ role: "system", content: tappedSelectionMessage }] : []),
       ...(confirmDirectiveMessage ? [{ role: "system", content: confirmDirectiveMessage }] : []),
+      ...(placeDateDirectiveMessage ? [{ role: "system", content: placeDateDirectiveMessage }] : []),
       ...(calendarConnectDirectiveMessage ? [{ role: "system", content: calendarConnectDirectiveMessage }] : []),
       ...(recipientStatusDirectiveMessage ? [{ role: "system", content: recipientStatusDirectiveMessage }] : []),
       ...(orderNowDirectiveMessage ? [{ role: "system", content: orderNowDirectiveMessage }] : []),
@@ -2625,12 +2925,21 @@ Use the whole conversation, not just the last message. Return JSON only:
           }
           toolContent = result;
         } else if (toolName === "confirm_scheduled_gift") {
-          const confirmProductIdArg = (args as { productId?: unknown }).productId;
+          const confirmArgs = { ...(args as { recipientId?: string; productId?: string; occasionDate?: string; placeByDate?: string; acceptLate?: boolean }) };
+          if (placeDateChange && typeof confirmArgs.placeByDate !== "string") {
+            confirmArgs.placeByDate = latestUserMessageContent;
+            if (acceptLatePlaceDate) confirmArgs.acceptLate = true;
+          }
+          const confirmProductIdArg = confirmArgs.productId;
           const confirmFallbackProduct = typeof confirmProductIdArg === "string" ? seenProducts.get(confirmProductIdArg) ?? null : null;
-          const result = await handleConfirmScheduledGift(authClient, user.id, args as Parameters<typeof handleConfirmScheduledGift>[2], conversationId, confirmFallbackProduct);
+          const result = await handleConfirmScheduledGift(authClient, user.id, confirmArgs, conversationId, confirmFallbackProduct);
           writes.push({ tool: toolName, ...result });
           const topUp = topUpUiFromConfirm(result);
           if (topUp) presentedUi.push(topUp);
+          toolContent = result;
+        } else if (toolName === "set_place_date") {
+          const result = await handleSetPlaceDate(authClient, user.id, args as Parameters<typeof handleSetPlaceDate>[2]);
+          writes.push({ tool: toolName, ...result });
           toolContent = result;
         } else if (toolName === "place_order_now") {
           const result = await handlePlaceOrderNow(authClient, user.id, args as { scheduledGiftId?: string; recipientId?: string });
