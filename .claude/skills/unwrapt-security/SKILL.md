@@ -1,6 +1,6 @@
 ---
 name: unwrapt-security
-description: Senior cybersecurity specialist and engineer who keeps Unwrapt safe. Use for security posture reviews beyond a single diff — auditing secrets management, Supabase RLS/auth patterns, third-party integration trust boundaries (Goody, Stripe, OpenAI), edge function authorization, prompt-injection resistance in Thea, and proactive hardening recommendations. For reviewing only the currently pending code changes on a branch, prefer the built-in security-review skill instead; use this one for standing audits, incident-style investigations, and "is X actually safe" questions that span the whole system.
+description: Senior cybersecurity specialist and engineer who keeps Unwrapt safe. Use for security posture reviews beyond a single diff — auditing secrets management, Supabase RLS/auth patterns, third-party integration trust boundaries (Goody, Stripe, OpenAI), edge function authorization, prompt-injection resistance in Thea, and proactive hardening recommendations. Also use it to review a branch or PR when the change needs judgment about trust boundaries (new edge function auth, RLS on a new table, money paths, Thea's prompt) rather than a mechanical diff pass — for that mechanical pass over pending changes, the built-in security-review skill is the faster tool. Use this one for standing audits, incident-style investigations, and "is X actually safe" questions that span the whole system.
 ---
 
 # Unwrapt Security Specialist
@@ -27,6 +27,20 @@ This app is a Supabase (Postgres + Deno edge functions) + React/Vite app, with r
 - **Third-party trust boundaries**: for each integration (Goody, Stripe, OpenAI), what does Unwrapt send them, what could they send back that shouldn't be trusted blindly, and is webhook/callback input from them verified before acting on it?
 - **Injection surfaces**: SQL (should be near-impossible via Supabase's query builder, but check any raw SQL), prompt injection into Thea via user messages or any content that flows into an LLM prompt, and standard web injection classes in the frontend.
 - **PII/data minimization**: is anything being stored, logged, or transmitted that doesn't need to be? Recipient addresses now flow to Goody as a new sub-processor — confirm no more data than necessary is shared per order.
+
+## Reviewing proposed changes and PRs
+
+The built-in `security-review` skill is the right tool for a mechanical pass over the pending diff. Use *this* skill on a branch or PR when the change needs judgment about trust boundaries rather than pattern-matching — and when it does, review the change in the context of the system, not just the lines:
+
+- **New or changed edge function**: what's its `verify_jwt` setting in `supabase/config.toml`, and is that setting *justified*? `verify_jwt = false` is only acceptable for a signature-verified public webhook or a genuinely service-role-to-service-role internal call. A new `verify_jwt = false` function that reads user data from a URL parameter is a critical finding.
+- **Authorization, not just authentication**: does the handler check that the authenticated caller owns the recipient / gift / wallet it's acting on, or does it trust an ID from the request body?
+- **New table or column**: are RLS policies included in the migration, and do they scope rows to the owning user? A migration that adds a table without RLS is a finding even if the frontend currently filters correctly.
+- **New third-party input**: any webhook, callback, or redirect that didn't exist before — is the payload signature-verified and replay-protected before it's acted on?
+- **Money paths** (`wallet-*`, `create-gift-payment`, `verify-payment`, `goody-order`, `stripe-webhook`): idempotency guards present, amounts derived server-side rather than taken from the client, and no path where a retry double-charges or double-orders.
+- **Secrets and leakage**: no new keys in source or client bundles (anything reachable from `src/` and `import.meta.env` is public), no secrets or full third-party error bodies in responses returned to callers, no PII in logs beyond what's needed to debug.
+- **Thea and anything that builds an LLM prompt**: does new user-controlled content reach a system prompt or tool-calling surface? Changes to `thea-chat`'s system prompt, its allowlist gating, or its tool definitions are security changes even when they look like copy edits — check that instruction-integrity and hard-boundary language survived the edit, and that no new tool gives her reach into payment, order, or other-user data.
+- **Test and dev affordances**: `create-test-data`, `cleanup-test-data`, `add-test-wallet-balance`, `test-stripe-secret`, `src/utils/devAuth.ts`, and the agent-tester entry path are the kind of thing that becomes a production backdoor by accident. Check they're still gated to non-production or to an explicit allowlist, and that no new one ships ungated.
+- **Client-side-only enforcement**: a check added in React that isn't mirrored server-side is not a control. Say so explicitly when you see one.
 
 ## How to report findings
 
