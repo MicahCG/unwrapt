@@ -32,7 +32,7 @@ import {
   priorityPaymentItems,
   type BriefingItem,
 } from '@/lib/dashboardBriefing';
-import { getRecipientStatus, giftStage, hasRecipientAddress, isWalletGift, type GiftRecord, type RecipientRecord } from '@/lib/giftStatus';
+import { getRecipientStatus, giftStage, hasRecipientAddress, isSettledGiftStatus, isWalletGift, type GiftRecord, type RecipientRecord } from '@/lib/giftStatus';
 import { VoiceDictateButton } from '@/components/dashboard/VoiceDictateButton';
 import { useSpeechDictation } from '@/hooks/useSpeechDictation';
 import { resumeGiftPayment } from '@/lib/giftPayment';
@@ -85,6 +85,8 @@ export type UpcomingEventPreview = {
   recipient: string;
   status: string;
   when: string;
+  /** Funds are reserved, or the gift is already ordered, shipped, or delivered. */
+  handled: boolean;
 };
 
 export const TheaIdentityChip: React.FC<{
@@ -174,7 +176,10 @@ export const TheaIdentityChip: React.FC<{
                     <li
                       key={event.id}
                       className="flex items-center justify-between gap-3 rounded-[14px] border px-3 py-2"
-                      style={{ background: U.surface, borderColor: U.border }}
+                      style={{
+                        background: event.handled ? U.sageSoft : U.surface,
+                        borderColor: event.handled ? 'rgba(110,123,91,0.35)' : 'rgba(182,91,60,0.28)',
+                      }}
                     >
                       <span className="min-w-0">
                         <span className="block truncate text-[14px] font-medium" style={{ color: U.ink }}>
@@ -186,7 +191,10 @@ export const TheaIdentityChip: React.FC<{
                       </span>
                       <span
                         className="shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold"
-                        style={{ background: U.chip, color: '#5A5147' }}
+                        style={{
+                          background: event.handled ? '#E3E8DA' : '#F7E4DA',
+                          color: event.handled ? '#4F5C3F' : '#87432E',
+                        }}
                       >
                         {event.status}
                       </span>
@@ -1018,12 +1026,14 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   };
   const upcomingEvents = briefing.upcoming.slice(0, 3).map((item) => {
     const recipient = recipients.find((row) => row.id === item.recipientId);
-    const hasGift = Boolean(recipient?.scheduled_gifts?.length);
+    const giftStatus = recipient?.scheduled_gifts?.length ? getRecipientStatus(recipient) : null;
+    const handled = giftStatus != null && isSettledGiftStatus(giftStatus.key);
     return {
       id: `${item.recipientId}:${item.label}`,
       recipient: item.recipientName,
       when: item.detail,
-      status: recipient && hasGift ? getRecipientStatus(recipient).label : 'No gift yet',
+      status: giftStatus?.label ?? 'No gift yet',
+      handled,
     };
   });
 
