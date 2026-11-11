@@ -45,12 +45,53 @@ import {
   ensureWalletTopUpUi,
   looksLikePaymentIntent,
 } from '@/lib/theaChatUi';
-import type { TheaPose } from '@/components/unwrapt2/TheaFigure';
+import type { TheaPose, TheaReaction } from '@/components/unwrapt2/TheaFigure';
 import {
   buildGiftResumeMessage,
   consumePendingGiftResume,
   type PendingGiftResume,
 } from '@/lib/postSubscribeResume';
+
+/** Live identity state Thea reports so the dashboard can share one header row with the account pill. */
+export type TheaHeaderChrome = {
+  pose: TheaPose | TheaReaction;
+  lively: boolean;
+  status: string;
+};
+
+export const TheaIdentityChip: React.FC<{ chrome: TheaHeaderChrome; className?: string }> = ({
+  chrome,
+  className = '',
+}) => (
+  <div
+    className={`u-thea-identity-chip min-w-0${chrome.lively ? ' u-thea-identity-chip--lively' : ''}${className ? ` ${className}` : ''}`}
+    aria-label="Thea, your gifting agent"
+  >
+    <TheaAvatar size={34} pose={chrome.pose} />
+    <div className="u-thea-identity-chip__copy">
+      <div className="truncate text-[9px] font-semibold uppercase tracking-[0.14em]" style={{ color: U.accent }}>
+        Your gifting agent
+      </div>
+      <div className="font-display truncate text-[17px] leading-tight" style={{ color: U.ink }}>
+        Thea
+      </div>
+      <span className="sr-only" aria-live="polite">
+        {chrome.status}
+      </span>
+    </div>
+  </div>
+);
+
+/** Reports chip state upward without putting a hook after late render math in TheaHomeTab. */
+const TheaChromeReporter: React.FC<{
+  chrome: TheaHeaderChrome;
+  onChange: (chrome: TheaHeaderChrome) => void;
+}> = ({ chrome, onChange }) => {
+  useEffect(() => {
+    onChange(chrome);
+  }, [chrome.pose, chrome.lively, chrome.status, onChange]);
+  return null;
+};
 
 /** Per user+gift: unpaid return nudge already shown this browser session. */
 const UNPAID_NUDGE_KEY = 'unwrapt_unpaid_nudge';
@@ -138,6 +179,8 @@ interface TheaHomeTabProps {
   recipientsLoaded?: boolean;
   /** Lets the dashboard hide the Thea/Manual tab bar and pin to the visual viewport while typing. */
   onComposerFocusChange?: (focused: boolean) => void;
+  /** Keeps Thea's frosted identity chip in the shared dashboard header beside the account pill. */
+  onHeaderChromeChange?: (chrome: TheaHeaderChrome) => void;
 }
 
 const STATUS_LINE: Partial<Record<TheaPose, string>> = {
@@ -158,6 +201,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   queuedMessage,
   recipientsLoaded = true,
   onComposerFocusChange,
+  onHeaderChromeChange,
 }) => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -842,41 +886,27 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   const latestReviewIndex = messages.reduce((latest, m, i) => (m.review ? i : latest), -1);
   // Soft expand while she reacts, thinks, or a send is in flight — then settle.
   const chipLively = sending || Boolean(reaction) || pose === 'thinking' || pose === 'listening';
+  const headerStatus = STATUS_LINE[pose] || 'Here when you need me';
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
-      <div className="relative min-h-0 flex-1">
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 px-0.5 pt-0.5">
-          <div
-            className={`u-thea-identity-chip${chipLively ? ' u-thea-identity-chip--lively' : ''}`}
-            aria-label="Thea, your gifting agent"
-          >
-            <TheaAvatar size={38} pose={reaction ?? pose} />
-            <div className="u-thea-identity-chip__copy">
-              <div className="text-[9.5px] font-semibold uppercase tracking-[0.16em]" style={{ color: U.accent }}>
-                Your gifting agent
-              </div>
-              <div className="font-display text-[18px] leading-tight" style={{ color: U.ink }}>
-                Thea
-              </div>
-              <span className="sr-only" aria-live="polite">
-                {STATUS_LINE[pose] || 'Here when you need me'}
-              </span>
-            </div>
-          </div>
-        </div>
-
+      {onHeaderChromeChange && (
+        <TheaChromeReporter
+          chrome={{ pose: reaction ?? pose, lively: chipLively, status: headerStatus }}
+          onChange={onHeaderChromeChange}
+        />
+      )}
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto pt-1 pr-1"
+        style={{ scrollPaddingBottom: listPadBottom }}
+        aria-live="polite"
+      >
         <div
-          ref={scrollRef}
-          className="h-full min-h-0 overflow-x-hidden overflow-y-auto pt-[4.25rem] pr-1"
-          style={{ scrollPaddingBottom: listPadBottom }}
-          aria-live="polite"
+          ref={chatContentRef}
+          className="space-y-3"
+          style={{ paddingBottom: listPadBottom }}
         >
-          <div
-            ref={chatContentRef}
-            className="space-y-3"
-            style={{ paddingBottom: listPadBottom }}
-          >
           {history === 'loading' && (
             <p className="text-center text-[12.5px]" style={{ color: U.muted }}>Loading your conversation…</p>
           )}
@@ -966,7 +996,6 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
               </div>
             </div>
           )}
-          </div>
         </div>
       </div>
 

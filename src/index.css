@@ -633,8 +633,8 @@
   display: inline-flex;
   max-width: 100%;
   align-items: center;
-  gap: 10px;
-  padding: 7px 14px 7px 7px;
+  gap: 8px;
+  padding: 5px 12px 5px 5px;
   border-radius: 999px;
   border: 1px solid rgba(42, 37, 32, 0.1);
   background: rgba(250, 246, 238, 0.72);
@@ -652,12 +652,12 @@
     background-color 220ms ease;
 }
 .u-thea-identity-chip--lively {
-  padding: 9px 16px 9px 9px;
+  padding: 7px 14px 7px 7px;
   background: rgba(251, 239, 229, 0.8);
   box-shadow:
     0 1px 0 rgba(255, 252, 245, 0.75) inset,
     0 12px 28px rgba(42, 37, 32, 0.09);
-  transform: scale(1.035);
+  transform: scale(1.03);
 }
 .u-thea-identity-chip__copy {
   min-width: 0;
@@ -680,7 +680,7 @@
   }
   .u-thea-identity-chip--lively {
     transform: none;
-    padding: 7px 14px 7px 7px;
+    padding: 5px 12px 5px 5px;
   }
 }
 
