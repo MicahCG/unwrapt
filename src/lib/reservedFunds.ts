@@ -5,8 +5,11 @@ export {
   formatUsd,
   orderNowConfirmationCopy,
   planDirectCharge,
+  planReserveFunds,
   planReservedCharge,
   roundMoney,
+  topUpShortfall,
   type OrderNowDecision,
   type ReservationAssessment,
+  type ReserveFundsPlan,
 } from '../../supabase/functions/_shared/reservedFunds.ts';

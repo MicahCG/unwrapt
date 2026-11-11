@@ -176,6 +176,7 @@ export const ensureWalletTopUpUi = (
   ui: ChatUiModule[],
   recipients: RecipientRecord[],
   available: number,
+  reservedApplied = 0,
 ): { reply: string; ui: ChatUiModule[] } => {
   if (!looksLikePaymentIntent(userMessage)) return { reply, ui };
   if (ui.some((m) => m.module === 'wallet_topup')) return { reply, ui };
@@ -183,6 +184,8 @@ export const ensureWalletTopUpUi = (
   if (!match?.gift.id) return { reply, ui };
 
   const giftTitle = match.gift.gift_type || match.gift.gift_description || 'their gift';
+  const fromGift = Number((match.gift as { wallet_reservation_amount?: number | null }).wallet_reservation_amount) || 0;
+  const reserved = Math.max(reservedApplied, fromGift);
   return {
     reply,
     ui: [...ui, {
@@ -192,6 +195,7 @@ export const ensureWalletTopUpUi = (
       giftTitle,
       needed: calculateGiftCost(Number(match.gift.payment_amount ?? match.gift.estimated_cost) || 0),
       available,
+      reservedApplied: reserved > 0.009 ? reserved : undefined,
     }],
   };
 };

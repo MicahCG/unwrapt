@@ -34,6 +34,7 @@ import {
   looksLikeOrderNowIntent,
   buildOrderNowDirectiveMessage,
   systemPromptIncludesReservedOrderRules,
+  systemPromptIncludesSwapReservedReuse,
   systemPromptIncludesPlaceDateAsk,
   looksLikePlaceDateChange,
   handleSetPlaceDate,
@@ -880,6 +881,10 @@ Deno.test("buildRecipientStatusEntries maps gift/address/preferences checks", ()
   assertEquals(entries[1].giftScheduled, false);
   assertEquals(entries[1].hasAddress, false);
   assertEquals(entries[1].hasPreferences, false);
+});
+
+Deno.test("swap funding copy tells Thea to move the prior hold and only ask for the delta", () => {
+  assert(systemPromptIncludesSwapReservedReuse());
 });
 
 Deno.test("a fully reserved gift never gets top-up wording, and a short hold states the exact difference", () => {
