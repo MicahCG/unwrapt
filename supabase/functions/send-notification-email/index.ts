@@ -537,7 +537,7 @@ function getEmailContent(type: EmailType, userName: string | undefined, data: an
               <p><strong>Occasion:</strong> ${data?.occasion}</p>
               ${data?.error ? `<p><strong>Issue:</strong> ${data.error}</p>` : ''}
             </div>
-            <p>Don't worry - if funds were reserved, they've been released back to your wallet. You can try again or send the gift manually.</p>
+            <p>Don't worry — the money for this gift is still in your wallet, and nothing extra was charged. We'll try again, and you can also ask Thea to place it now.</p>
             <div class="cta">
               <a href="${appUrl}" class="button">View Dashboard</a>
             </div>

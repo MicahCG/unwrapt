@@ -29,6 +29,11 @@ import {
   giftOrderTiming,
   resolveShippingLeadDays,
   shippingLeadDaysFromProduct,
+  looksLikeOrderNowIntent,
+  buildOrderNowDirectiveMessage,
+  systemPromptIncludesReservedOrderRules,
+  RESERVED_ORDER_RULES,
+  decideReservedOrder,
   buildRecipientStatusEntries,
   buildAccountRosterFromRows,
   formatAccountRosterSection,
@@ -456,6 +461,7 @@ Deno.test("giftOrderTiming places the order from occasion minus shipping lead mi
   // Default lead 21 + arrival buffer 3 = 24 days before the occasion.
   const timing = giftOrderTiming("2026-12-02", { today: "2026-10-01" });
   assertEquals(timing?.placeOrderOn, "2026-11-08");
+  assertEquals(timing?.idealPlaceOrderOn, "2026-11-08");
   assertEquals(timing?.deliveryBy, "2026-11-29");
   assertEquals(timing?.shippingLeadDays, 21);
   assertEquals(timing?.placeOrderASAP, false);
@@ -467,6 +473,7 @@ Deno.test("giftOrderTiming clamps past place dates to today and marks tight wind
   // Mid-November for a Dec 2 birthday: ideal place (Nov 8) is past; 21-day ship can't hit Nov 29.
   const timing = giftOrderTiming("2026-12-02", { today: "2026-11-11" });
   assertEquals(timing?.placeOrderOn, "2026-11-11");
+  assertEquals(timing?.idealPlaceOrderOn, "2026-11-08");
   assertEquals(timing?.deliveryBy, "2026-11-29");
   assertEquals(timing?.placeOrderASAP, true);
   assertEquals(timing?.feasible, false);
@@ -539,4 +546,48 @@ Deno.test("buildRecipientStatusEntries maps gift/address/preferences checks", ()
   assertEquals(entries[1].giftScheduled, false);
   assertEquals(entries[1].hasAddress, false);
   assertEquals(entries[1].hasPreferences, false);
+});
+
+Deno.test("a fully reserved gift never gets top-up wording, and a short hold states the exact difference", () => {
+  assert(systemPromptIncludesReservedOrderRules());
+  assert(/never request a top-up/i.test(RESERVED_ORDER_RULES));
+  assert(RESERVED_ORDER_RULES.includes("place_order_now"));
+  assert(!/place immediately/.test(RESERVED_ORDER_RULES));
+
+  const covered = decideReservedOrder({
+    owned: true,
+    hasAddress: true,
+    alreadyOrdered: false,
+    recipientName: "Alex",
+    productPrice: 40,
+    pendingReserved: 47,
+    paymentStatus: "unpaid",
+  });
+  assertEquals(covered.action, "place");
+  if (covered.action !== "place") return;
+  assert(!/top-?up/i.test(covered.confirmationCopy));
+  assert(!/add funds/i.test(covered.confirmationCopy));
+  assert(/nothing new will be charged/i.test(covered.confirmationCopy));
+  assert(covered.confirmationCopy.includes("$47"));
+
+  const short = decideReservedOrder({
+    owned: true,
+    hasAddress: true,
+    alreadyOrdered: false,
+    recipientName: "Alex",
+    productPrice: 50,
+    pendingReserved: 47,
+    paymentStatus: "unpaid",
+  });
+  assertEquals(short.action, "shortfall");
+  if (short.action !== "shortfall") return;
+  assertEquals(short.shortfall, 10);
+  assert(short.confirmationCopy.includes("$10"));
+  assert(!/top-?up/i.test(short.confirmationCopy));
+
+  assert(looksLikeOrderNowIntent("please order it now, shipping takes weeks"));
+  assertEquals(shouldForceWalletTopUpUi("please order it now", []), false);
+  const directive = buildOrderNowDirectiveMessage(true) || "";
+  assert(directive.includes("place_order_now"));
+  assert(/do not ask for a top-up/i.test(directive));
 });
