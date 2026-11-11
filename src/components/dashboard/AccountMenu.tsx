@@ -18,6 +18,11 @@ interface AccountMenuProps {
 
 const money = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 
+/** Spendable funds — sage from the Unwrapt palette (ready / free to use). */
+const availableTone = U.sage;
+/** Held for upcoming gifts — warm muted taupe, quieter than Available. */
+const reservedTone = U.muted;
+
 /**
  * The profile thumbnail doubles as the wallet: balance at a glance, Add funds one tap away,
  * and a plain explanation of how membership and autopilot differ.
@@ -79,15 +84,15 @@ const AccountMenu: React.FC<AccountMenuProps> = ({
           </div>
           {hasWallet ? (
             <>
-              <p className="mt-1 font-mono text-[20px]" style={{ color: U.ink }}>{money(walletBalance!)}</p>
-              <dl className="mt-2 grid gap-1 text-[12px]" style={{ color: U.textSecondary }}>
+              <p className="mt-1 font-mono text-[20px] font-semibold" style={{ color: U.ink }}>{money(walletBalance!)}</p>
+              <dl className="mt-2 grid gap-1 text-[12px]">
                 <div className="flex justify-between gap-3">
-                  <dt>Available</dt>
-                  <dd className="font-mono font-semibold" style={{ color: U.ink }}>{money(shownAvailable)}</dd>
+                  <dt style={{ color: availableTone }}>Available</dt>
+                  <dd className="font-mono font-semibold" style={{ color: availableTone }}>{money(shownAvailable)}</dd>
                 </div>
                 <div className="flex justify-between gap-3">
-                  <dt>Reserved</dt>
-                  <dd className="font-mono font-semibold" style={{ color: U.ink }}>{money(reserved)}</dd>
+                  <dt style={{ color: reservedTone }}>Reserved</dt>
+                  <dd className="font-mono font-medium" style={{ color: reservedTone }}>{money(reserved)}</dd>
                 </div>
               </dl>
               {reservations.length > 0 && (
@@ -95,13 +100,13 @@ const AccountMenu: React.FC<AccountMenuProps> = ({
                   {reservations.map((row) => {
                     const first = row.recipientName.split(' ')[0] || row.recipientName;
                     return (
-                      <li key={row.scheduledGiftId} className="flex items-start justify-between gap-2 text-[11.5px] leading-4" style={{ color: U.textSecondary }}>
+                      <li key={row.scheduledGiftId} className="flex items-start justify-between gap-2 text-[11.5px] leading-4" style={{ color: reservedTone, opacity: 0.9 }}>
                         <span className="min-w-0">
-                          <span className="font-medium" style={{ color: U.ink }}>{first}</span>
+                          <span className="font-medium" style={{ color: reservedTone }}>{first}</span>
                           {' · '}
                           {row.giftTitle}
                         </span>
-                        <span className="shrink-0 font-mono font-semibold" style={{ color: U.ink }}>{money(row.amount)}</span>
+                        <span className="shrink-0 font-mono font-medium" style={{ color: reservedTone }}>{money(row.amount)}</span>
                       </li>
                     );
                   })}
