@@ -56,6 +56,11 @@ import {
   swapSuccessCopy,
   reviewReplacesGift,
   markerToPersist,
+  replyNamesReviewProduct,
+  replyClaimsOnlyOtherGift,
+  reviewOfferCopy,
+  alignReviewReply,
+  alignReviewPresentation,
   unswappableGiftReason,
   buildRecipientStatusEntries,
   buildAccountRosterFromRows,
@@ -518,8 +523,68 @@ Deno.test("a swap review marker is persisted so yes can confirm, even without GI
   const swapReview = { replacesGiftTitle: "Coffee O'Clock", productTitle: "Layla Red Wine Glasses" };
   assert(reviewReplacesGift(swapReview));
   assertEquals(markerToPersist(marker, "Want me to swap Coffee O'Clock for the wine glasses?", [], swapReview), marker);
-  assertEquals(markerToPersist(marker, "Want me to schedule the wine glasses?", [], { productTitle: "Layla Red Wine Glasses" }), null);
+  // Aligned bubble that names the gift also persists (non-swap).
+  assertEquals(
+    markerToPersist(marker, "I'll schedule the Layla Red Wine Glasses for Aunty. Confirm?", [], {
+      productTitle: "Layla Red Wine Glasses",
+    }),
+    marker,
+  );
+  assertEquals(markerToPersist(marker, "Want me to schedule something nice?", [], { productTitle: "Layla Red Wine Glasses" }), null);
   assertEquals(markerToPersist(marker, "GIFT_REVIEW: rec_aunty:prod_wine:2026-12-02", [], { productTitle: "Layla" }), marker);
+});
+
+Deno.test("alignReviewPresentation rewrites cookie-only copy when the swap card is wine glasses", () => {
+  const swapReview = {
+    productId: "prod_wine",
+    productTitle: "Layla Red Wine Glasses",
+    recipientName: "Aunty Ulan",
+    replacesGiftTitle: "Coffee O'Clock",
+    price: 34,
+  };
+  const cookieOnly =
+    "For a sweet option, only the Gluten-Free Cookie 4-Pack is available right now under budget.";
+  assert(replyClaimsOnlyOtherGift(cookieOnly, swapReview.productTitle));
+  assertEquals(replyNamesReviewProduct(cookieOnly, swapReview.productTitle), false);
+
+  const aligned = alignReviewPresentation(cookieOnly, swapReview, [
+    { id: "prod_cookie", title: "Gluten-Free Cookie 4-Pack" },
+  ]);
+  assert(aligned.review);
+  assertEquals(aligned.products, []);
+  assert(replyNamesReviewProduct(aligned.reply, "Layla Red Wine Glasses"));
+  assertEquals(replyClaimsOnlyOtherGift(aligned.reply, "Layla Red Wine Glasses"), false);
+  assert(aligned.reply.includes("Coffee O'Clock"));
+  assert(aligned.reply.includes("Confirm?"));
+});
+
+Deno.test("alignReviewPresentation drops a non-swap review when the bubble pitches other catalog cards", () => {
+  const review = {
+    productId: "prod_wine",
+    productTitle: "Layla Red Wine Glasses",
+    recipientName: "Aunty",
+    price: 34,
+  };
+  const pitch = "Here are a couple of sweet picks under $40.";
+  const products = [{ id: "prod_cookie", title: "Gluten-Free Cookie 4-Pack" }];
+  const aligned = alignReviewPresentation(pitch, review, products);
+  assertEquals(aligned.review, null);
+  assertEquals(aligned.products, products);
+  assertEquals(aligned.reply, pitch);
+});
+
+Deno.test("alignReviewReply keeps a bubble that already names the reviewed gift", () => {
+  const review = {
+    productTitle: "Layla Red Wine Glasses",
+    recipientName: "Aunty",
+    replacesGiftTitle: "Coffee O'Clock",
+  };
+  const ok = "I'll swap Coffee O'Clock for the Layla Red Wine Glasses for Aunty. Confirm?";
+  assertEquals(alignReviewReply(ok, review), ok);
+  assertEquals(
+    reviewOfferCopy({ ...review, price: 34 }),
+    "I'll swap Coffee O'Clock for the Layla Red Wine Glasses ($34) for Aunty. Confirm?",
+  );
 });
 
 Deno.test("giftOrderTiming places the order from occasion minus shipping lead minus buffer", () => {

@@ -165,7 +165,7 @@ Account context (when present) already lists saved people and whether a calendar
 
 ## Choosing and scheduling a specific gift
 When the user picks one specific gift for a specific recipient, whether by tapping a card or naming it in text (match their words to the right id from your most recent search_gifts results, do not search again or repeat the list), call select_gift. It returns a review, not a save - nothing has been scheduled yet. Tell the user, in one short line, exactly what you're about to schedule (recipient, gift, price, occasion date, and the concrete place/arrive timing from review.timing) and ask them to confirm. If review.timing.feasible is false, lead with that warning and options before asking to confirm. Use future or conditional phrasing only ("I'll schedule...", "Ready to send...", "Want me to lock this in?") - never past tense or completed-action phrasing ("I've scheduled...", "This is booked...", "Done!") for a review, since nothing is booked until the user confirms and you call confirm_scheduled_gift; claiming otherwise is exactly the kind of invented completed action the hard boundaries above forbid.
-If select_gift returns a review with replacesGiftTitle, the recipient already has a different gift scheduled for that occasion that can still be changed - offer the swap in one short line (e.g. "I'll swap Coffee Beans for the French Chocolate box - confirm?") and still include the reviewMarker; do not dead-end or tell them to pick someone else. A status of confirmed or approved with no goody order is still swappable. When they say yes, call confirm_scheduled_gift — that replaces the gift and moves the wallet hold to the new price. Never offer a swap and then refuse it. If select_gift reports alreadyScheduled with no review (same gift already booked, or it's already ordered/shipped), say that in this same turn and do not ask if they want to swap.
+If select_gift returns a review with replacesGiftTitle, the recipient already has a different gift scheduled for that occasion that can still be changed - offer the swap in one short line (e.g. "I'll swap Coffee Beans for the French Chocolate box - confirm?") naming review.productTitle exactly, and still include the reviewMarker; do not dead-end or tell them to pick someone else. A status of confirmed or approved with no goody order is still swappable. When they say yes, call confirm_scheduled_gift — that replaces the gift and moves the wallet hold to the new price. Never offer a swap and then refuse it. Never say only a different gift is available in the same turn you present that review (the app shows a swap/review card for review.productTitle, so claiming "only the cookies" while the card is wine glasses is a hard contradiction). If select_gift reports alreadyScheduled with no review (same gift already booked, or it's already ordered/shipped), say that in this same turn and do not ask if they want to swap.
 
 This is a hard rule with no exceptions: whenever a select_gift result includes a reviewMarker field, add that exact string, unmodified, on its own new line somewhere in your reply (example: GIFT_REVIEW: abc123:def456:2026-11-01) - before the RECOMMENDED_IDS line if your reply also has one. Do this every time you present that review, including if you repeat or rephrase it later - the user never sees this line, but omitting it permanently breaks their ability to confirm the gift. Do not include this line in any other reply, and never include it when select_gift reported alreadyScheduled instead of a review.
 
@@ -827,7 +827,120 @@ export const reviewReplacesGift = (review: unknown): boolean => {
   return typeof title === "string" && title.trim().length > 0;
 };
 
-/** Persist a swap review marker even when the model forgets the GIFT_REVIEW line, so "yes" can confirm. */
+export type ReviewAlignFields = {
+  productId?: string;
+  productTitle?: string;
+  recipientName?: string;
+  replacesGiftTitle?: string | null;
+  price?: number;
+  confirmationCopy?: string | null;
+};
+
+/** Significant title tokens for matching "Layla Red Wine Glasses" ≈ "wine glasses". */
+export const significantTitleTokens = (title: string): string[] =>
+  title
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length > 3 && !["with", "from", "pack", "piece", "pieces", "set"].includes(w));
+
+/** True when the reply clearly names the reviewed gift (full title or distinctive tokens). */
+export const replyNamesReviewProduct = (reply: string, productTitle: string): boolean => {
+  const title = productTitle.trim();
+  if (!title || !reply.trim()) return false;
+  const hay = reply.toLowerCase();
+  if (hay.includes(title.toLowerCase())) return true;
+  const tokens = significantTitleTokens(title);
+  if (tokens.length === 0) return hay.includes(title.toLowerCase());
+  if (tokens.length === 1) return hay.includes(tokens[0]);
+  const hit = tokens.filter((t) => hay.includes(t)).length;
+  return hit >= Math.min(2, tokens.length);
+};
+
+/**
+ * Detects "only the Cookie Pack is available" / "the only sweet option is …"
+ * when that named gift is not the one on the review/swap card.
+ */
+export const replyClaimsOnlyOtherGift = (reply: string, productTitle: string): boolean => {
+  if (!reply.trim() || !productTitle.trim()) return false;
+  if (replyNamesReviewProduct(reply, productTitle)) return false;
+  return /\bonly\b[\s\S]{0,80}\b(?:available|option|choice|match|one)\b/i.test(reply)
+    || /\b(?:the )?only\b[\s\S]{0,60}\b(?:is|are)\b/i.test(reply)
+    || /\bnothing (?:else|other)\b/i.test(reply)
+    || /\bno other\b[\s\S]{0,40}\b(?:available|option)/i.test(reply);
+};
+
+/** Deterministic offer line so the bubble matches the structured review card. */
+export const reviewOfferCopy = (review: ReviewAlignFields): string => {
+  const gift = (review.productTitle || "this gift").trim();
+  const who = (review.recipientName || "").trim().split(/\s+/)[0];
+  const forWhom = who ? ` for ${who}` : "";
+  const price = typeof review.price === "number" && review.price > 0
+    ? ` ($${Number.isInteger(review.price) ? review.price : review.price.toFixed(2)})`
+    : "";
+  const replaced = typeof review.replacesGiftTitle === "string" ? review.replacesGiftTitle.trim() : "";
+  const lead = replaced
+    ? `I'll swap ${replaced} for the ${gift}${price}${forWhom}. Confirm?`
+    : `I'll schedule the ${gift}${price}${forWhom}. Confirm?`;
+  const timing = typeof review.confirmationCopy === "string" ? review.confirmationCopy.trim() : "";
+  return timing ? `${lead} ${timing}` : lead;
+};
+
+/**
+ * When select_gift returned a review (and the UI will show that card), the chat
+ * bubble must name that same gift. Observed live: Thea claimed only cookies were
+ * available while the swap card offered wine glasses. Rewrite on mismatch.
+ * If the reply is clearly about other options and never selected this gift in
+ * text, callers may instead drop the review — see alignReviewPresentation.
+ */
+export const alignReviewReply = (reply: string, review: ReviewAlignFields | null | undefined): string => {
+  if (!review?.productTitle?.trim()) return reply;
+  const namesIt = replyNamesReviewProduct(reply, review.productTitle);
+  const onlyOther = replyClaimsOnlyOtherGift(reply, review.productTitle);
+  if (namesIt && !onlyOther) return reply;
+  return reviewOfferCopy(review);
+};
+
+/**
+ * Keep copy, card, and carousel consistent for a select_gift review.
+ * - Mismatched / "only X" copy → rewrite to the reviewed gift.
+ * - Other recommended product cards are dropped (review card is the action).
+ * - If the reply is a search-only pitch that never names the reviewed gift and
+ *   the review is not a swap, drop the review so we don't show a different target.
+ */
+export const alignReviewPresentation = (
+  reply: string,
+  review: unknown,
+  products: Array<{ id: string; title?: string }>,
+): { reply: string; review: unknown; products: Array<{ id: string; title?: string }> } => {
+  if (!review || typeof review !== "object") {
+    return { reply, review, products };
+  }
+  const fields = review as ReviewAlignFields;
+  if (!fields.productTitle?.trim()) return { reply, review, products };
+
+  const namesIt = replyNamesReviewProduct(reply, fields.productTitle);
+  const onlyOther = replyClaimsOnlyOtherGift(reply, fields.productTitle);
+  const isSwap = reviewReplacesGift(review);
+  const recommendingOthers = products.some((p) => p.id && p.id !== fields.productId);
+
+  // Search-only pivot: model abandoned the review for a different catalog list.
+  // Keep swap reviews (confirmable card) but always rewrite copy; drop non-swap
+  // reviews that the bubble never presented so we don't flash the wrong target.
+  if (!namesIt && recommendingOthers && !isSwap) {
+    return { reply, review: null, products };
+  }
+
+  const alignedReply = alignReviewReply(reply, fields);
+  // Review card already shows the chosen gift — don't also attach a carousel of others.
+  return { reply: alignedReply, review, products: [] };
+};
+
+/**
+ * Persist a review marker when the user was actually shown that gift: literal
+ * GIFT_REVIEW, recommended id, swap review, or (after alignReviewReply) a
+ * bubble that names review.productTitle. So "yes" can confirm even if the
+ * model forgot the invisible marker line.
+ */
 export const markerToPersist = (
   reviewMarker: string | null,
   finalContent: string,
@@ -837,6 +950,10 @@ export const markerToPersist = (
   if (!reviewMarker) return null;
   if (shouldPersistReviewMarker(reviewMarker, finalContent, recommendedIds)) return reviewMarker;
   if (reviewReplacesGift(review)) return reviewMarker;
+  const title = review && typeof review === "object"
+    ? (review as ReviewAlignFields).productTitle
+    : undefined;
+  if (typeof title === "string" && replyNamesReviewProduct(finalContent, title)) return reviewMarker;
   return null;
 };
 
@@ -3525,11 +3642,22 @@ Use the whole conversation, not just the last message. Return JSON only:
       });
     }
 
-    const products = recommendedIds.length > 0
+    const resolvedProducts = recommendedIds.length > 0
       ? recommendedIds.map((id) => seenProducts.get(id)).filter((p): p is Product => Boolean(p))
       : [];
 
-    const confirmedReviewMarker = markerToPersist(lastReviewMarker, finalContent, recommendedIds, lastReview);
+    // Bubble + swap/review card must agree (live: "only cookies" vs wine-glasses card).
+    const aligned = alignReviewPresentation(reply, lastReview, resolvedProducts);
+    reply = aligned.reply;
+    lastReview = aligned.review;
+    const products = aligned.products as Product[];
+
+    const confirmedReviewMarker = markerToPersist(
+      lastReview ? lastReviewMarker : null,
+      reply,
+      recommendedIds,
+      lastReview,
+    );
 
     // Persist this turn: the user's newest message (always the last entry
     // in the client-sent `messages`, since both TheaHomeTab and TheaAgent
