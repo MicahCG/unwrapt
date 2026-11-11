@@ -25,6 +25,7 @@ export type GiftProgress = {
 export type ChatUiModule =
   | { module: 'calendar_connect' }
   | { module: 'add_recipient'; focus?: ChatUiFocus }
+  | { module: 'suggest_add_recipient'; name: string }
   | { module: 'edit_recipient'; recipientId: string; recipientName: string; focus?: ChatUiFocus }
   | { module: 'wallet_topup'; scheduledGiftId: string; recipientName: string; giftTitle: string; needed: number; available: number }
   | { module: 'gift_progress'; recipientId: string; recipientName: string; gifts: GiftProgress[] };
@@ -316,6 +317,21 @@ export const AddRecipientCard: React.FC<{ focus?: ChatUiFocus; onOpen: () => voi
   </section>
 );
 
+/** A lightweight tap target offering to add one named person, shown alongside Thea's reply
+ * text rather than opening the full form outright - the pill matches the quick-reply chips
+ * in TheaHomeTab, not the bigger boxed card style the other present_ui modules use. */
+export const SuggestAddRecipientChip: React.FC<{ name: string; onOpen: (prefillName?: string) => void }> = ({ name, onOpen }) => (
+  <button
+    type="button"
+    onClick={() => onOpen(name)}
+    className="u-press mt-2 inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3.5 text-[12.5px] font-medium"
+    style={{ background: U.chip, borderColor: 'rgba(42,37,32,0.1)', color: '#5A5147' }}
+  >
+    <UserPlus className="h-3.5 w-3.5" aria-hidden="true" />
+    Add {name.split(' ')[0] || name}
+  </button>
+);
+
 /** Opens the existing edit-recipient editor for a known person. */
 export const EditRecipientCard: React.FC<{
   recipientName: string;
@@ -536,7 +552,7 @@ export const GiftProgressCard: React.FC<{
 export const ChatUiModules: React.FC<{
   modules: ChatUiModule[];
   disabled?: boolean;
-  onAddRecipient: () => void;
+  onAddRecipient: (prefillName?: string) => void;
   onEditRecipient: (recipientId: string, focus?: ChatUiFocus) => void;
   stageOf: (giftId: string) => GiftStage | null;
   onTopUp: (mod: Extract<ChatUiModule, { module: 'wallet_topup' }>, amount: number) => Promise<void>;
@@ -545,10 +561,13 @@ export const ChatUiModules: React.FC<{
   <>
     {modules.map((mod, i) => {
       if (mod.module === 'calendar_connect') {
-        return <CalendarConnectCard key={`calendar-${i}`} onAddManually={onAddRecipient} />;
+        return <CalendarConnectCard key={`calendar-${i}`} onAddManually={() => onAddRecipient()} />;
       }
       if (mod.module === 'add_recipient') {
-        return <AddRecipientCard key={`add-${i}`} focus={mod.focus} onOpen={onAddRecipient} />;
+        return <AddRecipientCard key={`add-${i}`} focus={mod.focus} onOpen={() => onAddRecipient()} />;
+      }
+      if (mod.module === 'suggest_add_recipient') {
+        return <SuggestAddRecipientChip key={`suggest-${mod.name}-${i}`} name={mod.name} onOpen={onAddRecipient} />;
       }
       if (mod.module === 'wallet_topup') {
         return (

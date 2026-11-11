@@ -10,13 +10,23 @@ import { cleanName } from '@/lib/utils';
 import { formatOccasionDate, getDaysUntil, getNextOccurrence, parseLocalDate } from '@/lib/dateUtils';
 import { getRecipientStatus, type RecipientRecord } from '@/lib/giftStatus';
 import { buildDashboardBriefing } from '@/lib/dashboardBriefing';
+import { AddRecipientForm } from '@/components/AddRecipientModal';
+import { EditRecipientForm } from '@/components/EditRecipientModal';
+
+/** Desktop only (see Dashboard's `compactChrome` routing): instead of a modal, the add/edit
+ * form renders inline in this panel, since it's already visible next to the chat. */
+export type InlinePanelMode =
+  | { kind: 'add'; prefillName?: string }
+  | { kind: 'edit'; recipient: RecipientRecord; lockName?: boolean };
 
 interface ManualHomeTabProps {
   recipients: RecipientRecord[];
   autopilotThreshold?: number;
   onOpenRecipient: (recipient: RecipientRecord) => void;
-  onAddRecipient: () => void;
+  onAddRecipient: (prefillName?: string) => void;
   onBrowseCatalog: () => void;
+  inlinePanelMode?: InlinePanelMode | null;
+  onCloseInlinePanel?: () => void;
 }
 
 const sameDay = (a: Date, b: Date) =>
@@ -28,6 +38,8 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
   onOpenRecipient,
   onAddRecipient,
   onBrowseCatalog,
+  inlinePanelMode,
+  onCloseInlinePanel,
 }) => {
   const navigate = useNavigate();
   const today = useMemo(() => {
@@ -92,6 +104,40 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
     }
     return list;
   }, [recipients, selectedDay, occasionsOn]);
+
+  if (inlinePanelMode) {
+    const title = inlinePanelMode.kind === 'add' ? 'Add someone new' : `Edit ${inlinePanelMode.recipient.name}`;
+    return (
+      <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto pb-2 [&>*]:shrink-0">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onCloseInlinePanel}
+            aria-label="Back to calendar and people"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+            style={{ background: U.chip, color: U.ink }}
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <span className="font-display text-[22px] tracking-tight" style={{ color: U.ink }}>{title}</span>
+        </div>
+        {inlinePanelMode.kind === 'add' ? (
+          <AddRecipientForm
+            initialName={inlinePanelMode.prefillName}
+            onCancel={() => onCloseInlinePanel?.()}
+            onSuccess={() => onCloseInlinePanel?.()}
+          />
+        ) : (
+          <EditRecipientForm
+            recipient={inlinePanelMode.recipient}
+            lockName={inlinePanelMode.lockName}
+            onCancel={() => onCloseInlinePanel?.()}
+            onSaved={() => onCloseInlinePanel?.()}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     // Children keep their natural height; only this column scrolls (never squashed rows).
@@ -248,7 +294,7 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
           <Eyebrow>Your people</Eyebrow>
           <button
             type="button"
-            onClick={onAddRecipient}
+            onClick={() => onAddRecipient()}
             className="inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-[12px] font-semibold"
             style={{ background: U.chip, color: U.ink }}
           >
@@ -265,7 +311,7 @@ const ManualHomeTab: React.FC<ManualHomeTabProps> = ({
                 : 'Add someone you care about and Thea will watch the moments that matter.'}
             </p>
             <div className="mt-4 flex flex-col gap-2.5">
-              <PrimaryButton onClick={selectedDay ? () => setSelectedDay(null) : onAddRecipient}>
+              <PrimaryButton onClick={selectedDay ? () => setSelectedDay(null) : () => onAddRecipient()}>
                 {selectedDay ? 'Clear filter' : 'Add someone'}
               </PrimaryButton>
             </div>

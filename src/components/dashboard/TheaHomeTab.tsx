@@ -115,7 +115,7 @@ interface TheaHomeTabProps {
   recipients: RecipientRecord[];
   autopilotThreshold?: number;
   onOpenRecipient: (recipientId: string, intent?: BriefingItem['action']) => void;
-  onAddRecipient: () => void;
+  onAddRecipient: (prefillName?: string) => void;
   onEditRecipient: (recipientId: string, focus?: ChatUiFocus) => void;
   onSwitchToManual: () => void;
   /** A message another screen asks Thea to handle (e.g. a gift chosen in the catalog). */
