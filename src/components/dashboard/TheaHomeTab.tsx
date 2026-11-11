@@ -75,8 +75,8 @@ function splitChromePose(pose: TheaPose | TheaReaction): { pose: TheaPose; react
 }
 
 /**
- * Centered frosted island (ChatGPT-style): figure above the name, floating over chat.
- * Tap opens a larger frosted presence modal with her full animation.
+ * Compact top-nav frosted chip: top half of Thea only, no name label.
+ * Tap opens a frosted presence modal with her full animation.
  */
 export const TheaIdentityChip: React.FC<{ chrome: TheaHeaderChrome; className?: string }> = ({
   chrome,
@@ -95,24 +95,18 @@ export const TheaIdentityChip: React.FC<{ chrome: TheaHeaderChrome; className?: 
         aria-expanded={open}
         onClick={() => setOpen(true)}
       >
-        <TheaCharacter
-          size="chip"
-          pose={pose}
-          reaction={reaction}
-          speaking={false}
-          className="u-thea-character--chip-inline"
-        />
-        <div className="u-thea-identity-chip__copy">
-          <div className="font-display text-[18px] leading-none" style={{ color: U.ink }}>
-            Thea
-          </div>
-          <div className="mt-1 text-[9px] font-semibold uppercase tracking-[0.14em]" style={{ color: U.accent }}>
-            Your gifting agent
-          </div>
-          <span className="sr-only" aria-live="polite">
-            {chrome.status}
-          </span>
-        </div>
+        <span className="u-thea-identity-chip__figure" aria-hidden="true">
+          <TheaCharacter
+            size="chip"
+            pose={pose}
+            reaction={reaction}
+            speaking={false}
+            className="u-thea-character--chip-inline"
+          />
+        </span>
+        <span className="sr-only" aria-live="polite">
+          {chrome.status}
+        </span>
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -150,6 +144,17 @@ export const TheaIdentityChip: React.FC<{ chrome: TheaHeaderChrome; className?: 
       </Dialog>
     </>
   );
+};
+
+/** Reports chip state upward so Dashboard can keep Thea in the top nav. */
+const TheaChromeReporter: React.FC<{
+  chrome: TheaHeaderChrome;
+  onChange: (chrome: TheaHeaderChrome) => void;
+}> = ({ chrome, onChange }) => {
+  useEffect(() => {
+    onChange(chrome);
+  }, [chrome.pose, chrome.lively, chrome.status, onChange]);
+  return null;
 };
 
 /** Per user+gift: unpaid return nudge already shown this browser session. */
@@ -238,6 +243,8 @@ interface TheaHomeTabProps {
   recipientsLoaded?: boolean;
   /** Lets the dashboard hide the Thea/Manual tab bar and pin to the visual viewport while typing. */
   onComposerFocusChange?: (focused: boolean) => void;
+  /** Keeps Thea's frosted chip in the shared top nav beside the account pill. */
+  onHeaderChromeChange?: (chrome: TheaHeaderChrome) => void;
 }
 
 const STATUS_LINE: Partial<Record<TheaPose, string>> = {
@@ -258,6 +265,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   queuedMessage,
   recipientsLoaded = true,
   onComposerFocusChange,
+  onHeaderChromeChange,
 }) => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -943,32 +951,26 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   // Soft expand while she reacts, thinks, or a send is in flight — then settle.
   const chipLively = sending || Boolean(reaction) || pose === 'thinking' || pose === 'listening';
   const headerStatus = STATUS_LINE[pose] || 'Here when you need me';
-  const islandChrome: TheaHeaderChrome = {
-    pose: reaction ?? pose,
-    lively: chipLively,
-    status: headerStatus,
-  };
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
-      <div className="relative min-h-0 flex-1">
-        {/* Centered frosted island floats over the transcript (ChatGPT agent-chip pattern). */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center px-2 pt-0.5">
-          <div className="pointer-events-auto">
-            <TheaIdentityChip chrome={islandChrome} />
-          </div>
-        </div>
+      {onHeaderChromeChange && (
+        <TheaChromeReporter
+          chrome={{ pose: reaction ?? pose, lively: chipLively, status: headerStatus }}
+          onChange={onHeaderChromeChange}
+        />
+      )}
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto pt-1 pr-1"
+        style={{ scrollPaddingBottom: listPadBottom }}
+        aria-live="polite"
+      >
         <div
-          ref={scrollRef}
-          className="h-full min-h-0 overflow-x-hidden overflow-y-auto pt-[9.75rem] pr-1"
-          style={{ scrollPaddingBottom: listPadBottom }}
-          aria-live="polite"
+          ref={chatContentRef}
+          className="space-y-3"
+          style={{ paddingBottom: listPadBottom }}
         >
-          <div
-            ref={chatContentRef}
-            className="space-y-3"
-            style={{ paddingBottom: listPadBottom }}
-          >
           {history === 'loading' && (
             <p className="text-center text-[12.5px]" style={{ color: U.muted }}>Loading your conversation…</p>
           )}
@@ -1058,7 +1060,6 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
               </div>
             </div>
           )}
-          </div>
         </div>
       </div>
 
