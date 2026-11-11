@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Settings, Wallet } from 'lucide-react';
+import { Crown, Settings, Wallet } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { U, initialsOf } from '@/components/unwrapt2/theme';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -56,11 +56,23 @@ const AccountMenu: React.FC<AccountMenuProps> = ({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="u-press flex min-h-11 items-center gap-2 rounded-full py-1 pl-3 pr-1"
-          style={{ background: '#E5DBC6', color: '#5A5147' }}
-          aria-label={hasWallet ? `Account and gift wallet, available ${money(shownAvailable)}` : 'Account'}
+          className="u-press u-account-glass-pill flex min-h-11 items-center gap-2 rounded-full py-1 pl-3 pr-1"
+          aria-label={
+            hasWallet
+              ? `VIP account and gift wallet, available ${money(shownAvailable)}`
+              : tier === 'vip'
+                ? 'VIP account'
+                : 'Account'
+          }
         >
           {hasWallet && <span className="font-mono text-[12px] font-semibold">{money(shownAvailable)}</span>}
+          {tier === 'vip' && (
+            <Crown
+              className="h-3.5 w-3.5 shrink-0"
+              style={{ color: '#B65B3C' }}
+              aria-hidden="true"
+            />
+          )}
           <span
             className="flex h-[34px] w-[34px] items-center justify-center rounded-full"
             style={{ background: U.surface, fontFamily: "'Newsreader', serif", fontStyle: 'italic', fontSize: 15 }}

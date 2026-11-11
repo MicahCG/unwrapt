@@ -409,7 +409,7 @@ const Dashboard = () => {
       <MobileShell
         maxWidthClassName="max-w-[440px] md:max-w-[680px] lg:max-w-[1180px] xl:max-w-[1400px]"
         contentClassName={`flex min-h-0 flex-col px-5 pb-2 md:px-8 lg:overflow-hidden lg:pb-6 ${
-          pinToKeyboard ? 'overflow-hidden pt-3' : 'pt-10'
+          pinToKeyboard ? 'overflow-hidden pt-3' : 'pt-5'
         } ${activeTab === 'thea' ? 'overflow-hidden' : 'overflow-y-auto'}`}
         footerClassName="lg:hidden"
         footer={
@@ -451,10 +451,7 @@ const Dashboard = () => {
           )
         }
       >
-        <div className={`mb-3 flex shrink-0 items-center justify-between ${pinToKeyboard ? 'hidden' : ''}`}>
-          <div className="font-mono text-[9px] uppercase tracking-[1px]" style={{ color: U.accent, border: '1px solid rgba(182,91,60,0.4)', padding: '3px 7px', borderRadius: 8 }}>
-            {planLabel}
-          </div>
+        <div className={`mb-2 flex shrink-0 items-center justify-end ${pinToKeyboard ? 'hidden' : ''}`}>
           <AccountMenu
             displayName={displayName}
             planLabel={planLabel}

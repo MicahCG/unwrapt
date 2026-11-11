@@ -3,7 +3,6 @@ import { Send } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { TheaAvatar } from '@/components/unwrapt2/TheaAvatar';
-import { TheaCharacter } from '@/components/unwrapt2/TheaCharacter';
 import { U } from '@/components/unwrapt2/theme';
 import {
   ChatUiModules,
@@ -841,44 +840,43 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     lastReply: lastMessage?.role === 'assistant' && !lastMessage.products?.length && !lastMessage.review ? lastMessage.content : null,
   });
   const latestReviewIndex = messages.reduce((latest, m, i) => (m.review ? i : latest), -1);
+  // Soft expand while she reacts, thinks, or a send is in flight — then settle.
+  const chipLively = sending || Boolean(reaction) || pose === 'thinking' || pose === 'listening';
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
-      <div
-        className={`flex shrink-0 items-center border-b px-1 ${composerFocused ? 'gap-2.5 py-2' : 'gap-3 pb-3'}`}
-        style={{ borderColor: 'rgba(42,37,32,0.08)' }}
-      >
-        {composerFocused ? (
-          <TheaAvatar size={40} pose={pose} />
-        ) : (
-          <TheaCharacter size="compact" pose={pose} reaction={reaction} speaking={false} className="u-thea-character--chat" />
-        )}
-        <div className="min-w-0 flex-1 text-left">
-          {!composerFocused && (
-            <div className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: U.accent }}>
-              Your gifting agent
+      <div className="relative min-h-0 flex-1">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 px-0.5 pt-0.5">
+          <div
+            className={`u-thea-identity-chip${chipLively ? ' u-thea-identity-chip--lively' : ''}`}
+            aria-label="Thea, your gifting agent"
+          >
+            <TheaAvatar size={38} pose={reaction ?? pose} />
+            <div className="u-thea-identity-chip__copy">
+              <div className="text-[9.5px] font-semibold uppercase tracking-[0.16em]" style={{ color: U.accent }}>
+                Your gifting agent
+              </div>
+              <div className="font-display text-[18px] leading-tight" style={{ color: U.ink }}>
+                Thea
+              </div>
+              <span className="sr-only" aria-live="polite">
+                {STATUS_LINE[pose] || 'Here when you need me'}
+              </span>
             </div>
-          )}
-          <div className={`font-display leading-tight ${composerFocused ? 'text-[18px]' : 'text-[22px]'}`} style={{ color: U.ink }}>
-            Thea
-          </div>
-          <div className="truncate text-[11.5px]" style={{ color: U.muted }} aria-live="polite">
-            {STATUS_LINE[pose] || 'Here when you need me'}
           </div>
         </div>
-      </div>
 
-      <div
-        ref={scrollRef}
-        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto pt-4 pr-1"
-        style={{ scrollPaddingBottom: listPadBottom }}
-        aria-live="polite"
-      >
         <div
-          ref={chatContentRef}
-          className="space-y-3"
-          style={{ paddingBottom: listPadBottom }}
+          ref={scrollRef}
+          className="h-full min-h-0 overflow-x-hidden overflow-y-auto pt-[4.25rem] pr-1"
+          style={{ scrollPaddingBottom: listPadBottom }}
+          aria-live="polite"
         >
+          <div
+            ref={chatContentRef}
+            className="space-y-3"
+            style={{ paddingBottom: listPadBottom }}
+          >
           {history === 'loading' && (
             <p className="text-center text-[12.5px]" style={{ color: U.muted }}>Loading your conversation…</p>
           )}
@@ -968,6 +966,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
 
