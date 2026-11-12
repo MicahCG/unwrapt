@@ -146,6 +146,10 @@ export const getGiftStatus = (gift: GiftRecord, recipient: RecipientRecord): Gif
   return statuses.needs_details;
 };
 
+/** Ready to order (including reserved funds), ordered, shipped, or delivered. Still needs a person if details or payment are open. */
+export const isSettledGiftStatus = (key: GiftStatusKey) =>
+  key === 'ready_to_order' || key === 'ordered' || key === 'shipped' || key === 'delivered';
+
 export const getRecipientStatus = (recipient: RecipientRecord): GiftStatus => {
   const gifts = recipient.scheduled_gifts || [];
   if (gifts.length === 0) {
