@@ -703,23 +703,43 @@ export const decideAddressForm = (args: {
   }
   const already = args.alreadyPresented.some((m) =>
     m.module === "edit_recipient" && (m.focus === "address" || m.focus == null));
-  if (args.addressRequired) return { force: !already, suppressMissingClaim: false };
-
   const onFile = addressIsOnFile(args.addressFacts);
   const explicitUpdate = looksLikeAddressFormIntent(args.latestUserMessage);
   const agreed = looksLikeAddressFormAgreement(args.latestUserMessage)
     && priorTurnAskedToAddAddress(args.recentMessages);
-  if (!args.addressFacts) return { force: false, suppressMissingClaim: false };
 
+  // An address already on file wins over a stale addressRequired flag (e.g. Goody
+  // errors that mention mailing_address.country). Only reopen the form when the
+  // user explicitly asked to add or update it.
   if (onFile) {
     return { force: !already && (explicitUpdate || agreed), suppressMissingClaim: true };
   }
+  if (args.addressRequired) return { force: !already, suppressMissingClaim: false };
+  if (!args.addressFacts) return { force: false, suppressMissingClaim: false };
 
   const missing = args.addressFacts.hasAddress === false && args.addressFacts.addressConfirmed !== true;
   const wantsForm = explicitUpdate || agreed
     || replyClaimsMissingAddress(args.modelReply)
     || replyAsksToAddAddress(args.modelReply);
   return { force: !already && missing && wantsForm, suppressMissingClaim: false };
+};
+
+/** Drop a model-opened address form when that person's address is already on file. */
+export const stripAddressFormUnlessRequested = <T extends { module: string; recipientId?: string; focus?: string }>(
+  ui: T[],
+  recipientId: string | null | undefined,
+  latestUserMessage: string,
+  recentMessages: Array<{ role?: string; content?: string }>,
+): T[] => {
+  if (!recipientId) return ui;
+  const keep = looksLikeAddressFormIntent(latestUserMessage)
+    || (looksLikeAddressFormAgreement(latestUserMessage) && priorTurnAskedToAddAddress(recentMessages));
+  if (keep) return ui;
+  return ui.filter((mod) => !(
+    mod.module === "edit_recipient"
+    && mod.recipientId === recipientId
+    && (mod.focus === "address" || mod.focus == null)
+  ));
 };
 
 /** Drop a false missing-address claim when the address is already on file. */
@@ -2833,12 +2853,15 @@ const handlePlaceOrderNow = async (
     .eq("status", "pending")
     .maybeSingle();
   const pendingReserved = Math.abs(Number(reservation?.amount) || 0) || Number(gift.wallet_reservation_amount) || 0;
+  // Prefer estimated_cost (catalog price). payment_amount can already include the
+  // $7 fee after a wallet hold, and assessReservation adds the fee again.
+  const productPrice = Number(gift.estimated_cost) || Number(gift.payment_amount) || 0;
   const decision = decideReservedOrder({
     owned: true,
     hasAddress: Boolean(recipient && hasAddress(recipient)),
     alreadyOrdered: false,
     recipientName,
-    productPrice: Number(gift.payment_amount ?? gift.estimated_cost) || 0,
+    productPrice,
     pendingReserved,
     paymentStatus: gift.payment_status,
   });
@@ -2861,14 +2884,17 @@ const handlePlaceOrderNow = async (
   if (placeError || placed?.success === false) {
     const copy = typeof placed?.confirmationCopy === "string" ? placed.confirmationCopy : null;
     const message = copy || placed?.error || placeError?.message || "The order could not be placed.";
-    const addressMissing = /address/i.test(String(message));
+    // Address was verified above. Never reopen the form from fulfillment noise
+    // (Goody "mailing_address.country" errors match a naive /address/i check).
     return {
       ok: false,
       error: message,
       confirmationCopy: copy,
       code: placed?.code,
       shortfall: placed?.shortfall,
-      ...(addressMissing ? { addressRequired: true, recipientId, recipientName } : {}),
+      hasAddress: true,
+      recipientId,
+      recipientName,
     };
   }
   return {
@@ -3675,6 +3701,15 @@ Use the whole conversation, not just the last message. Return JSON only:
       const cleared = clearMissingAddressClaim(reply, addressPick.name);
       const wipedToOnFileNote = /address is already on file\.?$/i.test(cleared);
       reply = placedOrderCopy && wipedToOnFileNote ? placedOrderCopy : cleared;
+      // Model sometimes opens edit_recipient anyway; strip it unless they asked to update.
+      const kept = stripAddressFormUnlessRequested(
+        presentedUi,
+        addressPick.id,
+        latestUserMessageContent,
+        addressHistory,
+      );
+      presentedUi.length = 0;
+      presentedUi.push(...kept);
     }
     if (addressDecision.force && addressPick) {
       showAddressForm({

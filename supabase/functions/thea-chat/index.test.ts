@@ -49,6 +49,7 @@ import {
   looksLikeAddressFormAgreement,
   shouldDirectAddressForm,
   decideAddressForm,
+  stripAddressFormUnlessRequested,
   clearMissingAddressClaim,
   pickRecipientForAddress,
   editRecipientAddressUi,
@@ -956,6 +957,26 @@ Deno.test("hasAddress true does not claim the address is missing and does not fo
   });
   assertEquals(decision.force, false);
   assertEquals(decision.suppressMissingClaim, true);
+  // Stale addressRequired (e.g. Goody mailing_address.country) must not reopen the form.
+  const falseRequired = decideAddressForm({
+    latestUserMessage: "place it today actually",
+    recentMessages: [],
+    modelReply: "I've opened the address form for Aunty.",
+    alreadyPresented: [{ module: "edit_recipient", focus: "address" }],
+    addressFacts: AUNTY_ON_FILE,
+    addressRequired: true,
+  });
+  assertEquals(falseRequired.force, false);
+  assertEquals(falseRequired.suppressMissingClaim, true);
+  assertEquals(
+    stripAddressFormUnlessRequested(
+      [{ module: "edit_recipient", recipientId: "rec_aunty", focus: "address" as const }],
+      "rec_aunty",
+      "place it today actually",
+      [],
+    ),
+    [],
+  );
   const confirmedOnly = decideAddressForm({
     latestUserMessage: "Please place Aunty's gift",
     recentMessages: [],

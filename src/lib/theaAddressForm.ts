@@ -103,10 +103,22 @@ export const ensureAddressFormForPeople = (
     const nextReply = (replyClaimsMissingAddress(reply) || replyAsksToAddAddress(reply))
       ? clearMissingAddressClaim(reply, picked.name)
       : reply;
-    if (already || !(explicit || agreed)) return { reply: nextReply, ui };
+    // Keep / open the form only when the user asked to update. Otherwise strip a
+    // model-opened edit_recipient so place-order does not bounce into UPDATE DETAILS.
+    if (explicit || agreed) {
+      if (already) return { reply: nextReply, ui };
+      return {
+        reply: nextReply,
+        ui: [...ui, { module: 'edit_recipient', recipientId: picked.id, recipientName: picked.name, focus: 'address' }],
+      };
+    }
     return {
       reply: nextReply,
-      ui: [...ui, { module: 'edit_recipient', recipientId: picked.id, recipientName: picked.name, focus: 'address' }],
+      ui: ui.filter((mod) => !(
+        mod.module === 'edit_recipient'
+        && mod.recipientId === picked.id
+        && (mod.focus === 'address' || mod.focus == null)
+      )),
     };
   }
 

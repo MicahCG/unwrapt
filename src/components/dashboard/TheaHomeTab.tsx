@@ -836,6 +836,8 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
       // Same safety net for a missing address: open the form, and don't repeat a false "address is missing".
       const addressEnsured = ensureAddressFormUi(trimmed, nextMessages.slice(0, -1), ensured.reply, ensured.ui, recipients);
       const ui = addressEnsured.ui;
+      // place_order_now / shortfall failures are not "saves"; only recipient/gift writes are.
+      const saveTools = new Set(['update_recipient', 'create_recipient', 'confirm_scheduled_gift', 'set_place_date']);
       setMessages([
         ...nextMessages,
         {
@@ -844,13 +846,19 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
           products: (data.products || []) as ChatProduct[],
           review: (data.review || null) as GiftReview | null,
           ui: ui.length ? ui : undefined,
-          unsaved: writes.some((w) => !w.ok),
+          unsaved: writes.some((w) => !w.ok && saveTools.has(w.tool)),
         },
       ]);
       // Bring up existing editors immediately so the user isn't stuck behind another tap.
+      // Do not auto-open an address editor when that person already has a delivery address.
       for (const mod of ui) {
         if (mod.module === 'add_recipient') onAddRecipient();
-        if (mod.module === 'edit_recipient') onEditRecipient(mod.recipientId, mod.focus);
+        if (mod.module === 'edit_recipient') {
+          const person = recipients.find((row) => row.id === mod.recipientId);
+          const addressFocus = !mod.focus || mod.focus === 'address';
+          if (addressFocus && person && hasRecipientAddress(person)) continue;
+          onEditRecipient(mod.recipientId, mod.focus);
+        }
       }
       return writes;
     } catch (err) {
