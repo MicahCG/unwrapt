@@ -2883,14 +2883,20 @@ const handlePlaceOrderNow = async (
   });
   if (placeError || placed?.success === false) {
     const copy = typeof placed?.confirmationCopy === "string" ? placed.confirmationCopy : null;
-    const message = copy || placed?.error || placeError?.message || "The order could not be placed.";
+    const raw = copy || placed?.error || placeError?.message || "The order could not be placed.";
+    const message = String(raw);
     // Address was verified above. Never reopen the form from fulfillment noise
     // (Goody "mailing_address.country" errors match a naive /address/i check).
+    const productGone = /no longer available|product requires a variant/i.test(message);
+    const confirmationCopy = copy
+      || (productGone
+        ? `I couldn't place ${recipientName.split(/\s+/)[0] || "their"}'s order because that gift isn't available to order right now. Nothing was charged. Want to pick a different gift?`
+        : `I couldn't place the order just now (${message.replace(/^Order creation failed:\s*/i, "")}). Nothing was charged. Want to try again?`);
     return {
       ok: false,
       error: message,
-      confirmationCopy: copy,
-      code: placed?.code,
+      confirmationCopy,
+      code: placed?.code || (productGone ? "product_unavailable" : undefined),
       shortfall: placed?.shortfall,
       hasAddress: true,
       recipientId,
