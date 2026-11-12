@@ -249,6 +249,55 @@ export const decideReservedOrder = (args: {
   };
 };
 
+/**
+ * Decide whether a new (or swapped) gift hold can be placed.
+ * `existingReserved` for this gift is transferable and is not counted in `otherReserved`.
+ * Spendable = gross − other holds (= true available + this gift's current hold).
+ * Top-up is only the shortfall against that spendable amount, never a second full charge.
+ */
+export type ReserveFundsPlan = {
+  cost: number;
+  existingReserved: number;
+  /** True wallet available: gross − all pending holds (including this gift). */
+  available: number;
+  /** Gross − other gifts' holds (includes this gift's transferable hold). */
+  spendable: number;
+  shortfall: number;
+  covered: boolean;
+};
+
+export const planReserveFunds = (args: {
+  grossBalance: number;
+  otherReserved: number;
+  existingReserved: number;
+  giftPrice: number;
+}): ReserveFundsPlan => {
+  const price = roundMoney(Math.max(0, args.giftPrice || 0));
+  const cost = roundMoney(price + (price > 0 ? SERVICE_FEE : 0));
+  const other = roundMoney(Math.max(0, args.otherReserved || 0));
+  const existing = roundMoney(Math.max(0, args.existingReserved || 0));
+  const gross = roundMoney(Math.max(0, args.grossBalance || 0));
+  const spendable = roundMoney(gross - other);
+  const available = roundMoney(spendable - existing);
+  const shortfall = roundMoney(Math.max(0, cost - Math.max(0, spendable)));
+  return {
+    cost,
+    existingReserved: existing,
+    available: Math.max(0, available),
+    spendable: Math.max(0, spendable),
+    shortfall,
+    covered: shortfall <= 0.009 && cost > 0.009,
+  };
+};
+
+/** Top-up amount once a gift's transferable reserved hold is applied. */
+export const topUpShortfall = (args: {
+  cost: number;
+  available: number;
+  reservedApplied?: number;
+}): number =>
+  roundMoney(Math.max(0, roundMoney(args.cost) - roundMoney(Math.max(0, args.available)) - roundMoney(Math.max(0, args.reservedApplied || 0))));
+
 /** Service-role bearer tokens must not be sent to auth.getUser. */
 export const resolveChargeActor = (
   token: string | null,

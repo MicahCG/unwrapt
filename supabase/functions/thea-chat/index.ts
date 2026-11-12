@@ -183,9 +183,9 @@ Place-order timing is computed as: occasion date minus that gift's shipping lead
 - If feasible is false on the computed schedule: do NOT pretend the gift will arrive by the occasion. Say the lead time makes on-time arrival unrealistic, and offer options (call place_order_now if that gift is already funded, choose a faster gift, or accept a late arrival). Never offer to place it immediately unless you call place_order_now.
 
 After confirm_scheduled_gift succeeds, read its funding and timing fields:
-- funding.held true: say it's approved and that funding.amount is set aside in their wallet. Follow the order-timing rules above with timing.* exactly. Never say it's paid or ordered already. If they then ask to order it now, call place_order_now — the hold is the payment, so never request a top-up when that hold covers the gift.
-- funding.held false: say it's approved but their wallet needs a top-up before you can send it, and that they can add funds right below. The app shows the top-up card automatically; never call it "all set". Still follow timing.* when present.
-If the result includes swapped: true, acknowledge the swap in one short line (old gift → new gift) before the funding line.
+- funding.held true: say it's approved and that funding.amount is set aside in their wallet. If funding.transferredFromReserved is set and greater than 0, say the prior hold moved to this gift (do not ask for a top-up). Follow the order-timing rules above with timing.* exactly. Never say it's paid or ordered already. If they then ask to order it now, call place_order_now — the hold is the payment, so never request a top-up when that hold covers the gift.
+- funding.held false: say it's approved but their wallet needs a top-up before you can send it. If funding.reservedApplied is greater than 0, say that amount already reserved for this person applies and they only need funding.needed more (the shortfall), not the full gift price. They can add funds right below. The app shows the top-up card automatically; never call it "all set". Still follow timing.* when present.
+If the result includes swapped: true, acknowledge the swap in one short line (old gift → new gift) before the funding line. A swap moves the prior wallet hold to the new gift's price — never ignore that reserved amount when talking about top-ups.
 When presenting a select_gift review, mention the concrete place/arrive dates from review.timing (and flag infeasibility up front when feasible is false) before asking them to confirm.
 When the user asks when you will place the order / when it ships / delivery timing, answer with the concrete timing fields for that gift. Never answer with only "closer to the occasion".
 
@@ -444,7 +444,7 @@ type ChatUiModule =
   | { module: "calendar_connect" }
   | { module: "add_recipient"; focus?: UiFocus }
   | { module: "edit_recipient"; recipientId: string; recipientName: string; focus?: UiFocus }
-  | { module: "wallet_topup"; scheduledGiftId: string; recipientName: string; giftTitle: string; needed: number; available: number }
+  | { module: "wallet_topup"; scheduledGiftId: string; recipientName: string; giftTitle: string; needed: number; available: number; reservedApplied?: number }
   | { module: "gift_progress"; recipientId: string; recipientName: string; gifts: GiftProgress[] }
   | { module: "recipient_status"; recipients: RecipientStatusEntry[] };
 
@@ -598,6 +598,12 @@ export const shouldForceWalletTopUpUi = (
 export const systemPromptIncludesReservedOrderRules = (): boolean => SYSTEM_PROMPT.includes(RESERVED_ORDER_RULES);
 
 export const systemPromptIncludesAddressFormRules = (): boolean => SYSTEM_PROMPT.includes(ADDRESS_FORM_RULES);
+
+/** Swap confirm must reuse the prior hold and only ask for a shortfall top-up. */
+export const systemPromptIncludesSwapReservedReuse = (): boolean =>
+  SYSTEM_PROMPT.includes("funding.reservedApplied")
+  && SYSTEM_PROMPT.includes("never ignore that reserved amount")
+  && SYSTEM_PROMPT.includes("transferredFromReserved");
 
 export const buildWalletTopUpDirectiveMessage = (force: boolean): string | null => {
   if (!force) return null;
@@ -2119,8 +2125,26 @@ const hasPersistedReviewMarker = async (
 const SERVICE_FEE = 7;
 
 type Funding =
-  | { held: true; amount: number }
-  | { held: false; needed: number; available: number };
+  | { held: true; amount: number; transferredFromReserved?: number }
+  | { held: false; needed: number; available: number; cost: number; reservedApplied: number };
+
+/** Pending reservation amount for one gift (transferable on swap / re-hold). */
+const getGiftReservedAmount = async (
+  authClient: ReturnType<typeof createClient>,
+  userId: string,
+  scheduledGiftId: string,
+): Promise<number> => {
+  const { data } = await authClient
+    .from("wallet_transactions")
+    .select("amount")
+    .eq("user_id", userId)
+    .eq("scheduled_gift_id", scheduledGiftId)
+    .eq("transaction_type", "reservation")
+    .eq("status", "pending")
+    .limit(1)
+    .maybeSingle();
+  return Math.abs(Number((data as { amount?: number } | null)?.amount) || 0);
+};
 
 /** Wallet balance minus pending holds, the same figure wallet-reserve-funds checks against. */
 const getAvailableBalance = async (authClient: ReturnType<typeof createClient>, userId: string): Promise<number> => {
@@ -2141,12 +2165,27 @@ const holdGiftFunds = async (
   giftPrice: number,
 ): Promise<Funding> => {
   const { data, error } = await authClient.functions.invoke("wallet-reserve-funds", { body: { scheduledGiftId, approve: true } });
-  if (!error && data?.success) return { held: true, amount: Number(data.reservedAmount) || giftPrice + SERVICE_FEE };
+  if (!error && data?.success) {
+    return {
+      held: true,
+      amount: Number(data.reservedAmount) || giftPrice + SERVICE_FEE,
+      transferredFromReserved: Number(data.transferredFromReserved) || 0,
+    };
+  }
   if (error) console.error("thea-chat: holding gift funds failed", error);
+  const cost = Number(data?.requiredAmount) || giftPrice + SERVICE_FEE;
+  const reservedApplied = Number(data?.transferableReserved) || await getGiftReservedAmount(authClient, userId, scheduledGiftId);
+  const available = typeof data?.available === "number" ? Number(data.available) : await getAvailableBalance(authClient, userId);
+  const shortfall = typeof data?.shortfall === "number"
+    ? Number(data.shortfall)
+    : Math.max(0, Math.round((cost - available - reservedApplied) * 100) / 100);
   return {
     held: false,
-    needed: Number(data?.requiredAmount) || giftPrice + SERVICE_FEE,
-    available: await getAvailableBalance(authClient, userId),
+    // Top-up amount only — prior reserved for this gift already applies.
+    needed: shortfall,
+    available,
+    cost,
+    reservedApplied,
   };
 };
 
@@ -2321,6 +2360,9 @@ const buildWalletTopUpUi = async (
   const waiting = (await fetchRecipientGifts(authClient, userId, recipient.id)).find((g) => giftStage(g) === "scheduled");
   if (!waiting) return { ok: false, error: `Nothing for ${recipient.name} is waiting on funds right now.` };
   const price = Number(waiting.payment_amount ?? waiting.estimated_cost) || 0;
+  const cost = price + SERVICE_FEE;
+  const reservedApplied = await getGiftReservedAmount(authClient, userId, waiting.id);
+  const available = await getAvailableBalance(authClient, userId);
   return {
     ok: true,
     ui: {
@@ -2328,8 +2370,9 @@ const buildWalletTopUpUi = async (
       scheduledGiftId: waiting.id,
       recipientName: recipient.name,
       giftTitle: waiting.gift_type || "their gift",
-      needed: price + SERVICE_FEE,
-      available: await getAvailableBalance(authClient, userId),
+      needed: cost,
+      available,
+      reservedApplied: reservedApplied > 0.009 ? reservedApplied : undefined,
     },
   };
 };
@@ -2363,13 +2406,17 @@ const buildForcedWalletTopUpUi = async (
   const best = scored[0];
   if (!best?.recipient?.name) return null;
   const price = Number(best.g.payment_amount ?? best.g.estimated_cost) || 0;
+  const cost = price + SERVICE_FEE;
+  const reservedApplied = await getGiftReservedAmount(authClient, userId, best.g.id);
+  const available = await getAvailableBalance(authClient, userId);
   return {
     module: "wallet_topup",
     scheduledGiftId: best.g.id,
     recipientName: best.recipient.name,
     giftTitle: best.g.gift_type || "their gift",
-    needed: price + SERVICE_FEE,
-    available: await getAvailableBalance(authClient, userId),
+    needed: cost,
+    available,
+    reservedApplied: reservedApplied > 0.009 ? reservedApplied : undefined,
   };
 };
 
@@ -2383,8 +2430,9 @@ const topUpUiFromConfirm = (result: ToolResult): ChatUiModule | null => {
     scheduledGiftId: result.recordId,
     recipientName: saved?.recipientName || "them",
     giftTitle: saved?.gift_type || "their gift",
-    needed: funding.needed,
+    needed: funding.cost,
     available: funding.available,
+    reservedApplied: funding.reservedApplied > 0.009 ? funding.reservedApplied : undefined,
   };
 };
 
@@ -2525,16 +2573,11 @@ const handleConfirmScheduledGift = async (
     wallet_reserved: false,
   };
 
-  // Swap path: update the open gift in place (release any prior hold first).
+  // Swap path: update the open gift in place. Keep any pending hold on this
+  // gift id so wallet-reserve-funds can reallocate it toward the new price
+  // (only the delta is a top-up). Do not cancel the hold here — user JWT
+  // cannot update wallet_transactions, and a cancel would drop transferable funds.
   if (existing && isSwappableExistingGift(existing, product.id)) {
-    if (existing.wallet_reserved) {
-      await authClient
-        .from("wallet_transactions")
-        .update({ status: "cancelled" })
-        .eq("scheduled_gift_id", existing.id)
-        .eq("transaction_type", "reservation")
-        .eq("status", "pending");
-    }
     const { error: swapError } = await authClient
       .from("scheduled_gifts")
       .update(giftFields)

@@ -5,8 +5,10 @@ import {
   decideReservedOrder,
   orderNowConfirmationCopy,
   planDirectCharge,
+  planReserveFunds,
   planReservedCharge,
   resolveChargeActor,
+  topUpShortfall,
 } from "./reservedFunds.ts";
 
 const vipGift = {
@@ -162,4 +164,49 @@ Deno.test("order-now rejects a gift that is not owned, already ordered, or missi
     owned: true, hasAddress: false, alreadyOrdered: false, recipientName: "Alex",
     productPrice: 40, pendingReserved: 47, paymentStatus: "unpaid",
   }).action, "reject");
+});
+
+Deno.test("swap reuses a $47 hold toward a $41 gift with $3 available and needs no top-up", () => {
+  // Matches the Aunty Coffee O'Clock → Layla Red Wine Glasses bug: $47 reserved, $3 available.
+  const plan = planReserveFunds({
+    grossBalance: 50,
+    otherReserved: 0,
+    existingReserved: 47,
+    giftPrice: 34,
+  });
+  assertEquals(plan.cost, 41);
+  assertEquals(plan.available, 3);
+  assertEquals(plan.spendable, 50);
+  assertEquals(plan.existingReserved, 47);
+  assertEquals(plan.shortfall, 0);
+  assertEquals(plan.covered, true);
+  assertEquals(topUpShortfall({ cost: 41, available: 3, reservedApplied: 47 }), 0);
+});
+
+Deno.test("swap to a pricier gift only asks for the delta above the transferable hold", () => {
+  const plan = planReserveFunds({
+    grossBalance: 50,
+    otherReserved: 0,
+    existingReserved: 47,
+    giftPrice: 50,
+  });
+  assertEquals(plan.cost, 57);
+  assertEquals(plan.spendable, 50);
+  assertEquals(plan.shortfall, 7);
+  assertEquals(plan.covered, false);
+  assertEquals(topUpShortfall({ cost: 57, available: 3, reservedApplied: 47 }), 7);
+});
+
+Deno.test("a new gift without a hold cannot spend another gift's reservation", () => {
+  const plan = planReserveFunds({
+    grossBalance: 50,
+    otherReserved: 47,
+    existingReserved: 0,
+    giftPrice: 34,
+  });
+  assertEquals(plan.cost, 41);
+  assertEquals(plan.available, 3);
+  assertEquals(plan.spendable, 3);
+  assertEquals(plan.shortfall, 38);
+  assertEquals(plan.covered, false);
 });

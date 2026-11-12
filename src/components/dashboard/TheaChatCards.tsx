@@ -39,7 +39,7 @@ export type ChatUiModule =
   | { module: 'calendar_connect' }
   | { module: 'add_recipient'; focus?: ChatUiFocus }
   | { module: 'edit_recipient'; recipientId: string; recipientName: string; focus?: ChatUiFocus }
-  | { module: 'wallet_topup'; scheduledGiftId: string; recipientName: string; giftTitle: string; needed: number; available: number }
+  | { module: 'wallet_topup'; scheduledGiftId: string; recipientName: string; giftTitle: string; needed: number; available: number; reservedApplied?: number }
   | { module: 'gift_progress'; recipientId: string; recipientName: string; gifts: GiftProgress[] }
   | { module: 'recipient_status'; recipients: RecipientStatusEntry[] };
 
@@ -390,7 +390,9 @@ export const WalletTopUpCard: React.FC<{
   onUseBalance: () => Promise<boolean>;
 }> = ({ module: mod, stage, disabled, onTopUp, onUseBalance }) => {
   const first = mod.recipientName.split(' ')[0] || mod.recipientName;
-  const shortfall = Math.max(0, Math.round((mod.needed - mod.available) * 100) / 100);
+  const reservedApplied = Math.max(0, Number(mod.reservedApplied) || 0);
+  // Prior hold for this gift (e.g. after a swap) covers part or all of the new price.
+  const shortfall = Math.max(0, Math.round((mod.needed - mod.available - reservedApplied) * 100) / 100);
   const [selected, setSelected] = useState(() => topUpFor(shortfall));
   const [busy, setBusy] = useState<'topup' | 'balance' | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -422,18 +424,26 @@ export const WalletTopUpCard: React.FC<{
     setBusy('balance');
     setNote(null);
     const held = await onUseBalance().catch(() => false);
-    if (!held) setNote('Your balance doesn’t cover it yet.');
+    if (!held) setNote(reservedApplied > 0 ? 'Couldn’t move the reserved funds yet. Try again.' : 'Your balance doesn’t cover it yet.');
     setBusy(null);
   };
+
+  const coverageLine = reservedApplied > 0.009
+    ? shortfall > 0.009
+      ? `${mod.giftTitle} needs ${money(mod.needed)} including the service fee. ${money(reservedApplied)} already reserved for ${first} will apply, and you have ${money(Math.max(0, mod.available))} available — add ${money(shortfall)} more.`
+      : `${mod.giftTitle} needs ${money(mod.needed)} including the service fee. ${money(reservedApplied)} already reserved for ${first} covers it${mod.available > 0.009 ? ` (plus ${money(Math.max(0, mod.available))} available)` : ''}.`
+    : `${mod.giftTitle} needs ${money(mod.needed)} including the service fee. You have ${money(Math.max(0, mod.available))} available.`;
 
   return (
     <section className="mt-2 rounded-[18px] border bg-white p-3.5" style={{ borderColor: '#DED2C1' }} aria-label="Add wallet funds">
       <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: U.accent }}>
         <Wallet className="h-3.5 w-3.5" aria-hidden="true" /> Wallet
       </p>
-      <p className="mt-1.5 text-[14px] font-semibold leading-5 text-[#2A2520]">Add funds for {first}&apos;s gift</p>
+      <p className="mt-1.5 text-[14px] font-semibold leading-5 text-[#2A2520]">
+        {shortfall > 0.009 ? `Add funds for ${first}'s gift` : reservedApplied > 0.009 ? `Use reserved funds for ${first}` : `Add funds for ${first}'s gift`}
+      </p>
       <p className="mt-1 text-[12.5px] leading-5 text-[#5A5147]">
-        {mod.giftTitle} needs {money(mod.needed)} including the service fee. You have {money(Math.max(0, mod.available))} available.
+        {coverageLine}
       </p>
 
       {shortfall > 0 ? (
@@ -469,7 +479,7 @@ export const WalletTopUpCard: React.FC<{
             Add ${selected} and hold it for {first}
           </button>
           <button type="button" onClick={() => void holdFromBalance()} disabled={disabled || busy !== null} className="mt-1.5 min-h-9 w-full text-[12px] font-semibold disabled:opacity-50" style={{ color: U.accent }}>
-            {busy === 'balance' ? 'Checking…' : 'Already added funds? Use my balance'}
+            {busy === 'balance' ? 'Checking…' : reservedApplied > 0 ? 'Try applying reserved funds' : 'Already added funds? Use my balance'}
           </button>
         </>
       ) : (
@@ -481,7 +491,9 @@ export const WalletTopUpCard: React.FC<{
           style={{ background: U.ink, color: U.buttonText }}
         >
           {busy === 'balance' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-          Hold {money(mod.needed)} from my wallet
+          {reservedApplied > 0.009
+            ? `Apply ${money(reservedApplied)} reserved to ${first}'s gift`
+            : `Hold ${money(mod.needed)} from my wallet`}
         </button>
       )}
       {note && <p className="mt-1.5 text-[12px]" style={{ color: U.accent }}>{note}</p>}

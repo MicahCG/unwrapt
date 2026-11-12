@@ -37,7 +37,7 @@ import { getRecipientStatus, giftStage, hasRecipientAddress, isWalletGift, type 
 import { VoiceDictateButton } from '@/components/dashboard/VoiceDictateButton';
 import { useSpeechDictation } from '@/hooks/useSpeechDictation';
 import { resumeGiftPayment } from '@/lib/giftPayment';
-import { calculateGiftCost, getAvailableBalance, holdGiftFunds, startGiftTopUp, takePendingWalletHold } from '@/lib/wallet';
+import { calculateGiftCost, getAvailableBalance, getGiftReservedAmount, holdGiftFunds, startGiftTopUp, takePendingWalletHold } from '@/lib/wallet';
 import { formatGiftTimingLine, giftOrderTiming } from '@/lib/giftTiming';
 import {
   WalletHoldSuccessModal,
@@ -607,10 +607,19 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
         }
         if (hold && attempt === HOLD_ATTEMPTS) {
           const available = user?.id ? await getAvailableBalance(user.id) : 0;
+          const reservedApplied = !hold.held ? (hold.reservedApplied || 0) : 0;
           setMessages((current) => [...current, {
             role: 'assistant',
             content: `Your wallet still doesn't cover ${first}'s gift. If you just added funds they may take a moment to land.`,
-            ui: [{ module: 'wallet_topup', scheduledGiftId: pending.scheduledGiftId, recipientName: pending.recipientName, giftTitle: pending.giftTitle, needed: hold.needed, available }],
+            ui: [{
+              module: 'wallet_topup',
+              scheduledGiftId: pending.scheduledGiftId,
+              recipientName: pending.recipientName,
+              giftTitle: pending.giftTitle,
+              needed: hold.needed,
+              available,
+              reservedApplied: reservedApplied > 0.009 ? reservedApplied : undefined,
+            }],
           }]);
           return;
         }
@@ -704,7 +713,10 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     void (async () => {
       const first = pick.recipientName.split(' ')[0] || pick.recipientName;
       const giftTitle = gift.gift_type || gift.gift_description || 'their gift';
-      const available = await getAvailableBalance(user.id).catch(() => 0);
+      const [available, reservedApplied] = await Promise.all([
+        getAvailableBalance(user.id).catch(() => 0),
+        getGiftReservedAmount(user.id, gift.id!).catch(() => 0),
+      ]);
       stickToBottomRef.current = true;
       setMessages((current) => {
         if (current.some((m) => m.ui?.some((mod) => mod.module === 'wallet_topup' && mod.scheduledGiftId === gift.id))) {
@@ -720,6 +732,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
             giftTitle,
             needed: calculateGiftCost(Number(gift.payment_amount ?? gift.estimated_cost) || 0),
             available,
+            reservedApplied: reservedApplied > 0.009 ? reservedApplied : undefined,
           }],
         }];
       });
@@ -804,7 +817,21 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
       let ensured = statusEnsured;
       if (looksLikePaymentIntent(trimmed) && !statusEnsured.ui.some((m) => m.module === 'wallet_topup')) {
         const available = user?.id ? await getAvailableBalance(user.id).catch(() => 0) : 0;
-        ensured = ensureWalletTopUpUi(trimmed, statusEnsured.reply, statusEnsured.ui, recipients, available);
+        const provisional = ensureWalletTopUpUi(trimmed, statusEnsured.reply, statusEnsured.ui, recipients, available);
+        const topUp = provisional.ui.find((m): m is WalletTopUpModule => m.module === 'wallet_topup');
+        if (topUp && user?.id) {
+          const reservedApplied = await getGiftReservedAmount(user.id, topUp.scheduledGiftId).catch(() => 0);
+          ensured = ensureWalletTopUpUi(
+            trimmed,
+            statusEnsured.reply,
+            statusEnsured.ui,
+            recipients,
+            available,
+            reservedApplied,
+          );
+        } else {
+          ensured = provisional;
+        }
       }
       // Same safety net for a missing address: open the form, and don't repeat a false "address is missing".
       const addressEnsured = ensureAddressFormUi(trimmed, nextMessages.slice(0, -1), ensured.reply, ensured.ui, recipients);
@@ -928,6 +955,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     const first = item.recipientName.split(' ')[0] || item.recipientName;
     const giftTitle = gift.gift_type || gift.gift_description || 'their gift';
     const available = user?.id ? await getAvailableBalance(user.id) : 0;
+    const reservedApplied = user?.id ? await getGiftReservedAmount(user.id, gift.id!).catch(() => 0) : 0;
     stickToBottomRef.current = true;
     setMessages((current) => [...current, {
       role: 'assistant',
@@ -939,6 +967,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
         giftTitle,
         needed: calculateGiftCost(Number(gift.payment_amount ?? gift.estimated_cost) || 0),
         available,
+        reservedApplied: reservedApplied > 0.009 ? reservedApplied : undefined,
       }],
     }]);
   };

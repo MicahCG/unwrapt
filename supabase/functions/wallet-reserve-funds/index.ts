@@ -1,8 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
 import { corsHeaders } from "../_shared/cors.ts";
-
-const SERVICE_FEE = 7; // $7 service fee
+import { planReserveFunds, roundMoney } from "../_shared/reservedFunds.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -38,7 +37,6 @@ serve(async (req) => {
 
     console.log(`💰 Reserving funds for gift: ${scheduledGiftId}`);
 
-    // Get gift details
     const { data: gift, error: giftError } = await supabaseClient
       .from("scheduled_gifts")
       .select("*, recipients(*)")
@@ -48,21 +46,8 @@ serve(async (req) => {
 
     if (giftError || !gift) throw new Error("Gift not found");
 
-    // Already held (a retry after a top-up, or a double tap): report the existing hold.
-    if (gift.wallet_reserved) {
-      return new Response(
-        JSON.stringify({ success: true, reservedAmount: gift.wallet_reservation_amount, alreadyReserved: true }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
-      );
-    }
+    const giftPrice = Number(gift.payment_amount ?? gift.estimated_cost) || 35;
 
-    // Calculate cost from the chosen gift's price
-    const giftPrice = gift.payment_amount ?? gift.estimated_cost ?? 35; // Default to $35 if not set
-    const totalCost = giftPrice + SERVICE_FEE;
-
-    console.log(`💰 Total cost: $${totalCost} (gift: $${giftPrice} + service: $${SERVICE_FEE})`);
-
-    // Get user's current balance
     const { data: profile, error: profileError } = await supabaseClient
       .from("profiles")
       .select("gift_wallet_balance")
@@ -71,62 +56,103 @@ serve(async (req) => {
 
     if (profileError) throw profileError;
 
-    const currentBalance = profile?.gift_wallet_balance || 0;
+    const currentBalance = Number(profile?.gift_wallet_balance) || 0;
 
-    // Get pending reservations
     const { data: pendingReservations } = await supabaseClient
       .from("wallet_transactions")
-      .select("amount")
+      .select("id, amount, scheduled_gift_id")
       .eq("user_id", user.id)
       .eq("transaction_type", "reservation")
       .eq("status", "pending");
 
-    const totalReserved = pendingReservations?.reduce(
-      (sum, t) => sum + Math.abs(t.amount),
-      0
-    ) || 0;
+    const rows = (pendingReservations || []) as Array<{
+      id: string;
+      amount: number;
+      scheduled_gift_id: string | null;
+    }>;
 
-    const availableBalance = currentBalance - totalReserved;
+    const existing = rows.find((row) => row.scheduled_gift_id === scheduledGiftId) || null;
+    const existingAmount = existing ? Math.abs(Number(existing.amount) || 0) : 0;
+    const otherReserved = rows
+      .filter((row) => !existing || row.id !== existing.id)
+      .reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0);
 
-    console.log(`💰 Balance check: current=$${currentBalance}, reserved=$${totalReserved}, available=$${availableBalance}`);
+    const plan = planReserveFunds({
+      grossBalance: currentBalance,
+      otherReserved,
+      existingReserved: existingAmount,
+      giftPrice,
+    });
 
-    // Check if sufficient funds
-    if (availableBalance < totalCost) {
-      console.log("❌ Insufficient funds");
+    console.log(
+      `💰 Balance check: current=$${currentBalance}, otherReserved=$${otherReserved}, transferable=$${existingAmount}, cost=$${plan.cost}, shortfall=$${plan.shortfall}`,
+    );
+
+    // Exact hold already in place — nothing to move.
+    if (
+      gift.wallet_reserved &&
+      existing &&
+      Math.abs(existingAmount - plan.cost) <= 0.009
+    ) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          reservedAmount: existingAmount,
+          alreadyReserved: true,
+          transferredFromReserved: existingAmount,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+      );
+    }
+
+    if (!plan.covered) {
+      console.log("❌ Insufficient funds (after transferable reserved)");
       return new Response(
         JSON.stringify({
           success: false,
           error: "insufficient_funds",
           currentBalance,
-          requiredAmount: totalCost,
+          requiredAmount: plan.cost,
+          available: plan.available,
+          transferableReserved: plan.existingReserved,
+          shortfall: plan.shortfall,
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,
-        }
+        },
       );
     }
 
-    // Create reservation transaction
-    const { error: transactionError } = await supabaseClient
-      .from("wallet_transactions")
-      .insert({
-        user_id: user.id,
-        scheduled_gift_id: scheduledGiftId,
-        amount: -totalCost, // Negative for reservation
-        balance_after: currentBalance, // Don't deduct yet
-        transaction_type: "reservation",
-        status: "pending",
-      });
+    if (existing) {
+      const { error: updateTxnError } = await supabaseClient
+        .from("wallet_transactions")
+        .update({
+          amount: -plan.cost,
+          balance_after: currentBalance,
+        })
+        .eq("id", existing.id)
+        .eq("status", "pending");
+      if (updateTxnError) throw updateTxnError;
+    } else {
+      const { error: transactionError } = await supabaseClient
+        .from("wallet_transactions")
+        .insert({
+          user_id: user.id,
+          scheduled_gift_id: scheduledGiftId,
+          amount: -plan.cost,
+          balance_after: currentBalance,
+          transaction_type: "reservation",
+          status: "pending",
+        });
+      if (transactionError) throw transactionError;
+    }
 
-    if (transactionError) throw transactionError;
-
-    // Update scheduled gift
     const { error: updateError } = await supabaseClient
       .from("scheduled_gifts")
       .update({
         wallet_reserved: true,
-        wallet_reservation_amount: totalCost,
+        wallet_reservation_amount: plan.cost,
         ...(approve
           ? { automation_enabled: true, status: gift.status === "scheduled" ? "approved" : gift.status }
           : {}),
@@ -135,17 +161,22 @@ serve(async (req) => {
 
     if (updateError) throw updateError;
 
-    console.log(`✅ Funds reserved successfully: $${totalCost}`);
+    console.log(
+      `✅ Funds reserved: $${plan.cost}` +
+        (existingAmount > 0.009 ? ` (reallocated $${existingAmount})` : ""),
+    );
 
     return new Response(
       JSON.stringify({
         success: true,
-        reservedAmount: totalCost,
+        reservedAmount: plan.cost,
+        transferredFromReserved: existingAmount > 0.009 ? roundMoney(existingAmount) : 0,
+        reallocated: Boolean(existing),
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
-      }
+      },
     );
   } catch (error) {
     console.error("💰 Error in wallet-reserve-funds:", error);
@@ -158,7 +189,7 @@ serve(async (req) => {
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
-      }
+      },
     );
   }
 });
