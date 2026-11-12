@@ -836,6 +836,8 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
       // Same safety net for a missing address: open the form, and don't repeat a false "address is missing".
       const addressEnsured = ensureAddressFormUi(trimmed, nextMessages.slice(0, -1), ensured.reply, ensured.ui, recipients);
       const ui = addressEnsured.ui;
+      // place_order_now / shortfall failures are not "saves"; only recipient/gift writes are.
+      const saveTools = new Set(['update_recipient', 'create_recipient', 'confirm_scheduled_gift', 'set_place_date']);
       setMessages([
         ...nextMessages,
         {
@@ -844,13 +846,12 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
           products: (data.products || []) as ChatProduct[],
           review: (data.review || null) as GiftReview | null,
           ui: ui.length ? ui : undefined,
-          unsaved: writes.some((w) => !w.ok),
+          unsaved: writes.some((w) => !w.ok && saveTools.has(w.tool)),
         },
       ]);
-      // Bring up existing editors immediately so the user isn't stuck behind another tap.
+      // Add-person still opens the full form. Address edits happen inline on the chat card.
       for (const mod of ui) {
         if (mod.module === 'add_recipient') onAddRecipient();
-        if (mod.module === 'edit_recipient') onEditRecipient(mod.recipientId, mod.focus);
       }
       return writes;
     } catch (err) {
@@ -979,21 +980,30 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     return { street: recipient.street!, city: recipient.city!, state: recipient.state!, zipCode: recipient.zip_code! };
   };
 
-  // Writes only the address, only for this review's recipient, so nothing else about them can change here.
-  const saveReviewAddress = async (review: GiftReview, address: ReviewAddress) => {
+  // Writes only the address fields for one recipient (review card or inline edit_recipient card).
+  const saveRecipientAddress = async (recipientId: string, address: ReviewAddress) => {
     if (!user?.id) return false;
-    const recipient = recipients.find((r) => r.id === review.recipientId);
+    const recipient = recipients.find((r) => r.id === recipientId);
     const { error } = await supabase.from('recipients').update({
       street: address.street, city: address.city, state: address.state, zip_code: address.zipCode,
       country: recipient?.country || 'United States', updated_at: new Date().toISOString(),
-    }).eq('id', review.recipientId).eq('user_id', user.id);
+    }).eq('id', recipientId).eq('user_id', user.id);
     if (error) {
-      console.error('Saving review address failed', error);
+      console.error('Saving recipient address failed', error);
       return false;
     }
     void trackProductEvent('dashboard_thea_review_address_saved', {});
     await queryClient.invalidateQueries({ queryKey: ['recipients'] });
     return true;
+  };
+
+  const saveReviewAddress = (review: GiftReview, address: ReviewAddress) =>
+    saveRecipientAddress(review.recipientId, address);
+
+  const recipientAddress = (recipientId: string): ReviewAddress | null => {
+    const recipient = recipients.find((r) => r.id === recipientId);
+    if (!recipient || !hasRecipientAddress(recipient)) return null;
+    return { street: recipient.street!, city: recipient.city!, state: recipient.state!, zipCode: recipient.zip_code! };
   };
 
   const handleChip = (item: BriefingItem) => {
@@ -1157,6 +1167,8 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
                       onAddRecipient={onAddRecipient}
                       onEditRecipient={onEditRecipient}
                       onOpenRecipient={(recipientId) => onOpenRecipient(recipientId, 'open')}
+                      addressOf={recipientAddress}
+                      onSaveRecipientAddress={saveRecipientAddress}
                       stageOf={stageOf}
                       onTopUp={topUp}
                       onUseBalance={holdFromBalance}

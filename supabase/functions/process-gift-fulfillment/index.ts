@@ -348,7 +348,10 @@ serve(async (req) => {
 
     console.log(`🎁 Process-gift-fulfillment: Goody order result:`, orderResult);
 
-    const typedOrderResult = orderResult as { error?: { message?: string }; data?: { success?: boolean; error?: string } };
+    const typedOrderResult = orderResult as {
+      error?: { message?: string; context?: Response };
+      data?: { success?: boolean; error?: string };
+    };
 
     const undoCharge = async () => {
       if (!chargeContext.active || !chargeContext.scheduledGiftId || !chargeContext.userId) return;
@@ -359,11 +362,24 @@ serve(async (req) => {
       });
     };
 
+    const goodyErrorFromInvoke = async (): Promise<string | null> => {
+      const context = typedOrderResult.error?.context;
+      if (!context || typeof context.json !== 'function') return null;
+      try {
+        const body = await context.json() as { error?: unknown };
+        return typeof body?.error === 'string' && body.error.trim() ? body.error.trim() : null;
+      } catch {
+        return null;
+      }
+    };
+
     if (typedOrderResult.error) {
-      console.error('🎁 Process-gift-fulfillment: Goody order function error:', typedOrderResult.error);
+      const detail = await goodyErrorFromInvoke();
+      const message = detail || typedOrderResult.error.message || String(typedOrderResult.error);
+      console.error('🎁 Process-gift-fulfillment: Goody order function error:', message);
       await undoCharge();
       return new Response(JSON.stringify({
-        error: `Order creation failed: ${typedOrderResult.error}`,
+        error: `Order creation failed: ${message}`,
         success: false
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

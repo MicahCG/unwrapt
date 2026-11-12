@@ -82,7 +82,7 @@ export async function executeReservedCharge(
     grossBalance: Number(profile?.gift_wallet_balance) || 0,
     pendingReserved,
     otherReserved,
-    productPrice: Number(gift.payment_amount ?? gift.estimated_cost) || 0,
+    productPrice: Number(gift.estimated_cost) || Number(gift.payment_amount) || 0,
     paymentStatus: gift.payment_status,
     actorUserId: args.actorUserId,
     giftUserId: userId,
@@ -104,7 +104,7 @@ export async function executeReservedCharge(
       hasAddress: true,
       alreadyOrdered: false,
       recipientName: name,
-      productPrice: Number(gift.payment_amount ?? gift.estimated_cost) || 0,
+      productPrice: Number(gift.estimated_cost) || Number(gift.payment_amount) || 0,
       pendingReserved: 0,
       paymentStatus: "paid",
     });
@@ -125,7 +125,7 @@ export async function executeReservedCharge(
       hasAddress: true,
       alreadyOrdered: false,
       recipientName: name,
-      productPrice: Number(gift.payment_amount ?? gift.estimated_cost) || 0,
+      productPrice: Number(gift.estimated_cost) || Number(gift.payment_amount) || 0,
       pendingReserved: plan.reserved,
       paymentStatus: gift.payment_status,
     });
@@ -215,7 +215,7 @@ export async function executeReservedCharge(
     hasAddress: true,
     alreadyOrdered: false,
     recipientName: name,
-    productPrice: Number(gift.payment_amount ?? gift.estimated_cost) || 0,
+    productPrice: Number(gift.estimated_cost) || Number(gift.payment_amount) || 0,
     pendingReserved: plan.reserved,
     paymentStatus: gift.payment_status,
   });

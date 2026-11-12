@@ -21,6 +21,24 @@ test('hasAddress or addressConfirmed does not claim the address is missing or fo
   }
 });
 
+test('strips a model-opened address form when the address is already on file', () => {
+  const opened = [{
+    module: 'edit_recipient',
+    recipientId: 'rec_aunty',
+    recipientName: 'Aunty',
+    focus: 'address',
+  }];
+  const result = ensureAddressFormForPeople(
+    'place it today actually',
+    [],
+    "I've opened the address form for Aunty.",
+    opened,
+    [onFile],
+    false,
+  );
+  assert.equal(result.ui.some((mod) => mod.module === 'edit_recipient'), false);
+});
+
 test('a missing address or an agreement to add one opens the address form', () => {
   const fromClaim = ensureAddressFormForPeople("Please place Aunty's gift", [], claim, [], [missing], false);
   assert.deepEqual(fromClaim.ui, [{

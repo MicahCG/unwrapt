@@ -355,24 +355,87 @@ export const AddRecipientCard: React.FC<{ focus?: ChatUiFocus; onOpen: () => voi
   </section>
 );
 
-/** Opens the existing edit-recipient editor for a known person. */
+/**
+ * In-chat edit for a known person. Address focus edits inline on the card —
+ * no separate modal / "Open … form" button.
+ */
 export const EditRecipientCard: React.FC<{
   recipientName: string;
   focus?: ChatUiFocus;
-  onOpen: () => void;
-}> = ({ recipientName, focus, onOpen }) => {
+  address: ReviewAddress | null;
+  disabled?: boolean;
+  onSaveAddress: (address: ReviewAddress) => Promise<boolean>;
+}> = ({ recipientName, focus, address, disabled, onSaveAddress }) => {
   const first = recipientName.split(' ')[0] || recipientName;
+  const addressFocus = !focus || focus === 'address';
+  const [draft, setDraft] = useState<ReviewAddress>(() => address ?? blankAddress);
+  const [saving, setSaving] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const draftComplete = Boolean(draft.street.trim() && draft.city.trim() && draft.state.trim() && draft.zipCode.trim());
+
+  React.useEffect(() => {
+    setDraft(address ?? blankAddress);
+    setSaved(false);
+    setSaveFailed(false);
+  }, [address?.street, address?.city, address?.state, address?.zipCode]);
+
+  const set = (field: keyof ReviewAddress) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSaved(false);
+    setDraft((d) => ({ ...d, [field]: event.target.value }));
+  };
+
+  const saveAddress = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!draftComplete || saving || disabled) return;
+    setSaving(true);
+    setSaveFailed(false);
+    const ok = await onSaveAddress({
+      street: draft.street.trim(),
+      city: draft.city.trim(),
+      state: draft.state.trim(),
+      zipCode: draft.zipCode.trim(),
+    });
+    setSaving(false);
+    if (ok) setSaved(true);
+    else setSaveFailed(true);
+  };
+
   return (
     <section className="mt-2 rounded-[18px] border bg-white p-3.5" style={{ borderColor: '#DED2C1' }} aria-label={`Edit ${recipientName}`}>
       <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: U.accent }}>
         <UserRoundPen className="h-3.5 w-3.5" aria-hidden="true" /> Update details
       </p>
       <p className="mt-1.5 text-[14px] font-semibold leading-5 text-[#2A2520]">{first}&apos;s {focusLabel(focus)}</p>
-      <p className="mt-1 text-[12.5px] leading-5 text-[#5A5147]">Edit in the same form you use elsewhere — address, birthday, interests, and more.</p>
-      <button type="button" onClick={onOpen} className="u-press mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-[12px] text-[13px] font-semibold" style={{ background: U.ink, color: U.buttonText }}>
-        <UserRoundPen className="h-4 w-4" aria-hidden="true" />
-        Open {first}&apos;s form
-      </button>
+      {addressFocus ? (
+        <form onSubmit={saveAddress} className="mt-2.5 rounded-[12px] p-3" style={{ background: U.accentSoft }} aria-label={`${first}'s delivery address`}>
+          <p className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold text-[#3A332B]">
+            <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> Where should it go for {first}?
+          </p>
+          <div className="grid gap-2">
+            <input aria-label="Street address" placeholder="Street address" autoComplete="shipping street-address" value={draft.street} onChange={set('street')} className={addressInput} style={{ borderColor: '#DED2C1' }} disabled={disabled || saving} />
+            <input aria-label="City" placeholder="City" autoComplete="shipping address-level2" value={draft.city} onChange={set('city')} className={addressInput} style={{ borderColor: '#DED2C1' }} disabled={disabled || saving} />
+            <div className="grid grid-cols-2 gap-2">
+              <input aria-label="State" placeholder="State" autoComplete="shipping address-level1" value={draft.state} onChange={set('state')} className={addressInput} style={{ borderColor: '#DED2C1' }} disabled={disabled || saving} />
+              <input aria-label="ZIP code" placeholder="ZIP code" autoComplete="shipping postal-code" inputMode="numeric" value={draft.zipCode} onChange={set('zipCode')} className={addressInput} style={{ borderColor: '#DED2C1' }} disabled={disabled || saving} />
+            </div>
+          </div>
+          {saveFailed && <p className="mt-2 text-[12px]" style={{ color: U.accent }}>Couldn’t save that address. Try again.</p>}
+          {saved && !saveFailed && (
+            <p className="mt-2 flex items-center gap-1.5 text-[12px] font-semibold" style={{ color: U.sage }}>
+              <Check className="h-3.5 w-3.5" aria-hidden="true" /> Saved — you can place the order now.
+            </p>
+          )}
+          <button type="submit" disabled={!draftComplete || saving || disabled} className="u-press mt-2.5 flex min-h-11 w-full items-center justify-center gap-2 rounded-[11px] text-[12.5px] font-semibold disabled:opacity-50" style={{ background: U.ink, color: U.buttonText }}>
+            {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+            {saving ? 'Saving…' : 'Save address'}
+          </button>
+        </form>
+      ) : (
+        <p className="mt-1 text-[12.5px] leading-5 text-[#5A5147]">
+          Update {first}&apos;s {focusLabel(focus)} here when you have it — birthday, interests, and more stay with their profile.
+        </p>
+      )}
     </section>
   );
 };
@@ -696,10 +759,12 @@ export const ChatUiModules: React.FC<{
   onAddRecipient: () => void;
   onEditRecipient: (recipientId: string, focus?: ChatUiFocus) => void;
   onOpenRecipient?: (recipientId: string) => void;
+  addressOf?: (recipientId: string) => ReviewAddress | null;
+  onSaveRecipientAddress?: (recipientId: string, address: ReviewAddress) => Promise<boolean>;
   stageOf: (giftId: string) => GiftStage | null;
   onTopUp: (mod: Extract<ChatUiModule, { module: 'wallet_topup' }>, amount: number) => Promise<void>;
   onUseBalance: (mod: Extract<ChatUiModule, { module: 'wallet_topup' }>) => Promise<boolean>;
-}> = ({ modules, disabled, onAddRecipient, onEditRecipient, onOpenRecipient, stageOf, onTopUp, onUseBalance }) => (
+}> = ({ modules, disabled, onAddRecipient, onEditRecipient, onOpenRecipient, addressOf, onSaveRecipientAddress, stageOf, onTopUp, onUseBalance }) => (
   <>
     {modules.map((mod, i) => {
       if (mod.module === 'calendar_connect') {
@@ -739,7 +804,9 @@ export const ChatUiModules: React.FC<{
           key={`edit-${mod.recipientId}-${i}`}
           recipientName={mod.recipientName}
           focus={mod.focus}
-          onOpen={() => onEditRecipient(mod.recipientId, mod.focus)}
+          address={addressOf?.(mod.recipientId) ?? null}
+          disabled={disabled}
+          onSaveAddress={(address) => onSaveRecipientAddress?.(mod.recipientId, address) ?? Promise.resolve(false)}
         />
       );
     })}
