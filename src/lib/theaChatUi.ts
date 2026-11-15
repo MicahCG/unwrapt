@@ -7,6 +7,7 @@ import {
   type RecipientRecord,
 } from '@/lib/giftStatus';
 import { calculateGiftCost } from '@/lib/wallet';
+import { ensureAddressFormForPeople, type AddressPerson } from '@/lib/theaAddressForm';
 
 /**
  * User is asking to connect/sync/import a calendar — not merely mentioning one.
@@ -175,6 +176,7 @@ export const ensureWalletTopUpUi = (
   ui: ChatUiModule[],
   recipients: RecipientRecord[],
   available: number,
+  reservedApplied = 0,
 ): { reply: string; ui: ChatUiModule[] } => {
   if (!looksLikePaymentIntent(userMessage)) return { reply, ui };
   if (ui.some((m) => m.module === 'wallet_topup')) return { reply, ui };
@@ -182,6 +184,8 @@ export const ensureWalletTopUpUi = (
   if (!match?.gift.id) return { reply, ui };
 
   const giftTitle = match.gift.gift_type || match.gift.gift_description || 'their gift';
+  const fromGift = Number((match.gift as { wallet_reservation_amount?: number | null }).wallet_reservation_amount) || 0;
+  const reserved = Math.max(reservedApplied, fromGift);
   return {
     reply,
     ui: [...ui, {
@@ -191,6 +195,37 @@ export const ensureWalletTopUpUi = (
       giftTitle,
       needed: calculateGiftCost(Number(match.gift.payment_amount ?? match.gift.estimated_cost) || 0),
       available,
+      reservedApplied: reserved > 0.009 ? reserved : undefined,
     }],
   };
+};
+
+const addressPerson = (recipient: RecipientRecord): AddressPerson => ({
+  id: recipient.id,
+  name: recipient.name,
+  hasAddress: hasRecipientAddress(recipient),
+  addressConfirmed: (recipient.scheduled_gifts || []).some((gift) =>
+    Boolean((gift as { address_confirmed_at?: string | null }).address_confirmed_at)),
+});
+
+/**
+ * Safety net for a stale edge function or a model that only asks in text.
+ * Lives on live recipient rows; the decision itself is in theaAddressForm.
+ */
+export const ensureAddressFormUi = (
+  userMessage: string,
+  priorMessages: ChatTurn[],
+  reply: string,
+  ui: ChatUiModule[],
+  recipients: RecipientRecord[],
+): { reply: string; ui: ChatUiModule[] } => {
+  const result = ensureAddressFormForPeople(
+    userMessage,
+    priorMessages,
+    reply,
+    ui,
+    recipients.map(addressPerson),
+    looksLikeRecipientStatusIntent(userMessage),
+  );
+  return { reply: result.reply, ui: result.ui as ChatUiModule[] };
 };

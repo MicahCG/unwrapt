@@ -3,6 +3,7 @@ import { Crown, Settings, Wallet } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { U, initialsOf } from '@/components/unwrapt2/theme';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { formatHeldFundsStatus } from '@/lib/giftTiming';
 import { getWalletBreakdown, type PendingReservation } from '@/lib/wallet';
 
 interface AccountMenuProps {
@@ -129,13 +130,21 @@ const AccountMenu: React.FC<AccountMenuProps> = ({
                   {reservations.map((row) => {
                     const first = row.recipientName.split(' ')[0] || row.recipientName;
                     return (
-                      <li key={row.scheduledGiftId} className="flex items-start justify-between gap-2 text-[11.5px] leading-4" style={{ color: reservedTone, opacity: 0.9 }}>
-                        <span className="min-w-0">
-                          <span className="font-medium" style={{ color: reservedTone }}>{first}</span>
-                          {' · '}
-                          {row.giftTitle}
-                        </span>
-                        <span className="shrink-0 font-mono font-medium" style={{ color: reservedTone }}>{money(row.amount)}</span>
+                      <li key={row.scheduledGiftId} className="text-[11.5px] leading-4" style={{ color: reservedTone, opacity: 0.9 }}>
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="min-w-0">
+                            <span className="font-medium" style={{ color: reservedTone }}>{first}</span>
+                            {' · '}
+                            {row.giftTitle}
+                          </span>
+                          <span className="shrink-0 font-mono font-medium" style={{ color: reservedTone }}>{money(row.amount)}</span>
+                        </div>
+                        <p className="mt-0.5">{formatHeldFundsStatus({
+                          amount: row.amount,
+                          recipientName: row.recipientName,
+                          occasionDate: row.occasionDate,
+                          fulfillmentError: row.fulfillmentError,
+                        })}</p>
                       </li>
                     );
                   })}

@@ -29,7 +29,53 @@ export type DashboardBriefing = {
   recentlyDelivered: BriefingItem[];
 };
 
-const firstName = (name: string) => cleanName(name).split(/\s+/)[0] || 'them';
+const nameTokens = (name: string) => cleanName(name).split(/\s+/).filter(Boolean);
+
+const firstName = (name: string) => nameTokens(name)[0] || 'them';
+
+/**
+ * Short labels use a first name until two people in the same briefing would look identical.
+ * Then each label grows just far enough into the saved name to tell them apart.
+ * Someone whose whole name is "Aunty" stays "Aunty" next to "Aunty Andrea".
+ */
+export function disambiguateBriefingNames(people: Array<{ id: string; name: string }>): Map<string, string> {
+  const rows = people.map((person) => {
+    const tokens = nameTokens(person.name);
+    const first = (tokens[0] || 'them').toLowerCase();
+    return { id: person.id, tokens: tokens.length ? tokens : ['them'], first };
+  });
+  const firstCounts = new Map<string, number>();
+  for (const row of rows) firstCounts.set(row.first, (firstCounts.get(row.first) || 0) + 1);
+
+  const names = new Map<string, string>();
+  for (const row of rows) {
+    if ((firstCounts.get(row.first) || 0) < 2) {
+      names.set(row.id, row.tokens[0]);
+      continue;
+    }
+    let label = row.tokens[0];
+    const siblings = rows.filter((other) => other.first === row.first);
+    for (let length = 1; length <= row.tokens.length; length++) {
+      label = row.tokens.slice(0, length).join(' ');
+      const key = label.toLowerCase();
+      const same = siblings.filter((other) => {
+        const otherLabel = other.tokens.slice(0, Math.min(length, other.tokens.length)).join(' ').toLowerCase();
+        return otherLabel === key;
+      });
+      if (same.length === 1) break;
+    }
+    names.set(row.id, label);
+  }
+  return names;
+}
+
+/** Address chips open the in-chat recipient form. They do not send the label or leave Thea. */
+export function addressChipForm(
+  item: Pick<BriefingItem, 'action' | 'recipientId'>,
+): { recipientId: string; focus: 'address' } | null {
+  if (item.action !== 'address') return null;
+  return { recipientId: item.recipientId, focus: 'address' };
+}
 
 /**
  * Thea's default horizon. With a whole calendar imported, nudging about everyone at once is
@@ -59,6 +105,23 @@ const giftNeedsReview = (g: GiftRecord, autopilotThreshold: number) => {
   return cost > autopilotThreshold;
 };
 
+const recipientAppearsInBriefing = (recipient: RecipientRecord, autopilotThreshold: number): boolean => {
+  const occasionDate = recipient.birthday || recipient.anniversary;
+  const daysAway = occasionDate ? getDaysUntil(occasionDate) : null;
+  const inFocus = daysAway != null && daysAway <= FOCUS_WINDOW_DAYS;
+  if (occasionDate && inFocus) return true;
+  if (findResumableGift(recipient)) return true;
+  for (const gift of recipient.scheduled_gifts || []) {
+    const closed = ['cancelled', 'canceled', 'expired', 'archived'].includes((gift.status || '').toLowerCase());
+    if (!closed && isWalletGift(gift) && giftStage(gift) === 'scheduled') return true;
+    if (giftNeedsReview(gift, autopilotThreshold)) return true;
+    const giftStatus = getGiftStatus(gift, recipient);
+    if (giftStatus.key === 'ordered' || giftStatus.key === 'shipped' || giftStatus.key === 'delivered') return true;
+  }
+  if (inFocus && getRecipientStatus(recipient).key === 'needs_details') return true;
+  return false;
+};
+
 /** Derive Thea briefing buckets from live recipient + gift rows. */
 export function buildDashboardBriefing(
   recipients: RecipientRecord[],
@@ -70,9 +133,14 @@ export function buildDashboardBriefing(
   const needsFunds: BriefingItem[] = [];
   const inMotion: BriefingItem[] = [];
   const recentlyDelivered: BriefingItem[] = [];
+  const displayNames = disambiguateBriefingNames(
+    recipients
+      .filter((recipient) => recipientAppearsInBriefing(recipient, autopilotThreshold))
+      .map((recipient) => ({ id: recipient.id, name: recipient.name })),
+  );
 
   for (const recipient of recipients) {
-    const name = firstName(recipient.name);
+    const name = displayNames.get(recipient.id) || firstName(recipient.name);
     const occasionDate = recipient.birthday || recipient.anniversary;
     const occasionLabel = recipient.birthday ? 'birthday' : recipient.anniversary ? 'anniversary' : 'occasion';
     const status = getRecipientStatus(recipient);
@@ -95,7 +163,7 @@ export function buildDashboardBriefing(
         needsInfo.push({
           recipientId: recipient.id,
           recipientName: cleanName(recipient.name),
-          label: `Need ${name}'s address`,
+          label: `Fill ${name}'s address`,
           detail: `So I can plan their ${occasionLabel}`,
           kind: 'needs_info',
           action: 'address',

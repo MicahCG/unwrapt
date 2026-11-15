@@ -1,128 +1,82 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
 import { corsHeaders } from "../_shared/cors.ts";
+import { executeReservedCharge } from "../_shared/executeReservedCharge.ts";
+import { resolveChargeActor } from "../_shared/reservedFunds.ts";
 
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+if (import.meta.main) {
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log("💳 Starting wallet-charge-reserved function");
-
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { persistSession: false } }
-    );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      throw new Error("No authorization header provided");
+    const token = authHeader?.replace(/^Bearer\s+/i, "").trim() ?? "";
+    const actorKind = resolveChargeActor(token, serviceKey);
+    if (actorKind === "missing") return json({ success: false, error: "No authorization header provided" }, 401);
+
+    // The lifecycle job calls this with the service role key. auth.getUser(serviceKey)
+    // is not a user session and used to 500 every automatic order.
+    let actorUserId: string | null = null;
+    if (actorKind === "user") {
+      const anon = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+        auth: { persistSession: false },
+      });
+      const { data: { user }, error: userError } = await anon.auth.getUser();
+      if (userError || !user) return json({ success: false, error: "User not authenticated" }, 401);
+      actorUserId = user.id;
     }
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
-    if (userError || !user) throw new Error("User not authenticated");
-
-    const body = await req.json();
-    const { scheduledGiftId } = body;
-
-    if (!scheduledGiftId) {
-      throw new Error("Scheduled gift ID is required");
+    const body = await req.json().catch(() => ({}));
+    const scheduledGiftId = body?.scheduledGiftId;
+    if (!scheduledGiftId || typeof scheduledGiftId !== "string") {
+      return json({ success: false, error: "Scheduled gift ID is required" }, 400);
     }
 
-    console.log(`💳 Charging reserved funds for gift: ${scheduledGiftId}`);
+    const result = await executeReservedCharge(supabase, {
+      scheduledGiftId,
+      actorUserId,
+      recipientName: typeof body?.recipientName === "string" ? body.recipientName : undefined,
+    });
 
-    // Find the pending reservation
-    const { data: reservation, error: reservationError } = await supabaseClient
-      .from("wallet_transactions")
-      .select("*")
-      .eq("scheduled_gift_id", scheduledGiftId)
-      .eq("transaction_type", "reservation")
-      .eq("status", "pending")
-      .single();
-
-    if (reservationError || !reservation) {
-      throw new Error("No pending reservation found for this gift");
-    }
-
-    const chargeAmount = Math.abs(reservation.amount);
-
-    console.log(`💳 Charging amount: $${chargeAmount}`);
-
-    // Get current balance
-    const { data: profile, error: profileError } = await supabaseClient
-      .from("profiles")
-      .select("gift_wallet_balance")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError) throw profileError;
-
-    const currentBalance = profile?.gift_wallet_balance || 0;
-    const newBalance = currentBalance - chargeAmount;
-
-    if (newBalance < 0) {
-      throw new Error("Insufficient balance to complete charge");
-    }
-
-    // Update the transaction to completed charge
-    const { error: updateTransactionError } = await supabaseClient
-      .from("wallet_transactions")
-      .update({
-        transaction_type: "charge",
-        status: "completed",
-        balance_after: newBalance,
-      })
-      .eq("id", reservation.id);
-
-    if (updateTransactionError) throw updateTransactionError;
-
-    // Update user's wallet balance
-    const { error: updateBalanceError } = await supabaseClient
-      .from("profiles")
-      .update({ gift_wallet_balance: newBalance })
-      .eq("id", user.id);
-
-    if (updateBalanceError) throw updateBalanceError;
-
-    // Update gift payment status
-    const { error: updateGiftError } = await supabaseClient
-      .from("scheduled_gifts")
-      .update({
-        payment_status: "paid",
-        payment_amount: chargeAmount,
-      })
-      .eq("id", scheduledGiftId);
-
-    if (updateGiftError) throw updateGiftError;
-
-    console.log(`✅ Charge completed: $${chargeAmount}, new balance: $${newBalance}`);
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        newBalance,
-        chargedAmount: chargeAmount,
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      }
-    );
-  } catch (error) {
-    console.error("💳 Error in wallet-charge-reserved:", error);
-    const errorMessage = error instanceof Error ? error.message : "Failed to charge reserved funds";
-    return new Response(
-      JSON.stringify({
+    if (!result.ok) {
+      return json({
         success: false,
-        error: errorMessage,
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
-      }
-    );
+        error: result.error,
+        code: result.code,
+        shortfall: result.shortfall,
+        reserved: result.reserved,
+        cost: result.cost,
+        confirmationCopy: result.confirmationCopy,
+      }, result.status);
+    }
+
+    return json({
+      success: true,
+      newBalance: result.newBalance,
+      chargedAmount: result.chargedAmount,
+      alreadyCharged: Boolean(result.alreadyCharged),
+      userId: result.userId,
+      fromReservation: result.fromReservation,
+      confirmationCopy: result.confirmationCopy,
+    });
+  } catch (error) {
+    console.error("wallet-charge-reserved failed", error);
+    const errorMessage = error instanceof Error ? error.message : "Failed to charge reserved funds";
+    return json({ success: false, error: errorMessage }, 500);
   }
 });
+}

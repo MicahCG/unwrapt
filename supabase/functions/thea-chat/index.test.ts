@@ -28,8 +28,43 @@ import {
   buildWalletTopUpDirectiveMessage,
   isSwappableExistingGift,
   giftOrderTiming,
+  decidePlaceBy,
+  timingForStoredGift,
   resolveShippingLeadDays,
   shippingLeadDaysFromProduct,
+  looksLikeOrderNowIntent,
+  buildOrderNowDirectiveMessage,
+  systemPromptIncludesReservedOrderRules,
+  systemPromptIncludesSwapReservedReuse,
+  systemPromptIncludesPlaceDateAsk,
+  looksLikePlaceDateChange,
+  handleSetPlaceDate,
+  systemPromptIncludesAddressFormRules,
+  RESERVED_ORDER_RULES,
+  ADDRESS_FORM_RULES,
+  decideReservedOrder,
+  addressIsOnFile,
+  replyClaimsMissingAddress,
+  replyAsksToAddAddress,
+  looksLikeAddressFormIntent,
+  looksLikeAddressFormAgreement,
+  shouldDirectAddressForm,
+  decideAddressForm,
+  stripAddressFormUnlessRequested,
+  clearMissingAddressClaim,
+  pickRecipientForAddress,
+  editRecipientAddressUi,
+  guardUnswappableSwapReply,
+  replyRefusesSwap,
+  swapSuccessCopy,
+  reviewReplacesGift,
+  markerToPersist,
+  replyNamesReviewProduct,
+  replyClaimsOnlyOtherGift,
+  reviewOfferCopy,
+  alignReviewReply,
+  alignReviewPresentation,
+  unswappableGiftReason,
   buildRecipientStatusEntries,
   buildAccountRosterFromRows,
   formatAccountRosterSection,
@@ -517,10 +552,113 @@ Deno.test("isSwappableExistingGift allows replacing a different pre-order gift",
   assertEquals(isSwappableExistingGift({ ...coffee, status: "cancelled" }, "prod_chocolate"), false);
 });
 
+Deno.test("a confirmed unpaid gift with no order can be swapped, and an ordered gift cannot", () => {
+  const coffee = {
+    status: "confirmed",
+    goody_order_id: null,
+    gift_variant_id: "prod_coffee",
+    payment_status: "unpaid",
+    wallet_reserved: true,
+  };
+  assert(isSwappableExistingGift(coffee, "prod_wine"));
+  assertEquals(unswappableGiftReason(coffee, "prod_wine"), null);
+  assertEquals(isSwappableExistingGift({ ...coffee, status: "approved" }, "prod_wine"), true);
+  assertEquals(isSwappableExistingGift({ ...coffee, status: "ordered" }, "prod_wine"), false);
+  assertEquals(isSwappableExistingGift({ ...coffee, status: "shipped" }, "prod_wine"), false);
+  assertEquals(isSwappableExistingGift({ ...coffee, status: "delivered" }, "prod_wine"), false);
+  assertEquals(isSwappableExistingGift({ ...coffee, goody_order_id: "goody_1" }, "prod_wine"), false);
+  assertEquals(unswappableGiftReason({ ...coffee, status: "ordered", goody_order_id: "goody_1" }, "prod_wine"), "ordered");
+  assertEquals(unswappableGiftReason({ ...coffee, status: "confirmed", gift_variant_id: "prod_wine" }, "prod_wine"), "same_gift");
+
+  const offer = "Aunty already has Coffee O'Clock scheduled. Want to swap to the Layla Red Wine Glasses?";
+  assertEquals(
+    guardUnswappableSwapReply(offer, "already_ordered", "Coffee O'Clock"),
+    "Coffee O'Clock is already ordered, so it can't be swapped.",
+  );
+  assertEquals(guardUnswappableSwapReply(offer, null, "Coffee O'Clock"), offer);
+  assert(replyRefusesSwap("It can't be swapped for the Layla Red Wine Glasses."));
+  assertEquals(swapSuccessCopy({
+    replaced: "Coffee O'Clock",
+    gift: "Layla Red Wine Glasses, Set of 4",
+    recipientName: "Aunty",
+    heldAmount: 41,
+  }), "Done. Coffee O'Clock is now Layla Red Wine Glasses, Set of 4 for Aunty. $41 is now held for it.");
+});
+
+Deno.test("a swap review marker is persisted so yes can confirm, even without GIFT_REVIEW in the reply", () => {
+  const marker = "rec_aunty:prod_wine:2026-12-02";
+  const swapReview = { replacesGiftTitle: "Coffee O'Clock", productTitle: "Layla Red Wine Glasses" };
+  assert(reviewReplacesGift(swapReview));
+  assertEquals(markerToPersist(marker, "Want me to swap Coffee O'Clock for the wine glasses?", [], swapReview), marker);
+  // Aligned bubble that names the gift also persists (non-swap).
+  assertEquals(
+    markerToPersist(marker, "I'll schedule the Layla Red Wine Glasses for Aunty. Confirm?", [], {
+      productTitle: "Layla Red Wine Glasses",
+    }),
+    marker,
+  );
+  assertEquals(markerToPersist(marker, "Want me to schedule something nice?", [], { productTitle: "Layla Red Wine Glasses" }), null);
+  assertEquals(markerToPersist(marker, "GIFT_REVIEW: rec_aunty:prod_wine:2026-12-02", [], { productTitle: "Layla" }), marker);
+});
+
+Deno.test("alignReviewPresentation rewrites cookie-only copy when the swap card is wine glasses", () => {
+  const swapReview = {
+    productId: "prod_wine",
+    productTitle: "Layla Red Wine Glasses",
+    recipientName: "Aunty Ulan",
+    replacesGiftTitle: "Coffee O'Clock",
+    price: 34,
+  };
+  const cookieOnly =
+    "For a sweet option, only the Gluten-Free Cookie 4-Pack is available right now under budget.";
+  assert(replyClaimsOnlyOtherGift(cookieOnly, swapReview.productTitle));
+  assertEquals(replyNamesReviewProduct(cookieOnly, swapReview.productTitle), false);
+
+  const aligned = alignReviewPresentation(cookieOnly, swapReview, [
+    { id: "prod_cookie", title: "Gluten-Free Cookie 4-Pack" },
+  ]);
+  assert(aligned.review);
+  assertEquals(aligned.products, []);
+  assert(replyNamesReviewProduct(aligned.reply, "Layla Red Wine Glasses"));
+  assertEquals(replyClaimsOnlyOtherGift(aligned.reply, "Layla Red Wine Glasses"), false);
+  assert(aligned.reply.includes("Coffee O'Clock"));
+  assert(aligned.reply.includes("Confirm?"));
+});
+
+Deno.test("alignReviewPresentation drops a non-swap review when the bubble pitches other catalog cards", () => {
+  const review = {
+    productId: "prod_wine",
+    productTitle: "Layla Red Wine Glasses",
+    recipientName: "Aunty",
+    price: 34,
+  };
+  const pitch = "Here are a couple of sweet picks under $40.";
+  const products = [{ id: "prod_cookie", title: "Gluten-Free Cookie 4-Pack" }];
+  const aligned = alignReviewPresentation(pitch, review, products);
+  assertEquals(aligned.review, null);
+  assertEquals(aligned.products, products);
+  assertEquals(aligned.reply, pitch);
+});
+
+Deno.test("alignReviewReply keeps a bubble that already names the reviewed gift", () => {
+  const review = {
+    productTitle: "Layla Red Wine Glasses",
+    recipientName: "Aunty",
+    replacesGiftTitle: "Coffee O'Clock",
+  };
+  const ok = "I'll swap Coffee O'Clock for the Layla Red Wine Glasses for Aunty. Confirm?";
+  assertEquals(alignReviewReply(ok, review), ok);
+  assertEquals(
+    reviewOfferCopy({ ...review, price: 34 }),
+    "I'll swap Coffee O'Clock for the Layla Red Wine Glasses ($34) for Aunty. Confirm?",
+  );
+});
+
 Deno.test("giftOrderTiming places the order from occasion minus shipping lead minus buffer", () => {
   // Default lead 21 + arrival buffer 3 = 24 days before the occasion.
   const timing = giftOrderTiming("2026-12-02", { today: "2026-10-01" });
   assertEquals(timing?.placeOrderOn, "2026-11-08");
+  assertEquals(timing?.idealPlaceOrderOn, "2026-11-08");
   assertEquals(timing?.deliveryBy, "2026-11-29");
   assertEquals(timing?.shippingLeadDays, 21);
   assertEquals(timing?.placeOrderASAP, false);
@@ -532,6 +670,7 @@ Deno.test("giftOrderTiming clamps past place dates to today and marks tight wind
   // Mid-November for a Dec 2 birthday: ideal place (Nov 8) is past; 21-day ship can't hit Nov 29.
   const timing = giftOrderTiming("2026-12-02", { today: "2026-11-11" });
   assertEquals(timing?.placeOrderOn, "2026-11-11");
+  assertEquals(timing?.idealPlaceOrderOn, "2026-11-08");
   assertEquals(timing?.deliveryBy, "2026-11-29");
   assertEquals(timing?.placeOrderASAP, true);
   assertEquals(timing?.feasible, false);
@@ -556,6 +695,210 @@ Deno.test("resolveShippingLeadDays and shippingLeadDaysFromProduct fall back sen
   assertEquals(shippingLeadDaysFromProduct(null), undefined);
   assertEquals(shippingLeadDaysFromProduct({ shipping_lead_days: 14 }), 14);
   assertEquals(shippingLeadDaysFromProduct({ estimated_delivery_days: 5 }), 5);
+});
+
+Deno.test("default confirm stores the computed place-by for that gift's shipping lead", () => {
+  assert(systemPromptIncludesPlaceDateAsk());
+  const decision = decidePlaceBy({ occasionDate: "2026-12-02", today: "2026-10-01" });
+  assert(decision.ok);
+  if (!decision.ok) return;
+  assertEquals(decision.saved, true);
+  assertEquals(decision.usedOverride, false);
+  assertEquals(decision.placeByDate, "2026-11-08");
+  assertEquals(decision.shippingLeadDays, 21);
+  assertEquals(decision.timing.placeOrderOn, "2026-11-08");
+  assertEquals(decision.timing.expectedArrival, "2026-11-29");
+  assert(decision.confirmationCopy.includes("about 21 days"));
+  assert(decision.confirmationCopy.includes("November 8, 2026"));
+  assert(decision.confirmationCopy.includes("Does that work?"));
+
+  const faster = decidePlaceBy({ occasionDate: "2026-12-02", shippingLeadDays: 7, today: "2026-10-01" });
+  assert(faster.ok);
+  if (!faster.ok) return;
+  assertEquals(faster.placeByDate, "2026-11-22");
+  assertEquals(faster.timing.shippingLeadDays, 7);
+});
+
+Deno.test("a user place-date override is saved and a too-late one is not", () => {
+  const today = "2026-11-11";
+  const saved = decidePlaceBy({
+    occasionDate: "2026-12-02",
+    shippingLeadDays: 7,
+    requestedPlaceOn: "place it on Nov 15",
+    today,
+  });
+  assert(saved.ok);
+  if (!saved.ok) return;
+  assertEquals(saved.saved, true);
+  assertEquals(saved.feasible, true);
+  assertEquals(saved.placeByDate, "2026-11-15");
+  assertEquals(saved.timing.placeOrderOn, "2026-11-15");
+  assertEquals(saved.timing.expectedArrival, "2026-11-22");
+  assertEquals(saved.shippingLeadDays, 7);
+  assert(saved.confirmationCopy.includes("about 7 days"));
+  assert(saved.confirmationCopy.includes("November 15, 2026"));
+  assert(saved.confirmationCopy.includes("November 22, 2026"));
+
+  const sooner = decidePlaceBy({
+    occasionDate: "2026-12-02",
+    shippingLeadDays: 7,
+    requestedPlaceOn: "place it sooner",
+    today,
+  });
+  assert(sooner.ok);
+  if (!sooner.ok) return;
+  assertEquals(sooner.placeByDate, "2026-11-11");
+  assertEquals(sooner.feasible, true);
+
+  const nextWeek = decidePlaceBy({
+    occasionDate: "2026-12-02",
+    shippingLeadDays: 7,
+    requestedPlaceOn: "wait until next week",
+    today,
+  });
+  assert(nextWeek.ok);
+  if (!nextWeek.ok) return;
+  assertEquals(nextWeek.placeByDate, "2026-11-18");
+
+  const the20th = decidePlaceBy({
+    occasionDate: "2026-12-02",
+    shippingLeadDays: 7,
+    requestedPlaceOn: "place it on the 20th instead",
+    today,
+  });
+  assert(the20th.ok);
+  if (!the20th.ok) return;
+  assertEquals(the20th.placeByDate, "2026-11-20");
+  assertEquals(the20th.timing.expectedArrival, "2026-11-27");
+
+  const late = decidePlaceBy({
+    occasionDate: "2026-12-02",
+    shippingLeadDays: 21,
+    requestedPlaceOn: "place it on Nov 20",
+    today,
+  });
+  assert(late.ok);
+  if (!late.ok) return;
+  assertEquals(late.saved, false);
+  assertEquals(late.feasible, false);
+  assertEquals(late.tooLate, true);
+  assertEquals(late.placeByDate, null);
+  assertEquals(late.timing.placeOrderOn, "2026-11-20");
+  assertEquals(late.timing.expectedArrival, "2026-12-11");
+  assert(late.confirmationCopy.toLowerCase().includes("didn't change"));
+  assertEquals(late.options, ["place_asap", "pick_earlier_date", "accept_late_arrival"]);
+
+  const accepted = decidePlaceBy({
+    occasionDate: "2026-12-02",
+    shippingLeadDays: 21,
+    requestedPlaceOn: "Nov 20",
+    acceptLate: true,
+    today,
+  });
+  assert(accepted.ok);
+  if (!accepted.ok) return;
+  assertEquals(accepted.saved, true);
+  assertEquals(accepted.feasible, false);
+  assertEquals(accepted.placeByDate, "2026-11-20");
+
+  const past = decidePlaceBy({
+    occasionDate: "2026-12-02",
+    shippingLeadDays: 7,
+    requestedPlaceOn: "Nov 1",
+    today,
+  });
+  assertEquals(past.ok, false);
+
+  const stored = timingForStoredGift("2026-12-02", {
+    shippingLeadDays: 7,
+    placeByDate: "2026-11-15",
+    today,
+  });
+  assertEquals(stored?.placeOrderOn, "2026-11-15");
+  assertEquals(stored?.expectedArrival, "2026-11-22");
+  assertEquals(stored?.shippingLeadDays, 7);
+
+  assert(looksLikePlaceDateChange("place it on Nov 15"));
+  assert(looksLikePlaceDateChange("place it sooner"));
+  assert(looksLikePlaceDateChange("wait until next week"));
+  assert(looksLikePlaceDateChange("place it on the 20th instead"));
+  assertEquals(looksLikePlaceDateChange("yes"), false);
+  assertEquals(looksLikePlaceDateChange("please order it now"), false);
+});
+
+Deno.test("set_place_date writes the override and refuses a date that cannot arrive in time", async () => {
+  const rows = [{
+    id: "gift_coffee",
+    user_id: "user_1",
+    recipient_id: "rec_aunty",
+    occasion_date: "2026-12-02",
+    status: "confirmed",
+    goody_order_id: null,
+    shipping_lead_days: 7,
+    place_by_date: "2026-11-22",
+    gift_type: "Coffee O'Clock",
+  }];
+  const updates: Array<{ row: Record<string, unknown>; filters: Record<string, unknown> }> = [];
+  const client = {
+    from() {
+      const filters: Record<string, unknown> = {};
+      const builder = {
+        select() { return builder; },
+        eq(col: string, val: unknown) {
+          filters[col] = val;
+          return builder;
+        },
+        order() { return builder; },
+        limit() { return builder; },
+        update(row: Record<string, unknown>) {
+          const updateFilters: Record<string, unknown> = {};
+          const updater = {
+            eq(col: string, val: unknown) {
+              updateFilters[col] = val;
+              return updater;
+            },
+            then(resolve: (value: { error: null }) => unknown) {
+              updates.push({ row, filters: { ...updateFilters } });
+              return Promise.resolve({ error: null }).then(resolve);
+            },
+          };
+          return updater;
+        },
+        then(resolve: (value: { data: unknown[]; error: null }) => unknown) {
+          const matched = rows.filter((row) => Object.entries(filters).every(([col, val]) => row[col as keyof typeof row] === val));
+          return Promise.resolve({ data: matched, error: null }).then(resolve);
+        },
+      };
+      return builder;
+    },
+  };
+
+  const saved = await handleSetPlaceDate(client as never, "user_1", {
+    recipientId: "rec_aunty",
+    placeOn: "place it on Nov 15",
+  }, { today: "2026-11-11" });
+  assertEquals(saved.ok, true);
+  assertEquals(saved.saved, true);
+  assertEquals((saved.timing as { placeOrderOn: string }).placeOrderOn, "2026-11-15");
+  assertEquals((saved.timing as { expectedArrival: string }).expectedArrival, "2026-11-22");
+  assertEquals((saved.timing as { shippingLeadDays: number }).shippingLeadDays, 7);
+  assertEquals(saved.feasible, true);
+  assertEquals(updates.length, 1);
+  assertEquals(updates[0].row.place_by_date, "2026-11-15");
+  assertEquals(updates[0].row.shipping_lead_days, 7);
+  assertEquals(updates[0].filters.id, "gift_coffee");
+
+  const late = await handleSetPlaceDate(client as never, "user_1", {
+    scheduledGiftId: "gift_coffee",
+    placeOn: "Nov 28",
+  }, { today: "2026-11-11" });
+  assertEquals(late.ok, true);
+  assertEquals(late.saved, false);
+  assertEquals(late.feasible, false);
+  assertEquals(late.tooLate, true);
+  assertEquals(updates.length, 1);
+  assert(String(late.confirmationCopy).includes("about 7 days"));
+  assert(String(late.confirmationCopy).includes("November 28, 2026"));
 });
 
 Deno.test("buildRecipientStatusEntries maps gift/address/preferences checks", () => {
@@ -604,4 +947,175 @@ Deno.test("buildRecipientStatusEntries maps gift/address/preferences checks", ()
   assertEquals(entries[1].giftScheduled, false);
   assertEquals(entries[1].hasAddress, false);
   assertEquals(entries[1].hasPreferences, false);
+});
+
+Deno.test("swap funding copy tells Thea to move the prior hold and only ask for the delta", () => {
+  assert(systemPromptIncludesSwapReservedReuse());
+});
+
+Deno.test("a fully reserved gift never gets top-up wording, and a short hold states the exact difference", () => {
+  assert(systemPromptIncludesReservedOrderRules());
+  assert(/never request a top-up/i.test(RESERVED_ORDER_RULES));
+  assert(RESERVED_ORDER_RULES.includes("place_order_now"));
+  assert(!/place immediately/.test(RESERVED_ORDER_RULES));
+
+  const covered = decideReservedOrder({
+    owned: true,
+    hasAddress: true,
+    alreadyOrdered: false,
+    recipientName: "Alex",
+    productPrice: 40,
+    pendingReserved: 47,
+    paymentStatus: "unpaid",
+  });
+  assertEquals(covered.action, "place");
+  if (covered.action !== "place") return;
+  assert(!/top-?up/i.test(covered.confirmationCopy));
+  assert(!/add funds/i.test(covered.confirmationCopy));
+  assert(/nothing new will be charged/i.test(covered.confirmationCopy));
+  assert(covered.confirmationCopy.includes("$47"));
+
+  const short = decideReservedOrder({
+    owned: true,
+    hasAddress: true,
+    alreadyOrdered: false,
+    recipientName: "Alex",
+    productPrice: 50,
+    pendingReserved: 47,
+    paymentStatus: "unpaid",
+  });
+  assertEquals(short.action, "shortfall");
+  if (short.action !== "shortfall") return;
+  assertEquals(short.shortfall, 10);
+  assert(short.confirmationCopy.includes("$10"));
+  assert(!/top-?up/i.test(short.confirmationCopy));
+
+  assert(looksLikeOrderNowIntent("please order it now, shipping takes weeks"));
+  assertEquals(shouldForceWalletTopUpUi("please order it now", []), false);
+  const directive = buildOrderNowDirectiveMessage(true) || "";
+  assert(directive.includes("place_order_now"));
+  assert(/do not ask for a top-up/i.test(directive));
+  assert(/never say the address is missing/i.test(directive));
+});
+
+const AUNTY_ON_FILE = { id: "rec_aunty", name: "Aunty", hasAddress: true, addressConfirmed: true };
+const AUNTY_MISSING = { id: "rec_aunty", name: "Aunty", hasAddress: false, addressConfirmed: false };
+const MISSING_ADDRESS_REPLY = "I can't place the order until I confirm the address. Aunty's address is still missing. Would you like to add her address so we can proceed?";
+
+Deno.test("hasAddress true does not claim the address is missing and does not force the form", () => {
+  assert(systemPromptIncludesAddressFormRules());
+  assert(/never say an address is missing/i.test(ADDRESS_FORM_RULES));
+  assert(!/don't open another form/i.test(ADDRESS_FORM_RULES));
+  assert(/do not tell them to add it on a review card/i.test(ADDRESS_FORM_RULES));
+  assert(addressIsOnFile({ hasAddress: true, addressConfirmed: false }));
+  assert(addressIsOnFile({ hasAddress: false, addressConfirmed: true }));
+  assertEquals(addressIsOnFile({ hasAddress: false, addressConfirmed: false }), false);
+  assert(replyClaimsMissingAddress(MISSING_ADDRESS_REPLY));
+
+  const decision = decideAddressForm({
+    latestUserMessage: "Please place Aunty's gift",
+    recentMessages: [],
+    modelReply: MISSING_ADDRESS_REPLY,
+    alreadyPresented: [],
+    addressFacts: AUNTY_ON_FILE,
+    addressRequired: false,
+  });
+  assertEquals(decision.force, false);
+  assertEquals(decision.suppressMissingClaim, true);
+  // Stale addressRequired (e.g. Goody mailing_address.country) must not reopen the form.
+  const falseRequired = decideAddressForm({
+    latestUserMessage: "place it today actually",
+    recentMessages: [],
+    modelReply: "I've opened the address form for Aunty.",
+    alreadyPresented: [{ module: "edit_recipient", focus: "address" }],
+    addressFacts: AUNTY_ON_FILE,
+    addressRequired: true,
+  });
+  assertEquals(falseRequired.force, false);
+  assertEquals(falseRequired.suppressMissingClaim, true);
+  assertEquals(
+    stripAddressFormUnlessRequested(
+      [{ module: "edit_recipient", recipientId: "rec_aunty", focus: "address" as const }],
+      "rec_aunty",
+      "place it today actually",
+      [],
+    ),
+    [],
+  );
+  const confirmedOnly = decideAddressForm({
+    latestUserMessage: "Please place Aunty's gift",
+    recentMessages: [],
+    modelReply: MISSING_ADDRESS_REPLY,
+    alreadyPresented: [],
+    addressFacts: { hasAddress: false, addressConfirmed: true },
+    addressRequired: false,
+  });
+  assertEquals(confirmedOnly.force, false);
+  assertEquals(confirmedOnly.suppressMissingClaim, true);
+  const cleared = clearMissingAddressClaim(MISSING_ADDRESS_REPLY, "Aunty");
+  assert(!replyClaimsMissingAddress(cleared));
+  assert(!replyAsksToAddAddress(cleared));
+  assert(cleared.includes("Aunty's address is already on file"));
+  assertEquals(editRecipientAddressUi({ ok: true, hasAddress: true, recipientId: "rec_aunty", recipientName: "Aunty" }), null);
+});
+
+Deno.test("a missing address or addressRequired presents the address form", () => {
+  const missing = decideAddressForm({
+    latestUserMessage: "Please place Aunty's gift",
+    recentMessages: [],
+    modelReply: MISSING_ADDRESS_REPLY,
+    alreadyPresented: [],
+    addressFacts: AUNTY_MISSING,
+    addressRequired: false,
+  });
+  assertEquals(missing.force, true);
+  assertEquals(missing.suppressMissingClaim, false);
+
+  const required = decideAddressForm({
+    latestUserMessage: "yes",
+    recentMessages: [],
+    modelReply: "Aunty needs a delivery address before this can be ordered.",
+    alreadyPresented: [],
+    addressFacts: AUNTY_MISSING,
+    addressRequired: true,
+  });
+  assertEquals(required.force, true);
+  assertEquals(
+    editRecipientAddressUi({
+      ok: false,
+      addressRequired: true,
+      recipientId: "rec_aunty",
+      recipientName: "Aunty",
+    }),
+    { module: "edit_recipient", recipientId: "rec_aunty", recipientName: "Aunty", focus: "address" },
+  );
+  assertEquals(editRecipientAddressUi({ ok: false, error: "nope" }), null);
+
+  assert(looksLikeAddressFormIntent("please add her address"));
+  assert(shouldDirectAddressForm("yes", [
+    { role: "assistant", content: "Would you like to add her address so we can proceed?" },
+  ]));
+  assertEquals(looksLikeAddressFormAgreement("yes, swap to the wine glasses"), false);
+  const agreed = decideAddressForm({
+    latestUserMessage: "yes",
+    recentMessages: [{ role: "assistant", content: "Aunty's address is still missing. Want to add her address?" }],
+    modelReply: "Great.",
+    alreadyPresented: [],
+    addressFacts: AUNTY_MISSING,
+    addressRequired: false,
+  });
+  assertEquals(agreed.force, true);
+
+  assertEquals(pickRecipientForAddress([AUNTY_MISSING, { id: "rec_2", name: "Jordan", hasAddress: true, addressConfirmed: false }], ["place it for Aunty"], null)?.id, "rec_aunty");
+  assertEquals(
+    decideAddressForm({
+      latestUserMessage: "who is missing an address",
+      recentMessages: [],
+      modelReply: "Brianna is missing an address.",
+      alreadyPresented: [],
+      addressFacts: AUNTY_MISSING,
+      addressRequired: false,
+    }).force,
+    false,
+  );
 });

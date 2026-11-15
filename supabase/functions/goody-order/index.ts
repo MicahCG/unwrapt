@@ -1,9 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { goodyMailingCountry } from "../_shared/isoCountry.ts";
 
-// Inlined rather than imported from ../_shared/cors.ts so this function is a
-// single self-contained file, pastable directly into the Supabase Dashboard
-// function editor (which only sees this one file, not sibling folders).
+// CORS stays inlined rather than imported from ../_shared/cors.ts. Country
+// codes are normalized in ../_shared/isoCountry.ts, which `supabase functions
+// deploy` bundles with this function.
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -39,16 +40,44 @@ const goodyBaseUrl = () =>
   goodyEnvironment() === "production" ? "https://api.ongoody.com" : "https://api.sandbox.ongoody.com";
 
 // Goody's product-catalog endpoint only supports listing (no confirmed
-// single-product-by-id endpoint), so we fetch the page and find the product
-// we need. Mirrors the same call gift-catalog's getGoodyCatalog already makes.
+// single-product-by-id endpoint). Search pages like gift-catalog / thea-chat —
+// page 1 alone misses products Thea already recommended (live: Layla wine glasses).
 const findGoodyProduct = async (apiKey: string, productId: string): Promise<GoodyProduct | null> => {
-  const response = await fetch(`${goodyBaseUrl()}/v1/products?page=1&per_page=100`, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!response.ok) throw new Error(`Goody product lookup failed with ${response.status}`);
-  const payload = await response.json() as { data?: GoodyProduct[] };
-  return (payload.data || []).find((product) => product.id === productId) || null;
+  for (const page of [1, 2, 3]) {
+    const response = await fetch(`${goodyBaseUrl()}/v1/products?page=${page}&per_page=100`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) throw new Error(`Goody product lookup failed with ${response.status}`);
+    const payload = await response.json() as { data?: GoodyProduct[] };
+    const batch = payload.data || [];
+    const match = batch.find((product) => product.id === productId);
+    if (match) return match;
+    if (batch.length < 100) break;
+  }
+  return null;
+};
+
+/** Goody wants USPS-style state codes. Forms often store full names like "Texas". */
+const US_STATE_TO_CODE: Record<string, string> = {
+  alabama: "AL", alaska: "AK", arizona: "AZ", arkansas: "AR", california: "CA",
+  colorado: "CO", connecticut: "CT", delaware: "DE", florida: "FL", georgia: "GA",
+  hawaii: "HI", idaho: "ID", illinois: "IL", indiana: "IN", iowa: "IA", kansas: "KS",
+  kentucky: "KY", louisiana: "LA", maine: "ME", maryland: "MD", massachusetts: "MA",
+  michigan: "MI", minnesota: "MN", mississippi: "MS", missouri: "MO", montana: "MT",
+  nebraska: "NE", nevada: "NV", "new hampshire": "NH", "new jersey": "NJ",
+  "new mexico": "NM", "new york": "NY", "north carolina": "NC", "north dakota": "ND",
+  ohio: "OH", oklahoma: "OK", oregon: "OR", pennsylvania: "PA", "rhode island": "RI",
+  "south carolina": "SC", "south dakota": "SD", tennessee: "TN", texas: "TX", utah: "UT",
+  vermont: "VT", virginia: "VA", washington: "WA", "west virginia": "WV",
+  wisconsin: "WI", wyoming: "WY", "district of columbia": "DC",
+};
+
+const goodyMailingState = (state: string | null | undefined): string => {
+  const raw = typeof state === "string" ? state.trim() : "";
+  if (!raw) return raw;
+  if (/^[A-Za-z]{2}$/.test(raw)) return raw.toUpperCase();
+  return US_STATE_TO_CODE[raw.toLowerCase().replace(/\./g, "").replace(/\s+/g, " ")] || raw;
 };
 
 Deno.serve(async (req: Request) => {
@@ -131,6 +160,15 @@ Deno.serve(async (req: Request) => {
     const [firstName, ...lastNameParts] = recipient.name.trim().split(/\s+/);
     const fromName = profile?.full_name || (profile?.email ? profile.email.split("@")[0] : "A friend");
 
+    // Blank country keeps the historical US default. A stored English name
+    // such as "United States" has to be ISO 3166-1 alpha-2 before Goody sees it.
+    const country = goodyMailingCountry(recipient.country);
+    if (!country) {
+      const rawCountry = typeof recipient.country === "string" ? recipient.country.trim().slice(0, 80) : "";
+      console.error("goody-order rejected a recipient country that is not ISO 3166-1 alpha-2", rawCountry);
+      return json({ success: false, error: "Recipient country must be a 2-letter ISO 3166-1 code" }, 400);
+    }
+
     const orderBody = {
       from_name: fromName,
       send_method: "direct_send",
@@ -145,9 +183,9 @@ Deno.serve(async (req: Request) => {
             address_1: recipient.street,
             address_2: recipient.apartment || undefined,
             city: recipient.city,
-            state: recipient.state,
+            state: goodyMailingState(recipient.state),
             postal_code: recipient.zip_code,
-            country: recipient.country || "US",
+            country,
           },
         },
       ],

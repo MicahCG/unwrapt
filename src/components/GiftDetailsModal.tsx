@@ -8,6 +8,8 @@ import { cleanName } from '@/lib/utils';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { formatHeldFundsStatus } from '@/lib/giftTiming';
+import { assessReservation } from '@/lib/reservedFunds';
 
 interface GiftDetailsModalProps {
   gift: any;
@@ -22,10 +24,24 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClo
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Check if gift is paid but not yet ordered
-  const isPaidButNotOrdered = gift?.payment_status === 'paid' && 
-    gift?.status !== 'ordered' && 
-    !gift?.shopify_order_id;
+  const ordered = gift?.status === 'ordered' || gift?.status === 'shipped' || gift?.status === 'delivered' || gift?.shopify_order_id || gift?.goody_order_id;
+  const productPrice = Number(gift?.payment_amount ?? gift?.estimated_cost) || 0;
+  const reservedAmount = Number(gift?.wallet_reservation_amount) || 0;
+  const assessment = assessReservation({
+    productPrice,
+    pendingReserved: reservedAmount,
+    paymentStatus: gift?.payment_status,
+  });
+  const holdCovers = Boolean(gift?.wallet_reserved) && assessment.covered;
+  const isPaidButNotOrdered = !ordered && (gift?.payment_status === 'paid' || holdCovers);
+  const holdLine = reservedAmount > 0 && gift?.recipients?.name
+    ? formatHeldFundsStatus({
+        amount: reservedAmount,
+        recipientName: gift.recipients.name,
+        occasionDate: gift.occasion_date || null,
+        fulfillmentError: gift.fulfillment_error || null,
+      })
+    : null;
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -79,7 +95,7 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClo
       console.log('🎁 Manually placing order for gift:', gift.id);
       
       const { data, error } = await supabase.functions.invoke('process-gift-fulfillment', {
-        body: { scheduledGiftId: gift.id },
+        body: { scheduledGiftId: gift.id, manualTrigger: gift.payment_status !== 'paid' },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         }
@@ -90,7 +106,9 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClo
       if (data?.success) {
         toast({
           title: "Order Placed!",
-          description: "Your gift order has been submitted to Shopify.",
+          description: data?.confirmationCopy || (holdCovers
+            ? "Placed using the funds already held. Nothing new was charged."
+            : "Your gift order has been submitted."),
         });
         onClose();
         // Trigger refresh
@@ -203,10 +221,14 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({ gift, isOpen, onClo
             {/* Place Order Now - for paid but unordered gifts */}
             {isPaidButNotOrdered && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3">
                   <div>
                     <h4 className="text-sm font-semibold text-amber-800">Ready to Ship</h4>
-                    <p className="text-xs text-amber-700">Payment received. Click to place the order now.</p>
+                    <p className="text-xs text-amber-700">
+                      {holdLine || (gift?.payment_status === 'paid'
+                        ? 'Already paid. Nothing new will be charged.'
+                        : 'Click to place the order now.')}
+                    </p>
                   </div>
                   <Button
                     onClick={handlePlaceOrderNow}

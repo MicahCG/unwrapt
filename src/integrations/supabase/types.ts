@@ -724,6 +724,10 @@ export type Database = {
           user_id: string
           wallet_reservation_amount: number | null
           wallet_reserved: boolean | null
+          shipping_lead_days: number | null
+          place_by_date: string | null
+          fulfillment_error: string | null
+          fulfillment_error_at: string | null
         }
         Insert: {
           address_confirmed_at?: string | null
@@ -763,6 +767,10 @@ export type Database = {
           user_id: string
           wallet_reservation_amount?: number | null
           wallet_reserved?: boolean | null
+          shipping_lead_days?: number | null
+          place_by_date?: string | null
+          fulfillment_error?: string | null
+          fulfillment_error_at?: string | null
         }
         Update: {
           address_confirmed_at?: string | null
@@ -802,6 +810,10 @@ export type Database = {
           user_id?: string
           wallet_reservation_amount?: number | null
           wallet_reserved?: boolean | null
+          shipping_lead_days?: number | null
+          place_by_date?: string | null
+          fulfillment_error?: string | null
+          fulfillment_error_at?: string | null
         }
         Relationships: [
           {

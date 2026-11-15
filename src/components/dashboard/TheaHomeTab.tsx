@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Send, X } from 'lucide-react';
+import { CalendarDays, Send, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { TheaAvatar } from '@/components/unwrapt2/TheaAvatar';
@@ -27,14 +27,17 @@ import {
 import { useAuth } from '@/components/auth/AuthProvider';
 import {
   buildBriefingMessage,
+  addressChipForm,
   briefingQuickChips,
   buildDashboardBriefing,
   priorityPaymentItems,
   type BriefingItem,
 } from '@/lib/dashboardBriefing';
-import { giftStage, hasRecipientAddress, isWalletGift, type GiftRecord, type RecipientRecord } from '@/lib/giftStatus';
+import { getRecipientStatus, giftStage, hasRecipientAddress, isSettledGiftStatus, isWalletGift, type GiftRecord, type RecipientRecord } from '@/lib/giftStatus';
+import { VoiceDictateButton } from '@/components/dashboard/VoiceDictateButton';
+import { useSpeechDictation } from '@/hooks/useSpeechDictation';
 import { resumeGiftPayment } from '@/lib/giftPayment';
-import { calculateGiftCost, getAvailableBalance, holdGiftFunds, startGiftTopUp, takePendingWalletHold } from '@/lib/wallet';
+import { calculateGiftCost, getAvailableBalance, getGiftReservedAmount, holdGiftFunds, startGiftTopUp, takePendingWalletHold } from '@/lib/wallet';
 import { formatGiftTimingLine, giftOrderTiming } from '@/lib/giftTiming';
 import {
   WalletHoldSuccessModal,
@@ -48,6 +51,7 @@ import CalendarSyncButton from '@/components/CalendarSyncButton';
 import { cleanTheaText, hideProductIds, renderTheaText } from '@/lib/theaText';
 import { theaChatPose } from '@/lib/theaState';
 import {
+  ensureAddressFormUi,
   ensureCalendarConnectUi,
   ensureRecipientStatusUi,
   ensureWalletTopUpUi,
@@ -75,12 +79,28 @@ function splitChromePose(pose: TheaPose | TheaReaction): { pose: TheaPose; react
 }
 
 /**
- * Centered frosted island (ChatGPT-style): figure above the name, floating over chat.
- * Tap opens a larger frosted presence modal with her full animation.
+ * Freestanding Thea (ChatGPT Athena-style) with a frosted “Thea” name pill under her.
+ * Tap opens a frosted presence modal with her full animation.
  */
-export const TheaIdentityChip: React.FC<{ chrome: TheaHeaderChrome; className?: string }> = ({
+export type UpcomingEventPreview = {
+  id: string;
+  recipient: string;
+  status: string;
+  when: string;
+  /** Funds are reserved, or the gift is already ordered, shipped, or delivered. */
+  handled: boolean;
+};
+
+export const TheaIdentityChip: React.FC<{
+  chrome: TheaHeaderChrome;
+  className?: string;
+  upcoming?: UpcomingEventPreview[];
+  onSeeCalendar?: () => void;
+}> = ({
   chrome,
   className = '',
+  upcoming = [],
+  onSeeCalendar,
 }) => {
   const [open, setOpen] = useState(false);
   const { pose, reaction } = splitChromePose(chrome.pose);
@@ -89,7 +109,7 @@ export const TheaIdentityChip: React.FC<{ chrome: TheaHeaderChrome; className?: 
     <>
       <button
         type="button"
-        className={`u-thea-identity-chip u-press${chrome.lively ? ' u-thea-identity-chip--lively' : ''}${className ? ` ${className}` : ''}`}
+        className={`u-thea-presence-orb u-press${chrome.lively ? ' u-thea-presence-orb--lively' : ''}${className ? ` ${className}` : ''}`}
         aria-label="Thea, your gifting agent. Open to see her."
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -100,23 +120,18 @@ export const TheaIdentityChip: React.FC<{ chrome: TheaHeaderChrome; className?: 
           pose={pose}
           reaction={reaction}
           speaking={false}
-          className="u-thea-character--chip-inline"
+          className="u-thea-character--orb-inline"
         />
-        <div className="u-thea-identity-chip__copy">
-          <div className="font-display text-[18px] leading-none" style={{ color: U.ink }}>
-            Thea
-          </div>
-          <div className="mt-1 text-[9px] font-semibold uppercase tracking-[0.14em]" style={{ color: U.accent }}>
-            Your gifting agent
-          </div>
-          <span className="sr-only" aria-live="polite">
-            {chrome.status}
-          </span>
-        </div>
+        <span className="u-thea-name-pill" aria-hidden="true">
+          Thea
+        </span>
+        <span className="sr-only" aria-live="polite">
+          {chrome.status}
+        </span>
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="u-thea-presence-modal max-w-[min(400px,calc(100vw-1.5rem))] gap-0 overflow-hidden rounded-[28px] border p-0 shadow-[0_24px_60px_rgba(42,37,32,0.18)] sm:rounded-[28px]">
+        <DialogContent className="u-thea-presence-modal max-h-[min(88dvh,640px)] max-w-[min(400px,calc(100vw-1.5rem))] gap-0 overflow-y-auto rounded-[28px] border p-0 shadow-[0_24px_60px_rgba(42,37,32,0.18)] sm:rounded-[28px]">
           <DialogClose
             className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border opacity-100"
             style={{ background: 'rgba(250,246,238,0.85)', borderColor: 'rgba(42,37,32,0.1)', color: U.ink }}
@@ -145,6 +160,63 @@ export const TheaIdentityChip: React.FC<{ chrome: TheaHeaderChrome; className?: 
             <p className="mt-2 text-center text-[13px] leading-5" style={{ color: U.textSecondary }}>
               {chrome.status}
             </p>
+            <section className="mt-5 w-full text-left" aria-labelledby="upcoming-events-heading">
+              <h3
+                id="upcoming-events-heading"
+                className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+                style={{ color: U.muted }}
+              >
+                Upcoming events
+              </h3>
+              {upcoming.length === 0 ? (
+                <p className="mt-2 text-[13px] leading-5" style={{ color: U.textSecondary }}>
+                  Nothing coming up yet.
+                </p>
+              ) : (
+                <ul className="mt-2 space-y-2">
+                  {upcoming.slice(0, 3).map((event) => (
+                    <li
+                      key={event.id}
+                      className="flex items-center justify-between gap-3 rounded-[14px] border px-3 py-2"
+                      style={{
+                        background: event.handled ? U.sageSoft : U.surface,
+                        borderColor: event.handled ? 'rgba(110,123,91,0.35)' : 'rgba(182,91,60,0.28)',
+                      }}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-[14px] font-medium" style={{ color: U.ink }}>
+                          {event.recipient}
+                        </span>
+                        <span className="block truncate text-[12px]" style={{ color: U.muted }}>
+                          {event.when}
+                        </span>
+                      </span>
+                      <span
+                        className="shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold"
+                        style={{
+                          background: event.handled ? '#E3E8DA' : '#F7E4DA',
+                          color: event.handled ? '#4F5C3F' : '#87432E',
+                        }}
+                      >
+                        {event.status}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onSeeCalendar?.();
+                }}
+                className="u-press mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-full text-[13px] font-semibold"
+                style={{ background: U.ink, color: U.buttonText }}
+              >
+                <CalendarDays className="h-4 w-4" aria-hidden="true" />
+                See the calendar
+              </button>
+            </section>
           </div>
         </DialogContent>
       </Dialog>
@@ -238,6 +310,8 @@ interface TheaHomeTabProps {
   recipientsLoaded?: boolean;
   /** Lets the dashboard hide the Thea/Manual tab bar and pin to the visual viewport while typing. */
   onComposerFocusChange?: (focused: boolean) => void;
+  /** Hide the freestanding Thea orb while the keyboard chrome is pinned. */
+  hidePresenceOrb?: boolean;
 }
 
 const STATUS_LINE: Partial<Record<TheaPose, string>> = {
@@ -258,6 +332,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   queuedMessage,
   recipientsLoaded = true,
   onComposerFocusChange,
+  hidePresenceOrb = false,
 }) => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -540,10 +615,19 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
         }
         if (hold && attempt === HOLD_ATTEMPTS) {
           const available = user?.id ? await getAvailableBalance(user.id) : 0;
+          const reservedApplied = !hold.held ? (hold.reservedApplied || 0) : 0;
           setMessages((current) => [...current, {
             role: 'assistant',
             content: `Your wallet still doesn't cover ${first}'s gift. If you just added funds they may take a moment to land.`,
-            ui: [{ module: 'wallet_topup', scheduledGiftId: pending.scheduledGiftId, recipientName: pending.recipientName, giftTitle: pending.giftTitle, needed: hold.needed, available }],
+            ui: [{
+              module: 'wallet_topup',
+              scheduledGiftId: pending.scheduledGiftId,
+              recipientName: pending.recipientName,
+              giftTitle: pending.giftTitle,
+              needed: hold.needed,
+              available,
+              reservedApplied: reservedApplied > 0.009 ? reservedApplied : undefined,
+            }],
           }]);
           return;
         }
@@ -637,7 +721,10 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     void (async () => {
       const first = pick.recipientName.split(' ')[0] || pick.recipientName;
       const giftTitle = gift.gift_type || gift.gift_description || 'their gift';
-      const available = await getAvailableBalance(user.id).catch(() => 0);
+      const [available, reservedApplied] = await Promise.all([
+        getAvailableBalance(user.id).catch(() => 0),
+        getGiftReservedAmount(user.id, gift.id!).catch(() => 0),
+      ]);
       stickToBottomRef.current = true;
       setMessages((current) => {
         if (current.some((m) => m.ui?.some((mod) => mod.module === 'wallet_topup' && mod.scheduledGiftId === gift.id))) {
@@ -653,6 +740,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
             giftTitle,
             needed: calculateGiftCost(Number(gift.payment_amount ?? gift.estimated_cost) || 0),
             available,
+            reservedApplied: reservedApplied > 0.009 ? reservedApplied : undefined,
           }],
         }];
       });
@@ -737,24 +825,41 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
       let ensured = statusEnsured;
       if (looksLikePaymentIntent(trimmed) && !statusEnsured.ui.some((m) => m.module === 'wallet_topup')) {
         const available = user?.id ? await getAvailableBalance(user.id).catch(() => 0) : 0;
-        ensured = ensureWalletTopUpUi(trimmed, statusEnsured.reply, statusEnsured.ui, recipients, available);
+        const provisional = ensureWalletTopUpUi(trimmed, statusEnsured.reply, statusEnsured.ui, recipients, available);
+        const topUp = provisional.ui.find((m): m is WalletTopUpModule => m.module === 'wallet_topup');
+        if (topUp && user?.id) {
+          const reservedApplied = await getGiftReservedAmount(user.id, topUp.scheduledGiftId).catch(() => 0);
+          ensured = ensureWalletTopUpUi(
+            trimmed,
+            statusEnsured.reply,
+            statusEnsured.ui,
+            recipients,
+            available,
+            reservedApplied,
+          );
+        } else {
+          ensured = provisional;
+        }
       }
-      const ui = ensured.ui;
+      // Same safety net for a missing address: open the form, and don't repeat a false "address is missing".
+      const addressEnsured = ensureAddressFormUi(trimmed, nextMessages.slice(0, -1), ensured.reply, ensured.ui, recipients);
+      const ui = addressEnsured.ui;
+      // place_order_now / shortfall failures are not "saves"; only recipient/gift writes are.
+      const saveTools = new Set(['update_recipient', 'create_recipient', 'confirm_scheduled_gift', 'set_place_date']);
       setMessages([
         ...nextMessages,
         {
           role: 'assistant',
-          content: ensured.reply,
+          content: addressEnsured.reply,
           products: (data.products || []) as ChatProduct[],
           review: (data.review || null) as GiftReview | null,
           ui: ui.length ? ui : undefined,
-          unsaved: writes.some((w) => !w.ok),
+          unsaved: writes.some((w) => !w.ok && saveTools.has(w.tool)),
         },
       ]);
-      // Bring up existing editors immediately so the user isn't stuck behind another tap.
+      // Add-person still opens the full form. Address edits happen inline on the chat card.
       for (const mod of ui) {
         if (mod.module === 'add_recipient') onAddRecipient();
-        if (mod.module === 'edit_recipient') onEditRecipient(mod.recipientId, mod.focus);
       }
       return writes;
     } catch (err) {
@@ -859,6 +964,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     const first = item.recipientName.split(' ')[0] || item.recipientName;
     const giftTitle = gift.gift_type || gift.gift_description || 'their gift';
     const available = user?.id ? await getAvailableBalance(user.id) : 0;
+    const reservedApplied = user?.id ? await getGiftReservedAmount(user.id, gift.id!).catch(() => 0) : 0;
     stickToBottomRef.current = true;
     setMessages((current) => [...current, {
       role: 'assistant',
@@ -870,6 +976,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
         giftTitle,
         needed: calculateGiftCost(Number(gift.payment_amount ?? gift.estimated_cost) || 0),
         available,
+        reservedApplied: reservedApplied > 0.009 ? reservedApplied : undefined,
       }],
     }]);
   };
@@ -881,16 +988,16 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     return { street: recipient.street!, city: recipient.city!, state: recipient.state!, zipCode: recipient.zip_code! };
   };
 
-  // Writes only the address, only for this review's recipient, so nothing else about them can change here.
-  const saveReviewAddress = async (review: GiftReview, address: ReviewAddress) => {
+  // Writes only the address fields for one recipient (review card or inline edit_recipient card).
+  const saveRecipientAddress = async (recipientId: string, address: ReviewAddress) => {
     if (!user?.id) return false;
-    const recipient = recipients.find((r) => r.id === review.recipientId);
+    const recipient = recipients.find((r) => r.id === recipientId);
     const { error } = await supabase.from('recipients').update({
       street: address.street, city: address.city, state: address.state, zip_code: address.zipCode,
       country: recipient?.country || 'United States', updated_at: new Date().toISOString(),
-    }).eq('id', review.recipientId).eq('user_id', user.id);
+    }).eq('id', recipientId).eq('user_id', user.id);
     if (error) {
-      console.error('Saving review address failed', error);
+      console.error('Saving recipient address failed', error);
       return false;
     }
     void trackProductEvent('dashboard_thea_review_address_saved', {});
@@ -898,7 +1005,21 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     return true;
   };
 
+  const saveReviewAddress = (review: GiftReview, address: ReviewAddress) =>
+    saveRecipientAddress(review.recipientId, address);
+
+  const recipientAddress = (recipientId: string): ReviewAddress | null => {
+    const recipient = recipients.find((r) => r.id === recipientId);
+    if (!recipient || !hasRecipientAddress(recipient)) return null;
+    return { street: recipient.street!, city: recipient.city!, state: recipient.state!, zipCode: recipient.zip_code! };
+  };
+
   const handleChip = (item: BriefingItem) => {
+    const addressForm = addressChipForm(item);
+    if (addressForm) {
+      onEditRecipient(addressForm.recipientId, addressForm.focus);
+      return;
+    }
     if (item.action === 'payment') {
       const gift = item.giftId ? giftsById.get(item.giftId) : undefined;
       // VIP / wallet gifts stay in chat; Stripe abandoned checkouts resume checkout.
@@ -921,46 +1042,64 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
       void showWalletTopUp(item);
       return;
     }
-    if (item.action === 'address' || item.action === 'interests' || item.action === 'open' || item.action === 'review') {
+    if (item.action === 'interests' || item.action === 'open' || item.action === 'review') {
       onOpenRecipient(item.recipientId, item.action);
-      if (item.action === 'address' || item.action === 'interests') {
-        onSwitchToManual();
-      }
+      if (item.action === 'interests') onSwitchToManual();
       return;
     }
     void send(item.label);
   };
 
   const lastMessage = messages[messages.length - 1];
-  const pose = theaChatPose({
-    sending,
-    failed: history === 'error' || Boolean(lastMessage?.failed || lastMessage?.unsaved),
-    succeeded: celebrating,
-    typing: input.trim().length > 0,
-    lastReply: lastMessage?.role === 'assistant' && !lastMessage.products?.length && !lastMessage.review ? lastMessage.content : null,
-  });
+  const dictation = useSpeechDictation();
+  const pose = dictation.listening
+    ? 'listening'
+    : theaChatPose({
+      sending,
+      failed: history === 'error' || Boolean(lastMessage?.failed || lastMessage?.unsaved),
+      succeeded: celebrating,
+      typing: input.trim().length > 0,
+      lastReply: lastMessage?.role === 'assistant' && !lastMessage.products?.length && !lastMessage.review ? lastMessage.content : null,
+    });
   const latestReviewIndex = messages.reduce((latest, m, i) => (m.review ? i : latest), -1);
   // Soft expand while she reacts, thinks, or a send is in flight — then settle.
   const chipLively = sending || Boolean(reaction) || pose === 'thinking' || pose === 'listening';
   const headerStatus = STATUS_LINE[pose] || 'Here when you need me';
-  const islandChrome: TheaHeaderChrome = {
+  const orbChrome: TheaHeaderChrome = {
     pose: reaction ?? pose,
     lively: chipLively,
     status: headerStatus,
   };
+  const upcomingEvents = briefing.upcoming.slice(0, 3).map((item) => {
+    const recipient = recipients.find((row) => row.id === item.recipientId);
+    const giftStatus = recipient?.scheduled_gifts?.length ? getRecipientStatus(recipient) : null;
+    const handled = giftStatus != null && isSettledGiftStatus(giftStatus.key);
+    return {
+      id: `${item.recipientId}:${item.label}`,
+      recipient: item.recipientName,
+      when: item.detail,
+      status: giftStatus?.label ?? 'No gift yet',
+      handled,
+    };
+  });
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
       <div className="relative min-h-0 flex-1">
-        {/* Centered frosted island floats over the transcript (ChatGPT agent-chip pattern). */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center px-2 pt-0.5">
-          <div className="pointer-events-auto">
-            <TheaIdentityChip chrome={islandChrome} />
+        {!hidePresenceOrb && (
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-[25] flex justify-center pt-2 md:pt-2.5">
+            <div className="pointer-events-auto">
+              <TheaIdentityChip
+                chrome={orbChrome}
+                upcoming={upcomingEvents}
+                onSeeCalendar={onSwitchToManual}
+              />
+            </div>
           </div>
-        </div>
+        )}
         <div
           ref={scrollRef}
-          className="h-full min-h-0 overflow-x-hidden overflow-y-auto pt-[9.75rem] pr-1"
+          className={`h-full min-h-0 overflow-x-hidden overflow-y-auto pr-1 ${hidePresenceOrb ? 'pt-1' : 'pt-[10.25rem]'}`}
           style={{ scrollPaddingBottom: listPadBottom }}
           aria-live="polite"
         >
@@ -1038,6 +1177,8 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
                       onAddRecipient={onAddRecipient}
                       onEditRecipient={onEditRecipient}
                       onOpenRecipient={(recipientId) => onOpenRecipient(recipientId, 'open')}
+                      addressOf={recipientAddress}
+                      onSaveRecipientAddress={saveRecipientAddress}
                       stageOf={stageOf}
                       onTopUp={topUp}
                       onUseBalance={holdFromBalance}
@@ -1142,6 +1283,11 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
             autoCorrect="on"
             className="u-thea-composer__input min-w-0 flex-1"
           />
+          <VoiceDictateButton
+            listening={dictation.listening}
+            disabled={sending}
+            onClick={() => dictation.toggle(input, setInput)}
+          />
           <button
             type="submit"
             disabled={!input.trim() || sending}
@@ -1152,6 +1298,14 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
             <Send className="h-4 w-4" />
           </button>
         </div>
+        <p className="sr-only" role="status">
+          {dictation.listening ? 'Listening. Your words will appear in the message.' : ''}
+        </p>
+        {dictation.error && (
+          <p className="px-1 pt-1 text-[12px]" role="status" style={{ color: U.accent }}>
+            {dictation.error}
+          </p>
+        )}
       </form>
 
       <WalletHoldSuccessModal
