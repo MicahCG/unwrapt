@@ -76,7 +76,7 @@ serve(async (req) => {
               updated_at: new Date().toISOString()
             })
             .eq("id", scheduledGiftId)
-            .select("occasion, occasion_date, gift_type, price_range, recipients(name)")
+            .select("occasion, occasion_date, gift_type, gift_image_url, price_range, recipients(name)")
             .single();
 
           if (giftError) {
@@ -102,13 +102,14 @@ serve(async (req) => {
                   occasion: updatedGift.occasion,
                   occasionDate: updatedGift.occasion_date,
                   giftType: updatedGift.gift_type,
+                  giftImage: updatedGift.gift_image_url,
                   priceRange: updatedGift.price_range,
                 },
               },
             });
           }
 
-          // Trigger fulfillment (Shopify order)
+          // Trigger fulfillment (Goody order)
           console.log("🚀 Triggering gift fulfillment from webhook...");
           try {
             const fulfillmentResult = await supabaseClient.functions.invoke('process-gift-fulfillment', {

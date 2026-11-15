@@ -10,6 +10,7 @@ import {
   buildTappedSelectionMessage,
   buildTurnContextMessage,
   checkRecommendationIntegrity,
+  needsFallbackDisclosure,
   extractTappedProductId,
   giftStage,
   looksLikeConfirmation,
@@ -105,6 +106,26 @@ Deno.test("scoreInterestText scrubs the 'coffee table' false-friend to zero", ()
 Deno.test("scoreInterestText still scores a real coffee gift above zero", () => {
   const score = scoreInterestText("whole bean coffee roast from a local coffee shop", ["coffee"]);
   assert(score > 0);
+});
+
+Deno.test("scoreInterestText stays strict by default: a multi-word interest with no dictionary entry only matches the exact phrase, not its individual words (this is the deliberate 'curated, not padded' behavior - broadening only happens as an explicit second pass when the strict search finds nothing at all)", () => {
+  const strict = scoreInterestText("Wall Hanging Art Print for the living room", ["wall art"]);
+  assertEquals(strict, 0);
+});
+
+Deno.test("scoreInterestText still matches a multi-word interest by its exact phrase when that's what's in the catalog text", () => {
+  const score = scoreInterestText("a framed wall art piece for the hallway", ["wall art"]);
+  assert(score > 0);
+});
+
+Deno.test("scoreInterestText with broaden=true (the search's zero-result fallback) recovers a genuine catalog hit the exact phrase missed (regression: 'wall art' scored 0 against 'Wall Hanging Art Print' because only the verbatim phrase was tried)", () => {
+  const broadened = scoreInterestText("Wall Hanging Art Print for the living room", ["wall art"], undefined, true);
+  assert(broadened > 0);
+});
+
+Deno.test("scoreInterestText with broaden=true does not match a multi-word interest's short words inside unrelated longer words", () => {
+  const score = scoreInterestText("a leather wallet for everyday carry", ["wall art"], undefined, true);
+  assertEquals(score, 0);
 });
 
 Deno.test("scrubFalseFriends removes only the known false-friend phrase, not unrelated uses of the word", () => {
@@ -211,6 +232,38 @@ Deno.test("checkRecommendationIntegrity leaves ordinary conversational replies a
   const result = checkRecommendationIntegrity("What's your budget for this gift?", seenProducts([]));
   assertEquals(result.missingMarker, false);
   assertEquals(result.needsRealSearch, false);
+});
+
+Deno.test("needsFallbackDisclosure flags a reply recommending a fallback-sourced product with no disclosure marker (reproduces the live bug: 'Here are some gifts for men' presented fallback-only results, none of them gendered, as if they were a real match)", () => {
+  const flagged = needsFallbackDisclosure(
+    "Here are some gifts for men in the $25 to $50 range:\nRECOMMENDED_IDS: [prod_tote]",
+    ["prod_tote"],
+    new Set(["prod_tote"]),
+  );
+  assertEquals(flagged, true);
+});
+
+Deno.test("needsFallbackDisclosure passes once the reply includes the FALLBACK_DISCLOSED marker", () => {
+  const flagged = needsFallbackDisclosure(
+    "Nothing specifically for men right now, but here's what's live in that range:\nFALLBACK_DISCLOSED: true\nRECOMMENDED_IDS: [prod_tote]",
+    ["prod_tote"],
+    new Set(["prod_tote"]),
+  );
+  assertEquals(flagged, false);
+});
+
+Deno.test("needsFallbackDisclosure does not fire when the recommended products are all genuine matches, even if some other product this turn was a fallback result", () => {
+  const flagged = needsFallbackDisclosure(
+    "The Large Book Vase is a lovely cozy pick.\nRECOMMENDED_IDS: [prod_vase]",
+    ["prod_vase"],
+    new Set(["prod_tote"]),
+  );
+  assertEquals(flagged, false);
+});
+
+Deno.test("needsFallbackDisclosure does not fire when nothing was recommended from a fallback search this turn", () => {
+  const flagged = needsFallbackDisclosure("What's your budget for this gift?", [], new Set());
+  assertEquals(flagged, false);
 });
 
 const RECOMMENDED = [
@@ -334,6 +387,18 @@ Deno.test("resolvePresentUi accepts calendar_connect and add_recipient without a
     ok: true,
     ui: { module: "add_recipient", focus: "birthday" },
   });
+});
+
+Deno.test("resolvePresentUi accepts suggest_add_recipient with a name and trims it", () => {
+  assertEquals(resolvePresentUi({ module: "suggest_add_recipient", name: "  Jordan  " }, null), {
+    ok: true,
+    ui: { module: "suggest_add_recipient", name: "Jordan" },
+  });
+});
+
+Deno.test("resolvePresentUi rejects suggest_add_recipient with a missing or empty name", () => {
+  assertEquals(resolvePresentUi({ module: "suggest_add_recipient" }, null).ok, false);
+  assertEquals(resolvePresentUi({ module: "suggest_add_recipient", name: "   " }, null).ok, false);
 });
 
 Deno.test("resolvePresentUi requires an owned recipient for edit_recipient", () => {

@@ -134,7 +134,10 @@ Use what is already known and gather only missing essentials naturally, with at 
 - If the best live option is a substitute that needs permission, ask first instead of forcing it.
   Example: they want red wine and only white wine is live. Ask: "I don't see red wine gifts live right now. Would white wine also work?"
 - Never invent stretch connections across unrelated categories (plants are not nail polish or random kitchen tools).
-- If search_gifts returns nothing for the requested interests and budget, do not fall back to generic or hypothetical gift ideas (e.g. "a cozy blanket," "a coffee gift set," "a nice water bottle") that didn't come from an actual search_gifts result. Either call search_gifts again with a broader query still inside the budget, or tell the user plainly that nothing matches right now and ask them to adjust the budget or interest. Every gift you name, in any reply, must be a real search_gifts result from this conversation, never a category guess.
+- Never invent gift ideas that didn't come from an actual search_gifts result (e.g. "a cozy blanket," "a coffee gift set") just because nothing matched. Every gift you name, in any reply, must be a real search_gifts result from this conversation, never a category guess.
+- search_gifts returns { matchType, results }. matchType "matched" means results genuinely fit the interests/query you asked for - recommend normally. matchType "fallback" means nothing matched that specific interest or query at all, even on a broader try, so these results are just the closest live options in that budget/vibe with no connection to what was actually asked - say so plainly before listing them (e.g. "nothing specifically for wall art right now, but here's what's live in that price range") and never present a fallback result as if it matches the interest. If results is empty even with matchType fallback, there's truly nothing live at that budget - say so and ask them to adjust budget or interest, don't call search_gifts again on the same terms expecting a different answer.
+- A real miss is still a reply, not a dead end: name the specific thing they just asked for before saying it's not there ("no wall art in the catalog right now" beats "no results found"), and give one honest, warm reason to keep going instead of just stopping. Vary how you say it across the whole conversation, not just versus your immediately previous reply - don't let "it looks like" or "it seems" become your go-to opener for every miss, even ones that aren't back to back.
+- Don't silently re-show the same products you already showed for an earlier, different ask just because a new search came up empty - that reads as not having listened. Either say plainly those are still your best live options and ask if they're worth a second look, or skip repeating them and ask what to try next.
 - Only recommend items within budget.
 - Give one short, specific reason per pick, tied to the interest, relationship, or occasion. Never generic marketing language ("perfect for any occasion" is banned).
 - On lock in, confirm the exact product and price back clearly, in one line. Gifts are paid from the user's Unwrapt wallet; you never take card details. You place an order only by calling place_order_now, and only when the user asks to order an existing gift now.
@@ -143,10 +146,13 @@ This is a hard rule with no exceptions: any reply that names a specific product 
 RECOMMENDED_IDS: [comma-separated product ids you just recommended, or empty brackets if none]
 Every single time, including when you're refining, narrowing down, or repeating a recommendation from earlier in the conversation. A reply that names products without this line is incomplete, never send one.
 
+This is also a hard rule with no exceptions: if any product you're recommending came from a search_gifts call with matchType "fallback," add FALLBACK_DISCLOSED: true on its own new line (before RECOMMENDED_IDS if both apply), every time, in addition to actually saying so in the visible reply. Never include this line when every recommended product came from a matchType "matched" result.
+
 ## In-chat modules (present_ui)
 When the user wants to connect a calendar, add people via a form, or update someone's details, call present_ui so the app shows an interactive module. Reply with one short helpful line about what you're opening - never claim you lack the ability.
 - calendar_connect: ONLY when they want to connect, reconnect, sync, or import from a calendar (or birthdays/anniversaries from Google). Do NOT use this when they ask how many people are saved, who is on their list/calendar, or similar questions about people already imported - answer from account context or get_recipients instead.
 - add_recipient: open the add-person form. Use when they want to add someone / add more people and have not already given enough details for create_recipient.
+- suggest_add_recipient: use instead of add_recipient whenever you simply notice, mid-conversation, that someone they mentioned isn't saved and you're offering to add them in your reply text - pass that person's name. This shows a small "Add {name}" tap target alongside your normal reply; it does not open the full form by itself. Always call this in addition to saying so in your reply, never instead of it. Reserve add_recipient itself for when they explicitly ask to add someone or open a form.
 - edit_recipient: open the edit form for an existing person. Pass recipientId from get_recipients (call that first if needed) and optional focus (address, birthday, interests, details). Use when they want to update address, birthday, anniversary, interests, or "details".
 - wallet_topup: when they ask about a gift waiting on payment, an incomplete checkout, or adding funds for someone's gift. Pass that person's recipientId; the module shows top-up amounts and holds the funds once added.
 - gift_progress: when they ask how a gift is going, where it is, whether it shipped or arrived. Pass that person's recipientId. The card shows the real stage, so reply with one short line and don't describe the stage yourself.
@@ -155,7 +161,7 @@ You may call present_ui more than once in the same turn (e.g. calendar_connect a
 If they already gave a clear new name (and optional relationship/dates/interests) in chat and just want you to save it, create_recipient is fine without a form. Prefer present_ui when they ask for a form, connection, or to fill in details themselves.
 
 ## Recipients: reading and saving details
-Focus on what's close. By default, only bring up occasions in the next 30 days (the next occurrence, so in December a January birthday counts). Talk about anyone further out only when the user asks, for example "who's coming up after that" or about a specific person. When someone the user mentions isn't saved, offer to add them; they can always just tell you about more people.
+Focus on what's close. By default, only bring up occasions in the next 30 days (the next occurrence, so in December a January birthday counts). Talk about anyone further out only when the user asks, for example "who's coming up after that" or about a specific person. When someone the user mentions isn't saved, offer to add them and call present_ui with module suggest_add_recipient and their name (see above); they can always just tell you about more people instead.
 
 Account context (when present) already lists saved people and whether a calendar is connected. Use that for count/list questions ("how many people", "who's on my calendar", "who have I added"). Call get_recipients whenever you need a real recipientId, whenever the user refers to someone by name, or whenever you're unsure if the person they're describing already exists. Never guess an id or invent one.
 - If the user gives you an address or interests for someone who already exists, call update_recipient. Parse any free-text address into street/city/state/zip/country yourself. Pass only the new interest(s) mentioned, not a full list; they're merged automatically and capped at 3.
@@ -340,8 +346,8 @@ const PRESENT_UI_TOOL = {
       properties: {
         module: {
           type: "string",
-          enum: ["calendar_connect", "add_recipient", "edit_recipient", "wallet_topup", "gift_progress", "recipient_status"],
-          description: "calendar_connect = Google/calendar OAuth connect + full VIP import (not the onboarding 3-person sample); add_recipient = add-person form; edit_recipient = edit an existing person's details; wallet_topup = add wallet funds for that person's gift that is waiting on payment; gift_progress = a progress bar for that person's gifts (scheduled, funds held, ordered, in transit, delivered); recipient_status = cards showing gift scheduled/not, address, and preferences for one or more people.",
+          enum: ["calendar_connect", "add_recipient", "suggest_add_recipient", "edit_recipient", "wallet_topup", "gift_progress", "recipient_status"],
+          description: "calendar_connect = Google/calendar OAuth connect + full VIP import (not the onboarding 3-person sample); add_recipient = opens the full add-person form now; suggest_add_recipient = a small tap target offering to add one named person, shown alongside your reply without opening a form; edit_recipient = edit an existing person's details; wallet_topup = add wallet funds for that person's gift that is waiting on payment; gift_progress = a progress bar for that person's gifts (scheduled, funds held, ordered, in transit, delivered); recipient_status = cards showing gift scheduled/not, address, and preferences for one or more people.",
         },
         recipientId: {
           type: "string",
@@ -351,6 +357,10 @@ const PRESENT_UI_TOOL = {
           type: "array",
           items: { type: "string" },
           description: "For recipient_status: the people to show cards for (from get_recipients). Omit to show everyone (capped).",
+        },
+        name: {
+          type: "string",
+          description: "Required for suggest_add_recipient: the person's name as mentioned in the conversation.",
         },
         focus: {
           type: "string",
@@ -443,6 +453,7 @@ type RecipientStatusEntry = {
 type ChatUiModule =
   | { module: "calendar_connect" }
   | { module: "add_recipient"; focus?: UiFocus }
+  | { module: "suggest_add_recipient"; name: string }
   | { module: "edit_recipient"; recipientId: string; recipientName: string; focus?: UiFocus }
   | { module: "wallet_topup"; scheduledGiftId: string; recipientName: string; giftTitle: string; needed: number; available: number; reservedApplied?: number }
   | { module: "gift_progress"; recipientId: string; recipientName: string; gifts: GiftProgress[] }
@@ -455,13 +466,18 @@ const parseUiFocus = (value: unknown): UiFocus | undefined =>
 
 /** Resolves a present_ui tool call into a validated module for the client. Exported for unit tests. */
 export const resolvePresentUi = (
-  args: { module?: unknown; recipientId?: unknown; focus?: unknown },
+  args: { module?: unknown; recipientId?: unknown; focus?: unknown; name?: unknown },
   recipientLookup: { id: string; name: string } | null,
 ): { ok: true; ui: ChatUiModule } | { ok: false; error: string } => {
   const focus = parseUiFocus(args.focus);
   if (args.module === "calendar_connect") return { ok: true, ui: { module: "calendar_connect" } };
   if (args.module === "add_recipient") {
     return { ok: true, ui: focus ? { module: "add_recipient", focus } : { module: "add_recipient" } };
+  }
+  if (args.module === "suggest_add_recipient") {
+    const name = typeof args.name === "string" ? args.name.trim() : "";
+    if (!name) return { ok: false, error: "suggest_add_recipient requires a non-empty name." };
+    return { ok: true, ui: { module: "suggest_add_recipient", name } };
   }
   if (args.module === "edit_recipient") {
     if (!recipientLookup) {
@@ -474,7 +490,7 @@ export const resolvePresentUi = (
         : { module: "edit_recipient", recipientId: recipientLookup.id, recipientName: recipientLookup.name },
     };
   }
-  return { ok: false, error: "module must be calendar_connect, add_recipient, or edit_recipient." };
+  return { ok: false, error: "module must be calendar_connect, add_recipient, suggest_add_recipient, or edit_recipient." };
 };
 
 /**
@@ -1339,6 +1355,27 @@ export const checkRecommendationIntegrity = (content: string, seenProducts: Map<
   return { mentionedIds, missingMarker, needsRealSearch };
 };
 
+/** Whenever a reply recommends a product that only came from a "fallback"
+ * search (matchType: fallback - nothing matched the actual interest/query,
+ * just the closest live options in budget/vibe), the guide tells the model
+ * to say so plainly before listing it. Free text alone isn't checkable, so
+ * this requires the same invisible-marker convention as RECOMMENDED_IDS/
+ * GIFT_REVIEW: a reply using a fallback product must end with
+ * FALLBACK_DISCLOSED: true. Observed live (2026-11-09) without this check:
+ * the model recommended fallback-only results under "Here are some gifts
+ * for men" with zero disclosure - the same invented-stretch-connection
+ * problem the guide already forbids, just via a real catalog id instead of
+ * a made-up product. Exported for unit testing. */
+export const needsFallbackDisclosure = (
+  content: string,
+  mentionedIds: string[],
+  fallbackProductIds: Set<string>,
+): boolean => {
+  if (fallbackProductIds.size === 0) return false;
+  if (!mentionedIds.some((id) => fallbackProductIds.has(id))) return false;
+  return !/FALLBACK_DISCLOSED\s*:\s*true/i.test(content);
+};
+
 type NamedProductMatch = { id: string; title: string; price: number };
 
 /** When the user's newest message plausibly names one of the carried-over
@@ -1483,6 +1520,19 @@ const keywordsForSearchInterest = (interest: string): string[] => {
   return singular && singular !== key ? [key, singular] : [key];
 };
 
+// Only used as a second pass when the strict phrase match above finds
+// nothing at all (see the `broaden` param on scoreInterestText below). A
+// curated catalog is deliberately shown as "no match" rather than padded
+// out with loose guesses, so this never runs when the strict pass already
+// found something - it exists only to rescue genuine misses like "wall art"
+// matching a real "Wall Hanging Art Print," not to loosen matching across
+// the board.
+const broadenedKeywordsForSearchInterest = (interest: string): string[] => {
+  const key = interest.trim().toLowerCase();
+  const words = key.split(/\s+/).filter((w) => w.length >= 3);
+  return [...new Set([...keywordsForSearchInterest(interest), ...words])];
+};
+
 // Goody's catalog API exposes no category/tag field (verified against their
 // docs - a product is just name/subtitle/brand/images/price), so interest
 // matching has to work off free text. Plain substring matching false-
@@ -1511,9 +1561,10 @@ const wordBoundaryIncludes = (text: string, token: string): boolean => {
   return new RegExp(`\\b${escaped}\\b`, "i").test(text);
 };
 
-export const scoreInterestText = (text: string, interests: string[], query?: string) => {
+export const scoreInterestText = (text: string, interests: string[], query?: string, broaden = false) => {
+  const expand = broaden ? broadenedKeywordsForSearchInterest : keywordsForSearchInterest;
   const tokens = [
-    ...interests.flatMap((interest) => keywordsForSearchInterest(interest)),
+    ...interests.flatMap((interest) => expand(interest)),
     ...(query ? query.toLowerCase().split(/\s+/).filter((t) => t.length >= 3) : []),
   ];
   const unique = [...new Set(tokens)];
@@ -1616,6 +1667,8 @@ const findGoodyProductById = async (id: string): Promise<Product | null> => {
   }
 };
 
+type SearchResult = { products: Product[]; matchType: "matched" | "fallback" };
+
 const searchGoodyGifts = async (
   args: {
     vibe?: string;
@@ -1624,10 +1677,10 @@ const searchGoodyGifts = async (
     interests?: string[];
     query?: string;
   },
-): Promise<Product[]> => {
+): Promise<SearchResult> => {
   try {
     const raw = await fetchRawGoodyProducts();
-    if (!raw.length) return [];
+    if (!raw.length) return { products: [], matchType: "matched" };
 
     const interests = (args.interests || [])
       .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
@@ -1649,27 +1702,48 @@ const searchGoodyGifts = async (
       [product.name, product.brand?.name, product.subtitle, product.subtitle_short, product.recipient_description]
         .filter(Boolean).join(" ").toLowerCase();
 
-    const scored = candidates.map((product) => {
+    const score = (broaden: boolean) => candidates.map((product) => {
       const blob = text(product);
-      const interestScore = scoreInterestText(blob, interests, query);
+      const interestScore = scoreInterestText(blob, interests, query, broaden);
       const vibeScore = args.vibe ? scoreVibe(blob, args.vibe) : 0;
       return { product, interestScore, vibeScore, total: interestScore * 3 + vibeScore };
     });
 
-    // When interests are provided, only return products that actually match them.
-    const filtered = interests.length || query
-      ? scored.filter((row) => row.interestScore > 0)
-      : scored;
+    // When interests are provided, only return products that actually match
+    // them - a curated "nothing matches" is better than padding the list
+    // with loose guesses. Only if that strict pass comes up completely
+    // empty do we retry once with single-word fallbacks (e.g. "wall art"
+    // also trying "wall" and "art" alone), to rescue genuine catalog hits
+    // that the exact phrase missed, without loosening results whenever a
+    // decent strict match already exists.
+    const scored = score(false);
+    const requireMatch = interests.length > 0 || Boolean(query);
+    const strictFiltered = requireMatch ? scored.filter((row) => row.interestScore > 0) : scored;
+    const broadenedFiltered = strictFiltered.length === 0 && interests.length
+      ? score(true).filter((row) => row.interestScore > 0)
+      : strictFiltered;
+
+    // Tier 3: genuinely nothing for this interest/query at this budget,
+    // even broadened. Rather than a dead end, fall back to the best
+    // vibe/budget-ranked live products with no interest requirement at all
+    // - still real catalog items, never invented - flagged as "fallback" so
+    // the model presents them honestly as the closest live options, not as
+    // a match for what was actually asked.
+    const usingFallback = broadenedFiltered.length === 0 && requireMatch;
+    const filtered = usingFallback ? scored : broadenedFiltered;
 
     const ranked = filtered
       .sort((a, b) => b.total - a.total || a.product.price - b.product.price)
       .slice(0, 12)
-      .map(({ product, vibeScore }) => product);
+      .map(({ product }) => product);
 
-    return ranked.map((product) => toProduct(product, args.vibe));
+    return {
+      products: ranked.map((product) => toProduct(product, args.vibe)),
+      matchType: usingFallback ? "fallback" : "matched",
+    };
   } catch (error) {
     console.error("Goody catalog unavailable for Thea", error);
-    return [];
+    return { products: [], matchType: "matched" };
   }
 };
 
@@ -1681,7 +1755,7 @@ const searchGifts = async (
     interests?: string[];
     query?: string;
   },
-): Promise<Product[]> => searchGoodyGifts(args);
+): Promise<SearchResult> => searchGoodyGifts(args);
 
 // ---------------------------------------------------------------------------
 // CC-01/CC-04/CC-07 tool handlers: recipient read/write and gift
@@ -3248,6 +3322,12 @@ Use the whole conversation, not just the last message. Return JSON only:
     const addressFormDirectiveMessage = buildAddressFormDirectiveMessage(forceAddressForm);
 
     const seenProducts = new Map<string, Product>();
+    // Product ids returned by a search_gifts call with matchType "fallback"
+    // this turn (no real match for the interest/query, just the closest
+    // live options) - checked against RECOMMENDED_IDS below so a reply that
+    // recommends one of these without disclosing it's not an exact match
+    // gets bounced back for a rewrite (see needsFallbackDisclosure).
+    const fallbackProductIds = new Set<string>();
     // Seed from the prior turn's carried-over recommendations (CC-02) so
     // select_gift/confirm_scheduled_gift have a fallback product to use
     // even when the model skips search_gifts this turn as instructed (it's
@@ -3489,14 +3569,18 @@ Use the whole conversation, not just the last message. Return JSON only:
         const content = message.content || "";
 
         const { mentionedIds, missingMarker, needsRealSearch } = checkRecommendationIntegrity(content, seenProducts);
+        const missingFallbackDisclosure = !needsRealSearch && !missingMarker
+          && needsFallbackDisclosure(content, mentionedIds, fallbackProductIds);
 
-        if ((needsRealSearch || missingMarker) && iteration < MAX_TOOL_ITERATIONS - 1) {
+        if ((needsRealSearch || missingMarker || missingFallbackDisclosure) && iteration < MAX_TOOL_ITERATIONS - 1) {
           conversation.push({ role: "assistant", content });
           conversation.push({
             role: "system",
             content: needsRealSearch
               ? "You listed gift ideas that aren't backed by a real search_gifts result from this conversation - either you referenced ids that were never returned, or this looks like an invented list of generic examples. Never invent generic gift ideas. search_gifts is being called now with the budget/interests already given; recommend only from its actual results, using their real titles and prices. If nothing matches even on a broader search, say so honestly instead of listing invented examples."
-              : "You named specific products but left out the required RECOMMENDED_IDS line. Resend the same recommendations, ending on a new line with RECOMMENDED_IDS: followed by the exact ids of those products from your search_gifts results.",
+              : missingMarker
+              ? "You named specific products but left out the required RECOMMENDED_IDS line. Resend the same recommendations, ending on a new line with RECOMMENDED_IDS: followed by the exact ids of those products from your search_gifts results."
+              : "At least one product you just recommended only came from a fallback search (matchType: fallback - it doesn't actually match what was asked, it's just the closest live option in that budget/vibe). Resend the reply: say plainly, before listing them, that nothing matched exactly and these are the closest live options instead, then end with FALLBACK_DISCLOSED: true on its own new line (before RECOMMENDED_IDS if both apply).",
           });
           if (needsRealSearch) forceSearchNextCall = true;
           continue;
@@ -3520,11 +3604,15 @@ Use the whole conversation, not just the last message. Return JSON only:
         let toolContent: unknown;
 
         if (toolName === "search_gifts") {
-          const results = await searchGifts(args);
-          for (const product of results) seenProducts.set(product.id, product);
-          toolContent = results.map((p) => ({
-            id: p.id, title: p.title, price: p.price, product_type: p.product_type, vibe: p.gift_vibe, source: p.provider,
-          }));
+          const { products, matchType } = await searchGifts(args);
+          for (const product of products) seenProducts.set(product.id, product);
+          if (matchType === "fallback") for (const product of products) fallbackProductIds.add(product.id);
+          toolContent = {
+            matchType,
+            results: products.map((p) => ({
+              id: p.id, title: p.title, price: p.price, product_type: p.product_type, vibe: p.gift_vibe, source: p.provider,
+            })),
+          };
         } else if (toolName === "get_recipients") {
           const result = await handleGetRecipients(authClient, user.id, args as { name_query?: string });
           if (result.ok && result.singleMatch) lastActiveRecipient = result.singleMatch as { id: string; name: string };
@@ -3641,6 +3729,7 @@ Use the whole conversation, not just the last message. Return JSON only:
     // always followed, so enforce it here rather than relying on the model.
     let reply = (markerMatch ? finalContent.slice(0, markerMatch.index) : finalContent)
       .replace(/GIFT_REVIEW:\s*\S+/gi, "")
+      .replace(/FALLBACK_DISCLOSED\s*:\s*(true|false)/gi, "")
       .replace(/\s*[\u2014\u2013]\s*/g, ", ")
       .trim();
 

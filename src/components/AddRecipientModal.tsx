@@ -1,11 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Plus, X, UserPlus } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
@@ -15,38 +15,25 @@ import { rateLimiter, RATE_LIMITS } from '@/utils/rateLimiter';
 import { useQueryClient } from '@tanstack/react-query';
 import OccasionFields from '@/components/recipients/OccasionFields';
 
-interface AddRecipientModalProps {
-  onRecipientAdded?: () => void;
-  children?: React.ReactNode;
-  isOpen?: boolean;
-  onClose?: () => void;
+interface AddRecipientFormProps {
+  onCancel: () => void;
+  onSuccess: () => void;
+  /** Pre-fills the name field (e.g. tapping a "+ Add Jordan" suggestion from Thea's chat). */
+  initialName?: string;
 }
 
-export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({ 
-  onRecipientAdded, 
-  children,
-  isOpen,
-  onClose
-}) => {
-  const [internalIsOpen, setInternalIsOpen] = useState(false);
+/** The add-recipient form itself, with no Dialog/modal chrome - reusable as a centered
+ * modal (AddRecipientModal, below, for mobile) or rendered inline (desktop's side panel,
+ * see ManualHomeTab). */
+export const AddRecipientForm: React.FC<AddRecipientFormProps> = ({ onCancel, onSuccess, initialName }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showAddress, setShowAddress] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
-  // Use external state if provided, otherwise use internal state
-  const modalIsOpen = isOpen !== undefined ? isOpen : internalIsOpen;
-  const handleOpenChange = (open: boolean) => {
-    if (onClose && isOpen !== undefined) {
-      if (!open) onClose();
-    } else {
-      setInternalIsOpen(open);
-    }
-  };
-  
+
   const [formData, setFormData] = useState({
-    name: '',
+    name: initialName || '',
     relationship: '',
     birthday: '',
     anniversary: '',
@@ -57,12 +44,19 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
     country: 'United States',
     interests: [] as string[]
   });
-  
+
+  // Keeps the name field in sync if this same mounted instance is asked to prefill a
+  // different name (e.g. the inline desktop panel reused across two different chips)
+  // without a remount - mirrors EditRecipientModal's reset-on-prop-change pattern.
+  useEffect(() => {
+    setFormData((prev) => ({ ...prev, name: initialName || prev.name }));
+  }, [initialName]);
+
   const [newInterest, setNewInterest] = useState('');
 
   const handleInputChange = (field: string, value: string) => {
     let sanitizedValue = value;
-    
+
     // Apply appropriate sanitization based on field type
     switch (field) {
       case 'street':
@@ -75,7 +69,7 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
         sanitizedValue = sanitizeInput(value);
         break;
     }
-    
+
     setFormData(prev => ({
       ...prev,
       [field]: sanitizedValue
@@ -106,13 +100,13 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
     if (!formData.name.trim()) {
       return ErrorHandler.handleValidationError('name', formData.name);
     }
-    
+
     return null;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!user) {
       toast({
         title: "Error",
@@ -145,7 +139,7 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
     }
 
     setIsLoading(true);
-    
+
     try {
       const { error } = await supabase
         .from('recipients')
@@ -177,26 +171,8 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
         description: "Recipient added successfully",
       });
 
-      // Reset form
-      setFormData({
-        name: '',
-        relationship: '',
-        birthday: '',
-        anniversary: '',
-        street: '',
-        city: '',
-        state: '',
-        zip_code: '',
-        country: 'United States',
-        interests: []
-      });
-      
-      handleOpenChange(false);
-      setShowAddress(false);
       queryClient.invalidateQueries({ queryKey: ['recipients'] });
-      if (onRecipientAdded) {
-        onRecipientAdded();
-      }
+      onSuccess();
     } catch (error: unknown) {
       console.error('Error adding recipient:', error);
       const friendlyMessage = ErrorHandler.handleApiError(error, 'add-recipient', user.id);
@@ -211,6 +187,174 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
   };
 
   return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <Label htmlFor="name">Name *</Label>
+          <Input
+            id="name"
+            value={formData.name}
+            onChange={(e) => handleInputChange('name', e.target.value)}
+            placeholder="Enter full name"
+            required
+            maxLength={100}
+          />
+        </div>
+        <div>
+          <Label htmlFor="relationship">Relationship</Label>
+          <Input
+            id="relationship"
+            value={formData.relationship}
+            onChange={(e) => handleInputChange('relationship', e.target.value)}
+            placeholder="e.g., Friend, Family, Colleague"
+            maxLength={50}
+          />
+        </div>
+      </div>
+
+      <OccasionFields
+        idPrefix="add-occasion"
+        value={{ birthday: formData.birthday, anniversary: formData.anniversary }}
+        onChange={(occasions) => setFormData((prev) => ({ ...prev, ...occasions }))}
+      />
+
+      <div className="space-y-4 rounded-2xl border border-[#E4DCD2] bg-[#FAF8F3] p-4">
+        <button type="button" onClick={() => setShowAddress((value) => !value)} className="flex w-full items-center justify-between text-left">
+          <span><span className="block font-medium">Delivery address</span><span className="text-xs text-muted-foreground">Optional now; required before an order is placed</span></span>
+          <span className="text-sm font-medium text-[#9A7848]">{showAddress ? 'Hide' : 'Add'}</span>
+        </button>
+        {showAddress && <>
+        <div>
+          <Label htmlFor="street">Street Address</Label>
+          <Input
+            id="street"
+            value={formData.street}
+            onChange={(e) => handleInputChange('street', e.target.value)}
+            placeholder="Enter street address"
+            maxLength={200}
+          />
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div>
+            <Label htmlFor="city">City</Label>
+            <Input
+              id="city"
+              value={formData.city}
+              onChange={(e) => handleInputChange('city', e.target.value)}
+              placeholder="Enter city"
+              maxLength={100}
+            />
+          </div>
+          <div>
+            <Label htmlFor="state">State</Label>
+            <Input
+              id="state"
+              value={formData.state}
+              onChange={(e) => handleInputChange('state', e.target.value)}
+              placeholder="Enter state"
+              maxLength={50}
+            />
+          </div>
+          <div>
+            <Label htmlFor="zip_code">ZIP Code</Label>
+            <Input
+              id="zip_code"
+              value={formData.zip_code}
+              onChange={(e) => handleInputChange('zip_code', e.target.value)}
+              placeholder="Enter ZIP code"
+              maxLength={20}
+            />
+          </div>
+        </div>
+        <div>
+          <Label htmlFor="country">Country</Label>
+          <Input
+            id="country"
+            value={formData.country}
+            onChange={(e) => handleInputChange('country', e.target.value)}
+            placeholder="Enter country"
+            maxLength={100}
+          />
+        </div>
+        </>}
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between"><Label htmlFor="interests">Interests</Label><span className="text-xs text-muted-foreground">{formData.interests.length}/3</span></div>
+        <div className="flex gap-2 mb-2">
+          <Input
+            value={newInterest}
+            onChange={(e) => setNewInterest(e.target.value)}
+            placeholder="Add an interest"
+            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addInterest())}
+            maxLength={50}
+            disabled={formData.interests.length >= 3}
+          />
+          <Button type="button" onClick={addInterest} size="sm" disabled={formData.interests.length >= 3 || !newInterest.trim()}>
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {formData.interests.map((interest, index) => (
+            <Badge key={index} variant="secondary" className="flex items-center gap-1">
+              {interest}
+              <X
+                className="h-3 w-3 cursor-pointer"
+                onClick={() => removeInterest(interest)}
+              />
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+
+      <div className="grid grid-cols-[auto_1fr] gap-2 pt-2">
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={isLoading || !formData.name.trim()} className="h-11 bg-[#2A2520] text-[#F4ECDD] hover:bg-[#2A2520]/90">
+          {isLoading ? 'Adding...' : 'Add Recipient'}
+        </Button>
+      </div>
+    </form>
+  );
+};
+
+interface AddRecipientModalProps {
+  onRecipientAdded?: () => void;
+  children?: React.ReactNode;
+  isOpen?: boolean;
+  onClose?: () => void;
+  /** Pre-fills the name field (e.g. tapping a "+ Add Jordan" suggestion from Thea's chat). */
+  initialName?: string;
+}
+
+export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
+  onRecipientAdded,
+  children,
+  isOpen,
+  onClose,
+  initialName,
+}) => {
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+
+  // Use external state if provided, otherwise use internal state
+  const modalIsOpen = isOpen !== undefined ? isOpen : internalIsOpen;
+  const handleOpenChange = (open: boolean) => {
+    if (onClose && isOpen !== undefined) {
+      if (!open) onClose();
+    } else {
+      setInternalIsOpen(open);
+    }
+  };
+
+  const handleSuccess = () => {
+    handleOpenChange(false);
+    onRecipientAdded?.();
+  };
+
+  return (
     <Dialog open={modalIsOpen} onOpenChange={handleOpenChange}>
       {children && (
         <DialogTrigger asChild>
@@ -221,138 +365,7 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
         <DialogHeader>
           <DialogTitle>Add New Recipient</DialogTitle>
         </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="name">Name *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => handleInputChange('name', e.target.value)}
-                placeholder="Enter full name"
-                required
-                maxLength={100}
-              />
-            </div>
-            <div>
-              <Label htmlFor="relationship">Relationship</Label>
-              <Input
-                id="relationship"
-                value={formData.relationship}
-                onChange={(e) => handleInputChange('relationship', e.target.value)}
-                placeholder="e.g., Friend, Family, Colleague"
-                maxLength={50}
-              />
-            </div>
-          </div>
-
-          <OccasionFields
-            idPrefix="add-occasion"
-            value={{ birthday: formData.birthday, anniversary: formData.anniversary }}
-            onChange={(occasions) => setFormData((prev) => ({ ...prev, ...occasions }))}
-          />
-
-          <div className="space-y-4 rounded-2xl border border-[#E4DCD2] bg-[#FAF8F3] p-4">
-            <button type="button" onClick={() => setShowAddress((value) => !value)} className="flex w-full items-center justify-between text-left">
-              <span><span className="block font-medium">Delivery address</span><span className="text-xs text-muted-foreground">Optional now; required before an order is placed</span></span>
-              <span className="text-sm font-medium text-[#9A7848]">{showAddress ? 'Hide' : 'Add'}</span>
-            </button>
-            {showAddress && <>
-            <div>
-              <Label htmlFor="street">Street Address</Label>
-              <Input
-                id="street"
-                value={formData.street}
-                onChange={(e) => handleInputChange('street', e.target.value)}
-                placeholder="Enter street address"
-                maxLength={200}
-              />
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div>
-                <Label htmlFor="city">City</Label>
-                <Input
-                  id="city"
-                  value={formData.city}
-                  onChange={(e) => handleInputChange('city', e.target.value)}
-                  placeholder="Enter city"
-                  maxLength={100}
-                />
-              </div>
-              <div>
-                <Label htmlFor="state">State</Label>
-                <Input
-                  id="state"
-                  value={formData.state}
-                  onChange={(e) => handleInputChange('state', e.target.value)}
-                  placeholder="Enter state"
-                  maxLength={50}
-                />
-              </div>
-              <div>
-                <Label htmlFor="zip_code">ZIP Code</Label>
-                <Input
-                  id="zip_code"
-                  value={formData.zip_code}
-                  onChange={(e) => handleInputChange('zip_code', e.target.value)}
-                  placeholder="Enter ZIP code"
-                  maxLength={20}
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="country">Country</Label>
-              <Input
-                id="country"
-                value={formData.country}
-                onChange={(e) => handleInputChange('country', e.target.value)}
-                placeholder="Enter country"
-                maxLength={100}
-              />
-            </div>
-            </>}
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between"><Label htmlFor="interests">Interests</Label><span className="text-xs text-muted-foreground">{formData.interests.length}/3</span></div>
-            <div className="flex gap-2 mb-2">
-              <Input
-                value={newInterest}
-                onChange={(e) => setNewInterest(e.target.value)}
-                placeholder="Add an interest"
-                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addInterest())}
-                maxLength={50}
-                disabled={formData.interests.length >= 3}
-              />
-              <Button type="button" onClick={addInterest} size="sm" disabled={formData.interests.length >= 3 || !newInterest.trim()}>
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {formData.interests.map((interest, index) => (
-                <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                  {interest}
-                  <X 
-                    className="h-3 w-3 cursor-pointer" 
-                    onClick={() => removeInterest(interest)}
-                  />
-                </Badge>
-              ))}
-            </div>
-          </div>
-
-
-          <div className="grid grid-cols-[auto_1fr] gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading || !formData.name.trim()} className="h-11 bg-[#2A2520] text-[#F4ECDD] hover:bg-[#2A2520]/90">
-              {isLoading ? 'Adding...' : 'Add Recipient'}
-            </Button>
-          </div>
-        </form>
+        <AddRecipientForm onCancel={() => handleOpenChange(false)} onSuccess={handleSuccess} initialName={initialName} />
       </DialogContent>
     </Dialog>
   );

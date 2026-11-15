@@ -12,12 +12,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { RecipientRecord } from '@/lib/giftStatus';
 import OccasionFields from '@/components/recipients/OccasionFields';
 
-interface EditRecipientModalProps {
+interface EditRecipientFormProps {
   recipient: RecipientRecord;
-  isOpen: boolean;
-  onClose: () => void;
   /** Opened for a specific person (e.g. from Thea's chat): their name is shown, not editable. */
   lockName?: boolean;
+  onCancel: () => void;
+  onSaved: () => void;
 }
 
 const blankForm = {
@@ -25,7 +25,10 @@ const blankForm = {
   street: '', city: '', state: '', zipCode: '', country: 'United States', interests: [] as string[],
 };
 
-const EditRecipientModal: React.FC<EditRecipientModalProps> = ({ recipient, isOpen, onClose, lockName = false }) => {
+/** The edit-recipient form itself, with no Dialog/modal chrome - reusable as a centered
+ * modal (EditRecipientModal, below, for mobile) or rendered inline (desktop's side panel,
+ * see ManualHomeTab). */
+export const EditRecipientForm: React.FC<EditRecipientFormProps> = ({ recipient, lockName = false, onCancel, onSaved }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -71,42 +74,56 @@ const EditRecipientModal: React.FC<EditRecipientModalProps> = ({ recipient, isOp
     }
     await queryClient.invalidateQueries({ queryKey: ['recipients'] });
     toast({ title: 'Recipient updated', description: `${lockName ? recipient.name : formData.name}'s details are ready.` });
-    onClose();
+    onSaved();
   };
 
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {/* autoComplete="off" keeps a browser address autofill from writing the user's own name over the recipient's. */}
+        {!lockName && <div className="space-y-2"><Label htmlFor="edit-name">Name *</Label><Input id="edit-name" autoComplete="off" value={formData.name} onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))} required /></div>}
+        <div className="space-y-2"><Label>Relationship</Label><Select value={formData.relationship} onValueChange={(value) => setFormData((p) => ({ ...p, relationship: value }))}><SelectTrigger><SelectValue placeholder="Select relationship" /></SelectTrigger><SelectContent>{['Mom','Dad','Partner','Sibling','Friend','Child','Grandparent','Other'].map((label) => <SelectItem key={label} value={label.toLowerCase()}>{label}</SelectItem>)}</SelectContent></Select></div>
+      </div>
+      <OccasionFields
+        key={formVersion}
+        idPrefix="edit-occasion"
+        value={{ birthday: formData.birthday, anniversary: formData.anniversary }}
+        onChange={(occasions) => setFormData((p) => ({ ...p, ...occasions }))}
+      />
+
+      <div>
+        <div className="mb-2 flex items-center justify-between"><Label>Interests</Label><span className="text-xs text-muted-foreground">{formData.interests.length}/3</span></div>
+        <div className="mb-2 flex flex-wrap gap-2">{formData.interests.map((interest) => <span key={interest} className="inline-flex items-center gap-1 rounded-full bg-[#EEE5D5] py-1.5 pl-3 pr-2 text-xs">{interest}<button type="button" aria-label={`Remove ${interest}`} onClick={() => setFormData((p) => ({ ...p, interests: p.interests.filter((item) => item !== interest) }))}><X className="h-3.5 w-3.5" /></button></span>)}</div>
+        {formData.interests.length < 3 && <div className="flex gap-2"><Input value={newInterest} onChange={(e) => setNewInterest(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addInterest(); } }} placeholder="Add an interest" maxLength={40} /><Button type="button" variant="outline" size="icon" onClick={addInterest} disabled={!newInterest.trim()}><Plus className="h-4 w-4" /></Button></div>}
+      </div>
+
+      <div className="rounded-2xl border border-[#E4DCD2] bg-[#FAF8F3] p-4">
+        <h3 className="font-medium">Delivery details</h3><p className="mb-4 text-xs text-muted-foreground">Optional until a gift is ready to order.</p>
+        <div className="space-y-3">
+          <Input aria-label="Street address" autoComplete="shipping street-address" placeholder="Street address" value={formData.street} onChange={(e) => setFormData((p) => ({ ...p, street: e.target.value }))} />
+          <div className="grid grid-cols-2 gap-2"><Input aria-label="City" autoComplete="shipping address-level2" placeholder="City" value={formData.city} onChange={(e) => setFormData((p) => ({ ...p, city: e.target.value }))} /><Input aria-label="State" autoComplete="shipping address-level1" placeholder="State" value={formData.state} onChange={(e) => setFormData((p) => ({ ...p, state: e.target.value }))} /><Input aria-label="ZIP code" autoComplete="shipping postal-code" placeholder="ZIP code" value={formData.zipCode} onChange={(e) => setFormData((p) => ({ ...p, zipCode: e.target.value }))} /><Select value={formData.country} onValueChange={(value) => setFormData((p) => ({ ...p, country: value }))}><SelectTrigger aria-label="Country"><SelectValue /></SelectTrigger><SelectContent>{['United States','Canada','United Kingdom','Australia'].map((country) => <SelectItem key={country} value={country}>{country}</SelectItem>)}</SelectContent></Select></div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-[auto_1fr] gap-2"><Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>Cancel</Button><Button type="submit" disabled={isLoading || !formData.name.trim()} className="h-11 bg-[#2A2520] text-[#F4ECDD] hover:bg-[#2A2520]/90">{isLoading ? 'Saving...' : 'Save changes'}</Button></div>
+    </form>
+  );
+};
+
+interface EditRecipientModalProps {
+  recipient: RecipientRecord;
+  isOpen: boolean;
+  onClose: () => void;
+  /** Opened for a specific person (e.g. from Thea's chat): their name is shown, not editable. */
+  lockName?: boolean;
+}
+
+const EditRecipientModal: React.FC<EditRecipientModalProps> = ({ recipient, isOpen, onClose, lockName = false }) => {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="max-h-[92dvh] w-[calc(100%-1.5rem)] max-w-lg overflow-y-auto rounded-[24px] p-5 sm:p-6">
         <DialogHeader><DialogTitle>{lockName ? `Edit ${recipient.name}` : 'Edit recipient'}</DialogTitle></DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {/* autoComplete="off" keeps a browser address autofill from writing the user's own name over the recipient's. */}
-            {!lockName && <div className="space-y-2"><Label htmlFor="edit-name">Name *</Label><Input id="edit-name" autoComplete="off" value={formData.name} onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))} required /></div>}
-            <div className="space-y-2"><Label>Relationship</Label><Select value={formData.relationship} onValueChange={(value) => setFormData((p) => ({ ...p, relationship: value }))}><SelectTrigger><SelectValue placeholder="Select relationship" /></SelectTrigger><SelectContent>{['Mom','Dad','Partner','Sibling','Friend','Child','Grandparent','Other'].map((label) => <SelectItem key={label} value={label.toLowerCase()}>{label}</SelectItem>)}</SelectContent></Select></div>
-          </div>
-          <OccasionFields
-            key={formVersion}
-            idPrefix="edit-occasion"
-            value={{ birthday: formData.birthday, anniversary: formData.anniversary }}
-            onChange={(occasions) => setFormData((p) => ({ ...p, ...occasions }))}
-          />
-
-          <div>
-            <div className="mb-2 flex items-center justify-between"><Label>Interests</Label><span className="text-xs text-muted-foreground">{formData.interests.length}/3</span></div>
-            <div className="mb-2 flex flex-wrap gap-2">{formData.interests.map((interest) => <span key={interest} className="inline-flex items-center gap-1 rounded-full bg-[#EEE5D5] py-1.5 pl-3 pr-2 text-xs">{interest}<button type="button" aria-label={`Remove ${interest}`} onClick={() => setFormData((p) => ({ ...p, interests: p.interests.filter((item) => item !== interest) }))}><X className="h-3.5 w-3.5" /></button></span>)}</div>
-            {formData.interests.length < 3 && <div className="flex gap-2"><Input value={newInterest} onChange={(e) => setNewInterest(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addInterest(); } }} placeholder="Add an interest" maxLength={40} /><Button type="button" variant="outline" size="icon" onClick={addInterest} disabled={!newInterest.trim()}><Plus className="h-4 w-4" /></Button></div>}
-          </div>
-
-          <div className="rounded-2xl border border-[#E4DCD2] bg-[#FAF8F3] p-4">
-            <h3 className="font-medium">Delivery details</h3><p className="mb-4 text-xs text-muted-foreground">Optional until a gift is ready to order.</p>
-            <div className="space-y-3">
-              <Input aria-label="Street address" autoComplete="shipping street-address" placeholder="Street address" value={formData.street} onChange={(e) => setFormData((p) => ({ ...p, street: e.target.value }))} />
-              <div className="grid grid-cols-2 gap-2"><Input aria-label="City" autoComplete="shipping address-level2" placeholder="City" value={formData.city} onChange={(e) => setFormData((p) => ({ ...p, city: e.target.value }))} /><Input aria-label="State" autoComplete="shipping address-level1" placeholder="State" value={formData.state} onChange={(e) => setFormData((p) => ({ ...p, state: e.target.value }))} /><Input aria-label="ZIP code" autoComplete="shipping postal-code" placeholder="ZIP code" value={formData.zipCode} onChange={(e) => setFormData((p) => ({ ...p, zipCode: e.target.value }))} /><Select value={formData.country} onValueChange={(value) => setFormData((p) => ({ ...p, country: value }))}><SelectTrigger aria-label="Country"><SelectValue /></SelectTrigger><SelectContent>{['United States','Canada','United Kingdom','Australia'].map((country) => <SelectItem key={country} value={country}>{country}</SelectItem>)}</SelectContent></Select></div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-[auto_1fr] gap-2"><Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button><Button type="submit" disabled={isLoading || !formData.name.trim()} className="h-11 bg-[#2A2520] text-[#F4ECDD] hover:bg-[#2A2520]/90">{isLoading ? 'Saving...' : 'Save changes'}</Button></div>
-        </form>
+        <EditRecipientForm recipient={recipient} lockName={lockName} onCancel={onClose} onSaved={onClose} />
       </DialogContent>
     </Dialog>
   );

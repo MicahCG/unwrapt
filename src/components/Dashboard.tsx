@@ -19,7 +19,7 @@ import CatalogPreviewSheet from '@/components/CatalogPreviewSheet';
 import { type RecipientRecord, type GiftRecord } from '@/lib/giftStatus';
 import { findResumableGift, resumeGiftPayment, hasCompleteShippingAddress } from '@/lib/giftPayment';
 import TheaHomeTab from '@/components/dashboard/TheaHomeTab';
-import ManualHomeTab from '@/components/dashboard/ManualHomeTab';
+import ManualHomeTab, { type InlinePanelMode } from '@/components/dashboard/ManualHomeTab';
 import AccountMenu from '@/components/dashboard/AccountMenu';
 import { AUTOPILOT_THRESHOLDS, type BriefingItem } from '@/lib/dashboardBriefing';
 import type { GiftCatalogItem } from '@/lib/giftCatalog';
@@ -48,6 +48,11 @@ const Dashboard = () => {
   const [editingRecipient, setEditingRecipient] = useState<any>(null);
   // True when the editor was opened for one specific person from Thea, so their name stays fixed.
   const [editLockName, setEditLockName] = useState(false);
+  // Pre-fills AddRecipientModal's name field on mobile (desktop uses inlinePanelMode instead).
+  const [addRecipientPrefillName, setAddRecipientPrefillName] = useState<string | undefined>(undefined);
+  // Desktop only: renders the add/edit form inline in ManualHomeTab's side panel instead of
+  // a modal, since that panel is already visible next to the chat (see compactChrome below).
+  const [inlinePanelMode, setInlinePanelMode] = useState<InlinePanelMode | null>(null);
   const [approval, setApproval] = useState<{ gift: any; recipient: any } | null>(null);
   const [theaQueue, setTheaQueue] = useState<{ id: number; text: string } | null>(null);
   const [composerFocused, setComposerFocused] = useState(false);
@@ -62,6 +67,28 @@ const Dashboard = () => {
     mql.addEventListener('change', sync);
     return () => mql.removeEventListener('change', sync);
   }, []);
+
+  // Desktop (ManualHomeTab's panel already visible) opens the form inline; mobile keeps
+  // the existing modal. Both routes end up here so every add/edit entry point - Thea's
+  // chat, the side panel's own buttons, RecipientDetailSheet - gets the switch for free.
+  const openAddRecipient = useCallback((prefillName?: string) => {
+    if (compactChrome) {
+      setAddRecipientPrefillName(prefillName);
+      setShowAddRecipient(true);
+    } else {
+      setInlinePanelMode({ kind: 'add', prefillName });
+    }
+  }, [compactChrome]);
+
+  const openEditRecipient = useCallback((recipient: RecipientRecord, lockName: boolean) => {
+    if (compactChrome) {
+      setEditingRecipient(recipient);
+      setEditLockName(lockName);
+      setShowEditRecipient(true);
+    } else {
+      setInlinePanelMode({ kind: 'edit', recipient, lockName });
+    }
+  }, [compactChrome]);
 
   const tabParam = searchParams.get('tab');
   const activeTab: DashboardTab = tabParam === 'manual' ? 'manual' : 'thea';
@@ -215,7 +242,7 @@ const Dashboard = () => {
   useEffect(() => {
     const action = searchParams.get('action');
     if (action === 'add-person') {
-      setShowAddRecipient(true);
+      openAddRecipient();
       setActiveTab('manual');
     }
     if (action === 'catalog') {
@@ -229,7 +256,7 @@ const Dashboard = () => {
         return next;
       }, { replace: true });
     }
-  }, [searchParams, setSearchParams, setActiveTab]);
+  }, [searchParams, setSearchParams, setActiveTab, openAddRecipient]);
 
   useEffect(() => {
     if (recentGift) {
@@ -339,9 +366,7 @@ const Dashboard = () => {
 
     if (intent === 'address') {
       // The edit form opens over whichever tab is active, so Thea's conversation stays put.
-      setEditingRecipient(recipient);
-      setEditLockName(true);
-      setShowEditRecipient(true);
+      openEditRecipient(recipient, true);
       return;
     }
     if (intent === 'interests') setActiveTab('manual');
@@ -373,9 +398,7 @@ const Dashboard = () => {
 
   const handleEditRecipient = (recipient: RecipientRecord) => {
     setRecipientDetailId(null);
-    setEditingRecipient(recipient);
-    setEditLockName(false);
-    setShowEditRecipient(true);
+    openEditRecipient(recipient, false);
   };
 
   const displayName = (user?.user_metadata?.full_name || user?.email || 'there').split(' ')[0].split('@')[0];
@@ -443,14 +466,12 @@ const Dashboard = () => {
               recipients={typedRecipients}
               autopilotThreshold={autopilotThreshold}
               onOpenRecipient={handleOpenRecipientById}
-              onAddRecipient={() => setShowAddRecipient(true)}
+              onAddRecipient={openAddRecipient}
               onEditRecipient={(recipientId) => {
                 const recipient = typedRecipients.find((r) => r.id === recipientId);
                 if (!recipient) return;
                 // Same path as address chips: keep Thea chat put and open the existing editor.
-                setEditingRecipient(recipient);
-                setEditLockName(true);
-                setShowEditRecipient(true);
+                openEditRecipient(recipient, true);
               }}
               onSwitchToManual={() => setActiveTab('manual')}
               queuedMessage={theaQueue}
@@ -464,15 +485,22 @@ const Dashboard = () => {
               recipients={typedRecipients}
               autopilotThreshold={autopilotThreshold}
               onOpenRecipient={handleOpenRecipient}
-              onAddRecipient={() => setShowAddRecipient(true)}
+              onAddRecipient={openAddRecipient}
               onBrowseCatalog={() => handleBrowseCatalog()}
+              inlinePanelMode={inlinePanelMode}
+              onCloseInlinePanel={() => setInlinePanelMode(null)}
             />
           </div>
         </div>
       </MobileShell>
 
       {showAddRecipient && (
-        <AddRecipientModal isOpen={showAddRecipient} onClose={() => setShowAddRecipient(false)} onRecipientAdded={() => setShowAddRecipient(false)} />
+        <AddRecipientModal
+          isOpen={showAddRecipient}
+          onClose={() => { setShowAddRecipient(false); setAddRecipientPrefillName(undefined); }}
+          onRecipientAdded={() => { setShowAddRecipient(false); setAddRecipientPrefillName(undefined); }}
+          initialName={addRecipientPrefillName}
+        />
       )}
       {showScheduleGift && selectedRecipient && (
         <ScheduleGiftModal

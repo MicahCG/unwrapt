@@ -224,7 +224,9 @@ Deno.serve(async (req: Request) => {
       .update({
         status: "ordered",
         goody_order_id: goodyOrderId,
-        gift_description: `Goody order: ${goodyOrderId} | Product: ${product.name || gift.gift_variant_id}`.slice(0, 500),
+        // The real product name, not an internal "Goody order: <id> | Product: <name>" string —
+        // this field is shown to customers directly (dashboard gift details, order emails).
+        ...(product.name ? { gift_description: product.name.slice(0, 500) } : {}),
         updated_at: new Date().toISOString(),
       })
       .eq("id", scheduledGiftId);
