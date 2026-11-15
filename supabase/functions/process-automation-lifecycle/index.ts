@@ -199,7 +199,7 @@ async function processGiftStage(supabaseClient: any, gift: any, recipient: any, 
         });
 
         // Get product details for email
-        const productImage = await getProductImage(supabaseClient, gift.gift_variant_id);
+        const productImage = await getProductImage(gift, gift.gift_variant_id);
 
         // Send gift confirmed email
         await supabaseClient.functions.invoke("send-notification-email", {
@@ -210,7 +210,7 @@ async function processGiftStage(supabaseClient: any, gift: any, recipient: any, 
             data: {
               recipientName: recipient.name,
               occasion: gift.occasion,
-              giftDescription: gift.gift_description || "Curated selection",
+              giftDescription: gift.gift_type || gift.gift_description || "Curated selection",
               giftImage: productImage,
               deliveryDate: gift.delivery_date,
               modifyLink: `${Deno.env.get("SUPABASE_URL")}/dashboard`
@@ -423,7 +423,7 @@ async function handleAddressRequest(supabaseClient: any, gift: any, recipient: a
     });
 
     // Get product details for email
-    const productImage = await getProductImage(supabaseClient, gift.gift_variant_id);
+    const productImage = await getProductImage(gift, gift.gift_variant_id);
 
     // Send gift confirmed email (address already exists)
     await supabaseClient.functions.invoke("send-notification-email", {
@@ -434,7 +434,7 @@ async function handleAddressRequest(supabaseClient: any, gift: any, recipient: a
         data: {
           recipientName: recipient.name,
           occasion: gift.occasion,
-          giftDescription: gift.gift_description || "Curated selection",
+          giftDescription: gift.gift_type || gift.gift_description || "Curated selection",
           giftImage: productImage,
           deliveryDate: gift.delivery_date,
           modifyLink: `${Deno.env.get("SUPABASE_URL")}/dashboard`
@@ -457,7 +457,7 @@ async function handleAddressRequest(supabaseClient: any, gift: any, recipient: a
     if (updateError) throw updateError;
 
     // Get product details for email
-    const productImage = await getProductImage(supabaseClient, gift.gift_variant_id);
+    const productImage = await getProductImage(gift, gift.gift_variant_id);
 
     // Send gift confirmed but needs address email
     await supabaseClient.functions.invoke("send-notification-email", {
@@ -468,7 +468,7 @@ async function handleAddressRequest(supabaseClient: any, gift: any, recipient: a
         data: {
           recipientName: recipient.name,
           occasion: gift.occasion,
-          giftDescription: gift.gift_description || "Curated selection",
+          giftDescription: gift.gift_type || gift.gift_description || "Curated selection",
           giftImage: productImage,
           deliveryDate: gift.delivery_date,
           confirmationLink: `https://app.unwrapt.io/confirm-address/${gift.id}`,
@@ -668,7 +668,7 @@ async function handleGiftAutoConfirmation(supabaseClient: any, gift: any, recipi
 
   try {
     // Get product details for email
-    const productImage = await getProductImage(supabaseClient, gift.gift_variant_id);
+    const productImage = await getProductImage(gift, gift.gift_variant_id);
 
     // Mark gift as confirmed
     const { error: updateError } = await supabaseClient
@@ -689,7 +689,7 @@ async function handleGiftAutoConfirmation(supabaseClient: any, gift: any, recipi
         data: {
           recipientName: recipient.name,
           occasion: gift.occasion,
-          giftDescription: gift.gift_description || "Curated selection",
+          giftDescription: gift.gift_type || gift.gift_description || "Curated selection",
           giftImage: productImage,
           deliveryDate: gift.delivery_date,
           modifyLink: `${Deno.env.get("SUPABASE_URL")}/dashboard`
@@ -811,7 +811,10 @@ async function logAutomation(
     });
 }
 
-async function getProductImage(_supabaseClient: any, variantId: string | null): Promise<string | undefined> {
+// Prefers the image stored on the gift at order-creation time over a live Goody catalog
+// lookup, which only searches the first page of products and can miss.
+async function getProductImage(gift: { gift_image_url?: string | null }, variantId: string | null): Promise<string | undefined> {
+  if (gift.gift_image_url) return gift.gift_image_url;
   if (!variantId) return undefined;
 
   try {

@@ -181,9 +181,10 @@ serve(async (req) => {
         },
       });
 
-    // Get product image for email
-    let productImage: string | undefined;
-    if (gift.gift_variant_id) {
+    // Get product image for email - prefer the image stored at order time over a live
+    // Goody catalog lookup, which only searches the first page of products and can miss.
+    let productImage: string | undefined = gift.gift_image_url || undefined;
+    if (!productImage && gift.gift_variant_id) {
       productImage = await getGoodyProductImage(gift.gift_variant_id);
     }
 
@@ -201,7 +202,7 @@ serve(async (req) => {
         data: {
           recipientName: recipient?.name,
           occasion: gift.occasion,
-          giftDescription: gift.gift_description || "Curated selection",
+          giftDescription: gift.gift_type || gift.gift_description || "Curated selection",
           giftImage: productImage,
           deliveryDate: gift.delivery_date,
           confirmationLink: `${Deno.env.get("SUPABASE_URL")}/dashboard`,

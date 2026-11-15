@@ -850,6 +850,11 @@ function getGiftScheduledEmail(greeting: string, userName: string | undefined, d
       </div>
       <div class="content">
         <p>Your gift for <strong>${data?.recipientName}</strong> has been successfully scheduled!</p>
+        ${data?.giftImage ? `
+        <div class="gift-preview">
+          <img src="${data.giftImage}" alt="${data?.giftType || 'Gift'}" style="max-width: 100%; border-radius: 8px; margin: 16px 0;">
+        </div>
+        ` : ''}
         <div class="info-box">
           <h3>Gift Details</h3>
           <p><strong>Recipient:</strong> ${data?.recipientName}</p>
