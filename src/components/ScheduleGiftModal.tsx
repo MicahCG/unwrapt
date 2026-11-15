@@ -14,6 +14,7 @@ import { getWalletBreakdown } from '@/lib/wallet';
 import { cleanName } from '@/lib/utils';
 import { getGiftRecommendations, type GiftCatalogItem } from '@/lib/giftCatalog';
 import { ProductImage } from '@/components/dashboard/TheaChatCards';
+import { AddFundsModal } from '@/components/wallet/AddFundsModal';
 import { U } from '@/components/unwrapt2/theme';
 import type { RecipientRecord } from '@/lib/giftStatus';
 
@@ -67,6 +68,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   const [address, setAddress] = useState<Address>({ street: '', city: '', state: '', zip_code: '', country: 'United States' });
   const [editingAddress, setEditingAddress] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [showAddFunds, setShowAddFunds] = useState(false);
   // State updates are async; the ref stops a fast double tap from creating two plans.
   const submitLock = useRef(false);
 
@@ -158,7 +160,11 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   const occasionName = occasionType === 'custom' ? 'Special occasion' : defaults.occasion;
   const isPast = Boolean(occasionDate) && occasionDate < format(new Date(), 'yyyy-MM-dd');
   const price = product?.price ?? 0;
-  const payFromWallet = profile?.subscription_tier === 'vip' && availableBalance != null && availableBalance >= price && price > 0;
+  const isVip = profile?.subscription_tier === 'vip';
+  const payFromWallet = isVip && availableBalance != null && availableBalance >= price && price > 0;
+  // A VIP whose wallet just can't cover this one gift - surfaced so checkout isn't a silent
+  // default with no mention that topping up the wallet is the other option.
+  const walletShortfall = isVip && price > 0 && availableBalance != null && availableBalance < price;
   const missing = [
     !payingForGiftId && !product && 'a gift',
     !payingForGiftId && (!occasionDate || isPast) && 'an upcoming date',
@@ -337,6 +343,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   const tooSoon = Boolean(timing && !timing.feasible);
 
   return (
+    <>
     <Sheet open={isOpen} onOpenChange={(open) => { if (!open && !submitting) onClose(); }}>
       <SheetContent
         side="bottom"
@@ -525,9 +532,19 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
 
               {!payingForGiftId && product && (
                 <p className="px-1 text-[12px] leading-5" style={{ color: U.textSecondary }}>
-                  {payFromWallet
-                    ? `${money(price)} comes from your available gift wallet balance (${money(availableBalance ?? walletBalance)}). Other gifts' holds are not used.`
-                    : 'You’ll pay securely at checkout next.'}{' '}
+                  {payFromWallet ? (
+                    `${money(price)} comes from your available gift wallet balance (${money(availableBalance ?? walletBalance)}). Other gifts' holds are not used.`
+                  ) : walletShortfall ? (
+                    <>
+                      Your gift wallet has {money(availableBalance ?? walletBalance)} - not quite enough for this {money(price)} gift.{' '}
+                      <button type="button" onClick={() => setShowAddFunds(true)} className="font-semibold underline" style={{ color: U.accent }}>
+                        Add funds
+                      </button>{' '}
+                      to pay from your wallet instead of a card, or continue to pay by card next.
+                    </>
+                  ) : (
+                    'You’ll pay securely at checkout next.'
+                  )}{' '}
                   Need to cancel? Email <a href="mailto:team@unwrapt.io" className="underline">team@unwrapt.io</a> before it’s ordered.
                 </p>
               )}
@@ -575,6 +592,10 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         </div>
       </SheetContent>
     </Sheet>
+    {showAddFunds && (
+      <AddFundsModal isOpen={showAddFunds} onClose={() => setShowAddFunds(false)} currentBalance={availableBalance ?? walletBalance} />
+    )}
+    </>
   );
 };
 
