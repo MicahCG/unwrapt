@@ -39,6 +39,7 @@ import {
   systemPromptIncludesPlaceDateAsk,
   looksLikePlaceDateChange,
   handleSetPlaceDate,
+  handleSelectGift,
   systemPromptIncludesAddressFormRules,
   RESERVED_ORDER_RULES,
   ADDRESS_FORM_RULES,
@@ -71,6 +72,12 @@ import {
   scoreInterestText,
   shouldPersistReviewMarker,
   scrubFalseFriends,
+  systemPromptIncludesWalletBalanceRules,
+  WALLET_BALANCE_RULES,
+  systemPromptIncludesWalletShortfallHeadsUp,
+  needsConversationSummary,
+  splitForSummary,
+  needsWalletShortfallDisclosure,
 } from "./index.ts";
 
 Deno.test("normalizeInterests dedupes case-insensitively, caps at 3, newest wins on overflow", () => {
@@ -996,6 +1003,148 @@ Deno.test("a fully reserved gift never gets top-up wording, and a short hold sta
   assert(directive.includes("place_order_now"));
   assert(/do not ask for a top-up/i.test(directive));
   assert(/never say the address is missing/i.test(directive));
+});
+
+Deno.test("a plain wallet-balance question is routed to get_wallet_status, not left unanswerable (reproduces the live bug: 'what's my wallet balance?' got 'I can't check your wallet balance directly' with no path to a real answer)", () => {
+  assert(systemPromptIncludesWalletBalanceRules());
+  assert(WALLET_BALANCE_RULES.includes("get_wallet_status"));
+  assert(/don.t call get_wallet_status for those/i.test(WALLET_BALANCE_RULES));
+  // Distinguishing wallet vs. stripe_checkout gifts: a Stripe-scheduled gift (scheduled
+  // outside chat) must never be offered a wallet top-up, and its cost must come from
+  // giftCost rather than Thea claiming she can't find it (the live Jake's-gift bug).
+  assert(WALLET_BALANCE_RULES.includes("giftCost"));
+  assert(WALLET_BALANCE_RULES.includes("paymentMethod"));
+  assert(/never offer wallet_topup/i.test(WALLET_BALANCE_RULES));
+  assert(/instead of saying you can.t find it/i.test(WALLET_BALANCE_RULES));
+});
+
+Deno.test("select_gift's review warns about a wallet shortfall up front as a courtesy, without blocking confirmation", () => {
+  assert(systemPromptIncludesWalletShortfallHeadsUp());
+});
+
+Deno.test("needsWalletShortfallDisclosure (reproduces the live bug: a real $27 shortfall in the review result was silently dropped from the visible reply with no marker required to catch it)", () => {
+  // No shortfall at all - nothing to disclose, regardless of marker.
+  assertEquals(needsWalletShortfallDisclosure("Let's confirm that gift!", 0), false);
+  assertEquals(needsWalletShortfallDisclosure("Let's confirm that gift!", null), false);
+  assertEquals(needsWalletShortfallDisclosure("Let's confirm that gift!", undefined), false);
+  // A real shortfall, but the reply never said so and has no marker - must retry.
+  assertEquals(needsWalletShortfallDisclosure("Let's confirm that gift! Expected delivery is about 5 days.", 27), true);
+  // A real shortfall, properly disclosed with the marker - passes.
+  assertEquals(
+    needsWalletShortfallDisclosure("You've got $0 available, so you'd be $27 short.\nWALLET_SHORTFALL_NOTED: true", 27),
+    false,
+  );
+});
+
+function mockMultiTableClient(tables: Record<string, Array<Record<string, unknown>>>) {
+  const tableBuilder = (rows: Array<Record<string, unknown>>) => {
+    const filters: Record<string, unknown> = {};
+    const matches = () => rows.filter((row) => Object.entries(filters).every(([col, val]) => row[col] === val));
+    const builder = {
+      select() { return builder; },
+      eq(col: string, val: unknown) { filters[col] = val; return builder; },
+      order() { return builder; },
+      limit() { return builder; },
+      maybeSingle() { return Promise.resolve({ data: matches()[0] ?? null, error: null }); },
+      then(resolve: (value: { data: unknown[]; error: null }) => unknown) {
+        return Promise.resolve({ data: matches(), error: null }).then(resolve);
+      },
+    };
+    return builder;
+  };
+  return {
+    from(table: string) {
+      if (!(table in tables)) throw new Error(`mockMultiTableClient: no rows configured for table "${table}"`);
+      return tableBuilder(tables[table]);
+    },
+  };
+}
+
+Deno.test("select_gift's review reports a real wallet shortfall before any hold is attempted (no existing gift, no pending holds)", async () => {
+  const client = mockMultiTableClient({
+    recipients: [{
+      id: "rec_aunty", user_id: "user_1", name: "Aunty", birthday: "2026-11-29", anniversary: null,
+      interests: [], street: "1 Main St", city: "Austin", state: "TX", zip_code: "78701", country: "US",
+    }],
+    scheduled_gifts: [],
+    profiles: [{ id: "user_1", gift_wallet_balance: 10 }],
+    wallet_transactions: [],
+  });
+  const fallbackProduct = {
+    id: "prod_mug", title: "Grateful Mug", description: null, price: 25, currency: "USD",
+    featured_image_url: null, product_type: null, gift_vibe: null, provider: "goody" as const,
+  };
+
+  const result = await handleSelectGift(client as never, "user_1", {
+    recipientId: "rec_aunty",
+    productId: "prod_mug",
+    occasionDate: "2026-11-29",
+  }, fallbackProduct);
+
+  assertEquals(result.ok, true);
+  if (!result.ok) return;
+  const review = result.review as Record<string, unknown>;
+  assertEquals(review.walletAvailable, 10);
+  // $25 price + $7 service fee - $10 available = $22 shortfall.
+  assertEquals(review.walletShortfall, 22);
+});
+
+Deno.test("select_gift's review reports zero shortfall when the wallet already covers the gift", async () => {
+  const client = mockMultiTableClient({
+    recipients: [{
+      id: "rec_aunty", user_id: "user_1", name: "Aunty", birthday: "2026-11-29", anniversary: null,
+      interests: [], street: "1 Main St", city: "Austin", state: "TX", zip_code: "78701", country: "US",
+    }],
+    scheduled_gifts: [],
+    profiles: [{ id: "user_1", gift_wallet_balance: 100 }],
+    wallet_transactions: [],
+  });
+  const fallbackProduct = {
+    id: "prod_mug", title: "Grateful Mug", description: null, price: 25, currency: "USD",
+    featured_image_url: null, product_type: null, gift_vibe: null, provider: "goody" as const,
+  };
+
+  const result = await handleSelectGift(client as never, "user_1", {
+    recipientId: "rec_aunty",
+    productId: "prod_mug",
+    occasionDate: "2026-11-29",
+  }, fallbackProduct);
+
+  assertEquals(result.ok, true);
+  if (!result.ok) return;
+  const review = result.review as Record<string, unknown>;
+  assertEquals(review.walletAvailable, 100);
+  assertEquals(review.walletShortfall, 0);
+});
+
+Deno.test("a short conversation is left completely alone (no summarization threshold crossed)", () => {
+  const messages = Array.from({ length: 24 }, (_, i) => ({
+    role: (i % 2 === 0 ? "user" : "assistant") as const,
+    content: `message ${i}`,
+  }));
+  assertEquals(needsConversationSummary(messages.length), false);
+  const { older, recent } = splitForSummary(messages);
+  assertEquals(older.length, 0);
+  assertEquals(recent, messages);
+});
+
+Deno.test("a long conversation keeps the most recent window raw and marks the rest for summarizing, without dropping anything the split doesn't see (reproduces the live bug: a 40-message thread made Thea answer a plain gift selection with a stale, unrelated reply)", () => {
+  const messages = Array.from({ length: 40 }, (_, i) => ({
+    role: (i % 2 === 0 ? "user" : "assistant") as const,
+    content: `message ${i}`,
+  }));
+  assertEquals(needsConversationSummary(messages.length), true);
+  const { older, recent } = splitForSummary(messages);
+  assertEquals(older.length + recent.length, messages.length);
+  assertEquals(recent.length, 14);
+  assertEquals(recent[0].content, "message 26");
+  assertEquals(recent[recent.length - 1].content, "message 39");
+  assertEquals(older[older.length - 1].content, "message 25");
+});
+
+Deno.test("the summarization threshold sits exactly at the boundary (25 triggers, 24 does not)", () => {
+  assertEquals(needsConversationSummary(24), false);
+  assertEquals(needsConversationSummary(25), true);
 });
 
 const AUNTY_ON_FILE = { id: "rec_aunty", name: "Aunty", hasAddress: true, addressConfirmed: true };
