@@ -2,6 +2,52 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
 import { corsHeaders } from "../_shared/cors.ts";
 import { planReserveFunds, roundMoney } from "../_shared/reservedFunds.ts";
+import { quoteGoodyOrderPrice } from "../_shared/goodyPricing.ts";
+
+const goodyApiKey = () =>
+  (Deno.env.get("GOODY_API_ENV") === "production" ? Deno.env.get("GOODY_PRODUCTION_COMMERCE_API_KEY") : Deno.env.get("GOODY_SANDBOX_COMMERCE_API_KEY")) ?? null;
+const goodyEnvironment = () => (Deno.env.get("GOODY_API_ENV") === "production" ? "production" : "sandbox") as "production" | "sandbox";
+
+/**
+ * Adds Goody's real shipping + tax for this gift on top of its catalog price, so what's held
+ * (and later charged) isn't just a guess - the $7 Unwrapt service fee still applies on top of
+ * that via planReserveFunds below. Falls back to the catalog price alone (unchanged, prior
+ * behavior) whenever a real quote isn't available: no product/address yet, a non-US address
+ * (Goody's price endpoint is US-only today), or the Goody call itself fails.
+ */
+const priceWithRealShippingAndTax = async (
+  basePrice: number,
+  gift: { gift_variant_id?: string | null },
+  recipient: { name?: string | null; street?: string | null; apartment?: string | null; city?: string | null; state?: string | null; zip_code?: string | null; country?: string | null } | null,
+): Promise<{ price: number; shippingCost: number; taxCost: number }> => {
+  const apiKey = goodyApiKey();
+  if (!apiKey || !gift.gift_variant_id || !recipient?.street || !recipient?.city || !recipient?.state || !recipient?.zip_code) {
+    return { price: basePrice, shippingCost: 0, taxCost: 0 };
+  }
+  const [firstName, ...rest] = (recipient.name || "").trim().split(/\s+/);
+  const quote = await quoteGoodyOrderPrice({
+    apiKey,
+    environment: goodyEnvironment(),
+    productId: gift.gift_variant_id,
+    recipient: {
+      firstName,
+      lastName: rest.join(" "),
+      street: recipient.street,
+      apartment: recipient.apartment,
+      city: recipient.city,
+      state: recipient.state,
+      zipCode: recipient.zip_code,
+      country: recipient.country,
+    },
+  });
+  if (!quote) return { price: basePrice, shippingCost: 0, taxCost: 0 };
+  console.log(`💰 Real Goody quote: shipping=$${quote.shippingCost}, tax=$${quote.taxCost}, processingFee=$${quote.processingFeeCost} (not passed on to the customer)`);
+  return {
+    price: roundMoney(basePrice + quote.shippingCost + quote.taxCost),
+    shippingCost: quote.shippingCost,
+    taxCost: quote.taxCost,
+  };
+};
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -46,7 +92,12 @@ serve(async (req) => {
 
     if (giftError || !gift) throw new Error("Gift not found");
 
-    const giftPrice = Number(gift.payment_amount ?? gift.estimated_cost) || 35;
+    const catalogPrice = Number(gift.payment_amount ?? gift.estimated_cost) || 35;
+    const recipientRow = Array.isArray(gift.recipients) ? gift.recipients[0] : gift.recipients;
+    const { price: giftPrice, shippingCost, taxCost } = await priceWithRealShippingAndTax(catalogPrice, gift, recipientRow ?? null);
+    if (shippingCost || taxCost) {
+      console.log(`💰 Gift price with real shipping+tax: catalog=$${catalogPrice} shipping=$${shippingCost} tax=$${taxCost} -> $${giftPrice}`);
+    }
 
     const { data: profile, error: profileError } = await supabaseClient
       .from("profiles")
@@ -116,6 +167,7 @@ serve(async (req) => {
           available: plan.available,
           transferableReserved: plan.existingReserved,
           shortfall: plan.shortfall,
+          priceBreakdown: { catalogPrice, shippingCost, taxCost },
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -172,6 +224,9 @@ serve(async (req) => {
         reservedAmount: plan.cost,
         transferredFromReserved: existingAmount > 0.009 ? roundMoney(existingAmount) : 0,
         reallocated: Boolean(existing),
+        // Breakdown for callers that want to show it - gift + real shipping + real tax + the
+        // flat service fee all add up to reservedAmount above.
+        priceBreakdown: { catalogPrice, shippingCost, taxCost },
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
