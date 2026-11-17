@@ -41,6 +41,8 @@ import {
   handleSetPlaceDate,
   handleSelectGift,
   findMentionedRecipient,
+  claimsGiftSelected,
+  stripProductListFromReply,
   systemPromptIncludesAddressFormRules,
   RESERVED_ORDER_RULES,
   ADDRESS_FORM_RULES,
@@ -1212,6 +1214,19 @@ Deno.test("findMentionedRecipient picks the one named person, and nothing when z
   assertEquals(findMentionedRecipient("gift for Kora", people), null); // ambiguous first name
   assertEquals(findMentionedRecipient("I'd like the Holiday Cookie & Brownie Duo", people), null);
   assertEquals(findMentionedRecipient("what about Happy", people)?.id, "h");
+});
+
+Deno.test("a plain 'Price: $N' list with no ids is flagged as needing a real search, and a made-up selection claim is detected", () => {
+  const plain = "1. Medium Glass Canister\nPrice: $14\nStylish.\n\n2. Holiday Cookie Duo\nPrice: $15\nSweet.";
+  assertEquals(checkRecommendationIntegrity(plain, new Map()).needsRealSearch, true);
+  assertEquals(claimsGiftSelected("Great choice! I've selected the Holiday Cookie & Brownie Duo for Kora."), true);
+  assertEquals(claimsGiftSelected("I'll schedule the Cookie Duo for Kora. Confirm?"), false);
+});
+
+Deno.test("stripProductListFromReply drops the list paragraphs but keeps the intro and the closing question", () => {
+  const reply = "Here are some options for Kora.\n\n1. Canister\nPrice: $14\nNice.\n\n2. Cookies\nPrice: $15\nSweet.\n\nDo any catch your eye?";
+  assertEquals(stripProductListFromReply(reply), "Here are some options for Kora.\n\nDo any catch your eye?");
+  assertEquals(stripProductListFromReply("Just a short reply."), "Just a short reply.");
 });
 
 Deno.test("a short conversation is left completely alone (no summarization threshold crossed)", () => {

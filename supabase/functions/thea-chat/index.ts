@@ -1383,7 +1383,10 @@ export const checkRecommendationIntegrity = (content: string, seenProducts: Map<
   const seenProductIds = new Set(seenProducts.keys());
   const hasUnresolvedIds = mentionedIds.some((id) => !seenProductIds.has(id));
   const bulletItemCount = (content.match(/^\s*[•▪\-*]\s*\*\*[^*]{2,60}\*\*/gm) || []).length;
-  const looksLikeInventedList = bulletItemCount >= 2 && mentionedIds.length === 0;
+  // Plain "1. Name\nPrice: $14" lists (no bold) are the same failure: priced products named
+  // in text with no ids behind them, so no cards can be shown.
+  const priceLineCount = (content.match(/^\s*(?:[-*•]\s*)?\**price\**\s*:\s*\$\d/gim) || []).length;
+  const looksLikeInventedList = (bulletItemCount >= 2 || priceLineCount >= 2) && mentionedIds.length === 0;
   const needsRealSearch = hasUnresolvedIds || looksLikeInventedList;
   return { mentionedIds, missingMarker, needsRealSearch };
 };
@@ -2143,6 +2146,24 @@ const alreadyScheduledReason = (
   if (reason === "ordered") return "already_ordered";
   if (reason === "same_gift") return "same_gift";
   return "not_swappable";
+};
+
+/** The model announcing "I've selected / scheduled X" in text. Only legitimate after select_gift
+ * actually ran this turn (observed live: it claimed a selection and invented a $15 shortfall
+ * without ever calling the tool). Exported for unit testing. */
+export const claimsGiftSelected = (content: string): boolean =>
+  /\bI(?:'ve| have)\s+(?:just\s+)?(?:selected|scheduled|picked|chosen|locked in)\b/i.test(content);
+
+/** When product cards are attached the reply must not also list them (the cards show photo,
+ * name and price). Drops list-shaped paragraphs and keeps the intro/closing lines. Exported for
+ * unit testing. */
+export const stripProductListFromReply = (reply: string): string => {
+  const paragraphs = reply.split(/\n\s*\n/);
+  const isListBlock = (p: string) => /^\s*(?:\d+[.)]|[-*•])\s/.test(p) || /\bprice\s*:\s*\$\d/i.test(p);
+  const kept = paragraphs.filter((p) => !isListBlock(p));
+  if (kept.length === paragraphs.length) return reply;
+  const text = kept.join("\n\n").trim();
+  return text || "Here are a few ideas - tap one to pick it.";
 };
 
 /** The one saved person a user message names (whole-word, case-insensitive match on full name
@@ -3664,7 +3685,9 @@ Use the whole conversation, not just the last message. Return JSON only:
       presentedUi.push(mod);
     };
 
+    let selectGiftRan = false;
     const recordToolSideEffects = (toolName: string, result: ToolResult) => {
+      if (toolName === "select_gift") selectGiftRan = true;
       if (toolName === "get_recipients" && result.ok && Array.isArray(result.recipients)) {
         for (const raw of result.recipients as Array<Record<string, unknown>>) {
           if (typeof raw.recipientId !== "string" || typeof raw.name !== "string") continue;
@@ -3779,11 +3802,14 @@ Use the whole conversation, not just the last message. Return JSON only:
         const missingWalletShortfallDisclosure = !needsRealSearch && !missingMarker && !missingFallbackDisclosure
           && needsWalletShortfallDisclosure(content, reviewWalletShortfall);
 
-        if ((needsRealSearch || missingMarker || missingFallbackDisclosure || missingWalletShortfallDisclosure) && iteration < MAX_TOOL_ITERATIONS - 1) {
+        const claimedSelectionWithoutTool = !selectGiftRan && claimsGiftSelected(content);
+        if ((needsRealSearch || missingMarker || missingFallbackDisclosure || missingWalletShortfallDisclosure || claimedSelectionWithoutTool) && iteration < MAX_TOOL_ITERATIONS - 1) {
           conversation.push({ role: "assistant", content });
           conversation.push({
             role: "system",
-            content: needsRealSearch
+            content: claimedSelectionWithoutTool && !needsRealSearch && !missingMarker
+              ? "You said you selected or scheduled a gift, but select_gift has not been called this turn, so nothing was selected and any shortfall or timing you quoted was invented. Call select_gift now with the recipientId and productId of the gift the user just chose (from the products shown earlier in this conversation; use get_recipients if you need the id), then describe only its real review. If you cannot tell which product they meant, ask which one instead."
+              : needsRealSearch
               ? "You listed gift ideas that aren't backed by a real search_gifts result from this conversation - either you referenced ids that were never returned, or this looks like an invented list of generic examples. Never invent generic gift ideas. search_gifts is being called now with the budget/interests already given; recommend only from its actual results, using their real titles and prices. If nothing matches even on a broader search, say so honestly instead of listing invented examples."
               : missingMarker
               ? "You named specific products but left out the required RECOMMENDED_IDS line. Resend the same recommendations, ending on a new line with RECOMMENDED_IDS: followed by the exact ids of those products from your search_gifts results."
@@ -4036,6 +4062,7 @@ Use the whole conversation, not just the last message. Return JSON only:
     reply = aligned.reply;
     lastReview = aligned.review;
     const products = aligned.products as Product[];
+    if (products.length > 0 && !lastReview) reply = stripProductListFromReply(reply);
 
     const confirmedReviewMarker = markerToPersist(
       lastReview ? lastReviewMarker : null,
