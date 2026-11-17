@@ -40,6 +40,7 @@ import {
   looksLikePlaceDateChange,
   handleSetPlaceDate,
   handleSelectGift,
+  findMentionedRecipient,
   systemPromptIncludesAddressFormRules,
   RESERVED_ORDER_RULES,
   ADDRESS_FORM_RULES,
@@ -1199,6 +1200,15 @@ Deno.test("select_gift's shortfall falls back to the flat math with no address (
       assertEquals(priceCalls, 1);
     },
   );
+});
+
+Deno.test("findMentionedRecipient picks the one named person, and nothing when zero or several are named", () => {
+  const people = [{ id: "h", name: "Happy!" }, { id: "k", name: "Kora Smith" }, { id: "k2", name: "Kora Jones" }, { id: "a", name: "Aunty" }];
+  assertEquals(findMentionedRecipient("Can we pick a gift for aunty instead?", people)?.id, "a");
+  assertEquals(findMentionedRecipient("gift for Kora Smith please", people)?.id, "k");
+  assertEquals(findMentionedRecipient("gift for Kora", people), null); // ambiguous first name
+  assertEquals(findMentionedRecipient("I'd like the Holiday Cookie & Brownie Duo", people), null);
+  assertEquals(findMentionedRecipient("what about Happy", people)?.id, "h");
 });
 
 Deno.test("a short conversation is left completely alone (no summarization threshold crossed)", () => {

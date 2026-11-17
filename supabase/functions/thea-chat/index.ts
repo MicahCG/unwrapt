@@ -2144,6 +2144,22 @@ const alreadyScheduledReason = (
   return "not_swappable";
 };
 
+/** The one saved person a user message names (whole-word, case-insensitive match on full name
+ * or first name), or null when none or more than one is named. Exported for unit testing. */
+export const findMentionedRecipient = (
+  message: string,
+  recipients: Array<{ id: string; name: string }>,
+): { id: string; name: string } | null => {
+  const text = message.toLowerCase();
+  const escape = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const test = (t: string) => t.length >= 2 && new RegExp(`(^|[^\\p{L}\\p{N}])${escape(t)}(?![\\p{L}\\p{N}])`, "u").test(text);
+  const norm = (n: string) => (n || "").toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, "").trim();
+  const fullHits = recipients.filter((r) => test(norm(r.name)));
+  // A full name is more specific than a shared first name, so it wins when present.
+  const hits = fullHits.length ? fullHits : recipients.filter((r) => test(norm(r.name).split(/\s+/)[0]));
+  return hits.length === 1 ? { id: hits[0].id, name: hits[0].name } : null;
+};
+
 /** Real Goody shipping + tax (dollars) for one product to one recipient, or 0 whenever a quote
  * isn't available (no API key, incomplete/non-US address, Goody failure). Never throws. */
 const quoteShippingAndTax = async (productId: string, recipient: RecipientRow): Promise<number> => {
@@ -3441,7 +3457,19 @@ Use the whole conversation, not just the last message. Return JSON only:
     // CC-02 fix: carries forward the PRIOR turn's recommended products and
     // in-focus recipient, since the client never resends tool-call history
     // (see buildTurnContextMessage above for why this exists).
-    const turnContext = await fetchLastTurnContext(authClient, conversationId);
+    const fetchedTurnContext = await fetchLastTurnContext(authClient, conversationId);
+    // If the user's own message names exactly one saved person, that person is in focus now -
+    // even when the model never calls get_recipients with a single result (observed live:
+    // "pick a gift for Kora" kept the previous turn's recipient, so the tapped gift was
+    // scheduled for them instead).
+    const { data: namedRows } = await authClient.from("recipients").select("id, name").eq("user_id", user.id);
+    const mentionedRecipient = findMentionedRecipient(
+      messages[messages.length - 1]?.content ?? "",
+      (namedRows ?? []) as Array<{ id: string; name: string }>,
+    );
+    const turnContext = mentionedRecipient
+      ? { ...(fetchedTurnContext ?? {}), activeRecipient: mentionedRecipient } as NonNullable<typeof fetchedTurnContext>
+      : fetchedTurnContext;
     const turnContextMessage = buildTurnContextMessage(turnContext);
     // Belt-and-suspenders on top of buildTurnContextMessage's conditional
     // instruction: when the user's own new message unambiguously names one
