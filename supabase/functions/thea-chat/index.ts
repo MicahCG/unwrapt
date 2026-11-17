@@ -9,6 +9,7 @@ import {
   type PlaceByDecision,
 } from "../_shared/giftTiming.ts";
 import { decideReservedOrder } from "../_shared/reservedFunds.ts";
+import { quoteGoodyOrderPrice } from "../_shared/goodyPricing.ts";
 
 export { giftOrderTiming, resolveShippingLeadDays, shippingLeadDaysFromProduct, decidePlaceBy, timingForStoredGift, decideReservedOrder };
 
@@ -2143,6 +2144,38 @@ const alreadyScheduledReason = (
   return "not_swappable";
 };
 
+/** Real Goody shipping + tax (dollars) for one product to one recipient, or 0 whenever a quote
+ * isn't available (no API key, incomplete/non-US address, Goody failure). Never throws. */
+const quoteShippingAndTax = async (productId: string, recipient: RecipientRow): Promise<number> => {
+  try {
+    const environment = Deno.env.get("GOODY_API_ENV") === "production" ? "production" : "sandbox";
+    const apiKey = environment === "production"
+      ? Deno.env.get("GOODY_PRODUCTION_COMMERCE_API_KEY")
+      : Deno.env.get("GOODY_SANDBOX_COMMERCE_API_KEY");
+    if (!apiKey || !productId || !hasAddress(recipient)) return 0;
+    const [firstName, ...rest] = (recipient.name || "").trim().split(/\s+/);
+    const quote = await quoteGoodyOrderPrice({
+      apiKey,
+      environment,
+      productId,
+      recipient: {
+        firstName,
+        lastName: rest.join(" "),
+        street: recipient.street as string,
+        apartment: recipient.apartment,
+        city: recipient.city as string,
+        state: recipient.state as string,
+        zipCode: recipient.zip_code as string,
+        country: recipient.country,
+      },
+    });
+    return quote ? quote.shippingCost + quote.taxCost : 0;
+  } catch (error) {
+    console.error("select_gift quote failed, using flat estimate", error);
+    return 0;
+  }
+};
+
 export const handleSelectGift = async (
   authClient: ReturnType<typeof createClient>,
   userId: string,
@@ -2230,7 +2263,10 @@ export const handleSelectGift = async (
   // up front if their wallet likely won't cover this, not only after confirming.
   const walletAvailable = await getAvailableBalance(authClient, userId);
   const reservedForThisGift = existing ? await getGiftReservedAmount(authClient, userId, existing.id) : 0;
-  const walletShortfall = Math.max(0, Math.round((product.price + SERVICE_FEE - walletAvailable - reservedForThisGift) * 100) / 100);
+  // Real Goody shipping + tax on top of price + service fee, matching what wallet-reserve-funds
+  // will actually hold at confirm time. Falls back to 0 (the old flat math) when no quote.
+  const shippingAndTax = await quoteShippingAndTax(product.id, recipient);
+  const walletShortfall = Math.max(0, Math.round((product.price + SERVICE_FEE + shippingAndTax - walletAvailable - reservedForThisGift) * 100) / 100);
   const review: Record<string, unknown> = {
     recipientId: recipient.id,
     recipientName: recipient.name,

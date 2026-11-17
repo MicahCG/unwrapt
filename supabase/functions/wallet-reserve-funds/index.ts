@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
 import { corsHeaders } from "../_shared/cors.ts";
-import { planReserveFunds, roundMoney } from "../_shared/reservedFunds.ts";
+import { planReserveFunds, roundMoney, SERVICE_FEE } from "../_shared/reservedFunds.ts";
 import { quoteGoodyOrderPrice } from "../_shared/goodyPricing.ts";
 
 const goodyApiKey = () =>
@@ -75,7 +75,30 @@ serve(async (req) => {
     const body = await req.json();
     // `approve`: the user approved this gift (e.g. in Thea's chat), so once funds are held the
     // automation lifecycle may charge and order it in its window.
-    const { scheduledGiftId, approve = false } = body;
+    const { scheduledGiftId, approve = false, quoteOnly = false } = body;
+
+    // Preview mode for the schedule modal: same Goody quote + cost math, but nothing is
+    // written and no gift row is needed yet. The address comes from the request body.
+    if (quoteOnly) {
+      const { productId, price, recipient: quoteRecipient } = body;
+      const catalogPrice = Number(price) || 0;
+      if (!productId || catalogPrice <= 0) throw new Error("productId and price are required to quote");
+      const { price: giftPrice, shippingCost, taxCost } = await priceWithRealShippingAndTax(
+        catalogPrice,
+        { gift_variant_id: String(productId) },
+        quoteRecipient ?? null,
+      );
+      return new Response(
+        JSON.stringify({
+          success: true,
+          quoteOnly: true,
+          // Same total wallet-reserve-funds would hold: price + shipping + tax + service fee.
+          totalCost: roundMoney(giftPrice + SERVICE_FEE),
+          priceBreakdown: { catalogPrice, shippingCost, taxCost },
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+      );
+    }
 
     if (!scheduledGiftId) {
       throw new Error("Scheduled gift ID is required");

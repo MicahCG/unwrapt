@@ -1117,6 +1117,90 @@ Deno.test("select_gift's review reports zero shortfall when the wallet already c
   assertEquals(review.walletShortfall, 0);
 });
 
+const withGoodyQuote = async (
+  handler: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
+  run: () => Promise<void>,
+) => {
+  const original = globalThis.fetch;
+  const priorKey = Deno.env.get("GOODY_SANDBOX_COMMERCE_API_KEY");
+  const priorEnv = Deno.env.get("GOODY_API_ENV");
+  Deno.env.set("GOODY_SANDBOX_COMMERCE_API_KEY", "test-key");
+  Deno.env.delete("GOODY_API_ENV");
+  globalThis.fetch = handler as typeof fetch;
+  try {
+    await run();
+  } finally {
+    globalThis.fetch = original;
+    if (priorKey === undefined) Deno.env.delete("GOODY_SANDBOX_COMMERCE_API_KEY"); else Deno.env.set("GOODY_SANDBOX_COMMERCE_API_KEY", priorKey);
+    if (priorEnv !== undefined) Deno.env.set("GOODY_API_ENV", priorEnv);
+  }
+};
+
+const selectGiftReviewFor = async (recipientAddress: Record<string, unknown>) => {
+  const client = mockMultiTableClient({
+    recipients: [{
+      id: "rec_aunty", user_id: "user_1", name: "Aunty Smith", birthday: "2026-11-29", anniversary: null,
+      interests: [], country: "US", ...recipientAddress,
+    }],
+    scheduled_gifts: [],
+    profiles: [{ id: "user_1", gift_wallet_balance: 0 }],
+    wallet_transactions: [],
+  });
+  const fallbackProduct = {
+    id: "prod_mug", title: "Grateful Mug", description: null, price: 25, currency: "USD",
+    featured_image_url: null, product_type: null, gift_vibe: null, provider: "goody" as const,
+  };
+  const result = await handleSelectGift(client as never, "user_1", {
+    recipientId: "rec_aunty", productId: "prod_mug", occasionDate: "2026-11-29",
+  }, fallbackProduct);
+  assertEquals(result.ok, true);
+  if (!result.ok) throw new Error("unreachable");
+  return result.review as Record<string, unknown>;
+};
+
+const US_ADDRESS = { street: "1 Main St", city: "Austin", state: "TX", zip_code: "78701" };
+
+Deno.test("select_gift's shortfall includes real Goody shipping + tax when a quote succeeds", async () => {
+  await withGoodyQuote(
+    (input) => {
+      // Only Goody's price endpoint should be hit for the quote; products lookups fall to the fallback.
+      if (String(input).includes("/v1/order_batches/price")) {
+        return Promise.resolve(new Response(JSON.stringify({
+          cart_price: { price_product: 2500, price_shipping: 800, price_processing_fee: 100 },
+          total_price: { est_tax_calculated: 272 },
+        }), { status: 200 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }));
+    },
+    async () => {
+      const review = await selectGiftReviewFor(US_ADDRESS);
+      // $25 + $7 fee + $8 shipping + $2.72 tax - $0 wallet = $42.72 (matches wallet-reserve-funds).
+      assertEquals(review.walletShortfall, 42.72);
+    },
+  );
+});
+
+Deno.test("select_gift's shortfall falls back to the flat math with no address (no Goody call) or when the quote fails", async () => {
+  let priceCalls = 0;
+  await withGoodyQuote(
+    (input) => {
+      if (String(input).includes("/v1/order_batches/price")) {
+        priceCalls++;
+        return Promise.resolve(new Response("boom", { status: 500 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }));
+    },
+    async () => {
+      const noAddress = await selectGiftReviewFor({ street: null, city: null, state: null, zip_code: null });
+      assertEquals(noAddress.walletShortfall, 32);
+      assertEquals(priceCalls, 0);
+      const failedQuote = await selectGiftReviewFor(US_ADDRESS);
+      assertEquals(failedQuote.walletShortfall, 32);
+      assertEquals(priceCalls, 1);
+    },
+  );
+});
+
 Deno.test("a short conversation is left completely alone (no summarization threshold crossed)", () => {
   const messages = Array.from({ length: 24 }, (_, i) => ({
     role: (i % 2 === 0 ? "user" : "assistant") as const,

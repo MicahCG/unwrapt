@@ -11,6 +11,7 @@ import { MapPin, Package, Truck } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { giftOrderTiming } from '@/lib/giftTiming';
 import { getWalletBreakdown } from '@/lib/wallet';
+const SERVICE_FEE = 7;
 import { cleanName } from '@/lib/utils';
 import { getGiftRecommendations, type GiftCatalogItem } from '@/lib/giftCatalog';
 import { ProductImage } from '@/components/dashboard/TheaChatCards';
@@ -161,10 +162,32 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
   const isPast = Boolean(occasionDate) && occasionDate < format(new Date(), 'yyyy-MM-dd');
   const price = product?.price ?? 0;
   const isVip = profile?.subscription_tier === 'vip';
-  const payFromWallet = isVip && availableBalance != null && availableBalance >= price && price > 0;
+  // Real total (price + Goody shipping/tax + service fee) from the server, so what's shown here
+  // is what's actually held. Falls back to price + service fee while loading / if no quote.
+  const addressComplete = Boolean(address.street.trim() && address.city.trim() && address.state.trim() && address.zip_code.trim());
+  const { data: quote } = useQuery({
+    queryKey: ['wallet-quote', product?.providerProductId || product?.id, price, address.street, address.city, address.state, address.zip_code, address.country],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('wallet-reserve-funds', {
+        body: {
+          quoteOnly: true,
+          productId: product!.providerProductId || product!.id,
+          price,
+          recipient: { name: recipient.name, ...address },
+        },
+      });
+      if (error || !data?.success || typeof data.totalCost !== 'number') return null;
+      return data.totalCost as number;
+    },
+    enabled: isOpen && isVip && !!product && price > 0 && addressComplete,
+    staleTime: 5 * 60 * 1000,
+    retry: 0,
+  });
+  const totalCost = quote ?? price + SERVICE_FEE;
+  const payFromWallet = isVip && availableBalance != null && availableBalance >= totalCost && price > 0;
   // A VIP whose wallet just can't cover this one gift - surfaced so checkout isn't a silent
   // default with no mention that topping up the wallet is the other option.
-  const walletShortfall = isVip && price > 0 && availableBalance != null && availableBalance < price;
+  const walletShortfall = isVip && price > 0 && availableBalance != null && availableBalance < totalCost;
   const missing = [
     !payingForGiftId && !product && 'a gift',
     !payingForGiftId && (!occasionDate || isPast) && 'an upcoming date',
@@ -265,6 +288,16 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
         sessionStorage.setItem('giftScheduledSuccess', JSON.stringify({ recipientId: recipient.id, timestamp: Date.now() }));
 
       if (payFromWallet) {
+        // Hold the full amount (price + real shipping/tax + service fee) first, so the charge
+        // matches the preview; fulfillment then spends that hold.
+        const { data: hold } = await supabase.functions.invoke('wallet-reserve-funds', {
+          body: { scheduledGiftId: gift.id },
+        });
+        if (!hold?.success) {
+          invalidate();
+          fail(`${product.name} is saved for ${first}, but your wallet doesn't cover the full amount (${money(totalCost)}). Open ${first} to add funds or pay by card.`);
+          return;
+        }
         // The wallet debit and partner order happen server-side, idempotently.
         const { data: result, error } = await supabase.functions.invoke('process-gift-fulfillment', {
           body: { scheduledGiftId: gift.id, manualTrigger: true },
@@ -329,7 +362,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
       : missing.length
         ? `Add ${missing[0]}`
         : payFromWallet
-          ? `Schedule · ${money(price)} from wallet`
+          ? `Schedule · ${money(totalCost)} from wallet`
           : `Schedule and pay ${money(price)}`;
 
   // Steps already past for a near date happen right away rather than on a date that's gone.
@@ -533,10 +566,10 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
               {!payingForGiftId && product && (
                 <p className="px-1 text-[12px] leading-5" style={{ color: U.textSecondary }}>
                   {payFromWallet ? (
-                    `${money(price)} comes from your available gift wallet balance (${money(availableBalance ?? walletBalance)}). Other gifts' holds are not used.`
+                    `${money(totalCost)} (gift, shipping, tax and service fee) comes from your available gift wallet balance (${money(availableBalance ?? walletBalance)}). Other gifts' holds are not used.`
                   ) : walletShortfall ? (
                     <>
-                      Your gift wallet has {money(availableBalance ?? walletBalance)} - not quite enough for this {money(price)} gift.{' '}
+                      Your gift wallet has {money(availableBalance ?? walletBalance)} - not quite enough for this {money(totalCost)} gift (shipping, tax and service fee included).{' '}
                       <button type="button" onClick={() => setShowAddFunds(true)} className="font-semibold underline" style={{ color: U.accent }}>
                         Add funds
                       </button>{' '}
