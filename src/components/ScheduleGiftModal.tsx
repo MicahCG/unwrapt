@@ -184,6 +184,8 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
     retry: 0,
   });
   const totalCost = quote ?? price + SERVICE_FEE;
+  const shippingAndTax = Math.max(0, Math.round((totalCost - price - SERVICE_FEE) * 100) / 100);
+  const giftWithFee = price + SERVICE_FEE;
   const payFromWallet = isVip && availableBalance != null && availableBalance >= totalCost && price > 0;
   // A VIP whose wallet just can't cover this one gift - surfaced so checkout isn't a silent
   // default with no mention that topping up the wallet is the other option.
@@ -566,10 +568,10 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
               {!payingForGiftId && product && (
                 <p className="px-1 text-[12px] leading-5" style={{ color: U.textSecondary }}>
                   {payFromWallet ? (
-                    `${money(totalCost)} (gift, shipping, tax and service fee) comes from your available gift wallet balance (${money(availableBalance ?? walletBalance)}). Other gifts' holds are not used.`
+                    `${money(giftWithFee)} (gift + service fee)${shippingAndTax > 0 ? ` plus about ${money(shippingAndTax)} shipping & tax` : ''} comes from your available gift wallet balance (${money(availableBalance ?? walletBalance)}). Other gifts' holds are not used.`
                   ) : walletShortfall ? (
                     <>
-                      Your gift wallet has {money(availableBalance ?? walletBalance)} - not quite enough for this {money(totalCost)} gift (shipping, tax and service fee included).{' '}
+                      Your gift wallet has {money(availableBalance ?? walletBalance)} - not quite enough for this gift: {money(giftWithFee)} with the service fee{shippingAndTax > 0 ? <>, plus about {money(shippingAndTax)} shipping &amp; tax ({money(totalCost)} total)</> : null}.{' '}
                       <button type="button" onClick={() => setShowAddFunds(true)} className="font-semibold underline" style={{ color: U.accent }}>
                         Add funds
                       </button>{' '}

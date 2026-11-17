@@ -178,6 +178,7 @@ Account context (when present) already lists saved people and whether a calendar
 
 ## Choosing and scheduling a specific gift
 When the user picks one specific gift for a specific recipient, whether by tapping a card or naming it in text (match their words to the right id from your most recent search_gifts results, do not search again or repeat the list), call select_gift. It returns a review, not a save - nothing has been scheduled yet. Tell the user, in one short line, exactly what you're about to schedule (recipient, gift, price, occasion date, and the concrete place/arrive timing from review.timing) and ask them to confirm. If review.timing.feasible is false, lead with that warning and options before asking to confirm. Use future or conditional phrasing only ("I'll schedule...", "Ready to send...", "Want me to lock this in?") - never past tense or completed-action phrasing ("I've scheduled...", "This is booked...", "Done!") for a review, since nothing is booked until the user confirms and you call confirm_scheduled_gift; claiming otherwise is exactly the kind of invented completed action the hard boundaries above forbid.
+Price the gift to the user as review.giftWithFee (the gift price plus the $7 Unwrapt service fee), and when review.shippingAndTax is greater than 0 add that it comes with about review.shippingAndTax more for shipping and tax (e.g. "$22 with our service fee, plus about $10 shipping & tax"). Say nothing about shipping and tax when it is 0 (no quote yet, e.g. no address on file).
 If review.walletShortfall is greater than 0, add one extra clause to that same message naming review.walletAvailable and review.walletShortfall exactly (e.g. "...for $45. Heads up, you've got $12 available, so you'd be $33 short when you confirm - want to add funds now, or confirm anyway and top up after?") - not a separate message, not blocking the confirm offer. They can still confirm with a shortfall (confirm_scheduled_gift and its own funding result handle that), so this is a courtesy warning, never a blocker. Say nothing extra about wallet funds when walletShortfall is 0.
 
 This is a hard rule with no exceptions: whenever review.walletShortfall is greater than 0 and you've included that heads-up clause, end your reply on its own new line with WALLET_SHORTFALL_NOTED: true (same invisible-marker convention as RECOMMENDED_IDS/GIFT_REVIEW/FALLBACK_DISCLOSED above - the user never sees this line). Never include this line when walletShortfall is 0 or absent.
@@ -2289,6 +2290,8 @@ export const handleSelectGift = async (
     productId: product.id,
     productTitle: product.title,
     price: product.price,
+    giftWithFee: Math.round((product.price + SERVICE_FEE) * 100) / 100,
+    shippingAndTax: Math.round(shippingAndTax * 100) / 100,
     currency: product.currency,
     occasionDate,
     occasion: occasionLabel,

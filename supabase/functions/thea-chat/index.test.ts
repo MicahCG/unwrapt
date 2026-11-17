@@ -1177,6 +1177,8 @@ Deno.test("select_gift's shortfall includes real Goody shipping + tax when a quo
       const review = await selectGiftReviewFor(US_ADDRESS);
       // $25 + $7 fee + $8 shipping + $2.72 tax - $0 wallet = $42.72 (matches wallet-reserve-funds).
       assertEquals(review.walletShortfall, 42.72);
+      assertEquals(review.giftWithFee, 32);
+      assertEquals(review.shippingAndTax, 10.72);
     },
   );
 });
@@ -1194,6 +1196,7 @@ Deno.test("select_gift's shortfall falls back to the flat math with no address (
     async () => {
       const noAddress = await selectGiftReviewFor({ street: null, city: null, state: null, zip_code: null });
       assertEquals(noAddress.walletShortfall, 32);
+      assertEquals(noAddress.shippingAndTax, 0);
       assertEquals(priceCalls, 0);
       const failedQuote = await selectGiftReviewFor(US_ADDRESS);
       assertEquals(failedQuote.walletShortfall, 32);
