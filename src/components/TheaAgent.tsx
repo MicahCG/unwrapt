@@ -182,7 +182,8 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [chatProducts]);
 
-  const isTheaLlmTester = isTheaLlmEmailAllowed(user?.email);
+  // Real chat for VIPs (it's what they pay for) and allowlisted testers; everyone else still gets intent routing.
+  const isTheaLlmTester = isVip || isTheaLlmEmailAllowed(user?.email);
   const userMessageCount = chatMessages.filter((m) => m.role === 'user').length;
   const previewComplete =
     !isVip &&
