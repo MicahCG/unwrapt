@@ -43,7 +43,7 @@ export const LuxuryGiftBox = () => {
       >
         {/* Gift box image */}
         <img 
-          src="/lovable-uploads/06605ca2-e67b-4de3-a587-8dc2cb96206d.png"
+          src="/brand/06605ca2-e67b-4de3-a587-8dc2cb96206d.png"
           alt="Luxury Gift Box"
           className="w-full h-auto drop-shadow-2xl"
         />

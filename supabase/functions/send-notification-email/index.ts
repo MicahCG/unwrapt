@@ -709,7 +709,7 @@ function getEmailInner(type: EmailType, greeting: string, data: any, appUrl: str
   }
 }
 
-const LOGO_URL = "https://www.unwrapt.io/lovable-uploads/unwrapt-lux.png";
+const LOGO_URL = "https://www.unwrapt.io/brand/unwrapt-lux.png";
 
 function getBrandBar(): string {
   return `

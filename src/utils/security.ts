@@ -7,7 +7,6 @@ export const securityConfig = {
       "'self'", 
       "'unsafe-inline'", 
       "'unsafe-eval'", 
-      "https://cdn.gpteng.co",
       "https://js.stripe.com"
     ],
     styleSrc: [
