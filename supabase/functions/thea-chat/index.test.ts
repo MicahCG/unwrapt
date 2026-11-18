@@ -662,6 +662,11 @@ Deno.test("alignReviewReply keeps a bubble that already names the reviewed gift"
     reviewOfferCopy({ ...review, price: 34 }),
     "I'll swap Coffee O'Clock for the Layla Red Wine Glasses ($34) for Aunty. Confirm?",
   );
+  // The price shown is the gift plus the Unwrapt service fee when the review carries it.
+  assertEquals(
+    reviewOfferCopy({ ...review, price: 15, giftWithFee: 22 }),
+    "I'll swap Coffee O'Clock for the Layla Red Wine Glasses ($22) for Aunty. Confirm?",
+  );
 });
 
 Deno.test("giftOrderTiming places the order from occasion minus shipping lead minus buffer", () => {

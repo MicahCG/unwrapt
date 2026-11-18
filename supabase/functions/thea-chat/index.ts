@@ -908,6 +908,8 @@ export type ReviewAlignFields = {
   recipientName?: string;
   replacesGiftTitle?: string | null;
   price?: number;
+  /** Gift price + Unwrapt service fee: what the user is shown as the price. */
+  giftWithFee?: number;
   confirmationCopy?: string | null;
 };
 
@@ -949,8 +951,9 @@ export const reviewOfferCopy = (review: ReviewAlignFields): string => {
   const gift = (review.productTitle || "this gift").trim();
   const who = (review.recipientName || "").trim().split(/\s+/)[0];
   const forWhom = who ? ` for ${who}` : "";
-  const price = typeof review.price === "number" && review.price > 0
-    ? ` ($${Number.isInteger(review.price) ? review.price : review.price.toFixed(2)})`
+  const shown = typeof review.giftWithFee === "number" ? review.giftWithFee : review.price;
+  const price = typeof shown === "number" && shown > 0
+    ? ` ($${Number.isInteger(shown) ? shown : shown.toFixed(2)})`
     : "";
   const replaced = typeof review.replacesGiftTitle === "string" ? review.replacesGiftTitle.trim() : "";
   const lead = replaced

@@ -6,6 +6,7 @@ import { U } from '@/components/unwrapt2/theme';
 import { formatOccasionDate } from '@/lib/dateUtils';
 import { formatGiftTimingLine, formatHeldFundsStatus, giftOrderTiming } from '@/lib/giftTiming';
 import { TOP_UP_AMOUNTS, topUpFor } from '@/lib/wallet';
+import { withServiceFee } from '@/lib/pricing';
 
 /** Modules thea-chat returns in top-level `ui` from present_ui. */
 export type ChatUiFocus = 'details' | 'address' | 'birthday' | 'interests';
@@ -62,6 +63,9 @@ export type GiftReview = {
   productId: string;
   productTitle: string;
   price: number;
+  /** Gift price plus the Unwrapt service fee, and Goody's real shipping + tax on top (0 when no quote yet). */
+  giftWithFee?: number;
+  shippingAndTax?: number;
   currency: string;
   occasionDate: string;
   occasion: string;
@@ -115,7 +119,7 @@ export const ProductCards: React.FC<{
               <button type="button" onClick={() => setDetail(product)} className="u-press text-left" aria-label={`View ${product.title}`}>
                 <ProductImage src={product.featured_image_url} className="aspect-square w-full rounded-[11px]" />
                 <p className="mt-2 line-clamp-2 min-h-[32px] text-[12px] font-semibold leading-4 text-[#2A2520]">{product.title}</p>
-                <p className="mt-1 text-[12px] font-semibold text-[#B65B3C]">{money(product.price, product.currency)}</p>
+                <p className="mt-1 text-[12px] font-semibold text-[#B65B3C]">{money(withServiceFee(product.price), product.currency)}</p>
               </button>
               <button
                 type="button"
@@ -139,7 +143,7 @@ export const ProductCards: React.FC<{
               <ProductImage src={detail.featured_image_url} className="aspect-[4/3] w-full rounded-[20px]" />
               <SheetHeader className="mt-4 text-left">
                 <SheetTitle className="font-display text-[24px] font-normal leading-tight text-[#2A2520]">{detail.title}</SheetTitle>
-                <SheetDescription className="text-[15px] font-semibold text-[#B65B3C]">{money(detail.price, detail.currency)}</SheetDescription>
+                <SheetDescription className="text-[15px] font-semibold text-[#B65B3C]">{money(withServiceFee(detail.price), detail.currency)}</SheetDescription>
               </SheetHeader>
               {detail.description && <p className="mt-3 whitespace-pre-line text-[13.5px] leading-6 text-[#5A5147]">{detail.description}</p>}
               <button
@@ -223,7 +227,10 @@ export const ReviewCard: React.FC<{
       <dl className="mt-2 grid gap-1 text-[12.5px] text-[#5A5147]">
         <div className="flex justify-between gap-3"><dt>For</dt><dd className="font-medium text-[#2A2520]">{review.recipientName}</dd></div>
         <div className="flex justify-between gap-3"><dt>Occasion</dt><dd className="font-medium text-[#2A2520]">{review.occasion} · {formatOccasionDate(review.occasionDate)}</dd></div>
-        <div className="flex justify-between gap-3"><dt>Price</dt><dd className="font-medium text-[#2A2520]">{money(review.price, review.currency)}</dd></div>
+        <div className="flex justify-between gap-3"><dt>Price</dt><dd className="font-medium text-[#2A2520]">{money(review.giftWithFee ?? withServiceFee(review.price), review.currency)}</dd></div>
+        {(review.shippingAndTax ?? 0) > 0 && (
+          <div className="flex justify-between gap-3"><dt>Shipping &amp; tax</dt><dd className="font-medium text-[#2A2520]">about {money(review.shippingAndTax!, review.currency)}</dd></div>
+        )}
       </dl>
       {timing && state !== 'scheduled' && (
         <p
