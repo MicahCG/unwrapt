@@ -1,48 +1,30 @@
-# Reporting bugs & ideas: the 2-minute guide
+# Reporting bugs & ideas: the 1-minute guide
 
-**Fastest path:** open Codex in this repo and paste the prompt in `feedback/README.md`. It does the rest.
+You don't run any scripts. Open Codex (or Claude) in this repo and just tell it what you want. Nothing to install.
 
-We keep all bugs and feature ideas in one shared folder in the repo (`feedback/`).
-Claude and Codex read the same folder, so they can fix things and tell us when nothing is left.
-
-## Set up (once)
-1. Pull the latest code: `git pull`
-2. Test it: `node scripts/feedback.mjs list` (you should see a list of items). Nothing to install.
+First, `git pull` to get the latest.
 
 ## Report a bug or idea
-```bash
-node scripts/feedback.mjs new --type bug --title "Short title" --reporter yourname \
-  --description "What happened" --expected "What should happen" \
-  --screenshot ~/Desktop/screenshot.png
-```
-- `--type` is `bug` or `feature`.
-- Add `--platform mobile` or `--platform desktop` if it matters.
-- Paste the chat/message text too: copy it, then run `pbpaste | node scripts/feedback.mjs new --title "..." ...`
-- Add more than one screenshot by repeating `--screenshot`.
+Paste the message text, attach the screenshot, and say what's wrong:
+> Log this bug: [paste chat text]. Screenshot attached. It's on mobile. Expected: Thea should show gift cards.
 
-Then share it:
-```bash
-git add feedback && git commit -m "feedback: short title" && git push
-```
+For an idea:
+> Add a feature idea: [what you want].
 
-## See what's left
-```bash
-node scripts/feedback.mjs list          # everything not finished
-node scripts/feedback.mjs show <id>     # read one in full
-```
+The agent saves it to the shared queue and pushes it, then tells you the item id.
 
-## Let Claude or Codex fix things
-Tell either one:
-> Work through the feedback queue. Don't stop until `node scripts/feedback.mjs check` passes.
+## Fix things
+> Work through the feedback queue. Fix every open item. Don't stop until all are fixed and checked.
 
-The steps an item goes through: `open` → `in-progress` → `fixed` → `verified`.
-Whoever fixes it marks it `fixed`; the **other person or the other AI** re-tests it and marks it `verified`.
+## Double-check fixes
+Whoever fixed something shouldn't be the one to confirm it. Ask the other person's agent:
+> Verify the items marked fixed. Re-test each one; verify it or reopen it.
 
-## Are we done?
-```bash
-node scripts/feedback.mjs check
-```
-- It says **OK** only when every item is `verified` (or `wontfix`).
-- Otherwise it lists what's still open.
+## See where we are
+> What's left in the feedback queue? Are we done?
 
-More detail: `docs/FEEDBACK_INTAKE.md`
+"Done" means every item is verified. The agent will say so, or list what remains.
+
+## Good to know
+- Don't paste passwords or API keys. Reports are saved in git.
+- If a screenshot can't be saved, the agent will tell you.

@@ -1,29 +1,26 @@
 # Feedback queue (bugs & ideas)
 
-Everything reported lives here as plain files, so people, Codex and Claude all see the same list.
-**Nothing to install.** You only need git and Node (already needed for the app).
+You never run a script. Just talk to Codex or Claude in this repo; it handles the files, commands and git.
+Nothing to install.
 
-## Hand it to Codex (or Claude): paste this
+## Say things like this
 
-> Work through the feedback queue in `feedback/`. Read `AGENTS.md` first.
-> Take every item that is not verified, fix it, and mark it fixed.
-> If an item is already fixed by someone else, re-check it yourself and verify it or reopen it.
-> Do not stop until `node scripts/feedback.mjs check` says OK.
+**Report a bug or idea** (paste the message text and attach screenshots right in the prompt):
+> Log this bug: [paste chat text or describe it]. Here's the screenshot. It's a mobile issue.
 
-That is the whole job. The agent uses `node scripts/feedback.mjs ...` (no `npm install`).
+> Add a feature idea: let people pick a birthday manually in the calendar pop-up.
 
-## Report something
-Easiest, with a command:
-```bash
-node scripts/feedback.mjs new --type bug --title "Short title" --reporter yourname \
-  --description "What happened" --expected "What should happen" \
-  --screenshot ~/Desktop/shot.png
-```
-No terminal? Copy `feedback/TEMPLATE.md` to `feedback/items/<anything>.md`, fill it in, drop screenshots in `feedback/assets/<id>/`. Agents will pick it up.
-Then `git add feedback && git commit -m "feedback: title" && git push`.
+**Fix everything:**
+> Work through the feedback queue. Fix every open item. Don't stop until all are fixed and checked.
 
-## Is it all done?
-`node scripts/feedback.mjs check` → `OK` only when every item is verified (or won't-fix).
+**Double-check someone else's fix:**
+> Verify the items marked fixed. Re-test each one; verify it or reopen it.
 
-Statuses: `open` → `in-progress` → `fixed` → `verified`. The one who fixes it never verifies it; the other person or AI does.
-More: `docs/FEEDBACK_INTAKE.md`.
+**See where we are:**
+> What's left in the feedback queue? Are we done?
+
+That's the whole process. The agent keeps the list in `feedback/`, commits and pushes, and says "done" only when every item is verified.
+
+Rule of thumb: whoever fixes an item doesn't verify it. Ask the other person, or the other AI, to verify.
+
+(Agents: see `AGENTS.md`. Humans who want the details: `docs/FEEDBACK_INTAKE.md`.)
