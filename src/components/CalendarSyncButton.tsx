@@ -3,6 +3,7 @@ import { Calendar, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Input } from '@/components/ui/input';
 import BirthdaySourcePicker from '@/components/birthdays/BirthdaySourcePicker';
 import { useToast } from '@/hooks/use-toast';
 import { useCalendarConnection, type CalendarCandidate, type CalendarStatus } from '@/hooks/useCalendarConnection';
@@ -32,6 +33,16 @@ const statusCopy = (status: CalendarStatus, source: string): { tone: 'info' | 'w
   }
 };
 
+const MAX_IMPORT_INTERESTS = 3;
+
+/** Free text, comma-separated, trimmed and capped — same shape the add/edit forms store. */
+const parseInterestsDraft = (draft: string | undefined): string[] =>
+  (draft || '')
+    .split(',')
+    .map((interest) => interest.trim())
+    .filter(Boolean)
+    .slice(0, MAX_IMPORT_INTERESTS);
+
 /** VIP / dashboard review: every candidate, no onboarding 3-person sample. */
 const CalendarImportReview: React.FC<{
   sourceLabel: string;
@@ -42,8 +53,12 @@ const CalendarImportReview: React.FC<{
 }> = ({ sourceLabel, candidates, importing, onImport, onCancel }) => {
   // Pre-select everyone found — full calendar sync, not the onboarding sample.
   const [chosen, setChosen] = useState(() => new Set(candidates.map((c) => c.key)));
+  // Keyed by candidate, so typing for one person never clobbers another's draft.
+  const [interestDrafts, setInterestDrafts] = useState<Record<string, string>>({});
   useEffect(() => setChosen(new Set(candidates.map((c) => c.key))), [candidates]);
-  const selected = candidates.filter((c) => chosen.has(c.key));
+  const selected = candidates
+    .filter((c) => chosen.has(c.key))
+    .map((c) => ({ ...c, interests: parseInterestsDraft(interestDrafts[c.key]) }));
   const toggle = (key: string) => setChosen((prev) => {
     const next = new Set(prev);
     if (next.has(key)) next.delete(key);
@@ -60,7 +75,7 @@ const CalendarImportReview: React.FC<{
             {candidates.length} {candidates.length === 1 ? 'person' : 'people'} with birthdays or anniversaries. Choose who Thea should look after — you can add details later.
           </DialogDescription>
         </DialogHeader>
-        <ul className="mt-1 flex flex-col gap-2">
+        <ul className="mt-1 flex flex-col gap-2.5">
           {candidates.map((person) => (
             <li key={person.key}>
               <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-[14px] border border-[#E4DCD2] bg-[#FAF8F3] px-3.5 py-2.5">
@@ -72,10 +87,22 @@ const CalendarImportReview: React.FC<{
                   </span>
                 </span>
               </label>
+              {chosen.has(person.key) && (
+                <Input
+                  value={interestDrafts[person.key] || ''}
+                  onChange={(e) => setInterestDrafts((prev) => ({ ...prev, [person.key]: e.target.value }))}
+                  placeholder="Interests, comma separated (optional) — e.g. coffee, hiking"
+                  maxLength={120}
+                  className="mt-1.5 h-9 rounded-[10px] border-[#E4DCD2] bg-white px-3 text-[12.5px] placeholder:text-[#9A8F80]"
+                />
+              )}
             </li>
           ))}
         </ul>
-        <div className="mt-4 grid grid-cols-[auto_1fr] gap-2">
+        <p className="mt-2.5 text-[12px] leading-[1.4] text-[#7A6F62]">
+          A few interests help Thea pick something they'll actually like instead of a generic reminder — skip it and add later if you're not sure yet.
+        </p>
+        <div className="mt-3 grid grid-cols-[auto_1fr] gap-2">
           <Button type="button" variant="outline" onClick={onCancel} disabled={importing}>Not now</Button>
           <Button type="button" onClick={() => onImport(selected)} disabled={importing || !selected.length} className="h-11 bg-[#2A2520] text-[#F4ECDD] hover:bg-[#2A2520]/90">
             {importing ? 'Adding…' : `Add ${selected.length} ${selected.length === 1 ? 'person' : 'people'}`}
