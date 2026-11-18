@@ -20,7 +20,7 @@ export function isMarketingHostname(hostname: string | null | undefined): boolea
 
 export const OG_IMAGE_PATH = "/og-thea.png";
 export const OG_IMAGE_URL = `${CANONICAL_ORIGIN}${OG_IMAGE_PATH}`;
-export const LOGO_URL = `${CANONICAL_ORIGIN}/lovable-uploads/unwrapt-lux.png`;
+export const LOGO_URL = `${CANONICAL_ORIGIN}/brand/unwrapt-lux.png`;
 
 /**
  * Web membership price as labeled in the product (src/lib/stripe.ts).

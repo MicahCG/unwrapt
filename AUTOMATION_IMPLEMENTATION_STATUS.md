@@ -282,7 +282,7 @@ console.log(gift.price); // Adjusted price (1.3x for spouse)
 
 ### Logo Update (Manual Step)
 The user provided a new logo design (3D gold gift box with 'U'). To update:
-1. Save the image to `/public/lovable-uploads/unwrapt-logo-icon.png`
+1. Save the image to `/public/brand/unwrapt-logo-icon.png`
 2. Logo component already references this path
 3. No code changes needed - just replace the image file
 
