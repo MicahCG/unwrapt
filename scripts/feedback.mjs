@@ -1,27 +1,26 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env node
 /**
  * Shared bug / feature intake. Items live in feedback/items/*.md (screenshots in
  * feedback/assets/<id>/) so people, Claude and Codex all read and update the same files via git.
- * See docs/FEEDBACK_INTAKE.md. Usage: npm run feedback -- <command> [options]
+ * See docs/FEEDBACK_INTAKE.md. Plain Node, zero dependencies: node scripts/feedback.mjs <command> [options]
+ * (also `npm run feedback -- <command>`; no npm install needed).
  */
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { basename, extname, join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = resolve(import.meta.dirname, '..');
+const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..');
 const ITEMS = join(ROOT, 'feedback', 'items');
 const ASSETS = join(ROOT, 'feedback', 'assets');
-const STATUSES = ['open', 'in-progress', 'fixed', 'verified', 'wontfix'] as const;
-type Status = (typeof STATUSES)[number];
+const STATUSES = ['open', 'in-progress', 'fixed', 'verified', 'wontfix'];
 /** Statuses that still need work or a re-check. `fixed` = code done, not yet independently verified. */
-const UNFINISHED: Status[] = ['open', 'in-progress', 'fixed'];
+const UNFINISHED = ['open', 'in-progress', 'fixed'];
 
-type Item = { file: string; meta: Record<string, string>; body: string };
-
-const parse = (file: string): Item => {
+const parse = (file) => {
   const raw = readFileSync(file, 'utf8');
   const m = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
-  const meta: Record<string, string> = {};
+  const meta = {};
   for (const line of (m ? m[1] : '').split('\n')) {
     const i = line.indexOf(':');
     if (i > 0) meta[line.slice(0, i).trim()] = line.slice(i + 1).trim();
@@ -29,26 +28,26 @@ const parse = (file: string): Item => {
   return { file, meta, body: m ? m[2] : raw };
 };
 
-const write = (item: Item) => {
+const write = (item) => {
   const head = Object.entries(item.meta).map(([k, v]) => `${k}: ${v}`).join('\n');
   writeFileSync(item.file, `---\n${head}\n---\n${item.body.startsWith('\n') ? '' : '\n'}${item.body}`);
 };
 
-const all = (): Item[] =>
+const all = () =>
   existsSync(ITEMS)
     ? readdirSync(ITEMS).filter((f) => f.endsWith('.md')).sort().map((f) => parse(join(ITEMS, f)))
     : [];
 
-const find = (id: string): Item => {
+const find = (id) => {
   const hit = all().find((i) => i.meta.id === id || basename(i.file).startsWith(id));
   if (!hit) throw new Error(`No feedback item "${id}". Run: npm run feedback -- list --all`);
   return hit;
 };
 
 /** `--key value` and repeatable `--key a --key b`; bare words are positionals. */
-const args = (argv: string[]) => {
-  const flags: Record<string, string[]> = {};
-  const pos: string[] = [];
+const args = (argv) => {
+  const flags = {};
+  const pos = [];
   for (let i = 0; i < argv.length; i++) {
     if (argv[i].startsWith('--')) {
       const key = argv[i].slice(2);
@@ -61,8 +60,8 @@ const args = (argv: string[]) => {
 };
 
 const today = () => new Date().toISOString().slice(0, 10);
-const slug = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
-const rel = (p: string) => p.replace(`${ROOT}/`, '');
+const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+const rel = (p) => p.replace(`${ROOT}/`, '');
 
 const readStdin = async () => {
   if (process.stdin.isTTY) return '';
@@ -71,7 +70,7 @@ const readStdin = async () => {
   return s.trim();
 };
 
-const commands: Record<string, (a: ReturnType<typeof args>) => Promise<void> | void> = {
+const commands = {
   async new({ flags }) {
     const title = flags.title?.[0];
     if (!title) throw new Error('--title is required');
@@ -80,7 +79,7 @@ const commands: Record<string, (a: ReturnType<typeof args>) => Promise<void> | v
     // Date + random suffix instead of a counter, so two people filing at once never collide.
     const id = `FB-${today().replace(/-/g, '')}-${randomBytes(2).toString('hex')}`;
     mkdirSync(ITEMS, { recursive: true });
-    const shots: string[] = [];
+    const shots = [];
     for (const src of flags.screenshot || []) {
       if (!existsSync(src)) throw new Error(`Screenshot not found: ${src}`);
       const dir = join(ASSETS, id);
@@ -93,7 +92,7 @@ const commands: Record<string, (a: ReturnType<typeof args>) => Promise<void> | v
     let context = flags.context?.[0] || '';
     if (flags['context-file']?.[0]) context = readFileSync(flags['context-file'][0], 'utf8').trim();
     if (!context) context = await readStdin();
-    const meta: Record<string, string> = {
+    const meta = {
       id, type, status: 'open', title,
       reporter: flags.reporter?.[0] || 'unknown',
       created: today(),
@@ -115,7 +114,7 @@ const commands: Record<string, (a: ReturnType<typeof args>) => Promise<void> | v
 
   list({ flags }) {
     const wanted = flags.status?.[0];
-    const rows = all().filter((i) => (flags.all ? true : wanted ? i.meta.status === wanted : UNFINISHED.includes(i.meta.status as Status)));
+    const rows = all().filter((i) => (flags.all ? true : wanted ? i.meta.status === wanted : UNFINISHED.includes(i.meta.status)));
     if (!rows.length) return console.log('No matching items.');
     for (const i of rows) {
       console.log(`${i.meta.id}  [${i.meta.status}]  ${i.meta.type}  ${i.meta.title}${i.meta.assignee ? `  (@${i.meta.assignee})` : ''}\n    ${rel(i.file)}`);
@@ -176,8 +175,8 @@ const commands: Record<string, (a: ReturnType<typeof args>) => Promise<void> | v
   /** The completion gate: exit 1 while anything is open, in progress, or fixed-but-unverified. */
   check() {
     const items = all();
-    const bad = items.filter((i) => !(['verified', 'wontfix'] as string[]).includes(i.meta.status));
-    const malformed = items.filter((i) => !STATUSES.includes(i.meta.status as Status));
+    const bad = items.filter((i) => !['verified', 'wontfix'].includes(i.meta.status));
+    const malformed = items.filter((i) => !STATUSES.includes(i.meta.status));
     if (malformed.length) console.log('Items with an invalid status:', malformed.map((i) => i.meta.id).join(', '));
     if (!bad.length) return console.log(`OK: all ${items.length} feedback item(s) are verified or wontfix.`);
     console.log(`NOT DONE: ${bad.length} of ${items.length} item(s) still need work:`);
