@@ -12,7 +12,7 @@ import {
 } from '@/lib/calendarConnection';
 import { SOURCE_LABEL, type BirthdaySource, type FoundOccasion } from '@/lib/birthdaySources';
 
-export type CalendarCandidate = { key: string; name: string; birthday: string | null; anniversary: string | null };
+export type CalendarCandidate = { key: string; name: string; birthday: string | null; anniversary: string | null; interests?: string[] };
 
 export type CalendarStatus =
   | { kind: 'idle' }
@@ -68,7 +68,7 @@ async function insertPeople(userId: string, people: CalendarCandidate[], sourceL
       name: p.name,
       birthday: p.birthday,
       anniversary: p.anniversary,
-      interests: [],
+      interests: p.interests?.length ? p.interests : [],
       notes: `Imported from ${sourceLabel.replace('your ', '')}`,
     })))
     .select('id');

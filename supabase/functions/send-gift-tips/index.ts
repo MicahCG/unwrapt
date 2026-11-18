@@ -3,11 +3,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 
 // Weekly cron job (see migration 20261016_schedule_notification_emails.sql).
 // For users with profiles.marketing_emails on, finds recipients with an
-// occasion coming up but no active gift scheduled yet, and - if a real
-// catalog item fits the user's default gift budget - emails one idea.
-// Never fabricates a product; a recipient is silently skipped if nothing
-// in the local catalog fits their budget. Dedups via notification_queue so
-// the same recipient isn't tipped more than once every 14 days.
+// occasion coming up but no active gift scheduled yet. If a catalog item
+// actually matches the recipient's stated interests (and fits the user's
+// default gift budget), emails that pick. Otherwise - no interests on file,
+// or nothing in the catalog matches them - it never fabricates a "curated"
+// product; it sends a generic nudge to come schedule a gift instead.
+// Dedups via notification_queue so the same recipient isn't emailed more
+// than once every 14 days.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -102,11 +104,15 @@ async function fetchLocalCatalog(supabaseClient: ReturnType<typeof createClient>
   }));
 }
 
+// Only returns a pick when it's a genuine interest match - no interests on
+// file, or nothing in the budget-filtered catalog referencing them, both
+// mean "no real match" rather than "fall back to some arbitrary item", so
+// every recipient without stated tastes doesn't converge on the same pick.
 function pickBestMatch(catalog: CatalogItem[], budgetMax: number, interests: string[]): CatalogItem | null {
+  if (interests.length === 0) return null;
+
   const inBudget = catalog.filter((p) => p.price != null && p.price <= budgetMax);
   if (inBudget.length === 0) return null;
-
-  if (interests.length === 0) return inBudget[0];
 
   const scored = inBudget
     .map((p) => {
@@ -116,7 +122,7 @@ function pickBestMatch(catalog: CatalogItem[], budgetMax: number, interests: str
     })
     .sort((a, b) => b.score - a.score);
 
-  return scored[0].score > 0 ? scored[0].p : inBudget[0];
+  return scored[0].score > 0 ? scored[0].p : null;
 }
 
 function nextOccurrenceDays(dateString: string, today: Date): number {
@@ -158,13 +164,13 @@ serve(async (req) => {
     const userIds = [...profileById.keys()];
 
     let sent = 0;
-    let skippedNoIdea = 0;
+    let sentGeneric = 0;
     let skippedHasGift = 0;
     let skippedCooldown = 0;
 
     if (userIds.length === 0) {
       return new Response(
-        JSON.stringify({ success: true, sent, skippedNoIdea, skippedHasGift, skippedCooldown }),
+        JSON.stringify({ success: true, sent, sentGeneric, skippedHasGift, skippedCooldown }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -213,26 +219,34 @@ serve(async (req) => {
       const interests: string[] = (recipient.interests || []).map((i: string) => i.toLowerCase());
 
       const pick = pickBestMatch(catalog, budgetMax, interests);
-      if (!pick) {
-        skippedNoIdea++;
-        continue;
-      }
+      const occasion = recipient.birthday === occasionDate ? "birthday" : "anniversary";
 
       try {
         const { error: sendError } = await supabaseClient.functions.invoke("send-notification-email", {
-          body: {
-            type: "gift_tip",
-            recipientEmail: profile.email,
-            userName: profile.full_name,
-            data: {
-              recipientName: recipient.name,
-              occasion: recipient.birthday === occasionDate ? "birthday" : "anniversary",
-              giftDescription: pick.title,
-              giftImage: pick.image_url,
-              priceRange: typeof pick.price === "number" ? `$${pick.price.toFixed(2)}` : undefined,
-              modifyLink: "https://app.unwrapt.io/",
-            },
-          },
+          body: pick
+            ? {
+                type: "gift_tip",
+                recipientEmail: profile.email,
+                userName: profile.full_name,
+                data: {
+                  recipientName: recipient.name,
+                  occasion,
+                  giftDescription: pick.title,
+                  giftImage: pick.image_url,
+                  priceRange: typeof pick.price === "number" ? `$${pick.price.toFixed(2)}` : undefined,
+                  modifyLink: "https://app.unwrapt.io/",
+                },
+              }
+            : {
+                type: "gift_idea_reminder",
+                recipientEmail: profile.email,
+                userName: profile.full_name,
+                data: {
+                  recipientName: recipient.name,
+                  occasion,
+                  modifyLink: "https://app.unwrapt.io/",
+                },
+              },
         });
         if (sendError) throw sendError;
 
@@ -245,7 +259,7 @@ serve(async (req) => {
           status: "sent",
           processed_at: new Date().toISOString(),
         });
-        sent++;
+        if (pick) sent++; else sentGeneric++;
       } catch (sendError) {
         console.error(`Failed to send gift tip for ${recipient.name}:`, sendError);
         await supabaseClient.from("notification_queue").insert({
@@ -262,7 +276,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, sent, skippedNoIdea, skippedHasGift, skippedCooldown }),
+      JSON.stringify({ success: true, sent, sentGeneric, skippedHasGift, skippedCooldown }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
