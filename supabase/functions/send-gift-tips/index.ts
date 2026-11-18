@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import type { DigestItem } from "../_shared/giftTipsDigest.ts";
 
 // Weekly cron job (see migration 20261016_schedule_notification_emails.sql).
 // For users with profiles.marketing_emails on, finds recipients with an
@@ -8,8 +9,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 // default gift budget), emails that pick. Otherwise - no interests on file,
 // or nothing in the catalog matches them - it never fabricates a "curated"
 // product; it sends a generic nudge to come schedule a gift instead.
-// Dedups via notification_queue so the same recipient isn't emailed more
-// than once every 14 days.
+// Sends ONE digest email per user per run (not one per recipient) listing every
+// upcoming occasion with the date and either a real pick or a prompt to plan one.
+// Dedups via notification_queue so the same recipient isn't included more than
+// once every 14 days.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -165,12 +168,13 @@ serve(async (req) => {
 
     let sent = 0;
     let sentGeneric = 0;
+    let emailsSent = 0;
     let skippedHasGift = 0;
     let skippedCooldown = 0;
 
     if (userIds.length === 0) {
       return new Response(
-        JSON.stringify({ success: true, sent, sentGeneric, skippedHasGift, skippedCooldown }),
+        JSON.stringify({ success: true, emailsSent, sent, sentGeneric, skippedHasGift, skippedCooldown }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -184,6 +188,9 @@ serve(async (req) => {
 
     let catalog = await fetchGoodyCatalog();
     if (catalog.length === 0) catalog = await fetchLocalCatalog(supabaseClient);
+
+    // user id -> everything we'll tell them about in a single email
+    const pending = new Map<string, { profile: any; items: DigestItem[]; occasionDates: Map<string, string> }>();
 
     for (const recipient of recipients || []) {
       const profile = profileById.get((recipient as any).user_id);
@@ -221,62 +228,56 @@ serve(async (req) => {
       const pick = pickBestMatch(catalog, budgetMax, interests);
       const occasion = recipient.birthday === occasionDate ? "birthday" : "anniversary";
 
+      const entry = pending.get(profile.id) ?? { profile, items: [] as DigestItem[], occasionDates: new Map<string, string>() };
+      entry.items.push({
+        recipientName: recipient.name,
+        occasion,
+        occasionDate,
+        daysAway,
+        pick: pick ? { title: pick.title, image: pick.image_url, price: pick.price } : null,
+      });
+      entry.occasionDates.set(recipient.name, occasionDate);
+      pending.set(profile.id, entry);
+    }
+
+    // One email per user, soonest occasion first.
+    for (const { profile, items, occasionDates } of pending.values()) {
+      items.sort((a, b) => a.daysAway - b.daysAway);
+      const log = (status: "sent" | "failed", error?: string) =>
+        supabaseClient.from("notification_queue").insert(
+          items.map((i) => ({
+            notification_type: "gift_tip",
+            user_email: profile.email,
+            user_name: profile.full_name,
+            recipient_name: i.recipientName,
+            occasion_date: occasionDates.get(i.recipientName),
+            status,
+            ...(error ? { error_message: error } : {}),
+            processed_at: new Date().toISOString(),
+          })),
+        );
       try {
         const { error: sendError } = await supabaseClient.functions.invoke("send-notification-email", {
-          body: pick
-            ? {
-                type: "gift_tip",
-                recipientEmail: profile.email,
-                userName: profile.full_name,
-                data: {
-                  recipientName: recipient.name,
-                  occasion,
-                  giftDescription: pick.title,
-                  giftImage: pick.image_url,
-                  priceRange: typeof pick.price === "number" ? `$${pick.price.toFixed(2)}` : undefined,
-                  modifyLink: "https://app.unwrapt.io/",
-                },
-              }
-            : {
-                type: "gift_idea_reminder",
-                recipientEmail: profile.email,
-                userName: profile.full_name,
-                data: {
-                  recipientName: recipient.name,
-                  occasion,
-                  modifyLink: "https://app.unwrapt.io/",
-                },
-              },
+          body: {
+            type: "gift_tips_digest",
+            recipientEmail: profile.email,
+            userName: profile.full_name,
+            data: { items },
+          },
         });
         if (sendError) throw sendError;
-
-        await supabaseClient.from("notification_queue").insert({
-          notification_type: "gift_tip",
-          user_email: profile.email,
-          user_name: profile.full_name,
-          recipient_name: recipient.name,
-          occasion_date: occasionDate,
-          status: "sent",
-          processed_at: new Date().toISOString(),
-        });
-        if (pick) sent++; else sentGeneric++;
+        await log("sent");
+        sent += items.length;
+        emailsSent++;
+        sentGeneric += items.filter((i) => !i.pick).length;
       } catch (sendError) {
-        console.error(`Failed to send gift tip for ${recipient.name}:`, sendError);
-        await supabaseClient.from("notification_queue").insert({
-          notification_type: "gift_tip",
-          user_email: profile.email,
-          user_name: profile.full_name,
-          recipient_name: recipient.name,
-          occasion_date: occasionDate,
-          status: "failed",
-          error_message: errorMessage(sendError),
-          processed_at: new Date().toISOString(),
-        });
+        console.error(`Failed to send gift tips digest to ${profile.email}:`, sendError);
+        await log("failed", errorMessage(sendError));
       }
     }
 
     return new Response(
-      JSON.stringify({ success: true, sent, sentGeneric, skippedHasGift, skippedCooldown }),
+      JSON.stringify({ success: true, emailsSent, sent, sentGeneric, skippedHasGift, skippedCooldown }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
