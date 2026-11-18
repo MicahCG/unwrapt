@@ -9,6 +9,7 @@ import {
   type PlaceByDecision,
 } from "../_shared/giftTiming.ts";
 import { decideReservedOrder } from "../_shared/reservedFunds.ts";
+import { quoteGoodyOrderPrice } from "../_shared/goodyPricing.ts";
 
 export { giftOrderTiming, resolveShippingLeadDays, shippingLeadDaysFromProduct, decidePlaceBy, timingForStoredGift, decideReservedOrder };
 
@@ -145,7 +146,7 @@ Use what is already known and gather only missing essentials naturally, with at 
 - A real miss is still a reply, not a dead end: name the specific thing they just asked for before saying it's not there ("no wall art in the catalog right now" beats "no results found"), and give one honest, warm reason to keep going instead of just stopping. Vary how you say it across the whole conversation, not just versus your immediately previous reply - don't let "it looks like" or "it seems" become your go-to opener for every miss, even ones that aren't back to back.
 - Don't silently re-show the same products you already showed for an earlier, different ask just because a new search came up empty - that reads as not having listened. Either say plainly those are still your best live options and ask if they're worth a second look, or skip repeating them and ask what to try next.
 - Only recommend items within budget.
-- Give one short, specific reason per pick, tied to the interest, relationship, or occasion. Never generic marketing language ("perfect for any occasion" is banned).
+- The app shows every product you recommend as a card with its photo, name, and price, so NEVER list the products in your reply (no numbered or bulleted lists, no "Price:" lines, no repeating names and prices the cards already show). Write one or two short, warm sentences instead: why this set fits the person, relationship, or occasion (name at most one standout pick if it helps), then a single question like "Any of these catch your eye?". Keep it simple. Never generic marketing language ("perfect for any occasion" is banned).
 - On lock in, confirm the exact product and price back clearly, in one line. Gifts are paid from the user's Unwrapt wallet; you never take card details. You place an order only by calling place_order_now, and only when the user asks to order an existing gift now.
 
 This is a hard rule with no exceptions: any reply that names a specific product must end on its own new line with:
@@ -177,6 +178,7 @@ Account context (when present) already lists saved people and whether a calendar
 
 ## Choosing and scheduling a specific gift
 When the user picks one specific gift for a specific recipient, whether by tapping a card or naming it in text (match their words to the right id from your most recent search_gifts results, do not search again or repeat the list), call select_gift. It returns a review, not a save - nothing has been scheduled yet. Tell the user, in one short line, exactly what you're about to schedule (recipient, gift, price, occasion date, and the concrete place/arrive timing from review.timing) and ask them to confirm. If review.timing.feasible is false, lead with that warning and options before asking to confirm. Use future or conditional phrasing only ("I'll schedule...", "Ready to send...", "Want me to lock this in?") - never past tense or completed-action phrasing ("I've scheduled...", "This is booked...", "Done!") for a review, since nothing is booked until the user confirms and you call confirm_scheduled_gift; claiming otherwise is exactly the kind of invented completed action the hard boundaries above forbid.
+Price the gift to the user as review.giftWithFee (the gift price plus the $7 Unwrapt service fee), and when review.shippingAndTax is greater than 0 add that it comes with about review.shippingAndTax more for shipping and tax (e.g. "$22 with our service fee, plus about $10 shipping & tax"). Say nothing about shipping and tax when it is 0 (no quote yet, e.g. no address on file).
 If review.walletShortfall is greater than 0, add one extra clause to that same message naming review.walletAvailable and review.walletShortfall exactly (e.g. "...for $45. Heads up, you've got $12 available, so you'd be $33 short when you confirm - want to add funds now, or confirm anyway and top up after?") - not a separate message, not blocking the confirm offer. They can still confirm with a shortfall (confirm_scheduled_gift and its own funding result handle that), so this is a courtesy warning, never a blocker. Say nothing extra about wallet funds when walletShortfall is 0.
 
 This is a hard rule with no exceptions: whenever review.walletShortfall is greater than 0 and you've included that heads-up clause, end your reply on its own new line with WALLET_SHORTFALL_NOTED: true (same invisible-marker convention as RECOMMENDED_IDS/GIFT_REVIEW/FALLBACK_DISCLOSED above - the user never sees this line). Never include this line when walletShortfall is 0 or absent.
@@ -1381,7 +1383,10 @@ export const checkRecommendationIntegrity = (content: string, seenProducts: Map<
   const seenProductIds = new Set(seenProducts.keys());
   const hasUnresolvedIds = mentionedIds.some((id) => !seenProductIds.has(id));
   const bulletItemCount = (content.match(/^\s*[•▪\-*]\s*\*\*[^*]{2,60}\*\*/gm) || []).length;
-  const looksLikeInventedList = bulletItemCount >= 2 && mentionedIds.length === 0;
+  // Plain "1. Name\nPrice: $14" lists (no bold) are the same failure: priced products named
+  // in text with no ids behind them, so no cards can be shown.
+  const priceLineCount = (content.match(/^\s*(?:[-*•]\s*)?\**price\**\s*:\s*\$\d/gim) || []).length;
+  const looksLikeInventedList = (bulletItemCount >= 2 || priceLineCount >= 2) && mentionedIds.length === 0;
   const needsRealSearch = hasUnresolvedIds || looksLikeInventedList;
   return { mentionedIds, missingMarker, needsRealSearch };
 };
@@ -2143,6 +2148,72 @@ const alreadyScheduledReason = (
   return "not_swappable";
 };
 
+/** The model announcing "I've selected / scheduled X" in text. Only legitimate after select_gift
+ * actually ran this turn (observed live: it claimed a selection and invented a $15 shortfall
+ * without ever calling the tool). Exported for unit testing. */
+export const claimsGiftSelected = (content: string): boolean =>
+  /\bI(?:'ve| have)\s+(?:just\s+)?(?:selected|scheduled|picked|chosen|locked in)\b/i.test(content);
+
+/** When product cards are attached the reply must not also list them (the cards show photo,
+ * name and price). Drops list-shaped paragraphs and keeps the intro/closing lines. Exported for
+ * unit testing. */
+export const stripProductListFromReply = (reply: string): string => {
+  const paragraphs = reply.split(/\n\s*\n/);
+  const isListBlock = (p: string) => /^\s*(?:\d+[.)]|[-*•])\s/.test(p) || /\bprice\s*:\s*\$\d/i.test(p);
+  const kept = paragraphs.filter((p) => !isListBlock(p));
+  if (kept.length === paragraphs.length) return reply;
+  const text = kept.join("\n\n").trim();
+  return text || "Here are a few ideas - tap one to pick it.";
+};
+
+/** The one saved person a user message names (whole-word, case-insensitive match on full name
+ * or first name), or null when none or more than one is named. Exported for unit testing. */
+export const findMentionedRecipient = (
+  message: string,
+  recipients: Array<{ id: string; name: string }>,
+): { id: string; name: string } | null => {
+  const text = message.toLowerCase();
+  const escape = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const test = (t: string) => t.length >= 2 && new RegExp(`(^|[^\\p{L}\\p{N}])${escape(t)}(?![\\p{L}\\p{N}])`, "u").test(text);
+  const norm = (n: string) => (n || "").toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, "").trim();
+  const fullHits = recipients.filter((r) => test(norm(r.name)));
+  // A full name is more specific than a shared first name, so it wins when present.
+  const hits = fullHits.length ? fullHits : recipients.filter((r) => test(norm(r.name).split(/\s+/)[0]));
+  return hits.length === 1 ? { id: hits[0].id, name: hits[0].name } : null;
+};
+
+/** Real Goody shipping + tax (dollars) for one product to one recipient, or 0 whenever a quote
+ * isn't available (no API key, incomplete/non-US address, Goody failure). Never throws. */
+const quoteShippingAndTax = async (productId: string, recipient: RecipientRow): Promise<number> => {
+  try {
+    const environment = Deno.env.get("GOODY_API_ENV") === "production" ? "production" : "sandbox";
+    const apiKey = environment === "production"
+      ? Deno.env.get("GOODY_PRODUCTION_COMMERCE_API_KEY")
+      : Deno.env.get("GOODY_SANDBOX_COMMERCE_API_KEY");
+    if (!apiKey || !productId || !hasAddress(recipient)) return 0;
+    const [firstName, ...rest] = (recipient.name || "").trim().split(/\s+/);
+    const quote = await quoteGoodyOrderPrice({
+      apiKey,
+      environment,
+      productId,
+      recipient: {
+        firstName,
+        lastName: rest.join(" "),
+        street: recipient.street as string,
+        apartment: recipient.apartment,
+        city: recipient.city as string,
+        state: recipient.state as string,
+        zipCode: recipient.zip_code as string,
+        country: recipient.country,
+      },
+    });
+    return quote ? quote.shippingCost + quote.taxCost : 0;
+  } catch (error) {
+    console.error("select_gift quote failed, using flat estimate", error);
+    return 0;
+  }
+};
+
 export const handleSelectGift = async (
   authClient: ReturnType<typeof createClient>,
   userId: string,
@@ -2230,13 +2301,18 @@ export const handleSelectGift = async (
   // up front if their wallet likely won't cover this, not only after confirming.
   const walletAvailable = await getAvailableBalance(authClient, userId);
   const reservedForThisGift = existing ? await getGiftReservedAmount(authClient, userId, existing.id) : 0;
-  const walletShortfall = Math.max(0, Math.round((product.price + SERVICE_FEE - walletAvailable - reservedForThisGift) * 100) / 100);
+  // Real Goody shipping + tax on top of price + service fee, matching what wallet-reserve-funds
+  // will actually hold at confirm time. Falls back to 0 (the old flat math) when no quote.
+  const shippingAndTax = await quoteShippingAndTax(product.id, recipient);
+  const walletShortfall = Math.max(0, Math.round((product.price + SERVICE_FEE + shippingAndTax - walletAvailable - reservedForThisGift) * 100) / 100);
   const review: Record<string, unknown> = {
     recipientId: recipient.id,
     recipientName: recipient.name,
     productId: product.id,
     productTitle: product.title,
     price: product.price,
+    giftWithFee: Math.round((product.price + SERVICE_FEE) * 100) / 100,
+    shippingAndTax: Math.round(shippingAndTax * 100) / 100,
     currency: product.currency,
     occasionDate,
     occasion: occasionLabel,
@@ -3405,7 +3481,19 @@ Use the whole conversation, not just the last message. Return JSON only:
     // CC-02 fix: carries forward the PRIOR turn's recommended products and
     // in-focus recipient, since the client never resends tool-call history
     // (see buildTurnContextMessage above for why this exists).
-    const turnContext = await fetchLastTurnContext(authClient, conversationId);
+    const fetchedTurnContext = await fetchLastTurnContext(authClient, conversationId);
+    // If the user's own message names exactly one saved person, that person is in focus now -
+    // even when the model never calls get_recipients with a single result (observed live:
+    // "pick a gift for Kora" kept the previous turn's recipient, so the tapped gift was
+    // scheduled for them instead).
+    const { data: namedRows } = await authClient.from("recipients").select("id, name").eq("user_id", user.id);
+    const mentionedRecipient = findMentionedRecipient(
+      messages[messages.length - 1]?.content ?? "",
+      (namedRows ?? []) as Array<{ id: string; name: string }>,
+    );
+    const turnContext = mentionedRecipient
+      ? { ...(fetchedTurnContext ?? {}), activeRecipient: mentionedRecipient } as NonNullable<typeof fetchedTurnContext>
+      : fetchedTurnContext;
     const turnContextMessage = buildTurnContextMessage(turnContext);
     // Belt-and-suspenders on top of buildTurnContextMessage's conditional
     // instruction: when the user's own new message unambiguously names one
@@ -3597,7 +3685,9 @@ Use the whole conversation, not just the last message. Return JSON only:
       presentedUi.push(mod);
     };
 
+    let selectGiftRan = false;
     const recordToolSideEffects = (toolName: string, result: ToolResult) => {
+      if (toolName === "select_gift") selectGiftRan = true;
       if (toolName === "get_recipients" && result.ok && Array.isArray(result.recipients)) {
         for (const raw of result.recipients as Array<Record<string, unknown>>) {
           if (typeof raw.recipientId !== "string" || typeof raw.name !== "string") continue;
@@ -3712,11 +3802,14 @@ Use the whole conversation, not just the last message. Return JSON only:
         const missingWalletShortfallDisclosure = !needsRealSearch && !missingMarker && !missingFallbackDisclosure
           && needsWalletShortfallDisclosure(content, reviewWalletShortfall);
 
-        if ((needsRealSearch || missingMarker || missingFallbackDisclosure || missingWalletShortfallDisclosure) && iteration < MAX_TOOL_ITERATIONS - 1) {
+        const claimedSelectionWithoutTool = !selectGiftRan && claimsGiftSelected(content);
+        if ((needsRealSearch || missingMarker || missingFallbackDisclosure || missingWalletShortfallDisclosure || claimedSelectionWithoutTool) && iteration < MAX_TOOL_ITERATIONS - 1) {
           conversation.push({ role: "assistant", content });
           conversation.push({
             role: "system",
-            content: needsRealSearch
+            content: claimedSelectionWithoutTool && !needsRealSearch && !missingMarker
+              ? "You said you selected or scheduled a gift, but select_gift has not been called this turn, so nothing was selected and any shortfall or timing you quoted was invented. Call select_gift now with the recipientId and productId of the gift the user just chose (from the products shown earlier in this conversation; use get_recipients if you need the id), then describe only its real review. If you cannot tell which product they meant, ask which one instead."
+              : needsRealSearch
               ? "You listed gift ideas that aren't backed by a real search_gifts result from this conversation - either you referenced ids that were never returned, or this looks like an invented list of generic examples. Never invent generic gift ideas. search_gifts is being called now with the budget/interests already given; recommend only from its actual results, using their real titles and prices. If nothing matches even on a broader search, say so honestly instead of listing invented examples."
               : missingMarker
               ? "You named specific products but left out the required RECOMMENDED_IDS line. Resend the same recommendations, ending on a new line with RECOMMENDED_IDS: followed by the exact ids of those products from your search_gifts results."
@@ -3969,6 +4062,7 @@ Use the whole conversation, not just the last message. Return JSON only:
     reply = aligned.reply;
     lastReview = aligned.review;
     const products = aligned.products as Product[];
+    if (products.length > 0 && !lastReview) reply = stripProductListFromReply(reply);
 
     const confirmedReviewMarker = markerToPersist(
       lastReview ? lastReviewMarker : null,

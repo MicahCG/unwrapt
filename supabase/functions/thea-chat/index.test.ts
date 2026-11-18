@@ -40,6 +40,9 @@ import {
   looksLikePlaceDateChange,
   handleSetPlaceDate,
   handleSelectGift,
+  findMentionedRecipient,
+  claimsGiftSelected,
+  stripProductListFromReply,
   systemPromptIncludesAddressFormRules,
   RESERVED_ORDER_RULES,
   ADDRESS_FORM_RULES,
@@ -1115,6 +1118,115 @@ Deno.test("select_gift's review reports zero shortfall when the wallet already c
   const review = result.review as Record<string, unknown>;
   assertEquals(review.walletAvailable, 100);
   assertEquals(review.walletShortfall, 0);
+});
+
+const withGoodyQuote = async (
+  handler: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
+  run: () => Promise<void>,
+) => {
+  const original = globalThis.fetch;
+  const priorKey = Deno.env.get("GOODY_SANDBOX_COMMERCE_API_KEY");
+  const priorEnv = Deno.env.get("GOODY_API_ENV");
+  Deno.env.set("GOODY_SANDBOX_COMMERCE_API_KEY", "test-key");
+  Deno.env.delete("GOODY_API_ENV");
+  globalThis.fetch = handler as typeof fetch;
+  try {
+    await run();
+  } finally {
+    globalThis.fetch = original;
+    if (priorKey === undefined) Deno.env.delete("GOODY_SANDBOX_COMMERCE_API_KEY"); else Deno.env.set("GOODY_SANDBOX_COMMERCE_API_KEY", priorKey);
+    if (priorEnv !== undefined) Deno.env.set("GOODY_API_ENV", priorEnv);
+  }
+};
+
+const selectGiftReviewFor = async (recipientAddress: Record<string, unknown>) => {
+  const client = mockMultiTableClient({
+    recipients: [{
+      id: "rec_aunty", user_id: "user_1", name: "Aunty Smith", birthday: "2026-11-29", anniversary: null,
+      interests: [], country: "US", ...recipientAddress,
+    }],
+    scheduled_gifts: [],
+    profiles: [{ id: "user_1", gift_wallet_balance: 0 }],
+    wallet_transactions: [],
+  });
+  const fallbackProduct = {
+    id: "prod_mug", title: "Grateful Mug", description: null, price: 25, currency: "USD",
+    featured_image_url: null, product_type: null, gift_vibe: null, provider: "goody" as const,
+  };
+  const result = await handleSelectGift(client as never, "user_1", {
+    recipientId: "rec_aunty", productId: "prod_mug", occasionDate: "2026-11-29",
+  }, fallbackProduct);
+  assertEquals(result.ok, true);
+  if (!result.ok) throw new Error("unreachable");
+  return result.review as Record<string, unknown>;
+};
+
+const US_ADDRESS = { street: "1 Main St", city: "Austin", state: "TX", zip_code: "78701" };
+
+Deno.test("select_gift's shortfall includes real Goody shipping + tax when a quote succeeds", async () => {
+  await withGoodyQuote(
+    (input) => {
+      // Only Goody's price endpoint should be hit for the quote; products lookups fall to the fallback.
+      if (String(input).includes("/v1/order_batches/price")) {
+        return Promise.resolve(new Response(JSON.stringify({
+          cart_price: { price_product: 2500, price_shipping: 800, price_processing_fee: 100 },
+          total_price: { est_tax_calculated: 272 },
+        }), { status: 200 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }));
+    },
+    async () => {
+      const review = await selectGiftReviewFor(US_ADDRESS);
+      // $25 + $7 fee + $8 shipping + $2.72 tax - $0 wallet = $42.72 (matches wallet-reserve-funds).
+      assertEquals(review.walletShortfall, 42.72);
+      assertEquals(review.giftWithFee, 32);
+      assertEquals(review.shippingAndTax, 10.72);
+    },
+  );
+});
+
+Deno.test("select_gift's shortfall falls back to the flat math with no address (no Goody call) or when the quote fails", async () => {
+  let priceCalls = 0;
+  await withGoodyQuote(
+    (input) => {
+      if (String(input).includes("/v1/order_batches/price")) {
+        priceCalls++;
+        return Promise.resolve(new Response("boom", { status: 500 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }));
+    },
+    async () => {
+      const noAddress = await selectGiftReviewFor({ street: null, city: null, state: null, zip_code: null });
+      assertEquals(noAddress.walletShortfall, 32);
+      assertEquals(noAddress.shippingAndTax, 0);
+      assertEquals(priceCalls, 0);
+      const failedQuote = await selectGiftReviewFor(US_ADDRESS);
+      assertEquals(failedQuote.walletShortfall, 32);
+      assertEquals(priceCalls, 1);
+    },
+  );
+});
+
+Deno.test("findMentionedRecipient picks the one named person, and nothing when zero or several are named", () => {
+  const people = [{ id: "h", name: "Happy!" }, { id: "k", name: "Kora Smith" }, { id: "k2", name: "Kora Jones" }, { id: "a", name: "Aunty" }];
+  assertEquals(findMentionedRecipient("Can we pick a gift for aunty instead?", people)?.id, "a");
+  assertEquals(findMentionedRecipient("gift for Kora Smith please", people)?.id, "k");
+  assertEquals(findMentionedRecipient("gift for Kora", people), null); // ambiguous first name
+  assertEquals(findMentionedRecipient("I'd like the Holiday Cookie & Brownie Duo", people), null);
+  assertEquals(findMentionedRecipient("what about Happy", people)?.id, "h");
+});
+
+Deno.test("a plain 'Price: $N' list with no ids is flagged as needing a real search, and a made-up selection claim is detected", () => {
+  const plain = "1. Medium Glass Canister\nPrice: $14\nStylish.\n\n2. Holiday Cookie Duo\nPrice: $15\nSweet.";
+  assertEquals(checkRecommendationIntegrity(plain, new Map()).needsRealSearch, true);
+  assertEquals(claimsGiftSelected("Great choice! I've selected the Holiday Cookie & Brownie Duo for Kora."), true);
+  assertEquals(claimsGiftSelected("I'll schedule the Cookie Duo for Kora. Confirm?"), false);
+});
+
+Deno.test("stripProductListFromReply drops the list paragraphs but keeps the intro and the closing question", () => {
+  const reply = "Here are some options for Kora.\n\n1. Canister\nPrice: $14\nNice.\n\n2. Cookies\nPrice: $15\nSweet.\n\nDo any catch your eye?";
+  assertEquals(stripProductListFromReply(reply), "Here are some options for Kora.\n\nDo any catch your eye?");
+  assertEquals(stripProductListFromReply("Just a short reply."), "Just a short reply.");
 });
 
 Deno.test("a short conversation is left completely alone (no summarization threshold crossed)", () => {
