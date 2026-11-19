@@ -177,6 +177,10 @@ Account context (when present) already lists saved people and whether a calendar
 - Never ask for or store a recipient's phone number or email in this chat (see hard boundaries above). For shipping address and structured details, prefer present_ui (edit_recipient / add_recipient) over asking them to type everything into the chat.
 
 ## Choosing and scheduling a specific gift
+Keep the path from idea to scheduled short:
+- When the user says they want one specific gift (or you are suggesting exactly one), call select_gift right away: the review card it produces has its own Change and Confirm buttons, so do not first ask in text "Would you like me to schedule this?". One short line plus the card is the whole step.
+- Do not ask the user to confirm the same gift twice. After they confirm the review, follow confirm_scheduled_gift's result: if funds are short, the app shows the add-funds card, so say the one amount needed in a single line and stop; do not ask whether they want to add funds in plain text.
+
 Prices and availability, stated consistently:
 - Quote a gift's price exactly as search_gifts returned it (the gift's own price). The app shows the Unwrapt service fee and shipping and tax separately under each card, so say "plus a small service fee and shipping" when cost comes up; never add the fee into a number you quote and never quote the same gift at two different prices.
 - Never tell the user a gift is unavailable, out of stock or discontinued unless a tool result says so in those words. A lookup error, a late-delivery result, a wallet shortfall or a missing address are none of those: describe what actually happened (for example "that would arrive after her birthday") and offer the next step.
@@ -1293,6 +1297,24 @@ const CONFIRMATION_PATTERN = /\b(yes|yeah|yep|yup|confirm(ed)?|do it|go ahead|so
 /** Detects an explicit confirmation in the user's newest message. Exported
  * for unit testing. */
 export const looksLikeConfirmation = (message: string): boolean => CONFIRMATION_PATTERN.test(message.trim());
+
+/**
+ * A short "yes" to a reply that offered exactly one specific gift ("Want me to schedule the Holiday Cookie
+ * Duo for Kora?") with no review open yet. Observed live: the typed "Yes" had no handler, so Thea asked
+ * again in text and the user needed several more turns to reach the review card. Only the immediately
+ * previous reply's single saved product counts, and only for a short, question-free message, so
+ * "yes but anything cheaper?" still goes to the model.
+ */
+export const affirmedSingleOffer = (
+  message: string,
+  context: { recommendedProducts?: NamedProductMatch[]; pendingReview?: unknown; activeRecipient?: { id: string; name: string } } | null | undefined,
+): NamedProductMatch | null => {
+  const text = message.trim();
+  if (!context || context.pendingReview || !context.activeRecipient?.id) return null;
+  if (context.recommendedProducts?.length !== 1) return null;
+  if (!looksLikeConfirmation(text) || text.includes("?") || text.split(/\s+/).length > 6) return null;
+  return context.recommendedProducts[0];
+};
 
 const PLACE_DATE_TOKEN =
   /\b\d{4}-\d{2}-\d{2}\b|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}\b|\bthe\s+\d{1,2}(?:st|nd|rd|th)\b|\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/i;
@@ -3758,6 +3780,11 @@ Use the whole conversation, not just the last message. Return JSON only:
         seenProducts.get(tappedProductId) ?? null,
       );
       preAppliedCall = { name: "select_gift", args: { recipientId: turnContext.activeRecipient.id, productId: tappedProductId }, result };
+    } else if (!placeDateChange && affirmedSingleOffer(latestUserMessageContent, turnContext)) {
+      const offered = affirmedSingleOffer(latestUserMessageContent, turnContext)!;
+      const recipientId = turnContext!.activeRecipient!.id;
+      const result = await handleSelectGift(authClient, user.id, { recipientId, productId: offered.id }, seenProducts.get(offered.id) ?? null);
+      preAppliedCall = { name: "select_gift", args: { recipientId, productId: offered.id }, result };
     } else if (placeDateChange && turnContext?.pendingReview) {
       const { recipientId, productId, occasionDate } = turnContext.pendingReview;
       const result = await handleConfirmScheduledGift(

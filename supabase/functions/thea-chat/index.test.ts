@@ -5,6 +5,7 @@
 // import doesn't start a live HTTP listener - see the comment there.)
 import { assert, assertEquals } from "https://deno.land/std@0.190.0/testing/asserts.ts";
 import {
+  affirmedSingleOffer,
   pickCardProducts,
   searchGoodyGifts,
   looksLikeMoreOptionsIntent,
@@ -1506,4 +1507,20 @@ Deno.test("pickCardProducts shows what the search returned when the reply's titl
 Deno.test("pickCardProducts falls back to the top results when the reply names none, and to nothing without a search", () => {
   assertEquals(pickCardProducts("Here are some ideas", [], found, false, 3).map((p) => p.id), ["1", "2", "3"]);
   assertEquals(pickCardProducts("Here are some ideas", [], [], false), []);
+});
+
+const offer = { recommendedProducts: [{ id: "p1", title: "Holiday Cookie & Brownie Duo", price: 15 }], activeRecipient: { id: "r1", name: "Kora" } };
+
+Deno.test("affirmedSingleOffer: a short yes to one offered gift selects it", () => {
+  assertEquals(affirmedSingleOffer("Yes", offer)?.id, "p1");
+  assertEquals(affirmedSingleOffer("yeah sounds good", offer)?.id, "p1");
+});
+
+Deno.test("affirmedSingleOffer: stays out of the way when it is not a clear yes to one gift", () => {
+  assertEquals(affirmedSingleOffer("yes but anything cheaper?", offer), null);
+  assertEquals(affirmedSingleOffer("Yes, but I would like the cheaper one for her mom instead", offer), null);
+  assertEquals(affirmedSingleOffer("Yes", { ...offer, pendingReview: { recipientId: "r1", productId: "p1", occasionDate: "2026-11-20" } }), null);
+  assertEquals(affirmedSingleOffer("Yes", { ...offer, recommendedProducts: [...offer.recommendedProducts, { id: "p2", title: "Other", price: 9 }] }), null);
+  assertEquals(affirmedSingleOffer("Yes", { recommendedProducts: offer.recommendedProducts }), null);
+  assertEquals(affirmedSingleOffer("Yes", null), null);
 });
