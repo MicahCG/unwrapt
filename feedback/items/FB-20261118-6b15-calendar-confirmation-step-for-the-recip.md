@@ -1,13 +1,13 @@
 ---
 id: FB-20261118-6b15
 type: feature
-status: open
+status: fixed
 title: Calendar confirmation step for the recipient
 reporter: kevin
 created: 2026-11-18
 area: onboarding
 platform: 
-assignee: 
+assignee: claude
 fix: 
 verified_by: 
 ---
@@ -25,3 +25,4 @@ A confirmation step so the user can confirm the calendar event/birthday details 
 (none attached)
 
 ## Notes / fix log
+- 2026-11-19 fixed: Design: when the calendar auto-sync adds one person, the notice has a Review action that opens that person's details so the birthday can be confirmed and an address added. Also fixed a retry storm: a failed background sync is now throttled like a successful one. Awaiting verification.

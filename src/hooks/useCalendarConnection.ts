@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -11,7 +11,9 @@ import {
   type CalendarResult,
 } from '@/lib/calendarConnection';
 import { SOURCE_LABEL, type BirthdaySource, type FoundOccasion } from '@/lib/birthdaySources';
+import { createElement } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { ToastAction, type ToastActionElement } from '@/components/ui/toast';
 import {
   loadLastSyncAt, loadSeenPeople, planCalendarSync, saveLastSyncAt, saveSeenPeople, shouldRunCalendarSync,
 } from '@/lib/calendarAutoSync';
@@ -64,7 +66,7 @@ async function unsavedPeople(userId: string, people: Map<string, CalendarCandida
   return [...people.values()].filter((p) => !known.has(p.key));
 }
 
-async function insertPeople(userId: string, people: CalendarCandidate[], sourceLabel: string): Promise<number> {
+async function insertPeople(userId: string, people: CalendarCandidate[], sourceLabel: string): Promise<{ count: number; rows: Array<{ id: string; name: string }> }> {
   const { data, error } = await supabase
     .from('recipients')
     .insert(people.map((p) => ({
@@ -75,9 +77,9 @@ async function insertPeople(userId: string, people: CalendarCandidate[], sourceL
       interests: p.interests?.length ? p.interests : [],
       notes: `Imported from ${sourceLabel.replace('your ', '')}`,
     })))
-    .select('id');
+    .select('id, name');
   if (error) throw error;
-  return data?.length ?? people.length;
+  return { count: data?.length ?? people.length, rows: (data || []) as Array<{ id: string; name: string }> };
 }
 
 /** Saves whichever of these people aren't saved yet, without a review. Returns who was added. */
@@ -85,15 +87,17 @@ export async function importNewPeople(
   userId: string,
   people: Array<{ name: string; birthday: string | null; anniversary: string | null }>,
   sourceLabel: string,
-): Promise<CalendarCandidate[]> {
+): Promise<Array<CalendarCandidate & { id?: string }>> {
   const byKey = new Map<string, CalendarCandidate>();
   for (const p of people) {
     const key = normalizeRecipientName(p.name);
     if (key && !byKey.has(key)) byKey.set(key, { key, name: p.name, birthday: p.birthday, anniversary: p.anniversary });
   }
   const remaining = await unsavedPeople(userId, byKey);
-  if (remaining.length) await insertPeople(userId, remaining, sourceLabel);
-  return remaining;
+  if (!remaining.length) return remaining;
+  const { rows } = await insertPeople(userId, remaining, sourceLabel);
+  const idByKey = new Map(rows.map((r) => [normalizeRecipientName(r.name), r.id]));
+  return remaining.map((p) => ({ ...p, id: idByKey.get(p.key) }));
 }
 
 /**
@@ -125,7 +129,9 @@ export function useCalendarConnected() {
  * from then on, new people are added and a short notice says who. Failures are silent: manual
  * "Sync calendar" still works and reports its own errors.
  */
-export function useAutoCalendarSync() {
+export function useAutoCalendarSync(onReview?: (recipientId: string) => void) {
+  const onReviewRef = useRef(onReview);
+  onReviewRef.current = onReview;
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -150,13 +156,20 @@ export function useAutoCalendarSync() {
         if (!cancelled && added.length) {
           await queryClient.invalidateQueries({ queryKey: ['recipients'] });
           const names = added.map((p) => p.name.split(' ')[0]);
+          // One new person: offer to open them so the user can confirm the birthday and add an address.
+          const reviewId = added.length === 1 ? added[0].id : undefined;
           toast({
+            action: reviewId && onReviewRef.current
+              ? createElement(ToastAction, { altText: `Review ${names[0]}`, onClick: () => onReviewRef.current?.(reviewId) }, 'Review') as unknown as ToastActionElement
+              : undefined,
             title: names.length === 1 ? `Added ${names[0]} from your calendar` : `Added ${names.length} people from your calendar`,
             description: names.length === 1 ? 'Their birthday is now on your Unwrapt calendar.' : names.join(', '),
           });
         }
       } catch {
-        // Expired/not-connected/offline: stay quiet; the manual sync explains these.
+        // Expired/not-connected/offline: stay quiet; the manual sync explains these. Still count it as a
+        // run, so a broken connection is retried every 10 minutes, not on every tab switch.
+        saveLastSyncAt(userId, Date.now());
       } finally {
         running = false;
       }
@@ -250,7 +263,7 @@ export function useCalendarConnection(returnTo = '/?tab=manual') {
     setStatus({ kind: 'importing', candidates: selected });
     let count: number;
     try {
-      count = await insertPeople(user.id, selected, sourceLabel);
+      count = (await insertPeople(user.id, selected, sourceLabel)).count;
     } catch (error) {
       setStatus({ kind: 'review', candidates: selected });
       throw error;

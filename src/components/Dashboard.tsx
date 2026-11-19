@@ -30,7 +30,6 @@ type DashboardTab = 'thea' | 'manual';
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  useAutoCalendarSync();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
@@ -240,6 +239,12 @@ const Dashboard = () => {
       return { ...recipient, recentGift: recentScheduledGift };
     },
     enabled: !!user?.id,
+  });
+
+  // A person just added from the calendar: jump to Manual and open them so the details can be confirmed.
+  useAutoCalendarSync((recipientId) => {
+    setActiveTab('manual');
+    setRecipientDetailId(recipientId);
   });
 
   useEffect(() => {
