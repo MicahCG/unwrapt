@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { digestInnerHtml, digestSubject, type DigestItem } from "../_shared/giftTipsDigest.ts";
+import { cleanPersonName, theaNote, wrapEmail } from "../_shared/emailLayout.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -73,7 +74,10 @@ serve(async (req) => {
       throw new Error("Resend API key not configured");
     }
 
-    const { type, recipientEmail, userName, data }: EmailRequest = await req.json();
+    const body: EmailRequest = await req.json();
+    const { type, recipientEmail, userName } = body;
+    // Names imported from an event title can read "Eric's Birthday"; show just the person.
+    const data = body.data?.recipientName ? { ...body.data, recipientName: cleanPersonName(body.data.recipientName) } : body.data;
 
     console.log(`📧 Sending ${type} email to ${recipientEmail}`);
 
@@ -196,15 +200,11 @@ function getEmailContent(type: EmailType, userName: string | undefined, data: an
   const greeting = userName ? `Hi ${userName},` : 'Hi there,';
   const inner = getEmailInner(type, greeting, data, appUrl);
 
-  return `
-    ${getBaseEmailStyles()}
-    <div class="container">
-      ${getBrandBar()}
-      ${inner}
-      ${getFooter()}
-    </div>
-  `;
-}
+  return wrapEmail({
+    inner,
+    theaNote: theaNote(type, data ?? {}),
+    title: getEmailSubject(type, data) ?? "Unwrapt",
+  });}
 
 function getEmailInner(type: EmailType, greeting: string, data: any, appUrl: string): string {
   switch (type) {
@@ -707,69 +707,6 @@ function getEmailInner(type: EmailType, greeting: string, data: any, appUrl: str
         </div>
       `;
   }
-}
-
-const LOGO_URL = "https://www.unwrapt.io/brand/unwrapt-lux.png";
-
-function getBrandBar(): string {
-  return `
-    <div class="brand-bar">
-      <img src="${LOGO_URL}" width="36" height="36" alt="Unwrapt" />
-      <span class="brand-name">Unwrapt</span>
-    </div>
-  `;
-}
-
-function getBaseEmailStyles(): string {
-  return `
-    <style>
-      body { font-family: 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 0; background: #EDE6D8; }
-      .container { max-width: 600px; margin: 0 auto; background: #FFFFFF; border-radius: 16px; overflow: hidden; }
-      .brand-bar { text-align: center; padding: 24px 24px 20px; background: #FFFFFF; border-bottom: 1px solid rgba(42,37,32,0.08); }
-      .brand-bar img { vertical-align: middle; border-radius: 50%; }
-      .brand-bar .brand-name { display: inline-block; vertical-align: middle; margin-left: 10px; font-family: 'Newsreader', Georgia, serif; font-size: 18px; font-weight: 600; color: #2A2520; letter-spacing: 0.01em; }
-      .header, .header-success, .header-warning, .header-urgent { padding: 28px 28px 24px; }
-      .header { background: #FAF6EE; }
-      .header-success { background: #EEF0E4; }
-      .header-warning { background: #FBEFE5; }
-      .header-urgent { background: #9A3B2B; }
-      .header h2, .header-success h2, .header-warning h2 { margin: 0 0 8px 0; font-family: 'Newsreader', Georgia, serif; font-size: 22px; font-weight: 600; color: #2A2520; }
-      .header-urgent h2 { margin: 0 0 8px 0; font-family: 'Newsreader', Georgia, serif; font-size: 22px; font-weight: 600; color: #F4ECDD; }
-      .header p, .header-success p, .header-warning p { margin: 0; color: #6B6256; font-size: 14px; }
-      .header-urgent p { margin: 0; color: rgba(244,236,221,0.85); font-size: 14px; }
-      .content { padding: 28px 28px 32px; color: #2A2520; }
-      .content p { margin: 0 0 16px 0; line-height: 1.6; font-size: 15px; }
-      .info-box { background: #FAF6EE; border: 1px solid rgba(42,37,32,0.08); border-radius: 14px; padding: 18px 20px; margin: 20px 0; }
-      .info-box.success { background: #EEF0E4; border-color: rgba(110,123,91,0.25); }
-      .info-box h3 { margin: 0 0 12px 0; font-size: 13px; font-weight: 600; color: #2A2520; text-transform: uppercase; letter-spacing: 0.04em; }
-      .info-box p { margin: 0 0 8px 0; font-size: 14.5px; }
-      .info-box p:last-child { margin-bottom: 0; }
-      .info-box ul { margin: 0; padding-left: 18px; }
-      .info-box li { margin: 6px 0; font-size: 14.5px; }
-      .alert { background: #FBEFE5; border: 1px solid rgba(182,91,60,0.25); border-radius: 14px; padding: 16px 20px; margin: 20px 0; color: #8A4028; font-size: 14.5px; }
-      .alert-urgent { background: #F5E3DE; border: 1px solid rgba(154,59,43,0.35); border-radius: 14px; padding: 16px 20px; margin: 20px 0; color: #7A2E20; font-size: 14.5px; }
-      .gift-preview { text-align: center; margin: 20px 0; }
-      .gift-preview img { border: 1px solid rgba(42,37,32,0.08); }
-      .cta { text-align: center; margin: 28px 0 8px 0; }
-      .button { display: inline-block; padding: 13px 26px; margin: 0 6px 10px 6px; text-decoration: none; border-radius: 999px; font-weight: 600; font-size: 14.5px; background: #2A2520; color: #F4ECDD; }
-      .button.secondary { background: transparent; color: #2A2520; border: 1.5px solid rgba(42,37,32,0.3); }
-      .footer { text-align: center; padding: 28px 24px; color: #9A8E7C; font-size: 13px; background: #FAF6EE; border-top: 1px solid rgba(42,37,32,0.06); }
-      .footer p { margin: 6px 0; }
-      .footer a { color: #B65B3C; text-decoration: none; }
-    </style>
-  `;
-}
-
-function getFooter(): string {
-  return `
-    <div class="footer">
-      <p>Thanks for using Unwrapt!</p>
-      <p>Making gift-giving effortless 🎁</p>
-      <p style="font-size: 12px; margin-top: 16px;">
-        <a href="https://app.unwrapt.io/settings">Manage notification preferences</a>
-      </p>
-    </div>
-  `;
 }
 
 function formatDate(dateString: string | undefined): string {
