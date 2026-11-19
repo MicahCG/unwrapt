@@ -3239,21 +3239,90 @@ const getOrCreateConversation = async (
   }
 };
 
-const fetchConversationHistory = async (
+/** A product card as the UI draws it (kept small: descriptions are trimmed). */
+type DisplayProduct = {
+  id: string;
+  title: string;
+  price: number;
+  currency?: string;
+  featured_image_url: string | null;
+  description?: string | null;
+  product_type?: string | null;
+};
+
+export const toDisplayProduct = (p: {
+  id: string; title: string; price: number; currency?: string;
+  featured_image_url?: string | null; description?: string | null; product_type?: string | null;
+}): DisplayProduct => ({
+  id: p.id,
+  title: p.title,
+  price: p.price,
+  currency: p.currency,
+  featured_image_url: p.featured_image_url ?? null,
+  description: p.description ? p.description.slice(0, 240) : null,
+  product_type: p.product_type ?? null,
+});
+
+export type HistoryRow = { role: string; content: string; metadata?: Record<string, unknown> | null };
+export type RestoredMessage = { role: ChatRole; content: string; products?: DisplayProduct[]; review?: unknown };
+
+/** Pull in-page cards back out of a persisted turn. Turns saved before cards were stored only have
+ * id/title/price, so their images come from `catalogImages` (a best-effort catalog lookup). */
+export const restoreHistoryMessage = (
+  row: HistoryRow,
+  catalogImages?: Map<string, { image: string | null; brand: string | null }>,
+): RestoredMessage => {
+  const base = { role: row.role as ChatRole, content: row.content };
+  if (row.role !== "assistant") return base;
+  const meta = row.metadata || {};
+  const display = (meta.display || null) as { products?: DisplayProduct[]; review?: unknown } | null;
+  let products = Array.isArray(display?.products) && display!.products!.length ? display!.products : undefined;
+  if (!products && Array.isArray(meta.recommendedProducts) && catalogImages) {
+    const legacy = (meta.recommendedProducts as Array<{ id?: string; title?: string; price?: number }>)
+      .filter((p) => p?.id && p?.title && typeof p.price === "number" && catalogImages.has(p.id))
+      .map((p) => toDisplayProduct({
+        id: p.id!, title: p.title!, price: p.price!, currency: "USD",
+        featured_image_url: catalogImages.get(p.id!)!.image, product_type: catalogImages.get(p.id!)!.brand,
+      }));
+    if (legacy.length) products = legacy;
+  }
+  return {
+    ...base,
+    ...(products ? { products } : {}),
+    ...(display?.review ? { review: display.review } : {}),
+  };
+};
+
+const fetchConversationDisplayHistory = async (
   authClient: ReturnType<typeof createClient>,
   conversationId: string,
   limit = MAX_MESSAGES,
-): Promise<ChatMessage[]> => {
+): Promise<RestoredMessage[]> => {
   const { data } = await authClient
     .from("conversation_messages")
-    .select("role, content, created_at")
+    .select("role, content, metadata, created_at")
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: false })
     .limit(limit);
-  return (data || [])
-    .slice()
-    .reverse()
-    .map((m) => ({ role: m.role as ChatRole, content: m.content as string }));
+  const rows = ((data || []) as HistoryRow[]).slice().reverse();
+
+  // Older turns saved only id/title/price. Resolve images for the few most recent of those from
+  // the (cached) Goody catalog; if the lookup fails the turn just shows its text.
+  const needsLookup = (r: HistoryRow) =>
+    r.role === "assistant" && !(r.metadata as { display?: unknown } | null)?.display &&
+    Array.isArray((r.metadata as { recommendedProducts?: unknown[] } | null)?.recommendedProducts) &&
+    ((r.metadata as { recommendedProducts: unknown[] }).recommendedProducts.length > 0);
+  const recentLegacy = new Set(rows.filter(needsLookup).slice(-6));
+  let catalogImages: Map<string, { image: string | null; brand: string | null }> | undefined;
+  if (recentLegacy.size) {
+    try {
+      const raw = await fetchRawGoodyProducts();
+      catalogImages = new Map(raw.map((g) => [g.id, { image: goodyImage(g), brand: g.brand?.name || null }]));
+    } catch (error) {
+      console.error("history: catalog lookup for legacy cards failed", error);
+    }
+  }
+  return rows.map((r) => restoreHistoryMessage(r, recentLegacy.has(r) ? catalogImages : undefined));
 };
 
 const appendConversationMessages = async (
@@ -3265,6 +3334,8 @@ const appendConversationMessages = async (
     reviewMarker?: string | null;
     recommendedProducts?: Array<{ id: string; title: string; price: number }>;
     activeRecipient?: { id: string; name: string } | null;
+    /** What the UI showed under this reply (product cards, review card), so a reload can redraw it. */
+    display?: { products?: DisplayProduct[]; review?: unknown } | null;
   }>,
 ): Promise<void> => {
   if (!conversationId || !entries.length) return;
@@ -3277,6 +3348,7 @@ const appendConversationMessages = async (
         ...(e.reviewMarker ? { reviewMarker: e.reviewMarker } : {}),
         ...(e.recommendedProducts?.length ? { recommendedProducts: e.recommendedProducts } : {}),
         ...(e.activeRecipient ? { activeRecipient: e.activeRecipient } : {}),
+        ...(e.display && (e.display.products?.length || e.display.review) ? { display: e.display } : {}),
       },
     }));
     const { error } = await authClient.from("conversation_messages").insert(rows);
@@ -3416,7 +3488,7 @@ Deno.serve(async (req: Request) => {
       const vipBlock = await requireVipIfNotOnboarding(historyMode);
       if (vipBlock) return vipBlock;
       const conversationId = await getOrCreateConversation(authClient, user.id, historyMode);
-      const history = conversationId ? await fetchConversationHistory(authClient, conversationId) : [];
+      const history = conversationId ? await fetchConversationDisplayHistory(authClient, conversationId) : [];
       return json({ success: true, messages: history });
     }
 
@@ -4098,6 +4170,7 @@ Use the whole conversation, not just the last message. Return JSON only:
         reviewMarker: confirmedReviewMarker,
         recommendedProducts: products.length ? products.map((p) => ({ id: p.id, title: p.title, price: p.price })) : undefined,
         activeRecipient: lastActiveRecipient,
+        display: { products: products.map(toDisplayProduct), review: lastReview ?? undefined },
       },
     ]);
 

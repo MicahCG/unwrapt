@@ -5,6 +5,8 @@
 // import doesn't start a live HTTP listener - see the comment there.)
 import { assert, assertEquals } from "https://deno.land/std@0.190.0/testing/asserts.ts";
 import {
+  restoreHistoryMessage,
+  toDisplayProduct,
   buildConfirmDirectiveMessage,
   buildDirectSelectionMessage,
   buildTappedSelectionMessage,
@@ -1384,4 +1386,36 @@ Deno.test("a missing address or addressRequired presents the address form", () =
     }).force,
     false,
   );
+});
+
+Deno.test("restoreHistoryMessage returns stored product cards and the review card for a saved assistant turn", () => {
+  const product = toDisplayProduct({ id: "p1", title: "Mug", price: 22, featured_image_url: "https://img/m.png", description: "x".repeat(500) });
+  assertEquals(product.description?.length, 240);
+  const restored = restoreHistoryMessage({
+    role: "assistant",
+    content: "Here you go",
+    metadata: { display: { products: [product], review: { recipientId: "r1", productId: "p1" } } },
+  });
+  assertEquals(restored.products?.[0].featured_image_url, "https://img/m.png");
+  assertEquals((restored.review as { productId: string }).productId, "p1");
+});
+
+Deno.test("restoreHistoryMessage backfills images for turns saved before cards were stored", () => {
+  const legacy = {
+    role: "assistant",
+    content: "Try these",
+    metadata: { recommendedProducts: [{ id: "p1", title: "Mug", price: 22 }, { id: "gone", title: "Old", price: 9 }] },
+  };
+  const withCatalog = restoreHistoryMessage(legacy, new Map([["p1", { image: "https://img/m.png", brand: "Acme" }]]));
+  assertEquals(withCatalog.products?.length, 1, "products missing from the catalog are dropped, not faked");
+  assertEquals(withCatalog.products?.[0].featured_image_url, "https://img/m.png");
+  assertEquals(withCatalog.products?.[0].price, 22);
+  // No catalog available -> plain text turn, no cards.
+  assertEquals(restoreHistoryMessage(legacy).products, undefined);
+});
+
+Deno.test("restoreHistoryMessage never attaches cards to user messages", () => {
+  const m = restoreHistoryMessage({ role: "user", content: "hi", metadata: { display: { products: [toDisplayProduct({ id: "p", title: "t", price: 1 })] } } });
+  assertEquals(m.products, undefined);
+  assertEquals(m.content, "hi");
 });
