@@ -772,6 +772,18 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     scrollToBottom('smooth');
   }, [messages, sending, scrollToBottom]);
 
+  // A reply that ends in a Review card or gift cards is something to act on, so always bring it fully
+  // into view (not just when the "near bottom" heuristic happens to hold). Re-pin a few times because
+  // the card keeps growing as images load and the chip row below it appears/disappears.
+  const lastChatMessage = messages[messages.length - 1];
+  const endsInActionable = lastChatMessage?.role === 'assistant' && Boolean(lastChatMessage.review || lastChatMessage.products?.length);
+  useEffect(() => {
+    if (!endsInActionable) return;
+    stickToBottomRef.current = true;
+    const timers = [0, 150, 400, 900].map((ms) => window.setTimeout(() => scrollToBottom('auto'), ms));
+    return () => timers.forEach((t) => window.clearTimeout(t));
+  }, [messages.length, endsInActionable, scrollToBottom]);
+
   useEffect(() => () => window.clearTimeout(celebrateTimer.current), []);
 
   const celebrate = () => {
@@ -1231,7 +1243,10 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
         const earlySession = messages.length <= 2;
         const stickyPayment = !earlySession && paymentPriority.length > 0;
         const chipsToShow = earlySession ? chips : paymentPriority.slice(0, 2);
-        const showBar = !composerFocused && ((earlySession && (chips.length > 0 || !calendarConnected)) || stickyPayment);
+        // The Review card carries its own confirm / funding actions; payment chips under it just
+        // squeeze the chat and compete with it, so hold them back until the card is dealt with.
+        const reviewIsLatest = latestReviewIndex === messages.length - 1;
+        const showBar = !composerFocused && !reviewIsLatest && ((earlySession && (chips.length > 0 || !calendarConnected)) || stickyPayment);
         if (!showBar) return null;
         return (
           <div className="mb-3 flex flex-wrap gap-2">
