@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { choosePaymentMethod, type GoodyPaymentMethod } from "../_shared/goodyPayment.ts";
+import { choosePaymentMethod, pickOrderApiKey, type GoodyPaymentMethod } from "../_shared/goodyPayment.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { goodyMailingCountry } from "../_shared/isoCountry.ts";
 
@@ -187,25 +187,42 @@ Deno.serve(async (req: Request) => {
       return json({ success: false, error: "Recipient country must be a 2-letter ISO 3166-1 code" }, 400);
     }
 
+    // Orders are paid from the workspace's own Balance/cards, which only a workspace Automation key can see.
+    const orderKey = pickOrderApiKey(goodyEnvironment(), (name) => Deno.env.get(name), apiKey);
+    console.log(`Goody order key source: ${orderKey.source}`);
+    const orderApiKey = orderKey.key || apiKey;
+
     // Ask Goody which payment methods exist rather than guessing an id: the old hard-coded
     // "COMMERCE_STORED_VALUE" came back "Payment method not found".
     let methods: GoodyPaymentMethod[] = [];
+    let lookupFailure = "";
     try {
       const listResponse = await fetch(`${goodyBaseUrl()}/v1/payment_methods`, {
-        headers: { Authorization: `Bearer ${apiKey}` },
+        headers: { Authorization: `Bearer ${orderApiKey}` },
         signal: AbortSignal.timeout(8000),
       });
       if (listResponse.ok) {
         methods = ((await listResponse.json()) as { data?: GoodyPaymentMethod[] }).data || [];
       } else {
-        console.error("Goody payment_methods lookup failed", listResponse.status);
+        const body = (await listResponse.text()).slice(0, 300);
+        console.error("Goody payment_methods lookup failed", listResponse.status, body);
+        let reason = "";
+        try { reason = String((JSON.parse(body) as { error?: unknown }).error || "").slice(0, 160); } catch { /* not JSON */ }
+        lookupFailure = `${listResponse.status}${reason ? ` ${reason}` : ""}`;
       }
     } catch (error) {
       console.error("Goody payment_methods lookup errored", error);
+      lookupFailure = "could not reach Goody";
     }
     console.log("Goody payment methods:", JSON.stringify(methods.map((m) => ({ id: m.id, name: m.name, balance: m.balance }))));
     const payment = choosePaymentMethod(methods, Deno.env.get("GOODY_PAYMENT_METHOD_ID"));
-    if (!payment.ok) return json({ success: false, error: payment.error }, 400);
+    if (!payment.ok) {
+      // A refused lookup is not the same as an account with no payment methods: say which it was.
+      const error = lookupFailure && methods.length === 0
+        ? `Goody would not list this account's payment methods (${lookupFailure}). Commerce Stored Value may not be set up on the account yet; contact Goody support.`
+        : payment.error;
+      return json({ success: false, error }, 400);
+    }
     console.log(`Goody payment method chosen (${payment.reason}): ${payment.id}`);
 
     const orderBody = {
@@ -234,7 +251,7 @@ Deno.serve(async (req: Request) => {
 
     const orderResponse = await fetch(`${goodyBaseUrl()}/v1/order_batches`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${orderApiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify(orderBody),
       signal: AbortSignal.timeout(15000),
     });
