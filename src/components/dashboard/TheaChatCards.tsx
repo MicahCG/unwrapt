@@ -9,6 +9,7 @@ import { formatOccasionDate } from '@/lib/dateUtils';
 import { formatGiftTimingLine, formatHeldFundsStatus, giftOrderTiming, type GiftOrderTiming } from '@/lib/giftTiming';
 import { TOP_UP_AMOUNTS, topUpFor } from '@/lib/wallet';
 import { SERVICE_FEE, withServiceFee } from '@/lib/pricing';
+import { shippingLabel } from '@/lib/goodyShipping';
 
 /** Modules thea-chat returns in top-level `ui` from present_ui. */
 export type ChatUiFocus = 'details' | 'address' | 'birthday' | 'interests';
@@ -56,6 +57,9 @@ export type ChatProduct = {
   featured_image_url: string | null;
   description?: string | null;
   product_type?: string | null;
+  /** The brand's shipping charge and free-shipping threshold in dollars, from Goody (null/absent when unknown). */
+  shipping_price?: number | null;
+  free_shipping_minimum?: number | null;
 };
 
 /** select_gift's review, returned by thea-chat as `review`. */
@@ -133,7 +137,9 @@ const ProductCard: React.FC<{
   onOpen: () => void;
   onSelect: () => void;
 }> = ({ product, selected, disabled, shipTo, onOpen, onSelect }) => {
-  const shipping = useShippingEstimate(product, shipTo);
+  // Goody tells us each brand's shipping up front, so most cards need no per-card quote at all.
+  const listed = shippingLabel(product.price, product);
+  const shipping = useShippingEstimate(product, shipTo, !listed);
   return (
     <div role="listitem" className="flex w-[148px] shrink-0 flex-col rounded-[16px] border bg-white p-2" style={{ borderColor: selected ? U.ink : '#DED2C1' }}>
       <button type="button" onClick={onOpen} className="u-press text-left" aria-label={`View ${product.title}`}>
@@ -141,8 +147,7 @@ const ProductCard: React.FC<{
         <p className="mt-2 line-clamp-2 min-h-[32px] text-[12px] font-semibold leading-4 text-[#2A2520]">{product.title}</p>
         <p className="mt-1 text-[12px] font-semibold text-[#B65B3C]">{money(product.price, product.currency)}</p>
         <p className="text-[10.5px] leading-4" style={{ color: U.muted }}>
-          {`+ ${money(SERVICE_FEE, product.currency)} fee`}
-          {shipping != null && shipping > 0 ? ` + about ${money(shipping, product.currency)} shipping & tax` : ' + shipping & tax'}
+          {listed ?? (shipping != null && shipping > 0 ? `+ about ${money(shipping, product.currency)} shipping & tax` : '+ shipping')}
         </p>
       </button>
       <button
