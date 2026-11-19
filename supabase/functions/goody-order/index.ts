@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { choosePaymentMethod, type GoodyPaymentMethod } from "../_shared/goodyPayment.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { goodyMailingCountry } from "../_shared/isoCountry.ts";
 
@@ -186,6 +187,27 @@ Deno.serve(async (req: Request) => {
       return json({ success: false, error: "Recipient country must be a 2-letter ISO 3166-1 code" }, 400);
     }
 
+    // Ask Goody which payment methods exist rather than guessing an id: the old hard-coded
+    // "COMMERCE_STORED_VALUE" came back "Payment method not found".
+    let methods: GoodyPaymentMethod[] = [];
+    try {
+      const listResponse = await fetch(`${goodyBaseUrl()}/v1/payment_methods`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (listResponse.ok) {
+        methods = ((await listResponse.json()) as { data?: GoodyPaymentMethod[] }).data || [];
+      } else {
+        console.error("Goody payment_methods lookup failed", listResponse.status);
+      }
+    } catch (error) {
+      console.error("Goody payment_methods lookup errored", error);
+    }
+    console.log("Goody payment methods:", JSON.stringify(methods.map((m) => ({ id: m.id, name: m.name, balance: m.balance }))));
+    const payment = choosePaymentMethod(methods, Deno.env.get("GOODY_PAYMENT_METHOD_ID"));
+    if (!payment.ok) return json({ success: false, error: payment.error }, 400);
+    console.log(`Goody payment method chosen (${payment.reason}): ${payment.id}`);
+
     const orderBody = {
       from_name: fromName,
       send_method: "direct_send",
@@ -207,10 +229,7 @@ Deno.serve(async (req: Request) => {
         },
       ],
       cart: { items: [cartItem] },
-      // Draws from the account's prepaid Goody balance rather than relying on
-      // "first payment method on the account" auto-resolution, which doesn't
-      // pick up a dashboard-added card reliably.
-      payment_method_id: "COMMERCE_STORED_VALUE",
+      payment_method_id: payment.id,
     };
 
     const orderResponse = await fetch(`${goodyBaseUrl()}/v1/order_batches`, {
@@ -223,7 +242,9 @@ Deno.serve(async (req: Request) => {
     if (!orderResponse.ok) {
       const errorText = await orderResponse.text();
       console.error("Goody order_batches request failed", orderResponse.status, errorText);
-      return json({ success: false, error: `Goody order creation failed with ${orderResponse.status}` }, 502);
+      let reason = "";
+      try { reason = String((JSON.parse(errorText) as { error?: unknown }).error || "").slice(0, 200); } catch { /* not JSON */ }
+      return json({ success: false, error: `Goody order creation failed with ${orderResponse.status}${reason ? `: ${reason}` : ""}` }, 502);
     }
 
     const orderBatch = await orderResponse.json() as {
