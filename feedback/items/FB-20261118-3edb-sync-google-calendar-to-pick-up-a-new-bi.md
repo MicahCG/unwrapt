@@ -1,22 +1,22 @@
 ---
 id: FB-20261118-3edb
 type: feature
-status: open
+status: fixed
 title: Sync Google Calendar to pick up a new birthday
 reporter: kevin
 created: 2026-11-18
 area: onboarding
 platform: 
-assignee: 
+assignee: claude
 fix: 
 verified_by: 
 ---
 
 ## What happened
-(describe the problem or the idea)
+Reporter's note: 'Sync Google calendar for a new birthday.'
 
 ## Expected / desired
-(what should happen instead)
+When a new birthday is added, offer to sync it to Google Calendar so it is picked up. (Needs a design decision before building; see PR discussion.)
 
 ## Message context
 (none attached)
@@ -25,3 +25,4 @@ verified_by:
 (none attached)
 
 ## Notes / fix log
+- 2026-11-19 fixed: Clarified: people added to a connected Google Calendar later should appear in Unwrapt. PR #97 (background auto-sync); awaiting verification.
