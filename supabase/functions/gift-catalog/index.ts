@@ -41,7 +41,7 @@ type AskUserOffer = {
 type GiftVibe = "CALM_COMFORT" | "ARTFUL_UNIQUE" | "REFINED_STYLISH";
 
 const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") || "gpt-4o-mini";
-const GOODY_MAX_PAGES = 10;
+const GOODY_MAX_PAGES = 40;
 
 const VIBE_KEYWORDS: Record<GiftVibe, string[]> = {
   CALM_COMFORT: [
