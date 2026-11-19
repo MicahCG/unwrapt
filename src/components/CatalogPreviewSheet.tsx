@@ -126,7 +126,7 @@ const CatalogPreviewSheet: React.FC<CatalogPreviewSheetProps> = ({
             No matches for {filter === ALL ? 'these interests' : `“${filter}”`} yet.
             <div className="mt-2 flex justify-center gap-4">
               {filter !== ALL && <button type="button" onClick={() => setFilter(ALL)} className="min-h-8 font-semibold" style={{ color: U.accent }}>See all matches</button>}
-              <button type="button" onClick={() => openThea({ surface: 'catalog', recipientName })} className="min-h-8 font-semibold" style={{ color: U.accent }}>Ask Thea</button>
+              <button type="button" onClick={() => openThea({ surface: 'catalog', recipientName, autoStart: Boolean(recipientName) })} className="min-h-8 font-semibold" style={{ color: U.accent }}>Ask Thea</button>
             </div>
           </div>
         )}

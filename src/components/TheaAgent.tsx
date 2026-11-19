@@ -25,6 +25,17 @@ import {
 } from '@/lib/funnel';
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
+
+/** What Thea is asked automatically when an "Ask Thea" button opens the chat for a specific person. */
+export const starterPrompt = (context: TheaContext): string | null => {
+  const name = context.recipientName?.trim();
+  if (!name) return null;
+  switch (context.surface) {
+    case 'catalog': return `Show me some gift ideas for ${name}.`;
+    case 'gift_status': return `Where does ${name}'s gift stand right now?`;
+    default: return `Help me plan a gift for ${name}.`;
+  }
+};
 type ThreadProduct = { id: string; title: string; price: number; featured_image_url: string | null };
 
 // Reveals text progressively for a lightweight typewriter effect. Mounted
@@ -211,6 +222,7 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const restored = saved.map((m) => ({ role: m.role, content: m.role === 'assistant' ? cleanTheaText(m.content) : m.content }));
         // The sheet shows one carousel for the latest gift ideas; restore it from the last reply that had cards.
         const lastWithCards = [...saved].reverse().find((m) => m.role === 'assistant' && m.products?.length);
+        if (!cancelled) setHistoryReady(true);
         if (!cancelled && !sendingRef.current) {
           setChatMessages(restored);
           setChatProducts(lastWithCards?.products ?? []);
@@ -218,6 +230,7 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch (err) {
         console.error('Thea history failed to load', err);
+        if (!cancelled) setHistoryReady(true); // never block the starter message on a failed history load
       }
     })();
     return () => {
@@ -269,7 +282,11 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [showContinueCard, context.surface, context.recipientName, hasGiftVisuals]);
 
+  const autoStartRef = useRef<string | null>(null);
+  const [historyReady, setHistoryReady] = useState(false);
   const openThea = useCallback((nextContext: TheaContext = {}) => {
+    autoStartRef.current = nextContext.autoStart ? starterPrompt(nextContext) : null;
+    setHistoryReady(false);
     setContext(nextContext);
     setQuestion('');
     setMatchedIntent(null);
@@ -300,9 +317,13 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
     void trackProductEvent('thea_request_routed', { intent: match.intent, surface: context.surface || 'global' });
   };
 
-  const sendToThea = async (event: React.FormEvent) => {
+  const sendToThea = (event: React.FormEvent) => {
     event.preventDefault();
-    const text = question.trim();
+    void sendMessage(question);
+  };
+
+  const sendMessage = async (raw: string) => {
+    const text = raw.trim();
     if (!text || sending) return;
 
     if (llmLocked && !isVip) {
@@ -351,6 +372,16 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSending(false);
     }
   };
+
+  // "Ask Thea about Mom" etc.: send the starter message once the saved chat has loaded, so the user
+  // lands in a live conversation instead of an empty box. Fires once per open.
+  useEffect(() => {
+    const prompt = autoStartRef.current;
+    if (!open || !prompt || !historyReady || !isTheaLlmTester || sending) return;
+    autoStartRef.current = null;
+    void sendMessage(prompt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, historyReady, isTheaLlmTester, sending]);
 
   const handleDismissUpgrade = () => {
     dismissTheaUpgrade();
