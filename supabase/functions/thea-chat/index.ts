@@ -179,7 +179,7 @@ Account context (when present) already lists saved people and whether a calendar
 ## Choosing and scheduling a specific gift
 When the user picks one specific gift for a specific recipient, whether by tapping a card or naming it in text (match their words to the right id from your most recent search_gifts results, do not search again or repeat the list), call select_gift. It returns a review, not a save - nothing has been scheduled yet. Tell the user, in one short line, exactly what you're about to schedule (recipient, gift, price, occasion date, and the concrete place/arrive timing from review.timing) and ask them to confirm. If review.timing.feasible is false, lead with that warning and options before asking to confirm. Use future or conditional phrasing only ("I'll schedule...", "Ready to send...", "Want me to lock this in?") - never past tense or completed-action phrasing ("I've scheduled...", "This is booked...", "Done!") for a review, since nothing is booked until the user confirms and you call confirm_scheduled_gift; claiming otherwise is exactly the kind of invented completed action the hard boundaries above forbid.
 Price the gift to the user as review.giftWithFee (the gift price plus the $7 Unwrapt service fee), and when review.shippingAndTax is greater than 0 add that it comes with about review.shippingAndTax more for shipping and tax (e.g. "$22 with our service fee, plus about $10 shipping & tax"). Say nothing about shipping and tax when it is 0 (no quote yet, e.g. no address on file).
-If review.walletShortfall is greater than 0, add one extra clause to that same message naming review.walletAvailable and review.walletShortfall exactly (e.g. "...for $45. Heads up, you've got $12 available, so you'd be $33 short when you confirm - want to add funds now, or confirm anyway and top up after?") - not a separate message, not blocking the confirm offer. They can still confirm with a shortfall (confirm_scheduled_gift and its own funding result handle that), so this is a courtesy warning, never a blocker. Say nothing extra about wallet funds when walletShortfall is 0.
+If review.walletShortfall is greater than 0, add one extra clause to that same message naming review.walletAvailable and review.walletShortfall exactly (e.g. "...for $45. Heads up, you've got $12 available, so you'd be $33 short once shipping and tax are included - want to add funds now, or confirm anyway and top up after?") - not a separate message, not blocking the confirm offer. They can still confirm with a shortfall (confirm_scheduled_gift and its own funding result handle that), so this is a courtesy warning, never a blocker. Say nothing extra about wallet funds when walletShortfall is 0.
 
 This is a hard rule with no exceptions: whenever review.walletShortfall is greater than 0 and you've included that heads-up clause, end your reply on its own new line with WALLET_SHORTFALL_NOTED: true (same invisible-marker convention as RECOMMENDED_IDS/GIFT_REVIEW/FALLBACK_DISCLOSED above - the user never sees this line). Never include this line when walletShortfall is 0 or absent.
 If select_gift returns a review with replacesGiftTitle, the recipient already has a different gift scheduled for that occasion that can still be changed - offer the swap in one short line (e.g. "I'll swap Coffee Beans for the French Chocolate box - confirm?") naming review.productTitle exactly, and still include the reviewMarker; do not dead-end or tell them to pick someone else. A status of confirmed or approved with no goody order is still swappable. When they say yes, call confirm_scheduled_gift — that replaces the gift and moves the wallet hold to the new price. Never offer a swap and then refuse it. Never say only a different gift is available in the same turn you present that review (the app shows a swap/review card for review.productTitle, so claiming "only the cookies" while the card is wine glasses is a hard contradiction). If select_gift reports alreadyScheduled with no review (same gift already booked, or it's already ordered/shipped), say that in this same turn and do not ask if they want to swap.
@@ -3264,7 +3264,7 @@ export const toDisplayProduct = (p: {
 });
 
 export type HistoryRow = { role: string; content: string; metadata?: Record<string, unknown> | null };
-export type RestoredMessage = { role: ChatRole; content: string; products?: DisplayProduct[]; review?: unknown };
+export type RestoredMessage = { role: ChatRole; content: string; products?: DisplayProduct[]; review?: unknown; activeRecipient?: { id: string; name: string } };
 
 /** Pull in-page cards back out of a persisted turn. Turns saved before cards were stored only have
  * id/title/price, so their images come from `catalogImages` (a best-effort catalog lookup). */
@@ -3275,7 +3275,7 @@ export const restoreHistoryMessage = (
   const base = { role: row.role as ChatRole, content: row.content };
   if (row.role !== "assistant") return base;
   const meta = row.metadata || {};
-  const display = (meta.display || null) as { products?: DisplayProduct[]; review?: unknown } | null;
+  const display = (meta.display || null) as { products?: DisplayProduct[]; review?: unknown; activeRecipient?: { id: string; name: string } | null } | null;
   let products = Array.isArray(display?.products) && display!.products!.length ? display!.products : undefined;
   if (!products && Array.isArray(meta.recommendedProducts) && catalogImages) {
     const legacy = (meta.recommendedProducts as Array<{ id?: string; title?: string; price?: number }>)
@@ -3290,6 +3290,7 @@ export const restoreHistoryMessage = (
     ...base,
     ...(products ? { products } : {}),
     ...(display?.review ? { review: display.review } : {}),
+    ...(display?.activeRecipient ? { activeRecipient: display.activeRecipient } : {}),
   };
 };
 
@@ -3335,7 +3336,7 @@ const appendConversationMessages = async (
     recommendedProducts?: Array<{ id: string; title: string; price: number }>;
     activeRecipient?: { id: string; name: string } | null;
     /** What the UI showed under this reply (product cards, review card), so a reload can redraw it. */
-    display?: { products?: DisplayProduct[]; review?: unknown } | null;
+    display?: { products?: DisplayProduct[]; review?: unknown; activeRecipient?: { id: string; name: string } | null } | null;
   }>,
 ): Promise<void> => {
   if (!conversationId || !entries.length) return;
@@ -4170,11 +4171,11 @@ Use the whole conversation, not just the last message. Return JSON only:
         reviewMarker: confirmedReviewMarker,
         recommendedProducts: products.length ? products.map((p) => ({ id: p.id, title: p.title, price: p.price })) : undefined,
         activeRecipient: lastActiveRecipient,
-        display: { products: products.map(toDisplayProduct), review: lastReview ?? undefined },
+        display: { products: products.map(toDisplayProduct), review: lastReview ?? undefined, activeRecipient: lastActiveRecipient },
       },
     ]);
 
-    return json({ success: true, reply, products, writes, review: lastReview, ui: presentedUi });
+    return json({ success: true, reply, products, writes, review: lastReview, ui: presentedUi, activeRecipient: lastActiveRecipient });
   } catch (error) {
     console.error("thea-chat failed", error);
     return json({

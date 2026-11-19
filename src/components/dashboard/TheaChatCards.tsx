@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Calendar, Check, Gift, Loader2, MapPin, Truck, UserPlus, UserRoundPen, Wallet } from 'lucide-react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import CalendarSyncButton from '@/components/CalendarSyncButton';
@@ -6,7 +8,7 @@ import { U } from '@/components/unwrapt2/theme';
 import { formatOccasionDate } from '@/lib/dateUtils';
 import { formatGiftTimingLine, formatHeldFundsStatus, giftOrderTiming } from '@/lib/giftTiming';
 import { TOP_UP_AMOUNTS, topUpFor } from '@/lib/wallet';
-import { withServiceFee } from '@/lib/pricing';
+import { SERVICE_FEE, withServiceFee } from '@/lib/pricing';
 
 /** Modules thea-chat returns in top-level `ui` from present_ui. */
 export type ChatUiFocus = 'details' | 'address' | 'birthday' | 'interests';
@@ -96,43 +98,94 @@ export const ProductImage: React.FC<{ src: string | null; className: string }> =
   );
 };
 
+/** Where a gift would ship, so cards can show real shipping & tax. Omit when there's no complete US address. */
+export type ShipTo = { name: string; street: string; city: string; state: string; zip_code: string; country: string };
+
+/**
+ * Real shipping + tax for one product to one address (dollars), from the same quote the schedule
+ * modal and wallet hold use, so the card never promises less than what is actually reserved.
+ * null while loading, with no address, or if the quote isn't available (non-US, API error).
+ */
+const useShippingEstimate = (product: ChatProduct | null, shipTo?: ShipTo | null, enabled = true): number | null => {
+  const { data } = useQuery({
+    queryKey: ['ship-estimate', product?.id, product?.price, shipTo?.street, shipTo?.city, shipTo?.state, shipTo?.zip_code, shipTo?.country],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('wallet-reserve-funds', {
+        body: { quoteOnly: true, productId: product!.id, price: product!.price, recipient: shipTo },
+      });
+      if (error || !data?.success || typeof data.totalCost !== 'number') return null;
+      return Math.max(0, Math.round((data.totalCost - product!.price - SERVICE_FEE) * 100) / 100);
+    },
+    enabled: enabled && !!product && !!shipTo && product.price > 0,
+    staleTime: 10 * 60 * 1000,
+    retry: 0,
+  });
+  return typeof data === 'number' ? data : null;
+};
+
+const ProductCard: React.FC<{
+  product: ChatProduct;
+  selected: boolean;
+  disabled?: boolean;
+  shipTo?: ShipTo | null;
+  onOpen: () => void;
+  onSelect: () => void;
+}> = ({ product, selected, disabled, shipTo, onOpen, onSelect }) => {
+  const shipping = useShippingEstimate(product, shipTo);
+  return (
+    <div role="listitem" className="flex w-[148px] shrink-0 flex-col rounded-[16px] border bg-white p-2" style={{ borderColor: selected ? U.ink : '#DED2C1' }}>
+      <button type="button" onClick={onOpen} className="u-press text-left" aria-label={`View ${product.title}`}>
+        <ProductImage src={product.featured_image_url} className="aspect-square w-full rounded-[11px]" />
+        <p className="mt-2 line-clamp-2 min-h-[32px] text-[12px] font-semibold leading-4 text-[#2A2520]">{product.title}</p>
+        <p className="mt-1 text-[12px] font-semibold text-[#B65B3C]">{money(withServiceFee(product.price), product.currency)}</p>
+        <p className="text-[10.5px] leading-4" style={{ color: U.muted }}>
+          {shipping != null && shipping > 0 ? `+ about ${money(shipping, product.currency)} shipping & tax` : '+ shipping & tax'}
+        </p>
+      </button>
+      <button
+        type="button"
+        onClick={onSelect}
+        disabled={disabled || selected}
+        className="u-press mt-2 min-h-10 rounded-[11px] text-[12px] font-semibold disabled:opacity-60"
+        style={{ background: selected ? U.sageSoft : U.ink, color: selected ? U.sage : U.buttonText }}
+      >
+        {selected ? 'Selected' : 'Select gift'}
+      </button>
+    </div>
+  );
+};
+
 /** Recommended gifts under a Thea reply. Tapping a card opens its detail; Select hands it back to Thea. */
 export const ProductCards: React.FC<{
   products: ChatProduct[];
   selectedId?: string | null;
   disabled?: boolean;
+  /** Who the gifts are for, when known and their address is complete: enables real shipping & tax estimates. */
+  shipTo?: ShipTo | null;
   onSelect: (product: ChatProduct) => void;
-}> = ({ products, selectedId, disabled, onSelect }) => {
+}> = ({ products, selectedId, disabled, shipTo, onSelect }) => {
   const [detail, setDetail] = useState<ChatProduct | null>(null);
+  const detailShipping = useShippingEstimate(detail, shipTo);
   const select = (product: ChatProduct) => {
     setDetail(null);
     onSelect(product);
   };
+  const detailTotal = detail && detailShipping != null ? withServiceFee(detail.price) + detailShipping : null;
 
   return (
     <>
       <div className="-mx-1 mt-2 flex gap-2.5 overflow-x-auto px-1 pb-1" role="list" aria-label="Recommended gifts">
-        {products.map((product) => {
-          const selected = selectedId === product.id;
-          return (
-            <div key={product.id} role="listitem" className="flex w-[148px] shrink-0 flex-col rounded-[16px] border bg-white p-2" style={{ borderColor: selected ? U.ink : '#DED2C1' }}>
-              <button type="button" onClick={() => setDetail(product)} className="u-press text-left" aria-label={`View ${product.title}`}>
-                <ProductImage src={product.featured_image_url} className="aspect-square w-full rounded-[11px]" />
-                <p className="mt-2 line-clamp-2 min-h-[32px] text-[12px] font-semibold leading-4 text-[#2A2520]">{product.title}</p>
-                <p className="mt-1 text-[12px] font-semibold text-[#B65B3C]">{money(withServiceFee(product.price), product.currency)}</p>
-              </button>
-              <button
-                type="button"
-                onClick={() => select(product)}
-                disabled={disabled || selected}
-                className="u-press mt-2 min-h-10 rounded-[11px] text-[12px] font-semibold disabled:opacity-60"
-                style={{ background: selected ? U.sageSoft : U.ink, color: selected ? U.sage : U.buttonText }}
-              >
-                {selected ? 'Selected' : 'Select gift'}
-              </button>
-            </div>
-          );
-        })}
+        {products.map((product) => (
+          <ProductCard
+            key={product.id}
+            product={product}
+            selected={selectedId === product.id}
+            disabled={disabled}
+            shipTo={shipTo}
+            onOpen={() => setDetail(product)}
+            onSelect={() => select(product)}
+          />
+        ))}
       </div>
 
       <Sheet open={Boolean(detail)} onOpenChange={(open) => { if (!open) setDetail(null); }}>
@@ -145,6 +198,17 @@ export const ProductCards: React.FC<{
                 <SheetTitle className="font-display text-[24px] font-normal leading-tight text-[#2A2520]">{detail.title}</SheetTitle>
                 <SheetDescription className="text-[15px] font-semibold text-[#B65B3C]">{money(withServiceFee(detail.price), detail.currency)}</SheetDescription>
               </SheetHeader>
+              <dl className="mt-3 space-y-1 rounded-[14px] bg-white/70 px-3 py-2.5 text-[13px] text-[#5A5147]">
+                <div className="flex justify-between gap-3"><dt>Gift</dt><dd>{money(detail.price, detail.currency)}</dd></div>
+                <div className="flex justify-between gap-3"><dt>Unwrapt service fee</dt><dd>{money(SERVICE_FEE, detail.currency)}</dd></div>
+                <div className="flex justify-between gap-3">
+                  <dt>Shipping &amp; tax</dt>
+                  <dd>{detailShipping != null ? `about ${money(detailShipping, detail.currency)}` : 'calculated when you review'}</dd>
+                </div>
+                {detailTotal != null && (
+                  <div className="flex justify-between gap-3 border-t border-[#DED2C1] pt-1.5 font-semibold text-[#2A2520]"><dt>Estimated total</dt><dd>about {money(detailTotal, detail.currency)}</dd></div>
+                )}
+              </dl>
               {detail.description && <p className="mt-3 whitespace-pre-line text-[13.5px] leading-6 text-[#5A5147]">{detail.description}</p>}
               <button
                 type="button"
