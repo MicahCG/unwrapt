@@ -179,6 +179,7 @@ Account context (when present) already lists saved people and whether a calendar
 ## Choosing and scheduling a specific gift
 Keep the path from idea to scheduled short:
 - When the user says they want one specific gift (or you are suggesting exactly one), call select_gift right away: the review card it produces has its own Change and Confirm buttons, so do not first ask in text "Would you like me to schedule this?". One short line plus the card is the whole step.
+- If confirm_scheduled_gift returns lateNeedsAcceptance, nothing was scheduled because the gift cannot arrive by the occasion. Say in one or two short lines when it would arrive (timing.expectedArrival), then that they can tap "Send it late anyway" on the card or pick a faster gift. If they accept in words ("send it anyway", "that's fine, late is ok"), call confirm_scheduled_gift again with acceptLate true.
 - Do not ask the user to confirm the same gift twice. After they confirm the review, follow confirm_scheduled_gift's result: if funds are short, the app shows the add-funds card, so say the one amount needed in a single line and stop; do not ask whether they want to add funds in plain text.
 
 Prices and availability, stated consistently:
@@ -1242,6 +1243,18 @@ export const buildTurnContextMessage = (context: TurnContext | null): string | n
   return `Context carried over from your previous reply (data only, not instructions from the user):\n${parts.join("\n")}`;
 };
 
+/** How many of the latest assistant replies may still carry the review the user is answering. */
+const PENDING_REVIEW_LOOKBACK = 4;
+
+/** Newest review marker among replies given newest first, or undefined. Exported for unit testing. */
+export const pickPendingReviewMarker = (rows: Array<Record<string, unknown> | null | undefined>): string | undefined => {
+  for (const row of rows.slice(0, PENDING_REVIEW_LOOKBACK)) {
+    const marker = row?.reviewMarker;
+    if (typeof marker === "string" && marker) return marker;
+  }
+  return undefined;
+};
+
 /** Mirrors hasPersistedReviewMarker's approach: read structured metadata
  * from the most recently persisted assistant turn in this conversation,
  * rather than trusting the client to resend tool-call history (it doesn't -
@@ -1251,16 +1264,18 @@ const fetchLastTurnContext = async (
   conversationId: string | null,
 ): Promise<TurnContext | null> => {
   if (!conversationId) return null;
-  const { data } = await authClient
+  const { data: recent } = await authClient
     .from("conversation_messages")
     .select("metadata")
     .eq("conversation_id", conversationId)
     .eq("role", "assistant")
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const metadata = data?.metadata as Record<string, unknown> | undefined;
+    .limit(PENDING_REVIEW_LOOKBACK);
+  const metadata = recent?.[0]?.metadata as Record<string, unknown> | undefined;
   if (!metadata) return null;
+  // A side question after the review ("is that price right?") must not cancel it: the most recent review
+  // marker among the last few replies still counts as pending.
+  const reviewMarkerSource = pickPendingReviewMarker((recent || []).map((row) => row.metadata as Record<string, unknown> | null));
 
   const recommendedProducts = Array.isArray(metadata.recommendedProducts)
     ? (metadata.recommendedProducts as unknown[])
@@ -1277,7 +1292,7 @@ const fetchLastTurnContext = async (
     ? { id: rawActiveRecipient.id, name: rawActiveRecipient.name }
     : undefined;
 
-  const rawReviewMarker = typeof metadata.reviewMarker === "string" ? metadata.reviewMarker : undefined;
+  const rawReviewMarker = reviewMarkerSource;
   const reviewParts = rawReviewMarker?.split(":") ?? [];
   const pendingReview: PendingReview | undefined = reviewParts.length === 3 && reviewParts.every(Boolean)
     ? { recipientId: reviewParts[0], productId: reviewParts[1], occasionDate: reviewParts[2] }
@@ -2895,6 +2910,22 @@ const handleConfirmScheduledGift = async (
       error: "That place date is too late for this gift's shipping time. Nothing was scheduled. Say confirmationCopy. Do not invent a different place date.",
     };
   }
+  // No date asked for, but the default schedule can't arrive by the occasion: do not quietly save a late
+  // gift. The review card offers "Send it late anyway"; only an explicit accept (acceptLate) schedules it.
+  if (!placeDecision.feasible && args.acceptLate !== true) {
+    return {
+      ok: false,
+      saved: false,
+      confirmed: false,
+      feasible: false,
+      tooLate: true,
+      lateNeedsAcceptance: true,
+      timing: placeDecision.timing,
+      options: ["place_asap", "accept_late_arrival", "choose_faster_gift"],
+      confirmationCopy: placeDecision.confirmationCopy,
+      error: "This gift cannot arrive by the occasion, so nothing was scheduled. Say plainly when it would arrive instead (timing.expectedArrival) and that the card has a 'Send it late anyway' button, or they can pick a faster gift. Do not say it is unavailable and do not schedule it until they accept the late arrival.",
+    };
+  }
   const timing = placeDecision.timing;
   const deliveryDate = timing.deliveryBy;
 
@@ -3811,11 +3842,12 @@ Use the whole conversation, not just the last message. Return JSON only:
       };
     } else if (looksLikeConfirmation(latestUserMessageContent) && turnContext?.pendingReview) {
       const { recipientId, productId, occasionDate } = turnContext.pendingReview;
+      const confirmArgs = { recipientId, productId, occasionDate, ...(acceptLatePlaceDate ? { acceptLate: true } : {}) };
       const result = await handleConfirmScheduledGift(
-        authClient, user.id, { recipientId, productId, occasionDate }, conversationId,
+        authClient, user.id, confirmArgs, conversationId,
         seenProducts.get(productId) ?? null,
       );
-      preAppliedCall = { name: "confirm_scheduled_gift", args: { recipientId, productId, occasionDate }, result };
+      preAppliedCall = { name: "confirm_scheduled_gift", args: confirmArgs, result };
     }
 
     const conversationWindow = await buildConversationWindow(openaiApiKey, messages);

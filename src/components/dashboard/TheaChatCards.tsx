@@ -6,7 +6,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import CalendarSyncButton from '@/components/CalendarSyncButton';
 import { U } from '@/components/unwrapt2/theme';
 import { formatOccasionDate } from '@/lib/dateUtils';
-import { formatGiftTimingLine, formatHeldFundsStatus, giftOrderTiming } from '@/lib/giftTiming';
+import { formatGiftTimingLine, formatHeldFundsStatus, giftOrderTiming, type GiftOrderTiming } from '@/lib/giftTiming';
 import { TOP_UP_AMOUNTS, topUpFor } from '@/lib/wallet';
 import { SERVICE_FEE, withServiceFee } from '@/lib/pricing';
 
@@ -75,6 +75,8 @@ export type GiftReview = {
   /** When set, confirming replaces this already-scheduled gift for the same occasion. */
   replacesGiftId?: string | null;
   replacesGiftTitle?: string | null;
+  /** Server-computed schedule for this gift's own shipping time (place date, arrival, feasible). */
+  timing?: GiftOrderTiming;
 };
 
 export type ReviewState = 'pending' | 'confirming' | 'scheduled';
@@ -241,7 +243,8 @@ export const ReviewCard: React.FC<{
   address: ReviewAddress | null;
   /** Live: true once the approved gift's funds are held (or it's further along). */
   funded: boolean;
-  onConfirm: () => void;
+  /** `acceptLate` is true when the user taps "Send it late anyway" on a gift that can't arrive in time. */
+  onConfirm: (acceptLate?: boolean) => void;
   onChange: () => void;
   onSaveAddress: (address: ReviewAddress) => Promise<boolean>;
   onViewPlan: () => void;
@@ -277,7 +280,8 @@ export const ReviewCard: React.FC<{
     setDraft((d) => ({ ...d, [field]: event.target.value }));
 
   const isSwap = Boolean(review.replacesGiftTitle);
-  const timing = giftOrderTiming(review.occasionDate);
+  const timing = review.timing ?? giftOrderTiming(review.occasionDate);
+  const late = Boolean(timing && !timing.feasible);
   return (
     <section className="mt-2 rounded-[18px] border bg-white p-3.5" style={{ borderColor: '#DED2C1' }} aria-label="Gift review">
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: U.accent }}>
@@ -302,7 +306,9 @@ export const ReviewCard: React.FC<{
           className="mt-2 text-[12.5px] leading-5"
           style={{ color: timing.feasible ? '#5A5147' : U.accent }}
         >
-          {formatGiftTimingLine(timing)}
+          {late
+            ? `This won't arrive by ${formatOccasionDate(timing.deliveryBy)}. Ordered today it should arrive about ${formatOccasionDate(timing.expectedArrival)}. You can send it late anyway, or pick a gift that ships faster.`
+            : formatGiftTimingLine(timing)}
         </p>
       )}
       {editing ? (
@@ -368,11 +374,11 @@ export const ReviewCard: React.FC<{
       ) : (
         <div className="mt-3 grid grid-cols-[auto_1fr] gap-2">
           <button type="button" onClick={onChange} disabled={disabled || state === 'confirming'} className="u-press min-h-11 rounded-[12px] border px-3.5 text-[13px] font-semibold disabled:opacity-50" style={{ borderColor: U.border, color: U.ink }}>
-            Change
+            {late ? 'Pick another' : 'Change'}
           </button>
           <button
             type="button"
-            onClick={onConfirm}
+            onClick={() => onConfirm(late)}
             disabled={disabled || state === 'confirming' || !hasAddress || editing}
             title={hasAddress ? undefined : `Add ${first}'s address first`}
             aria-busy={state === 'confirming'}
@@ -380,7 +386,7 @@ export const ReviewCard: React.FC<{
             style={{ background: U.ink, color: U.buttonText }}
           >
             {state === 'confirming' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-            {state === 'confirming' ? (isSwap ? 'Swapping…' : 'Scheduling…') : (isSwap ? 'Confirm swap' : 'Confirm gift')}
+            {state === 'confirming' ? (isSwap ? 'Swapping…' : 'Scheduling…') : late ? 'Send it late anyway' : (isSwap ? 'Confirm swap' : 'Confirm gift')}
           </button>
         </div>
       )}
