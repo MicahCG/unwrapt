@@ -30,6 +30,7 @@ type ChatMessage = { role: 'user' | 'assistant'; content: string };
 export const starterPrompt = (context: TheaContext): string | null => {
   const name = context.recipientName?.trim();
   if (!name) return null;
+  if (context.starter?.trim()) return context.starter.trim();
   switch (context.surface) {
     case 'catalog': return `Show me some gift ideas for ${name}.`;
     case 'gift_status': return `Where does ${name}'s gift stand right now?`;
