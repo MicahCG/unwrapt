@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { digestInnerHtml, digestSubject, type DigestItem } from "../_shared/giftTipsDigest.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,7 +30,8 @@ type EmailType =
   | 'order_cancelled'
   | 'occasion_reminder'
   | 'gift_tip'
-  | 'gift_idea_reminder';
+  | 'gift_idea_reminder'
+  | 'gift_tips_digest';
 
 interface EmailRequest {
   type: EmailType;
@@ -55,6 +57,7 @@ interface EmailRequest {
     reloadAmount?: number;
     newBalance?: number;
     pauseReason?: string;
+    items?: DigestItem[];
   };
 }
 
@@ -76,6 +79,15 @@ serve(async (req) => {
 
     const appUrl = "https://app.unwrapt.io";
     const subject = getEmailSubject(type, data);
+    // Never send the old vague "You have a new notification" fallback: an unknown type is a bug
+    // in the caller, so fail loudly instead of emailing a user something with no details.
+    if (subject === null) {
+      console.error(`Unknown email type "${type}" - not sending`);
+      return new Response(JSON.stringify({ success: false, error: `Unknown email type: ${type}` }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
+    }
     const htmlContent = getEmailContent(type, userName, data, appUrl);
 
     // Send email using Resend
@@ -123,7 +135,7 @@ serve(async (req) => {
   }
 });
 
-function getEmailSubject(type: EmailType, data: any): string {
+function getEmailSubject(type: EmailType, data: any): string | null {
   switch (type) {
     case 'recipient_added':
       return `✅ ${data?.recipientName} has been added to your gift list`;
@@ -173,8 +185,10 @@ function getEmailSubject(type: EmailType, data: any): string {
       return `✨ A gift idea for ${data?.recipientName}`;
     case 'gift_idea_reminder':
       return `🎂 ${data?.recipientName}'s ${data?.occasion || 'birthday'} is coming up`;
+    case 'gift_tips_digest':
+      return Array.isArray(data?.items) && data.items.length > 0 ? digestSubject(data.items) : null;
     default:
-      return 'Notification from Unwrapt';
+      return null;
   }
 }
 
@@ -662,24 +676,20 @@ function getEmailInner(type: EmailType, greeting: string, data: any, appUrl: str
         </div>
       `;
 
+    case 'gift_tips_digest':
+      return digestInnerHtml(greeting, data?.items ?? [], appUrl);
+
     case 'gift_idea_reminder':
       return `
-        ${baseStyles}
-        <div class="container">
-          <div class="header">
-            <h2>🎂 ${data?.recipientName}'s ${data?.occasion || 'birthday'} is coming up</h2>
-            <p>${greeting}</p>
+        <div class="header">
+          <h2>🎂 ${data?.recipientName}'s ${data?.occasion || 'birthday'} is coming up</h2>
+          <p>${greeting}</p>
+        </div>
+        <div class="content">
+          <p><strong>${data?.recipientName}'s</strong> ${data?.occasion || 'birthday'} is coming up and there's no gift scheduled yet.</p>
+          <div class="cta">
+            <a href="${data?.modifyLink || appUrl}" class="button primary">Plan ${data?.recipientName}'s gift</a>
           </div>
-          <div class="content">
-            <p><strong>${data?.recipientName}'s</strong> ${data?.occasion || 'birthday'} is coming up and there's no gift scheduled yet.</p>
-            <div class="info-box">
-              <p>Come check out Unwrapt and schedule a gift for them - we've got a wide selection of options to choose from.</p>
-            </div>
-            <div class="cta">
-              <a href="${data?.modifyLink || appUrl}" class="button primary">Browse gift ideas</a>
-            </div>
-          </div>
-          ${getFooter()}
         </div>
       `;
 
@@ -699,7 +709,7 @@ function getEmailInner(type: EmailType, greeting: string, data: any, appUrl: str
   }
 }
 
-const LOGO_URL = "https://www.unwrapt.io/lovable-uploads/unwrapt-lux.png";
+const LOGO_URL = "https://www.unwrapt.io/brand/unwrapt-lux.png";
 
 function getBrandBar(): string {
   return `

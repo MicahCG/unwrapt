@@ -48,7 +48,7 @@ test("robots allows assets and blocks private routes", () => {
   assert.match(robots, /Disallow: \/gift-history/);
   assert.match(robots, /Disallow: \/muse\//);
   assert.equal(robots.includes("Disallow: /assets"), false);
-  assert.equal(robots.includes("Disallow: /lovable-uploads"), false);
+  assert.equal(robots.includes("Disallow: /brand"), false);
   assert.equal(/Allow:\s+\/\s/.test(robots), true);
 });
 

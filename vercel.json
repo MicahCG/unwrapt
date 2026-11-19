@@ -3,9 +3,14 @@
   "trailingSlash": false,
   "proxy": {
     "entrypoint": "proxy.ts",
-    "matcher": ["/((?!assets/|lovable-uploads/).*)"]
+    "matcher": ["/((?!assets/|brand/).*)"]
   },
   "redirects": [
+    {
+      "source": "/lovable-uploads/:path*",
+      "destination": "/brand/:path*",
+      "permanent": true
+    },
     {
       "source": "/:path*",
       "has": [{ "type": "host", "value": "unwrapt.io" }],
