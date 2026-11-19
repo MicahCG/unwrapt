@@ -28,3 +28,4 @@ Every set of proposals renders as selectable cards; fewer turns from pick to sch
 
 ## Notes / fix log
 - 2026-11-19 fixed: Search results now always render as cards (matching loosely-worded titles, else the top results) and the bullet list is stripped. The longer confirm-twice path is not changed here. Awaiting verification.
+- 2026-11-19 follow-up: a typed 'Yes' to a single offered gift now opens the review card directly (affirmedSingleOffer), and Thea is told to open the review card herself instead of asking in text first, and never to ask to confirm the same gift twice. Awaiting verification.
