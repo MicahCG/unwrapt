@@ -1738,13 +1738,32 @@ const findGoodyProductById = async (id: string): Promise<Product | null> => {
 
 type SearchResult = { products: Product[]; matchType: "matched" | "fallback" };
 
-const searchGoodyGifts = async (
+const PET_WORDS = /\b(dogs?|puppy|puppies|cats?|kittens?|pets?|paws?|canine|feline|chew(?:er)?s?|fetch)\b/i;
+
+/** True for products made for animals (dog treats, cat toys...), which are never a gift for a person. */
+export const isPetProductText = (text: string): boolean => PET_WORDS.test(text);
+
+/** Only surface pet products when the recipient, the request or the search itself is about pets. */
+export const wantsPetGifts = (...sources: Array<string | string[] | null | undefined>): boolean =>
+  sources.flat().some((v) => typeof v === "string" && PET_WORDS.test(v));
+
+/** "more options", "something else", "show me different ones": the user wants new items, not a repeat. */
+export const looksLikeMoreOptionsIntent = (message: string): boolean =>
+  /\b(more|other|different|another|alternative|alternatives|new|else)\b[^.?!]{0,30}\b(options?|ideas?|gifts?|suggestions?|choices?|ones?|picks?)\b/i.test(message) ||
+  /\b(something|anything) (else|different|new)\b/i.test(message) ||
+  /^\s*(more|show (me )?more|any more)\??\s*$/i.test(message);
+
+export const searchGoodyGifts = async (
   args: {
     vibe?: string;
     max_price?: number;
     min_price?: number;
     interests?: string[];
     query?: string;
+    /** Product ids the user has already been shown; left out so "more options" is actually more. */
+    excludeIds?: string[];
+    /** Pet products are hidden unless the gift really is about a pet. */
+    allowPets?: boolean;
   },
 ): Promise<SearchResult> => {
   try {
@@ -1756,6 +1775,7 @@ const searchGoodyGifts = async (
       .map((v) => v.trim().toLowerCase())
       .slice(0, 5);
     const query = typeof args.query === "string" ? args.query.trim().slice(0, 120) : undefined;
+    const excluded = new Set(args.excludeIds || []);
 
     const candidates = raw
       .filter((product): product is GoodyProduct & { id: string; name: string; price: number } =>
@@ -1764,6 +1784,8 @@ const searchGoodyGifts = async (
       .filter((product) => {
         if (typeof args.max_price === "number" && product.price > args.max_price) return false;
         if (typeof args.min_price === "number" && product.price < args.min_price) return false;
+        if (excluded.has(product.id)) return false;
+        if (!args.allowPets && isPetProductText([product.name, product.brand?.name, product.subtitle, product.recipient_description].filter(Boolean).join(" "))) return false;
         return true;
       });
 
@@ -1801,8 +1823,12 @@ const searchGoodyGifts = async (
     const usingFallback = broadenedFiltered.length === 0 && requireMatch;
     const filtered = usingFallback ? scored : broadenedFiltered;
 
+    // With no interest signal at all (nothing saved, nothing asked) or in the last-resort tier,
+    // "cheapest first" just floats the dregs of the catalog to the top, so prefer the priciest
+    // item that fits the budget instead; with a real match, keep cheaper-first among equals.
+    const noSignal = usingFallback || !requireMatch;
     const ranked = filtered
-      .sort((a, b) => b.total - a.total || a.product.price - b.product.price)
+      .sort((a, b) => b.total - a.total || (noSignal ? b.product.price - a.product.price : a.product.price - b.product.price))
       .slice(0, 12)
       .map(({ product }) => product);
 
@@ -1823,6 +1849,8 @@ const searchGifts = async (
     min_price?: number;
     interests?: string[];
     query?: string;
+    excludeIds?: string[];
+    allowPets?: boolean;
   },
 ): Promise<SearchResult> => searchGoodyGifts(args);
 
@@ -3195,6 +3223,31 @@ const loadAddressPeople = async (
 // the in-flight chat response over a failed save.
 // ---------------------------------------------------------------------------
 
+/** Every product id Thea has already put in front of this user in this conversation (recent turns). */
+const fetchShownProductIds = async (
+  authClient: ReturnType<typeof createClient>,
+  conversationId: string | null,
+): Promise<string[]> => {
+  if (!conversationId) return [];
+  try {
+    const { data } = await authClient
+      .from("conversation_messages")
+      .select("metadata")
+      .eq("conversation_id", conversationId)
+      .eq("role", "assistant")
+      .order("created_at", { ascending: false })
+      .limit(30);
+    const ids = new Set<string>();
+    for (const row of (data || []) as Array<{ metadata?: { recommendedProducts?: Array<{ id?: string }> } | null }>) {
+      for (const p of row.metadata?.recommendedProducts || []) if (typeof p?.id === "string") ids.add(p.id);
+    }
+    return [...ids];
+  } catch (error) {
+    console.error("fetchShownProductIds failed", error);
+    return [];
+  }
+};
+
 const getOrCreateConversation = async (
   authClient: ReturnType<typeof createClient>,
   userId: string,
@@ -3927,11 +3980,34 @@ Use the whole conversation, not just the last message. Return JSON only:
         let toolContent: unknown;
 
         if (toolName === "search_gifts") {
-          const { products, matchType } = await searchGifts(args);
+          const searchArgs = { ...(args as Parameters<typeof searchGifts>[0]) };
+          // "What they love": when the model searched without interests, use the ones saved for the
+          // person this chat is about, so the recipient's profile always shapes the options.
+          let savedInterests: string[] = [];
+          if (lastActiveRecipient?.id) {
+            const saved = await fetchOwnedRecipient(authClient, user.id, lastActiveRecipient.id);
+            savedInterests = (saved?.interests || []).filter((i) => typeof i === "string" && i.trim());
+          }
+          const modelGaveSignal = (searchArgs.interests || []).some((i) => typeof i === "string" && i.trim()) || Boolean(searchArgs.query?.trim());
+          let usedSavedInterests = false;
+          if (!modelGaveSignal && savedInterests.length) {
+            searchArgs.interests = savedInterests;
+            usedSavedInterests = true;
+          }
+          const wantsMore = looksLikeMoreOptionsIntent(latestUserMessageContent);
+          const shownBefore = wantsMore ? await fetchShownProductIds(authClient, conversationId) : [];
+          searchArgs.excludeIds = shownBefore;
+          searchArgs.allowPets = wantsPetGifts(searchArgs.interests, searchArgs.query, savedInterests, latestUserMessageContent);
+          const { products, matchType } = await searchGifts(searchArgs);
           for (const product of products) seenProducts.set(product.id, product);
           if (matchType === "fallback") for (const product of products) fallbackProductIds.add(product.id);
           toolContent = {
             matchType,
+            ...(usedSavedInterests ? { usedSavedInterests: savedInterests, note: "No interests were passed, so this search used what the recipient is saved as loving. Say so briefly." } : {}),
+            ...(shownBefore.length ? { excludedAlreadyShown: shownBefore.length } : {}),
+            ...(wantsMore && products.length < 3
+              ? { note: "That is nearly everything left that fits. Say so plainly and offer to widen the budget or try a different interest; do not repeat earlier options." }
+              : {}),
             results: products.map((p) => ({
               id: p.id, title: p.title, price: p.price, product_type: p.product_type, vibe: p.gift_vibe, source: p.provider,
             })),
