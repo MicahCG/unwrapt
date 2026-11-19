@@ -435,7 +435,7 @@ const Dashboard = () => {
         } ${activeTab === 'thea' ? 'overflow-hidden' : 'overflow-y-auto'}`}
       >
         {/* Frost + chrome stay visible while the keyboard is open (composer focus). */}
-        <div className="u-dashboard-frost-nav pointer-events-none absolute inset-x-0 top-0 z-20 -mx-5 px-5 md:-mx-8 md:px-8">
+        <div className={`u-dashboard-frost-nav${activeTab === 'manual' ? ' u-dashboard-frost-nav--manual' : ''} pointer-events-none absolute inset-x-0 top-0 z-20 -mx-5 px-5 md:-mx-8 md:px-8`}>
           <div className="pointer-events-auto flex items-center justify-between gap-2 px-1 pt-2.5 md:px-1.5 md:pt-3">
             <button
               type="button"
@@ -480,7 +480,7 @@ const Dashboard = () => {
               hidePresenceOrb={compactChrome && activeTab !== 'thea'}
             />
           </div>
-          <div className={`${activeTab === 'manual' ? 'h-full' : 'hidden'} ${pinToKeyboard ? '' : 'pt-12'} lg:block lg:h-full lg:min-h-0 lg:rounded-[24px] lg:border lg:border-[rgba(42,37,32,0.09)] lg:bg-[rgba(250,246,238,0.6)] lg:px-5 lg:pt-5`}>
+          <div className={`${activeTab === 'manual' ? 'h-full' : 'hidden'} ${pinToKeyboard ? '' : 'pt-[4.25rem] md:pt-12'} lg:block lg:h-full lg:min-h-0 lg:rounded-[24px] lg:border lg:border-[rgba(42,37,32,0.09)] lg:bg-[rgba(250,246,238,0.6)] lg:px-5 lg:pt-5`}>
             <ManualHomeTab
               recipients={typedRecipients}
               autopilotThreshold={autopilotThreshold}
