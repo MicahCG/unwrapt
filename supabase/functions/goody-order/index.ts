@@ -190,6 +190,7 @@ Deno.serve(async (req: Request) => {
     // Ask Goody which payment methods exist rather than guessing an id: the old hard-coded
     // "COMMERCE_STORED_VALUE" came back "Payment method not found".
     let methods: GoodyPaymentMethod[] = [];
+    let lookupFailure = "";
     try {
       const listResponse = await fetch(`${goodyBaseUrl()}/v1/payment_methods`, {
         headers: { Authorization: `Bearer ${apiKey}` },
@@ -198,14 +199,25 @@ Deno.serve(async (req: Request) => {
       if (listResponse.ok) {
         methods = ((await listResponse.json()) as { data?: GoodyPaymentMethod[] }).data || [];
       } else {
-        console.error("Goody payment_methods lookup failed", listResponse.status);
+        const body = (await listResponse.text()).slice(0, 300);
+        console.error("Goody payment_methods lookup failed", listResponse.status, body);
+        let reason = "";
+        try { reason = String((JSON.parse(body) as { error?: unknown }).error || "").slice(0, 160); } catch { /* not JSON */ }
+        lookupFailure = `${listResponse.status}${reason ? ` ${reason}` : ""}`;
       }
     } catch (error) {
       console.error("Goody payment_methods lookup errored", error);
+      lookupFailure = "could not reach Goody";
     }
     console.log("Goody payment methods:", JSON.stringify(methods.map((m) => ({ id: m.id, name: m.name, balance: m.balance }))));
     const payment = choosePaymentMethod(methods, Deno.env.get("GOODY_PAYMENT_METHOD_ID"));
-    if (!payment.ok) return json({ success: false, error: payment.error }, 400);
+    if (!payment.ok) {
+      // A refused lookup is not the same as an account with no payment methods: say which it was.
+      const error = lookupFailure && methods.length === 0
+        ? `Goody would not list this account's payment methods (${lookupFailure}). Commerce Stored Value may not be set up on the account yet; contact Goody support.`
+        : payment.error;
+      return json({ success: false, error }, 400);
+    }
     console.log(`Goody payment method chosen (${payment.reason}): ${payment.id}`);
 
     const orderBody = {
