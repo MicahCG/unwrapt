@@ -4,7 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { U, initialsOf } from '@/components/unwrapt2/theme';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { formatHeldFundsStatus } from '@/lib/giftTiming';
-import { getWalletBreakdown, type PendingReservation } from '@/lib/wallet';
+import { getWalletBreakdown, WALLET_CHANGED_EVENT, type PendingReservation } from '@/lib/wallet';
 
 interface AccountMenuProps {
   displayName: string;
@@ -36,6 +36,9 @@ const AccountMenu: React.FC<AccountMenuProps> = ({
   const [reserved, setReserved] = useState(0);
   const [available, setAvailable] = useState<number | null>(null);
   const [reservations, setReservations] = useState<PendingReservation[]>([]);
+  // Bumped when a hold or top-up happens elsewhere, or the tab comes back to the foreground: the total balance
+  // doesn't change when funds are only reserved, so without this the pill kept showing a stale amount.
+  const [refreshTick, setRefreshTick] = useState(0);
   const hasWallet = tier === 'vip' && walletBalance != null;
   const close = (then: () => void) => () => {
     setOpen(false);
@@ -44,6 +47,17 @@ const AccountMenu: React.FC<AccountMenuProps> = ({
 
   // Load Available (balance − reserved) as soon as the wallet is known — never wait for the
   // dropdown. Falling back to gross `walletBalance` made the header pill flash the total.
+  useEffect(() => {
+    const bump = () => setRefreshTick((n) => n + 1);
+    const onVisible = () => { if (document.visibilityState === 'visible') bump(); };
+    window.addEventListener(WALLET_CHANGED_EVENT, bump);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener(WALLET_CHANGED_EVENT, bump);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
+
   useEffect(() => {
     if (!hasWallet || !user?.id) {
       setReserved(0);
@@ -60,7 +74,7 @@ const AccountMenu: React.FC<AccountMenuProps> = ({
       setReservations(breakdown.reservations);
     })();
     return () => { cancelled = true; };
-  }, [hasWallet, user?.id, walletBalance]);
+  }, [hasWallet, user?.id, walletBalance, refreshTick]);
 
   const availableLabel = available != null ? money(available) : null;
 

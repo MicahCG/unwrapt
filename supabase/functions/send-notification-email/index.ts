@@ -46,6 +46,7 @@ interface EmailRequest {
     giftType?: string;
     giftDescription?: string;
     giftImage?: string;
+    chosenInChat?: boolean;
     priceRange?: string;
     amount?: number;
     currentBalance?: number;
@@ -767,6 +768,16 @@ function getGiftScheduledInner(greeting: string, data: any, appUrl: string): str
         <p><strong>Gift Type:</strong> ${data?.giftType || 'Curated selection'}</p>
         ${data?.priceRange ? `<p><strong>Budget:</strong> ${data.priceRange}</p>` : ''}
       </div>
+      ${data?.chosenInChat ? `
+      <div class="info-box">
+        <h3>What Happens Next</h3>
+        <ul>
+          <li>The funds for this gift are held in your wallet. You are only charged when it is ordered</li>
+          <li>Thea places the order at the right time so it arrives as close to the date as it can</li>
+          <li>You'll get tracking updates once it ships</li>
+        </ul>
+      </div>
+      ` : `
       <div class="info-box">
         <h3>What Happens Next</h3>
         <ul>
@@ -776,6 +787,7 @@ function getGiftScheduledInner(greeting: string, data: any, appUrl: string): str
           <li>You'll receive tracking updates along the way</li>
         </ul>
       </div>
+      `}
       <div class="cta">
         <a href="${appUrl}" class="button">View Your Dashboard</a>
       </div>
