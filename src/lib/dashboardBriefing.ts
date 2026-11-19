@@ -300,7 +300,7 @@ export function buildBriefingMessage(displayName: string, briefing: DashboardBri
   if (briefing.upcoming.length) {
     lines.push('');
     lines.push('Coming up:');
-    for (const item of briefing.upcoming.slice(0, 2)) {
+    for (const item of briefing.upcoming.slice(0, 3)) {
       lines.push(`· ${item.label} · ${item.detail}`);
     }
   }
