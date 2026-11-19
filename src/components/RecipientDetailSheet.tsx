@@ -1,6 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, Check, CreditCard, Gift, MapPin, Pencil, Plus, Sparkles, X } from 'lucide-react';
+import { CalendarDays, Check, CreditCard, Gift, MapPin, Package, Pencil, Plus, Sparkles, X } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { placeGiftOrderNow } from '@/lib/placeOrder';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -39,6 +43,8 @@ const RecipientDetailSheet: React.FC<RecipientDetailSheetProps> = ({
   const [interests, setInterests] = useState<string[]>([]);
   const [draftInterest, setDraftInterest] = useState('');
   const [saving, setSaving] = useState(false);
+  const [orderTarget, setOrderTarget] = useState<GiftRecord | null>(null);
+  const [ordering, setOrdering] = useState(false);
 
   useEffect(() => {
     setInterests((recipient?.interests || []).slice(0, MAX_INTERESTS));
@@ -54,6 +60,26 @@ const RecipientDetailSheet: React.FC<RecipientDetailSheetProps> = ({
   const name = cleanName(recipient.name);
   const recipientStatus = getRecipientStatus(recipient);
   const nextDate = recipient.birthday || recipient.anniversary;
+
+  const placeOrder = async () => {
+    if (!orderTarget?.id || ordering) return;
+    setOrdering(true);
+    try {
+      const outcome = await placeGiftOrderNow(orderTarget.id, recipient.name);
+      toast(outcome.ok
+        ? { title: outcome.alreadyOrdered ? 'Already ordered' : 'Order placed', description: outcome.message }
+        : { title: 'Order not placed', description: outcome.message, variant: 'destructive' });
+      if (outcome.ok) {
+        await queryClient.invalidateQueries({ queryKey: ['recipients'] });
+        setOrderTarget(null);
+      }
+    } catch (error) {
+      console.error('Placing order failed', error);
+      toast({ title: 'Order not placed', description: 'Something went wrong. Nothing was charged. Please try again.', variant: 'destructive' });
+    } finally {
+      setOrdering(false);
+    }
+  };
 
   const persistInterests = async (next: string[]) => {
     setSaving(true);
@@ -196,6 +222,15 @@ const RecipientDetailSheet: React.FC<RecipientDetailSheetProps> = ({
                     </div>
                   </div>
                 )}
+                {status.key === 'ready_to_order' && gift.id && (
+                  <button
+                    type="button"
+                    onClick={(event) => { event.stopPropagation(); setOrderTarget(gift); }}
+                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#2A2520] px-4 py-3 text-[13px] font-semibold text-white transition-transform active:scale-[0.99]"
+                  >
+                    <Package className="h-4 w-4" /> Place order now
+                  </button>
+                )}
                 {needsPaymentOnly && (
                   <button
                     type="button"
@@ -210,6 +245,24 @@ const RecipientDetailSheet: React.FC<RecipientDetailSheetProps> = ({
           })}
         </section>
       </SheetContent>
+      <AlertDialog open={Boolean(orderTarget)} onOpenChange={(next) => { if (!next && !ordering) setOrderTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Place this order now?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {orderTarget?.gift_description || orderTarget?.gift_type || 'This gift'} will be ordered today for {name}
+              {recipient.street ? ` and shipped to ${[recipient.street, recipient.city, recipient.state, recipient.zip_code].filter(Boolean).join(', ')}` : ''}.
+              {orderTarget?.payment_status === 'paid' ? ' It is already paid for.' : ' The funds held in your wallet will be charged. This cannot be undone.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={ordering}>Not yet</AlertDialogCancel>
+            <AlertDialogAction disabled={ordering} onClick={(event) => { event.preventDefault(); void placeOrder(); }}>
+              {ordering ? 'Placing order…' : 'Place order'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   );
 };
