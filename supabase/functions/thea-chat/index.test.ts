@@ -5,6 +5,10 @@
 // import doesn't start a live HTTP listener - see the comment there.)
 import { assert, assertEquals } from "https://deno.land/std@0.190.0/testing/asserts.ts";
 import {
+  searchGoodyGifts,
+  looksLikeMoreOptionsIntent,
+  wantsPetGifts,
+  isPetProductText,
   restoreHistoryMessage,
   toDisplayProduct,
   buildConfirmDirectiveMessage,
@@ -1418,4 +1422,69 @@ Deno.test("restoreHistoryMessage never attaches cards to user messages", () => {
   const m = restoreHistoryMessage({ role: "user", content: "hi", metadata: { display: { products: [toDisplayProduct({ id: "p", title: "t", price: 1 })] } } });
   assertEquals(m.products, undefined);
   assertEquals(m.content, "hi");
+});
+
+// --- Gift search: pets, repeats, and ranking with no signal -------------------------------------
+const CATALOG = [
+  { id: "wipes", name: "Facial Cleansing Wipes", price: 500 },
+  { id: "treats", name: "Meat Hunks Dog Treats, 10 oz", price: 700 },
+  { id: "topper", name: "Dog Food Meal Topper", price: 1000 },
+  { id: "canister", name: "Medium Glass Canister", price: 1400 },
+  { id: "charcuterie", name: "Charcuterie Trio", price: 1500 },
+  { id: "pickleballs", name: "Set of 3 Pickleballs", price: 1500 },
+  { id: "cookies", name: "Holiday Cookie & Brownie Duo", price: 1500 },
+  { id: "coffee", name: "Coffee Beans by Methodical Coffee", price: 1600 },
+  { id: "chewer", name: "Golf Ball Super Chewer + Fetch Dog Toy", price: 2500 },
+];
+
+const withCatalog = async (run: () => Promise<void>) => {
+  const original = globalThis.fetch;
+  Deno.env.set("GOODY_API_ENV", "sandbox");
+  Deno.env.set("GOODY_SANDBOX_COMMERCE_API_KEY", "test");
+  globalThis.fetch = (() => Promise.resolve(new Response(JSON.stringify({ data: CATALOG }), { status: 200 }))) as typeof fetch;
+  try { await run(); } finally { globalThis.fetch = original; }
+};
+
+Deno.test("pet products are never offered as a gift for a person", async () => {
+  await withCatalog(async () => {
+    const { products } = await searchGoodyGifts({ max_price: 25 });
+    const titles = products.map((p) => p.title);
+    assert(!titles.some((t) => /dog/i.test(t)), `dog items leaked: ${titles.join(", ")}`);
+    assert(titles.includes("Charcuterie Trio"));
+  });
+});
+
+Deno.test("pet products come back when the recipient or request is about pets", async () => {
+  await withCatalog(async () => {
+    assert(wantsPetGifts(["dog toys"]) && wantsPetGifts(null, "gift for my cat") && !wantsPetGifts(["coffee"], "festive"));
+    const { products } = await searchGoodyGifts({ interests: ["dog toys"], allowPets: true });
+    assert(products.some((p) => /dog toy/i.test(p.title)));
+    assert(isPetProductText("Dog Food Meal Topper") && !isPetProductText("Charcuterie Trio"));
+  });
+});
+
+Deno.test("with no interest signal the budget-fitting best items lead, not the cheapest dregs", async () => {
+  await withCatalog(async () => {
+    const { products } = await searchGoodyGifts({ max_price: 25 });
+    assert(products[0].price >= 15, `expected a higher-priced lead, got ${products[0].title} $${products[0].price}`);
+  });
+});
+
+Deno.test("'more options' excludes products already shown", async () => {
+  await withCatalog(async () => {
+    const first = await searchGoodyGifts({ max_price: 25 });
+    const shown = first.products.slice(0, 3).map((p) => p.id);
+    const more = await searchGoodyGifts({ max_price: 25, excludeIds: shown });
+    assert(more.products.every((p) => !shown.includes(p.id)), "a repeat slipped through");
+    assert(more.products.length > 0);
+  });
+});
+
+Deno.test("looksLikeMoreOptionsIntent recognizes asks for new items but not other messages", () => {
+  for (const yes of ["Can I get some more options?", "show me more", "something else", "any other ideas", "give me different gifts", "More"]) {
+    assert(looksLikeMoreOptionsIntent(yes), yes);
+  }
+  for (const no of ["I'd like the Holiday Cookie & Brownie Duo", "yes confirm", "anything under 25?", "tell me more about the pickleballs"]) {
+    assert(!looksLikeMoreOptionsIntent(no), no);
+  }
 });
