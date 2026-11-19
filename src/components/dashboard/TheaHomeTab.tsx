@@ -1261,7 +1261,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
                 {chip.label}
               </button>
             ))}
-            {earlySession && !calendarConnected && (
+            {earlySession && !calendarConnected && chipsToShow.length < 2 && (
               <CalendarSyncButton
                 appearance="pill"
                 onAddManually={onSwitchToManual}
@@ -1269,7 +1269,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
                 style={{ background: U.surface, borderColor: U.border, color: U.ink }}
               />
             )}
-            {earlySession && (
+            {earlySession && chipsToShow.length === 0 && (
               <button
                 type="button"
                 onClick={onSwitchToManual}
