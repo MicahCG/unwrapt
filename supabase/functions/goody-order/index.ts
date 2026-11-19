@@ -43,7 +43,24 @@ const goodyBaseUrl = () =>
 // single-product-by-id endpoint). Search pages like gift-catalog / thea-chat —
 // page 1 alone misses products Thea already recommended (live: Layla wine glasses).
 const findGoodyProduct = async (apiKey: string, productId: string): Promise<GoodyProduct | null> => {
-  for (const page of [1, 2, 3]) {
+  // Direct lookup first: Thea now picks from Goody's whole catalog, so a gift can sit far past the first
+  // few list pages. A 404 means Goody no longer sells it; any other failure falls back to paging.
+  try {
+    const direct = await fetch(`${goodyBaseUrl()}/v1/products/${encodeURIComponent(productId)}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (direct.ok) {
+      const body = await direct.json() as { data?: GoodyProduct } & GoodyProduct;
+      const found = body.data ?? body;
+      if (found?.id) return found;
+    } else if (direct.status === 404) {
+      return null;
+    }
+  } catch (error) {
+    console.error("goody-order direct product lookup failed, falling back to listing", error);
+  }
+  for (const page of Array.from({ length: 40 }, (_, i) => i + 1)) {
     const response = await fetch(`${goodyBaseUrl()}/v1/products?page=${page}&per_page=100`, {
       headers: { Authorization: `Bearer ${apiKey}` },
       signal: AbortSignal.timeout(8000),
