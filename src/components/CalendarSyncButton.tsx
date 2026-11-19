@@ -55,10 +55,12 @@ const CalendarImportReview: React.FC<{
   const [chosen, setChosen] = useState(() => new Set(candidates.map((c) => c.key)));
   // Keyed by candidate, so typing for one person never clobbers another's draft.
   const [interestDrafts, setInterestDrafts] = useState<Record<string, string>>({});
+  // Birthday picked by hand (YYYY-MM-DD). Overrides the calendar's date, and fills in a missing one.
+  const [birthdayDrafts, setBirthdayDrafts] = useState<Record<string, string>>({});
   useEffect(() => setChosen(new Set(candidates.map((c) => c.key))), [candidates]);
   const selected = candidates
     .filter((c) => chosen.has(c.key))
-    .map((c) => ({ ...c, interests: parseInterestsDraft(interestDrafts[c.key]) }));
+    .map((c) => ({ ...c, birthday: birthdayDrafts[c.key] || c.birthday, interests: parseInterestsDraft(interestDrafts[c.key]) }));
   const toggle = (key: string) => setChosen((prev) => {
     const next = new Set(prev);
     if (next.has(key)) next.delete(key);
@@ -83,10 +85,23 @@ const CalendarImportReview: React.FC<{
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[14px] font-semibold text-[#2A2520]">{person.name}</span>
                   <span className="block text-[12px] text-[#7A6F62]">
-                    {[person.birthday && `Birthday · ${formatOccasionDate(person.birthday)}`, person.anniversary && `Anniversary · ${formatOccasionDate(person.anniversary)}`].filter(Boolean).join('  ·  ') || 'No date yet'}
+                    {[(birthdayDrafts[person.key] || person.birthday) && `Birthday · ${formatOccasionDate(birthdayDrafts[person.key] || person.birthday!)}`, person.anniversary && `Anniversary · ${formatOccasionDate(person.anniversary)}`].filter(Boolean).join('  ·  ') || 'No date yet'}
                   </span>
                 </span>
               </label>
+              {chosen.has(person.key) && (
+                <label className="mt-1.5 flex items-center gap-2 text-[12px] text-[#7A6F62]">
+                  <span className="shrink-0">{person.birthday ? 'Change birthday' : 'Add birthday'}</span>
+                  <Input
+                    type="date"
+                    value={birthdayDrafts[person.key] || person.birthday || ''}
+                    max={new Date().toISOString().slice(0, 10)}
+                    onChange={(e) => setBirthdayDrafts((prev) => ({ ...prev, [person.key]: e.target.value }))}
+                    aria-label={`Birthday for ${person.name}`}
+                    className="h-9 min-w-0 flex-1 rounded-[10px] border-[#E4DCD2] bg-white px-3 text-[16px]"
+                  />
+                </label>
+              )}
               {chosen.has(person.key) && (
                 <Input
                   value={interestDrafts[person.key] || ''}
