@@ -46,6 +46,7 @@ import {
 } from '@/components/wallet/WalletHoldSuccessModal';
 import { trackProductEvent } from '@/lib/productAnalytics';
 import { useTheaReaction } from '@/hooks/useTheaReaction';
+import { chatSuggestions } from '@/lib/chatSuggestions';
 import { importNewPeople, importRemainingCalendarPeople, useCalendarConnected } from '@/hooks/useCalendarConnection';
 import { clearOnboardingFoundPeople, loadOnboardingFoundPeople } from '@/lib/onboardingFoundPeople';
 import CalendarSyncButton from '@/components/CalendarSyncButton';
@@ -1242,6 +1243,37 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
       </div>
 
       {(() => {
+        // Once a conversation is under way, the buttons follow it: options and price limits while choosing a gift,
+        // the other people once one is scheduled, and people to pick from when the user wants to switch.
+        const reviewAt = messages.reduce((latest, m, i) => (m.review ? i : latest), -1);
+        const latestReview = reviewAt >= 0 ? messages[reviewAt].review : null;
+        const justScheduled = Boolean(latestReview && reviewStates[reviewKey(latestReview)] === 'scheduled' && messages.length - reviewAt <= 3);
+        const seen = new Set<string>();
+        const people = [
+          ...briefing.upcoming.map((i) => ({ id: i.recipientId, name: i.recipientName })),
+          ...recipients.map((r) => ({ id: r.id, name: r.name })),
+        ].filter((p) => p.id && p.name && !seen.has(p.id) && seen.add(p.id));
+        const flow = messages.length > 2 && history === 'ready'
+          ? chatSuggestions({ messages, justScheduled, people })
+          : [];
+        if (flow.length > 0 && !composerFocused && latestReviewIndex !== messages.length - 1) {
+          return (
+            <div className="mb-3 flex flex-wrap gap-2" aria-label="Suggested replies">
+              {flow.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  disabled={sending}
+                  onClick={() => void send(chip.send)}
+                  className="u-press min-h-10 rounded-full border px-3 py-2 text-left text-[12.5px] font-medium disabled:opacity-50"
+                  style={{ background: U.chip, borderColor: 'rgba(42,37,32,0.1)', color: '#5A5147' }}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          );
+        }
         // Fresh session: full chip set. Longer threads: only unpaid payment chips stay sticky
         // so softer "need address" noise doesn't compete with finishing payment.
         const earlySession = messages.length <= 2;

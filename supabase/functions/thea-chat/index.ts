@@ -3363,6 +3363,8 @@ const loadAddressPeople = async (
 const fetchShownProductIds = async (
   authClient: ReturnType<typeof createClient>,
   conversationId: string | null,
+  /** Only count what was shown while working on this person (the conversation is shared across everyone). */
+  recipientId?: string | null,
 ): Promise<string[]> => {
   if (!conversationId) return [];
   try {
@@ -3372,9 +3374,10 @@ const fetchShownProductIds = async (
       .eq("conversation_id", conversationId)
       .eq("role", "assistant")
       .order("created_at", { ascending: false })
-      .limit(30);
+      .limit(60);
     const ids = new Set<string>();
-    for (const row of (data || []) as Array<{ metadata?: { recommendedProducts?: Array<{ id?: string }> } | null }>) {
+    for (const row of (data || []) as Array<{ metadata?: { recommendedProducts?: Array<{ id?: string }>; activeRecipient?: { id?: string } | null } | null }>) {
+      if (recipientId && row.metadata?.activeRecipient?.id && row.metadata.activeRecipient.id !== recipientId) continue;
       for (const p of row.metadata?.recommendedProducts || []) if (typeof p?.id === "string") ids.add(p.id);
     }
     return [...ids];
@@ -4144,17 +4147,25 @@ Use the whole conversation, not just the last message. Return JSON only:
             usedSavedInterests = true;
           }
           const wantsMore = looksLikeMoreOptionsIntent(latestUserMessageContent);
-          const shownBefore = wantsMore ? await fetchShownProductIds(authClient, conversationId) : [];
+          // Every new search skips what this person has already been shown, so trying again gives fresh ideas;
+          // only when almost nothing new is left do we fall back to repeats (and say so).
+          const shownBefore = await fetchShownProductIds(authClient, conversationId, lastActiveRecipient?.id);
           searchArgs.excludeIds = shownBefore;
           searchArgs.allowPets = wantsPetGifts(searchArgs.interests, searchArgs.query, savedInterests, latestUserMessageContent);
-          const { products, matchType } = await searchGifts(searchArgs);
+          let { products, matchType } = await searchGifts(searchArgs);
+          let repeatsAllowed = false;
+          if (!wantsMore && shownBefore.length && products.length < 3) {
+            ({ products, matchType } = await searchGifts({ ...searchArgs, excludeIds: [] }));
+            repeatsAllowed = true;
+          }
           for (const product of products) seenProducts.set(product.id, product);
           lastSearchProducts = products;
           if (matchType === "fallback") for (const product of products) fallbackProductIds.add(product.id);
           toolContent = {
             matchType,
             ...(usedSavedInterests ? { usedSavedInterests: savedInterests, note: "No interests were passed, so this search used what the recipient is saved as loving. Say so briefly." } : {}),
-            ...(shownBefore.length ? { excludedAlreadyShown: shownBefore.length } : {}),
+            ...(shownBefore.length && !repeatsAllowed ? { excludedAlreadyShown: shownBefore.length } : {}),
+            ...(repeatsAllowed ? { note: "Almost nothing new fits that budget and taste, so some of these were shown before. Say so briefly and offer to widen the budget or try a different interest." } : {}),
             ...(wantsMore && products.length < 3
               ? { note: "That is nearly everything left that fits. Say so plainly and offer to widen the budget or try a different interest; do not repeat earlier options." }
               : {}),
