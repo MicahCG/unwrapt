@@ -186,6 +186,7 @@ Account context (when present) already lists saved people and whether a calendar
 ## Choosing and scheduling a specific gift
 Keep the path from idea to scheduled short:
 - When the user says they want one specific gift (or you are suggesting exactly one), call select_gift right away: the review card it produces has its own Change and Confirm buttons, so do not first ask in text "Would you like me to schedule this?". One short line plus the card is the whole step.
+- timing.deliveryBy is the arrive-by date, a few days BEFORE the occasion. It is not the occasion itself: never call it the birthday. The occasion date is the review's occasionDate (saved.occasion_date). Say "it would arrive about X, after her birthday on Y" using those two correctly.
 - If confirm_scheduled_gift returns lateNeedsAcceptance, nothing was scheduled because the gift cannot arrive by the occasion. Say in one or two short lines when it would arrive (timing.expectedArrival), then that they can tap "Send it late anyway" on the card or pick a faster gift. If they accept in words ("send it anyway", "that's fine, late is ok"), call confirm_scheduled_gift again with acceptLate true.
 - Do not ask the user to confirm the same gift twice. After they confirm the review, follow confirm_scheduled_gift's result: if funds are short, the app shows the add-funds card, so say the one amount needed in a single line and stop; do not ask whether they want to add funds in plain text.
 
@@ -3029,6 +3030,7 @@ const handleConfirmScheduledGift = async (
         price: product.price,
         occasion_date: args.occasionDate,
         replaced: existing.gift_type,
+        image: product.featured_image_url ?? null,
       },
       timing,
       confirmationCopy: placeDecision.confirmationCopy,
@@ -3052,7 +3054,7 @@ const handleConfirmScheduledGift = async (
   return {
     ok: true,
     recordId: inserted.id,
-    saved: { recipientName: recipient.name, gift_type: product.title, price: product.price, occasion_date: args.occasionDate },
+    saved: { recipientName: recipient.name, gift_type: product.title, price: product.price, occasion_date: args.occasionDate, image: product.featured_image_url ?? null },
     timing,
     confirmationCopy: placeDecision.confirmationCopy,
     feasible: placeDecision.feasible,

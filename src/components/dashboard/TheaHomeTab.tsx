@@ -38,7 +38,7 @@ import { getRecipientStatus, giftStage, hasRecipientAddress, isSettledGiftStatus
 import { VoiceDictateButton } from '@/components/dashboard/VoiceDictateButton';
 import { useSpeechDictation } from '@/hooks/useSpeechDictation';
 import { resumeGiftPayment } from '@/lib/giftPayment';
-import { calculateGiftCost, getAvailableBalance, getGiftReservedAmount, holdGiftFunds, startGiftTopUp, takePendingWalletHold } from '@/lib/wallet';
+import { calculateGiftCost, getAvailableBalance, getGiftReservedAmount, holdGiftFunds, notifyWalletChanged, startGiftTopUp, takePendingWalletHold } from '@/lib/wallet';
 import { formatGiftTimingLine, giftOrderTiming } from '@/lib/giftTiming';
 import {
   WalletHoldSuccessModal,
@@ -229,7 +229,13 @@ export const TheaIdentityChip: React.FC<{
 /** Per user+gift: unpaid return nudge already shown this browser session. */
 const UNPAID_NUDGE_KEY = 'unwrapt_unpaid_nudge';
 
-type WriteResult = { tool: string; ok: boolean; recordId?: string; error?: string };
+type WriteResult = {
+  tool: string;
+  ok: boolean;
+  recordId?: string;
+  error?: string;
+  saved?: { recipientName?: string; gift_type?: string; price?: number; occasion_date?: string; image?: string | null };
+};
 
 type ChatMessage = {
   role: 'user' | 'assistant';
@@ -789,6 +795,43 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
 
   useEffect(() => () => window.clearTimeout(celebrateTimer.current), []);
 
+  // Chat confirmations never emailed anyone (only the manual form and card checkout did). Once per gift.
+  const emailGiftScheduled = async (write: WriteResult) => {
+    const email = user?.email;
+    const saved = write.saved;
+    if (!email || !write.recordId || !saved?.gift_type) return;
+    const key = `unwrapt:gift-email:${write.recordId}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, '1');
+    } catch {
+      /* sessionStorage unavailable: send anyway */
+    }
+    const person = recipients.find((r) => r.name === saved.recipientName);
+    const md = (iso?: string | null) => (iso || '').slice(5, 10);
+    const occasion = person?.anniversary && md(person.anniversary) === md(saved.occasion_date) ? 'Anniversary' : 'Birthday';
+    try {
+      await supabase.functions.invoke('send-notification-email', {
+        body: {
+          type: 'gift_scheduled',
+          recipientEmail: email,
+          userName: (user?.user_metadata as { full_name?: string } | undefined)?.full_name || email.split('@')[0],
+          data: {
+            recipientName: saved.recipientName,
+            occasion,
+            occasionDate: saved.occasion_date,
+            giftType: saved.gift_type,
+            priceRange: saved.price != null ? `$${Number(saved.price).toFixed(2)}` : undefined,
+            giftImage: saved.image || undefined,
+            chosenInChat: true,
+          },
+        },
+      });
+    } catch (error) {
+      console.error('Failed to send gift scheduled email:', error);
+    }
+  };
+
   const celebrate = () => {
     setCelebrating(true);
     window.clearTimeout(celebrateTimer.current);
@@ -830,7 +873,11 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
       if (writes.some((w) => w.ok)) {
         await queryClient.invalidateQueries({ queryKey: ['recipients'] });
       }
+      if (writes.some((w) => w.ok)) notifyWalletChanged();
       if (writes.some((w) => w.ok && w.tool === 'confirm_scheduled_gift')) celebrate();
+      for (const w of writes) {
+        if (w.ok && w.tool === 'confirm_scheduled_gift') void emailGiftScheduled(w);
+      }
       // Client safety net: if the edge function is stale or the model refuses
       // calendar connect after a poisoned history, still surface the module.
       const calendarEnsured = ensureCalendarConnectUi(

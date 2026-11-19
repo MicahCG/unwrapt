@@ -17,11 +17,17 @@ const SWITCH_PERSON = /\b(someone else|somebody else|another person|different pe
 
 export const wantsDifferentPerson = (text: string): boolean => SWITCH_PERSON.test(text);
 
-const firstName = (name: string): string => (name || '').trim().split(/\s+/)[0] || name;
+// Saved names are sometimes calendar event titles ("Eric's Birthday"); strip that so we never say "Eric's's gift".
+const firstName = (name: string): string => {
+  const first = (name || '').trim().split(/\s+/)[0] || name || '';
+  return first.replace(/['\u2019]s$/i, '');
+};
+
+const possessive = (name: string): string => (/s$/i.test(name) ? `${name}'` : `${name}'s`);
 
 const personChip = (p: SuggestionPerson): Suggestion => ({
   id: `person:${p.id}`,
-  label: `${firstName(p.name)}'s gift`,
+  label: `${possessive(firstName(p.name))} gift`,
   send: `Let's find a gift for ${firstName(p.name)}.`,
 });
 

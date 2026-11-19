@@ -124,6 +124,12 @@ export const getWalletBreakdown = async (userId: string): Promise<WalletBreakdow
 /**
  * Get user's available wallet balance (balance minus pending reservations)
  */
+/** Fired after anything that moves wallet money (a hold, a top-up) so the header pill reloads. */
+export const WALLET_CHANGED_EVENT = 'unwrapt:wallet-changed';
+export const notifyWalletChanged = (): void => {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(WALLET_CHANGED_EVENT));
+};
+
 export const getAvailableBalance = async (userId: string): Promise<number> => {
   const breakdown = await getWalletBreakdown(userId);
   return breakdown.available;

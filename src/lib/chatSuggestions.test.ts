@@ -51,3 +51,14 @@ test('with nobody else to switch to, there is no "Someone else"', () => {
   const s = chatSuggestions({ messages: [u('x'), a('y', { activeRecipient: kora })], justScheduled: false, people: [kora] });
   assert.equal(ids(s).includes('someone-else'), false);
 });
+
+test('names saved as event titles do not become "Eric\'s\'s gift"', () => {
+  const s = chatSuggestions({
+    messages: [u('yes'), a('Scheduled!', { activeRecipient: kora })],
+    justScheduled: true,
+    people: [kora, { id: 'e', name: "Eric's Birthday" }, { id: 'c', name: 'Chris' }],
+  });
+  assert.equal(s[0].label, "Eric's gift");
+  assert.equal(s[0].send, "Let's find a gift for Eric.");
+  assert.equal(s[1].label, "Chris' gift");
+});
