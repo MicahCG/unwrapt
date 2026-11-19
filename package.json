@@ -9,7 +9,7 @@
     "feedback": "node scripts/feedback.mjs",
     "feedback:check": "node scripts/feedback.mjs check",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
-    "test": "tsx --test src/seo/routing.test.ts src/lib/calendarAutoSync.test.ts src/lib/dashboardBriefing.test.ts",
+    "test": "tsx --test src/seo/routing.test.ts src/lib/calendarAutoSync.test.ts src/lib/dashboardBriefing.test.ts src/lib/chatSuggestions.test.ts",
     "test:html": "tsx --test src/seo/static-output.test.ts",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
