@@ -740,6 +740,8 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
         if (current.some((m) => m.ui?.some((mod) => mod.module === 'wallet_topup' && mod.scheduledGiftId === gift.id))) {
           return current;
         }
+        // This is a greeting, not an interruption: once the user is talking about something, stay out of it.
+        if (current.some((m) => m.role === 'user')) return current;
         return [...current, {
           role: 'assistant',
           content: `${first}'s ${giftTitle} is scheduled but payment isn't finished yet. Add funds below and I'll hold them until I place the order.`,
