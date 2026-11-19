@@ -1,13 +1,13 @@
 ---
 id: FB-20261118-60ce
 type: bug
-status: open
+status: fixed
 title: Mobile view gets smushed
 reporter: kevin
 created: 2026-11-18
 area: 
 platform: mobile
-assignee: 
+assignee: claude
 fix: 
 verified_by: 
 ---
@@ -25,3 +25,6 @@ On mobile, content is no longer squashed; rows keep their natural height and scr
 (none attached)
 
 ## Notes / fix log
+- 2026-11-19 fixed: Screenshot showed Ask Thea sheet squashed with the keyboard open. PR #95; awaiting verification on a real iPhone.
+
+![](../../feedback/assets/FB-20261118-60ce/1.png)

@@ -1,13 +1,13 @@
 ---
 id: FB-20261119-28cb
 type: feature
-status: open
+status: fixed
 title: Confirm the address at the start, and flag when it differs from the shipping address
 reporter: kevin
 created: 2026-11-19
 area: onboarding
 platform: 
-assignee: 
+assignee: claude
 fix: 
 verified_by: 
 ---
@@ -25,3 +25,4 @@ TO CLARIFY: which address is compared with which, and where in the flow it shoul
 (none attached)
 
 ## Notes / fix log
+- 2026-11-19 fixed: Clarified: confirm the address is real when it is added. PR #96 (Census geocoder check + 'Did you mean' / 'couldn't find' prompts on the Add Recipient form); awaiting verification.
