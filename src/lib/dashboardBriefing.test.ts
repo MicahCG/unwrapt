@@ -5,6 +5,7 @@ import {
   buildBriefingMessage,
   buildDashboardBriefing,
   disambiguateBriefingNames,
+  fundsDueSoon,
 } from './dashboardBriefing.ts';
 import type { RecipientRecord } from './giftStatus.ts';
 
@@ -96,4 +97,14 @@ test('a first name is only lengthened when someone else in the briefing shares i
   assert.equal(disambiguateBriefingNames([
     { id: '1', name: 'Sam Smith' },
   ]).get('1'), 'Sam');
+});
+
+test('unpaid wallet gifts only count when the occasion is coming up', () => {
+  const now = new Date(2026, 10, 19, 12);
+  assert.equal(fundsDueSoon({ occasion_date: '2026-11-20' }, now), true);
+  assert.equal(fundsDueSoon({ occasion_date: '2026-12-20' }, now), true); // 31 days
+  assert.equal(fundsDueSoon({ occasion_date: '2026-11-14' }, now), false); // already past
+  assert.equal(fundsDueSoon({ occasion_date: '2025-09-27' }, now), false);
+  assert.equal(fundsDueSoon({ occasion_date: '2027-09-25' }, now), false); // months away
+  assert.equal(fundsDueSoon({ occasion_date: null }, now), true);
 });

@@ -83,6 +83,22 @@ export function addressChipForm(
  */
 export const FOCUS_WINDOW_DAYS = 30;
 
+/** An approved wallet gift only needs funds soon when its occasion is coming up (not past, not months away). */
+export const FUNDS_WINDOW_DAYS = 45;
+
+/**
+ * Whether an unpaid wallet gift is worth nagging about today. Occasions already past are stale rows, and
+ * ones months away are not urgent: Happy!'s mug for next September was being offered mid-chat about
+ * someone else, alongside unpaid gifts from 2025.
+ */
+export const fundsDueSoon = (gift: { occasion_date?: string | null }, now: Date = new Date()): boolean => {
+  const iso = typeof gift.occasion_date === 'string' ? gift.occasion_date.slice(0, 10) : '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return true; // no date to judge by: keep it visible
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const days = Math.round((new Date(`${iso}T00:00:00`).getTime() - today) / 86_400_000);
+  return days >= 0 && days <= FUNDS_WINDOW_DAYS;
+};
+
 /** profiles.autopilot_level -> the $ amount Thea can confirm without asking first. */
 export const AUTOPILOT_THRESHOLDS: Record<string, number> = {
   always: 0,
@@ -113,7 +129,7 @@ const recipientAppearsInBriefing = (recipient: RecipientRecord, autopilotThresho
   if (findResumableGift(recipient)) return true;
   for (const gift of recipient.scheduled_gifts || []) {
     const closed = ['cancelled', 'canceled', 'expired', 'archived'].includes((gift.status || '').toLowerCase());
-    if (!closed && isWalletGift(gift) && giftStage(gift) === 'scheduled') return true;
+    if (!closed && isWalletGift(gift) && giftStage(gift) === 'scheduled' && fundsDueSoon(gift)) return true;
     if (giftNeedsReview(gift, autopilotThreshold)) return true;
     const giftStatus = getGiftStatus(gift, recipient);
     if (giftStatus.key === 'ordered' || giftStatus.key === 'shipped' || giftStatus.key === 'delivered') return true;
@@ -197,7 +213,7 @@ export function buildDashboardBriefing(
 
     for (const gift of recipient.scheduled_gifts || []) {
       const closed = ['cancelled', 'canceled', 'expired', 'archived'].includes((gift.status || '').toLowerCase());
-      if (!closed && isWalletGift(gift) && giftStage(gift) === 'scheduled') {
+      if (!closed && isWalletGift(gift) && giftStage(gift) === 'scheduled' && fundsDueSoon(gift)) {
         needsFunds.push({
           recipientId: recipient.id,
           recipientName: cleanName(recipient.name),
