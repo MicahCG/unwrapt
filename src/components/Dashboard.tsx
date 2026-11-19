@@ -15,6 +15,7 @@ import { ApprovalScreen } from '@/components/unwrapt2/ApprovalScreen';
 import { U } from '@/components/unwrapt2/theme';
 import { Settings } from 'lucide-react';
 import RecipientDetailSheet from '@/components/RecipientDetailSheet';
+import { useAutoCalendarSync } from '@/hooks/useCalendarConnection';
 import CatalogPreviewSheet from '@/components/CatalogPreviewSheet';
 import { type RecipientRecord, type GiftRecord } from '@/lib/giftStatus';
 import { findResumableGift, resumeGiftPayment, hasCompleteShippingAddress } from '@/lib/giftPayment';
@@ -29,6 +30,7 @@ type DashboardTab = 'thea' | 'manual';
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  useAutoCalendarSync();
   const [searchParams, setSearchParams] = useSearchParams();
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [successRecipient, setSuccessRecipient] = useState(null);

@@ -11,6 +11,10 @@ import {
   type CalendarResult,
 } from '@/lib/calendarConnection';
 import { SOURCE_LABEL, type BirthdaySource, type FoundOccasion } from '@/lib/birthdaySources';
+import { useToast } from '@/hooks/use-toast';
+import {
+  loadLastSyncAt, loadSeenPeople, planCalendarSync, saveLastSyncAt, saveSeenPeople, shouldRunCalendarSync,
+} from '@/lib/calendarAutoSync';
 
 export type CalendarCandidate = { key: string; name: string; birthday: string | null; anniversary: string | null; interests?: string[] };
 
@@ -112,6 +116,60 @@ export function useCalendarConnected() {
     },
     enabled: !!user,
   });
+}
+
+/**
+ * Keeps Unwrapt in step with a connected Google Calendar: someone added to the calendar after it was
+ * connected shows up here on its own. Runs when the app opens and when the user comes back to the tab
+ * (at most every 10 minutes). The first run on a device only records who is already on the calendar;
+ * from then on, new people are added and a short notice says who. Failures are silent: manual
+ * "Sync calendar" still works and reports its own errors.
+ */
+export function useAutoCalendarSync() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { data: connected = false } = useCalendarConnected();
+
+  useEffect(() => {
+    if (!user || !connected) return;
+    const userId = user.id;
+    let cancelled = false;
+    let running = false;
+
+    const run = async () => {
+      if (running || document.visibilityState !== 'visible') return;
+      if (!shouldRunCalendarSync(loadLastSyncAt(userId), Date.now())) return;
+      running = true;
+      try {
+        const people = [...(await fetchGoogleCalendarPeople()).values()];
+        const plan = planCalendarSync(people, loadSeenPeople(userId));
+        const added = plan.toImport.length ? await importNewPeople(userId, plan.toImport, SOURCE_LABEL.google) : [];
+        saveSeenPeople(userId, plan.seen);
+        saveLastSyncAt(userId, Date.now());
+        if (!cancelled && added.length) {
+          await queryClient.invalidateQueries({ queryKey: ['recipients'] });
+          const names = added.map((p) => p.name.split(' ')[0]);
+          toast({
+            title: names.length === 1 ? `Added ${names[0]} from your calendar` : `Added ${names.length} people from your calendar`,
+            description: names.length === 1 ? 'Their birthday is now on your Unwrapt calendar.' : names.join(', '),
+          });
+        }
+      } catch {
+        // Expired/not-connected/offline: stay quiet; the manual sync explains these.
+      } finally {
+        running = false;
+      }
+    };
+
+    void run();
+    const onVisible = () => { void run(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [user, connected, queryClient, toast]);
 }
 
 // Several buttons can mount at once; only one should act on the OAuth return.
