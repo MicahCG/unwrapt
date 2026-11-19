@@ -5,6 +5,7 @@
 // import doesn't start a live HTTP listener - see the comment there.)
 import { assert, assertEquals } from "https://deno.land/std@0.190.0/testing/asserts.ts";
 import {
+  pickPendingReviewMarker,
   affirmedSingleOffer,
   pickCardProducts,
   searchGoodyGifts,
@@ -1523,4 +1524,11 @@ Deno.test("affirmedSingleOffer: stays out of the way when it is not a clear yes 
   assertEquals(affirmedSingleOffer("Yes", { ...offer, recommendedProducts: [...offer.recommendedProducts, { id: "p2", title: "Other", price: 9 }] }), null);
   assertEquals(affirmedSingleOffer("Yes", { recommendedProducts: offer.recommendedProducts }), null);
   assertEquals(affirmedSingleOffer("Yes", null), null);
+});
+
+Deno.test("pickPendingReviewMarker keeps a review pending through side questions, newest first", () => {
+  assertEquals(pickPendingReviewMarker([{ activeRecipient: {} }, { reviewMarker: "r:p:2026-11-20" }, { reviewMarker: "old:p:2026-01-01" }]), "r:p:2026-11-20");
+  assertEquals(pickPendingReviewMarker([{ reviewMarker: "new:p:2026-11-20" }, { reviewMarker: "old:p:2026-01-01" }]), "new:p:2026-11-20");
+  assertEquals(pickPendingReviewMarker([{}, {}, {}, {}, { reviewMarker: "too:far:back" }]), undefined);
+  assertEquals(pickPendingReviewMarker([null, undefined]), undefined);
 });

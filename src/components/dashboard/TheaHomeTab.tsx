@@ -917,10 +917,12 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     void send(`I'd like the ${product.title} (product ${product.id}).`);
   };
 
-  const confirmReview = async (review: GiftReview) => {
+  const confirmReview = async (review: GiftReview, acceptLate = false) => {
     const key = reviewKey(review);
     setReviewStates((s) => ({ ...s, [key]: 'confirming' }));
-    const confirmText = review.replacesGiftTitle
+    const confirmText = acceptLate
+      ? `Yes, confirm the ${review.productTitle} for ${review.recipientName}. I accept a late arrival.`
+      : review.replacesGiftTitle
       ? `Yes, swap to the ${review.productTitle} for ${review.recipientName} (replace ${review.replacesGiftTitle}).`
       : `Yes, confirm the ${review.productTitle} for ${review.recipientName}.`;
     const writes = await send(confirmText);
@@ -1198,7 +1200,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
                       disabled={sending || index !== latestReviewIndex}
                       address={reviewAddress(message.review)}
                       funded={reviewFunded(message.review)}
-                      onConfirm={() => void confirmReview(message.review!)}
+                      onConfirm={(acceptLate) => void confirmReview(message.review!, acceptLate)}
                       onChange={() => void send('Let’s look at other options.')}
                       onSaveAddress={(address) => saveReviewAddress(message.review!, address)}
                       onViewPlan={() => onOpenRecipient(message.review!.recipientId, 'open')}
