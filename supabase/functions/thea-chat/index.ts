@@ -10,6 +10,7 @@ import {
 } from "../_shared/giftTiming.ts";
 import { decideReservedOrder } from "../_shared/reservedFunds.ts";
 import { quoteGoodyOrderPrice } from "../_shared/goodyPricing.ts";
+import { matchesOccasion, productOccasions, productsMentionedIn, remainingPages, shippingFromBrand } from "../_shared/goodyCatalog.ts";
 
 export { giftOrderTiming, resolveShippingLeadDays, shippingLeadDaysFromProduct, decidePlaceBy, timingForStoredGift, decideReservedOrder };
 
@@ -48,6 +49,11 @@ type Product = {
   /** Optional per-item transit days when the catalog exposes them. */
   shipping_lead_days?: number | null;
   estimated_delivery_days?: number | null;
+  /** The brand's own shipping charge and free-shipping threshold in dollars, straight from Goody (null when absent). */
+  shipping_price?: number | null;
+  free_shipping_minimum?: number | null;
+  /** Occasion categories Goody files it under, lowercased ("birthday", "christmas"). */
+  occasions?: string[];
 };
 
 type GoodyProduct = {
@@ -57,7 +63,8 @@ type GoodyProduct = {
   subtitle_short?: string | null;
   recipient_description?: string | null;
   price?: number | null;
-  brand?: { name?: string | null } | null;
+  brand?: { name?: string | null; shipping_price?: number | null; free_shipping_minimum?: number | null } | null;
+  categories?: Array<{ name?: string | null; sets?: string[] | null }> | null;
   images?: Array<{ image_large?: { url?: string | null } | null }>;
   variants?: Array<{ image_large?: { url?: string | null } | null }>;
   /** Present only if Goody starts returning lead-time fields; otherwise ignored. */
@@ -185,6 +192,8 @@ Keep the path from idea to scheduled short:
 Prices and availability, stated consistently:
 - Quote a gift's price exactly as search_gifts returned it (the gift's own price). The app shows the Unwrapt service fee and shipping and tax separately under each card, so say "plus a small service fee and shipping" when cost comes up; never add the fee into a number you quote and never quote the same gift at two different prices.
 - Never tell the user a gift is unavailable, out of stock or discontinued unless a tool result says so in those words. A lookup error, a late-delivery result, a wallet shortfall or a missing address are none of those: describe what actually happened (for example "that would arrive after her birthday") and offer the next step.
+- Never say you cannot show pictures. When you name a gift the app shows its picture card with your reply, so just name it. If they ask to see it, say it is right below.
+- Pass occasion to search_gifts when you know it (birthday, anniversary, christmas...): Goody files gifts by the occasions they suit, so those are better ideas.
 - When the user wants more, cheaper or different ideas, call search_gifts again and let the app show the results as cards; keep your own text to one short line instead of re-listing gifts in bullets.
 
 When the user picks one specific gift for a specific recipient, whether by tapping a card or naming it in text (match their words to the right id from your most recent search_gifts results, do not search again or repeat the list), call select_gift. It returns a review, not a save - nothing has been scheduled yet. Tell the user, in one short line, exactly what you're about to schedule (recipient, gift, price, occasion date, and the concrete place/arrive timing from review.timing) and ask them to confirm. If review.timing.feasible is false, lead with that warning and options before asking to confirm. Use future or conditional phrasing only ("I'll schedule...", "Ready to send...", "Want me to lock this in?") - never past tense or completed-action phrasing ("I've scheduled...", "This is booked...", "Done!") for a review, since nothing is booked until the user confirms and you call confirm_scheduled_gift; claiming otherwise is exactly the kind of invented completed action the hard boundaries above forbid.
@@ -246,6 +255,10 @@ const SEARCH_GIFTS_TOOL = {
         },
         max_price: { type: "number", description: "Maximum price in USD." },
         min_price: { type: "number", description: "Minimum price in USD." },
+        occasion: {
+          type: "string",
+          description: "The occasion the gift is for, when known: birthday, anniversary, christmas, holiday, thank you... Gifts Goody files under that occasion are preferred.",
+        },
       },
     },
   },
@@ -1700,24 +1713,34 @@ const fetchRawGoodyProductsUncached = async (): Promise<GoodyProduct[]> => {
     ? "https://api.ongoody.com"
     : "https://api.sandbox.ongoody.com";
 
-  const pages = [1, 2, 3];
   const seen = new Set<string>();
   const raw: GoodyProduct[] = [];
-  for (const page of pages) {
-    const response = await fetch(`${baseUrl}/v1/products?page=${page}&per_page=100`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!response.ok) break;
-    const payload = await response.json() as { data?: GoodyProduct[] };
-    const batch = payload.data || [];
-    if (!batch.length) break;
+  const addBatch = (batch: GoodyProduct[]) => {
     for (const product of batch) {
       if (!product.id || seen.has(product.id)) continue;
       seen.add(product.id);
       raw.push(product);
     }
-    if (batch.length < 100) break;
+  };
+  const fetchPage = async (page: number) => {
+    const response = await fetch(`${baseUrl}/v1/products?page=${page}&per_page=100`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) return null;
+    return await response.json() as { data?: GoodyProduct[]; list_meta?: { total_count?: number } };
+  };
+
+  // Read the whole catalog, not just the first 300 products: Goody's own site shows far more, and a
+  // listing cut short is why gifts appeared and vanished between turns. Page 1 says how many pages
+  // there are; the rest are fetched a few at a time.
+  const first = await fetchPage(1);
+  if (!first) return raw;
+  addBatch(first.data || []);
+  const rest = remainingPages(first.list_meta?.total_count);
+  for (let i = 0; i < rest.length; i += 5) {
+    const results = await Promise.all(rest.slice(i, i + 5).map((page) => fetchPage(page).catch(() => null)));
+    for (const result of results) addBatch(result?.data || []);
   }
   return raw;
 };
@@ -1734,7 +1757,7 @@ const fetchRawGoodyProductsUncached = async (): Promise<GoodyProduct[]> => {
 // API's own call-to-call volatility does. Only a successful, non-empty
 // fetch is cached, so a transient API error doesn't poison it.
 let goodyProductsCache: { data: GoodyProduct[]; fetchedAt: number } | null = null;
-const GOODY_PRODUCTS_CACHE_TTL_MS = 60_000;
+const GOODY_PRODUCTS_CACHE_TTL_MS = 5 * 60_000;
 
 const fetchRawGoodyProducts = async (): Promise<GoodyProduct[]> => {
   if (goodyProductsCache && Date.now() - goodyProductsCache.fetchedAt < GOODY_PRODUCTS_CACHE_TTL_MS) {
@@ -1761,24 +1784,53 @@ const toProduct = (product: GoodyProduct & { id: string; name: string; price: nu
   provider: "goody" as const,
   shipping_lead_days: product.shipping_lead_days ?? null,
   estimated_delivery_days: product.estimated_delivery_days ?? null,
+  ...shippingFromBrand(product.brand),
+  occasions: productOccasions(product.categories),
 });
 
 /** Fresh, unranked lookup of one product by id - used right before writing a
  * scheduled_gifts row so price/availability is validated against the live
  * catalog, not a value carried over from a possibly-stale earlier turn. */
-const findGoodyProductById = async (id: string): Promise<Product | null> => {
+const goodyApi = (): { baseUrl: string; apiKey: string } | null => {
+  const environment = Deno.env.get("GOODY_API_ENV") === "production" ? "production" : "sandbox";
+  const apiKey = environment === "production"
+    ? Deno.env.get("GOODY_PRODUCTION_COMMERCE_API_KEY")
+    : Deno.env.get("GOODY_SANDBOX_COMMERCE_API_KEY");
+  if (!apiKey) return null;
+  return { baseUrl: environment === "production" ? "https://api.ongoody.com" : "https://api.sandbox.ongoody.com", apiKey };
+};
+
+/** One product as Goody sees it right now. `gone` is true only when Goody says it does not exist (404);
+ * any other failure is "could not check", which must never be reported to the user as out of stock. */
+const lookupGoodyProduct = async (id: string): Promise<{ product: Product | null; gone: boolean }> => {
+  const usable = (p: GoodyProduct | undefined | null) => Boolean(p && p.id === id && p.name && typeof p.price === "number");
   try {
-    const isIt = (p: GoodyProduct) => p.id === id && p.name && typeof p.price === "number";
-    // Goody's listing has returned different sets across calls seconds apart, so one miss on the cached
-    // copy is not proof the gift is gone: check a fresh copy before giving up.
-    const match = (await fetchRawGoodyProducts()).find(isIt) ?? (await fetchRawGoodyProductsUncached()).find(isIt);
-    if (!match) return null;
-    return toProduct({ ...match, id: match.id!, name: match.name!, price: match.price! / 100 });
+    const fromList = (await fetchRawGoodyProducts()).find(usable);
+    if (fromList) return { product: toProduct({ ...fromList, id: fromList.id!, name: fromList.name!, price: fromList.price! / 100 }), gone: false };
   } catch (error) {
-    console.error("Goody product lookup failed", error);
-    return null;
+    console.error("Goody product list lookup failed", error);
+  }
+  const api = goodyApi();
+  if (!api) return { product: null, gone: false };
+  try {
+    const response = await fetch(`${api.baseUrl}/v1/products/${encodeURIComponent(id)}`, {
+      headers: { Authorization: `Bearer ${api.apiKey}` },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (response.status === 404) return { product: null, gone: true };
+    if (!response.ok) return { product: null, gone: false };
+    const payload = await response.json() as { data?: GoodyProduct } & GoodyProduct;
+    const raw = payload.data ?? payload;
+    if (!usable(raw)) return { product: null, gone: false };
+    return { product: toProduct({ ...raw, id: raw.id!, name: raw.name!, price: raw.price! / 100 }), gone: false };
+  } catch (error) {
+    console.error("Goody product retrieve failed", error);
+    return { product: null, gone: false };
   }
 };
+
+const COULD_NOT_CHECK_ERROR = "Could not re-check that gift's details just now. This is NOT the same as the gift being out of stock: do not tell the user it is unavailable. Say you couldn't confirm it this second, and offer to try again or pick another.";
+const GIFT_GONE_ERROR = "Goody no longer carries that gift (it may have been seasonal or sold out), so it can't be ordered. Tell the user that plainly and offer to look for something similar with search_gifts.";
 
 type SearchResult = { products: Product[]; matchType: "matched" | "fallback" };
 
@@ -1808,6 +1860,8 @@ export const searchGoodyGifts = async (
     excludeIds?: string[];
     /** Pet products are hidden unless the gift really is about a pet. */
     allowPets?: boolean;
+    /** "birthday", "anniversary", "christmas"...: products Goody files under it rank higher. */
+    occasion?: string;
   },
 ): Promise<SearchResult> => {
   try {
@@ -1841,7 +1895,9 @@ export const searchGoodyGifts = async (
       const blob = text(product);
       const interestScore = scoreInterestText(blob, interests, query, broaden);
       const vibeScore = args.vibe ? scoreVibe(blob, args.vibe) : 0;
-      return { product, interestScore, vibeScore, total: interestScore * 3 + vibeScore };
+      // Goody files each gift under the occasions it suits; a gift made for this occasion is a better idea.
+      const occasionScore = matchesOccasion(productOccasions(product.categories), args.occasion) ? 2 : 0;
+      return { product, interestScore, vibeScore, total: interestScore * 3 + vibeScore + occasionScore };
     });
 
     // When interests are provided, only return products that actually match
@@ -2357,8 +2413,9 @@ export const handleSelectGift = async (
   // product search_gifts just returned can wrongly look "unavailable" here
   // through no fault of the user's selection - the fallback is the same
   // data the user was already shown, not invented.
-  const product = (await findGoodyProductById(args.productId)) ?? fallbackProduct ?? null;
-  if (!product) return { ok: false, error: "Could not re-check that gift's details just now. This is NOT the same as the gift being out of stock: do not tell the user it is unavailable. Say you couldn't confirm it this second, and offer to try again or pick another." };
+  const looked = await lookupGoodyProduct(args.productId);
+  const product = looked.product ?? (looked.gone ? null : fallbackProduct) ?? null;
+  if (!product) return { ok: false, error: looked.gone ? GIFT_GONE_ERROR : COULD_NOT_CHECK_ERROR };
 
   // No DB uniqueness on (recipient_id, occasion_date) exists, so this can't
   // assume at most one row - query as a list and take the most recent
@@ -2835,8 +2892,9 @@ const handleConfirmScheduledGift = async (
   // turn's search_gifts, or CC-02's carried-over turn context) rather than
   // failing outright when Goody's own listing doesn't surface it moments
   // later - see the matching comment in handleSelectGift.
-  const product = (await findGoodyProductById(args.productId)) ?? fallbackProduct ?? null;
-  if (!product) return { ok: false, error: "Could not re-check that gift's details just now. This is NOT the same as the gift being out of stock: do not tell the user it is unavailable. Say you couldn't confirm it this second, and offer to try again or pick another." };
+  const looked = await lookupGoodyProduct(args.productId);
+  const product = looked.product ?? (looked.gone ? null : fallbackProduct) ?? null;
+  if (!product) return { ok: false, error: looked.gone ? GIFT_GONE_ERROR : COULD_NOT_CHECK_ERROR };
 
   // Same gift already booked, or already ordered — leave the product alone.
   // A place-date change on that open gift still has to be stored.
@@ -3379,11 +3437,14 @@ type DisplayProduct = {
   featured_image_url: string | null;
   description?: string | null;
   product_type?: string | null;
+  shipping_price?: number | null;
+  free_shipping_minimum?: number | null;
 };
 
 export const toDisplayProduct = (p: {
   id: string; title: string; price: number; currency?: string;
   featured_image_url?: string | null; description?: string | null; product_type?: string | null;
+  shipping_price?: number | null; free_shipping_minimum?: number | null;
 }): DisplayProduct => ({
   id: p.id,
   title: p.title,
@@ -3392,6 +3453,8 @@ export const toDisplayProduct = (p: {
   featured_image_url: p.featured_image_url ?? null,
   description: p.description ? p.description.slice(0, 240) : null,
   product_type: p.product_type ?? null,
+  shipping_price: p.shipping_price ?? null,
+  free_shipping_minimum: p.free_shipping_minimum ?? null,
 });
 
 export type HistoryRow = { role: string; content: string; metadata?: Record<string, unknown> | null };
@@ -4304,12 +4367,27 @@ Use the whole conversation, not just the last message. Return JSON only:
       });
     }
 
-    const resolvedProducts = pickCardProducts(
+    let resolvedProducts = pickCardProducts(
       reply,
       recommendedIds.map((id) => seenProducts.get(id)).filter((p): p is Product => Boolean(p)),
       lastSearchProducts,
       Boolean(lastReview),
     );
+    // A reply that names a gift always comes with its picture, even when it was named from memory
+    // ("can I see a picture of it?") and no search ran this turn.
+    if (resolvedProducts.length === 0 && !lastReview) {
+      try {
+        const named = productsMentionedIn(
+          reply,
+          (await fetchRawGoodyProducts())
+            .filter((p): p is GoodyProduct & { id: string; name: string; price: number } => Boolean(p.id && p.name && typeof p.price === "number")),
+        );
+        resolvedProducts = named.map((p) => toProduct({ ...p, price: p.price / 100 }));
+        for (const product of resolvedProducts) seenProducts.set(product.id, product);
+      } catch (error) {
+        console.error("Could not attach pictures for named gifts", error);
+      }
+    }
 
     // Bubble + swap/review card must agree (live: "only cookies" vs wine-glasses card).
     const aligned = alignReviewPresentation(reply, lastReview, resolvedProducts);
