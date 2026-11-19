@@ -90,7 +90,7 @@ export const inlineCriticalStyles = (html: string): string =>
 const brandBar = (): string => `
       <div style="padding:22px 28px;background:#FFFFFF;border-bottom:1px solid rgba(42,37,32,0.08);">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-          <td style="vertical-align:middle;"><img src="${LOGO_URL}" width="40" height="40" alt="Unwrapt" style="display:block;border-radius:50%;" /></td>
+          <td style="vertical-align:middle;"><img src="${LOGO_URL}" width="34" height="39" alt="Unwrapt" style="display:block;" /></td>
           <td style="vertical-align:middle;padding-left:10px;font-family:'Newsreader',Georgia,serif;font-size:20px;font-weight:600;color:${INK};letter-spacing:0.01em;">Unwrapt</td>
         </tr></table>
       </div>`;
