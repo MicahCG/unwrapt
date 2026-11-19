@@ -177,6 +177,11 @@ Account context (when present) already lists saved people and whether a calendar
 - Never ask for or store a recipient's phone number or email in this chat (see hard boundaries above). For shipping address and structured details, prefer present_ui (edit_recipient / add_recipient) over asking them to type everything into the chat.
 
 ## Choosing and scheduling a specific gift
+Prices and availability, stated consistently:
+- Quote a gift's price exactly as search_gifts returned it (the gift's own price). The app shows the Unwrapt service fee and shipping and tax separately under each card, so say "plus a small service fee and shipping" when cost comes up; never add the fee into a number you quote and never quote the same gift at two different prices.
+- Never tell the user a gift is unavailable, out of stock or discontinued unless a tool result says so in those words. A lookup error, a late-delivery result, a wallet shortfall or a missing address are none of those: describe what actually happened (for example "that would arrive after her birthday") and offer the next step.
+- When the user wants more, cheaper or different ideas, call search_gifts again and let the app show the results as cards; keep your own text to one short line instead of re-listing gifts in bullets.
+
 When the user picks one specific gift for a specific recipient, whether by tapping a card or naming it in text (match their words to the right id from your most recent search_gifts results, do not search again or repeat the list), call select_gift. It returns a review, not a save - nothing has been scheduled yet. Tell the user, in one short line, exactly what you're about to schedule (recipient, gift, price, occasion date, and the concrete place/arrive timing from review.timing) and ask them to confirm. If review.timing.feasible is false, lead with that warning and options before asking to confirm. Use future or conditional phrasing only ("I'll schedule...", "Ready to send...", "Want me to lock this in?") - never past tense or completed-action phrasing ("I've scheduled...", "This is booked...", "Done!") for a review, since nothing is booked until the user confirms and you call confirm_scheduled_gift; claiming otherwise is exactly the kind of invented completed action the hard boundaries above forbid.
 Price the gift to the user as review.giftWithFee (the gift price plus the $7 Unwrapt service fee), and when review.shippingAndTax is greater than 0 add that it comes with about review.shippingAndTax more for shipping and tax (e.g. "$22 with our service fee, plus about $10 shipping & tax"). Say nothing about shipping and tax when it is 0 (no quote yet, e.g. no address on file).
 If review.walletShortfall is greater than 0, add one extra clause to that same message naming review.walletAvailable and review.walletShortfall exactly (e.g. "...for $45. Heads up, you've got $12 available, so you'd be $33 short once shipping and tax are included - want to add funds now, or confirm anyway and top up after?") - not a separate message, not blocking the confirm offer. They can still confirm with a shortfall (confirm_scheduled_gift and its own funding result handle that), so this is a courtesy warning, never a blocker. Say nothing extra about wallet funds when walletShortfall is 0.
@@ -1726,8 +1731,10 @@ const toProduct = (product: GoodyProduct & { id: string; name: string; price: nu
  * catalog, not a value carried over from a possibly-stale earlier turn. */
 const findGoodyProductById = async (id: string): Promise<Product | null> => {
   try {
-    const raw = await fetchRawGoodyProducts();
-    const match = raw.find((p) => p.id === id && p.name && typeof p.price === "number");
+    const isIt = (p: GoodyProduct) => p.id === id && p.name && typeof p.price === "number";
+    // Goody's listing has returned different sets across calls seconds apart, so one miss on the cached
+    // copy is not proof the gift is gone: check a fresh copy before giving up.
+    const match = (await fetchRawGoodyProducts()).find(isIt) ?? (await fetchRawGoodyProductsUncached()).find(isIt);
     if (!match) return null;
     return toProduct({ ...match, id: match.id!, name: match.name!, price: match.price! / 100 });
   } catch (error) {
@@ -2197,6 +2204,24 @@ export const stripProductListFromReply = (reply: string): string => {
   return text || "Here are a few ideas - tap one to pick it.";
 };
 
+/**
+ * Which products become cards for this reply. Titles Thea types are matched exactly first; when that finds
+ * nothing but a search ran this turn, show what the search returned (the ones the reply names loosely, else
+ * the top few) instead of dropping to a plain text list. Observed live: follow-ups like "anything under 25?"
+ * came back as bullet lists with no cards and nothing saved, so a later pick had no product to fall back on.
+ */
+export const pickCardProducts = <T extends { id: string; title: string }>(
+  reply: string,
+  resolved: T[],
+  searchResults: T[],
+  hasReview: boolean,
+  limit = 6,
+): T[] => {
+  if (resolved.length > 0 || hasReview || searchResults.length === 0) return resolved;
+  const named = searchResults.filter((p) => replyNamesReviewProduct(reply, p.title));
+  return (named.length ? named : searchResults).slice(0, limit);
+};
+
 /** The one saved person a user message names (whole-word, case-insensitive match on full name
  * or first name), or null when none or more than one is named. Exported for unit testing. */
 export const findMentionedRecipient = (
@@ -2296,7 +2321,7 @@ export const handleSelectGift = async (
   // through no fault of the user's selection - the fallback is the same
   // data the user was already shown, not invented.
   const product = (await findGoodyProductById(args.productId)) ?? fallbackProduct ?? null;
-  if (!product) return { ok: false, error: "That product isn't available right now - search again for current options." };
+  if (!product) return { ok: false, error: "Could not re-check that gift's details just now. This is NOT the same as the gift being out of stock: do not tell the user it is unavailable. Say you couldn't confirm it this second, and offer to try again or pick another." };
 
   // No DB uniqueness on (recipient_id, occasion_date) exists, so this can't
   // assume at most one row - query as a list and take the most recent
@@ -2774,7 +2799,7 @@ const handleConfirmScheduledGift = async (
   // failing outright when Goody's own listing doesn't surface it moments
   // later - see the matching comment in handleSelectGift.
   const product = (await findGoodyProductById(args.productId)) ?? fallbackProduct ?? null;
-  if (!product) return { ok: false, error: "That product is no longer available - search again for current options." };
+  if (!product) return { ok: false, error: "Could not re-check that gift's details just now. This is NOT the same as the gift being out of stock: do not tell the user it is unavailable. Say you couldn't confirm it this second, and offer to try again or pick another." };
 
   // Same gift already booked, or already ordered — leave the product alone.
   // A place-date change on that open gift still has to be stored.
@@ -3693,6 +3718,8 @@ Use the whole conversation, not just the last message. Return JSON only:
     // recommends one of these without disclosing it's not an exact match
     // gets bounced back for a rewrite (see needsFallbackDisclosure).
     const fallbackProductIds = new Set<string>();
+    // What this turn's most recent search_gifts returned, so the reply can show them as cards.
+    let lastSearchProducts: Product[] = [];
     // Seed from the prior turn's carried-over recommendations (CC-02) so
     // select_gift/confirm_scheduled_gift have a fallback product to use
     // even when the model skips search_gifts this turn as instructed (it's
@@ -4000,6 +4027,7 @@ Use the whole conversation, not just the last message. Return JSON only:
           searchArgs.allowPets = wantsPetGifts(searchArgs.interests, searchArgs.query, savedInterests, latestUserMessageContent);
           const { products, matchType } = await searchGifts(searchArgs);
           for (const product of products) seenProducts.set(product.id, product);
+          lastSearchProducts = products;
           if (matchType === "fallback") for (const product of products) fallbackProductIds.add(product.id);
           toolContent = {
             matchType,
@@ -4217,9 +4245,12 @@ Use the whole conversation, not just the last message. Return JSON only:
       });
     }
 
-    const resolvedProducts = recommendedIds.length > 0
-      ? recommendedIds.map((id) => seenProducts.get(id)).filter((p): p is Product => Boolean(p))
-      : [];
+    const resolvedProducts = pickCardProducts(
+      reply,
+      recommendedIds.map((id) => seenProducts.get(id)).filter((p): p is Product => Boolean(p)),
+      lastSearchProducts,
+      Boolean(lastReview),
+    );
 
     // Bubble + swap/review card must agree (live: "only cookies" vs wine-glasses card).
     const aligned = alignReviewPresentation(reply, lastReview, resolvedProducts);
