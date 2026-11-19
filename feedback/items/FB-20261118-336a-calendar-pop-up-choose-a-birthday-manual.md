@@ -13,10 +13,10 @@ verified_by:
 ---
 
 ## What happened
-(describe the problem or the idea)
+Reporter's note: 'Selecting birthday manually for the calendar pop up.'
 
 ## Expected / desired
-(what should happen instead)
+In the calendar pop-up, the user can choose/enter a birthday manually instead of only syncing. (Needs a design decision before building; see PR discussion.)
 
 ## Message context
 (none attached)

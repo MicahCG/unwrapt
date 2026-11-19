@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Sparkles } from 'lucide-react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { getGiftRecommendations, type GiftCatalogItem } from '@/lib/giftCatalog';
@@ -23,6 +23,13 @@ const price = (product: GiftCatalogItem) =>
     ? 'Price at review'
     : new Intl.NumberFormat('en-US', { style: 'currency', currency: product.currency, maximumFractionDigits: 0 }).format(product.price);
 
+/** Shared with Dashboard so the catalog can be fetched before the sheet is even opened. */
+export const catalogPreviewQuery = (requested: string[]) => ({
+  queryKey: ['catalog-preview', [...requested].sort().join('|')],
+  queryFn: () => getGiftRecommendations(requested, 6),
+  staleTime: 30 * 60 * 1000,
+});
+
 const CatalogPreviewSheet: React.FC<CatalogPreviewSheetProps> = ({
   open,
   onOpenChange,
@@ -39,11 +46,11 @@ const CatalogPreviewSheet: React.FC<CatalogPreviewSheetProps> = ({
 
   const requested = filter === ALL ? saved : [filter];
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ['catalog-preview', [...requested].sort().join('|')],
-    queryFn: () => getGiftRecommendations(requested, 6),
+    ...catalogPreviewQuery(requested),
     enabled: open,
-    staleTime: 10 * 60 * 1000,
     retry: 1,
+    // Switching the interest filter keeps the current grid on screen instead of flashing empty.
+    placeholderData: keepPreviousData,
   });
   const products = data?.products || [];
   const first = recipientName?.split(' ')[0];
@@ -119,7 +126,7 @@ const CatalogPreviewSheet: React.FC<CatalogPreviewSheetProps> = ({
             No matches for {filter === ALL ? 'these interests' : `“${filter}”`} yet.
             <div className="mt-2 flex justify-center gap-4">
               {filter !== ALL && <button type="button" onClick={() => setFilter(ALL)} className="min-h-8 font-semibold" style={{ color: U.accent }}>See all matches</button>}
-              <button type="button" onClick={() => openThea({ surface: 'catalog', recipientName })} className="min-h-8 font-semibold" style={{ color: U.accent }}>Ask Thea</button>
+              <button type="button" onClick={() => openThea({ surface: 'catalog', recipientName, autoStart: Boolean(recipientName) })} className="min-h-8 font-semibold" style={{ color: U.accent }}>Ask Thea</button>
             </div>
           </div>
         )}

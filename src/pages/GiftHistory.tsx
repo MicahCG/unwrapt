@@ -82,7 +82,7 @@ const FulfillmentCard = ({ order }: { order: FulfillmentOrder }) => {
               {order.exception_reason || state.detail}
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" onClick={() => openThea({ surface: 'gift_status', recipientName: recipient })}><Sparkles className="mr-2 h-4 w-4" />Ask Thea</Button>
+              <Button size="sm" variant="outline" onClick={() => openThea({ surface: 'gift_status', recipientName: recipient, autoStart: Boolean(recipient) })}><Sparkles className="mr-2 h-4 w-4" />Ask Thea</Button>
               {order.status === 'awaiting_recipient' && (
                 <Button size="sm" onClick={refreshAndCopy} disabled={sharing} className="bg-brand-charcoal text-white hover:bg-brand-charcoal/90">
                   {sharing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Copy className="mr-2 h-4 w-4" />}Copy a fresh choice link

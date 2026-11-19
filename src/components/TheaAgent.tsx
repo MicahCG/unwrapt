@@ -25,6 +25,18 @@ import {
 } from '@/lib/funnel';
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
+
+/** What Thea is asked automatically when an "Ask Thea" button opens the chat for a specific person. */
+export const starterPrompt = (context: TheaContext): string | null => {
+  const name = context.recipientName?.trim();
+  if (!name) return null;
+  if (context.starter?.trim()) return context.starter.trim();
+  switch (context.surface) {
+    case 'catalog': return `Show me some gift ideas for ${name}.`;
+    case 'gift_status': return `Where does ${name}'s gift stand right now?`;
+    default: return `Help me plan a gift for ${name}.`;
+  }
+};
 type ThreadProduct = { id: string; title: string; price: number; featured_image_url: string | null };
 
 // Reveals text progressively for a lightweight typewriter effect. Mounted
@@ -138,6 +150,30 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeDismissed, setUpgradeDismissed] = useState(() => isTheaUpgradeDismissed());
   const [isVip, setIsVip] = useState(false);
+  // iOS shows the keyboard on top of the page without resizing it, so a bottom sheet keeps its input
+  // underneath. Track the real visible area (visualViewport), lift the sheet above the keyboard and
+  // collapse the decorative header while typing.
+  const [kb, setKb] = useState({ open: false, bottom: 0, height: 0 });
+  useEffect(() => {
+    if (!open) {
+      setKb({ open: false, bottom: 0, height: 0 });
+      return;
+    }
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      const bottom = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      setKb({ open: bottom > 120, bottom, height: Math.round(vv.height) });
+    };
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, [open]);
+
   const productCarouselRef = useRef<HTMLDivElement>(null);
   const [canScrollProducts, setCanScrollProducts] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement>(null);
@@ -211,6 +247,7 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const restored = saved.map((m) => ({ role: m.role, content: m.role === 'assistant' ? cleanTheaText(m.content) : m.content }));
         // The sheet shows one carousel for the latest gift ideas; restore it from the last reply that had cards.
         const lastWithCards = [...saved].reverse().find((m) => m.role === 'assistant' && m.products?.length);
+        if (!cancelled) setHistoryReady(true);
         if (!cancelled && !sendingRef.current) {
           setChatMessages(restored);
           setChatProducts(lastWithCards?.products ?? []);
@@ -218,6 +255,7 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch (err) {
         console.error('Thea history failed to load', err);
+        if (!cancelled) setHistoryReady(true); // never block the starter message on a failed history load
       }
     })();
     return () => {
@@ -269,7 +307,11 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [showContinueCard, context.surface, context.recipientName, hasGiftVisuals]);
 
+  const autoStartRef = useRef<string | null>(null);
+  const [historyReady, setHistoryReady] = useState(false);
   const openThea = useCallback((nextContext: TheaContext = {}) => {
+    autoStartRef.current = nextContext.autoStart ? starterPrompt(nextContext) : null;
+    setHistoryReady(false);
     setContext(nextContext);
     setQuestion('');
     setMatchedIntent(null);
@@ -300,9 +342,13 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
     void trackProductEvent('thea_request_routed', { intent: match.intent, surface: context.surface || 'global' });
   };
 
-  const sendToThea = async (event: React.FormEvent) => {
+  const sendToThea = (event: React.FormEvent) => {
     event.preventDefault();
-    const text = question.trim();
+    void sendMessage(question);
+  };
+
+  const sendMessage = async (raw: string) => {
+    const text = raw.trim();
     if (!text || sending) return;
 
     if (llmLocked && !isVip) {
@@ -351,6 +397,16 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSending(false);
     }
   };
+
+  // "Ask Thea about Mom" etc.: send the starter message once the saved chat has loaded, so the user
+  // lands in a live conversation instead of an empty box. Fires once per open.
+  useEffect(() => {
+    const prompt = autoStartRef.current;
+    if (!open || !prompt || !historyReady || !isTheaLlmTester || sending) return;
+    autoStartRef.current = null;
+    void sendMessage(prompt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, historyReady, isTheaLlmTester, sending]);
 
   const handleDismissUpgrade = () => {
     dismissTheaUpgrade();
@@ -403,11 +459,12 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
         <SheetContent
           side="bottom"
           className="mx-auto max-h-[88dvh] w-full max-w-[440px] overflow-y-auto rounded-t-[28px] border-x border-t border-[#DED2C1] bg-[#F7F1E6] px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-5 lg:max-w-[600px]"
+          style={kb.open ? { bottom: kb.bottom, maxHeight: Math.max(240, kb.height - 12), paddingBottom: '0.75rem' } : undefined}
         >
           <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-[#2A2520]/15" />
           <SheetHeader className="text-left">
             <div className="flex items-center gap-3">
-              <TheaCharacter
+              {!kb.open && <TheaCharacter
                 size="compact"
                 pose={theaChatPose({
                   sending,
@@ -418,16 +475,16 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 reaction={reaction}
                 speaking={false}
                 className="u-thea-character--chat !mx-0 !w-auto shrink-0"
-              />
+              />}
               <div>
                 <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#B65B3C]">Your gifting agent</div>
                 <SheetTitle className="font-display text-[28px] font-normal text-[#2A2520]">Ask Thea</SheetTitle>
               </div>
             </div>
-            <SheetDescription className="pt-1 text-[13.5px] leading-6 text-[#6F6559]">{contextualIntro}</SheetDescription>
+            <SheetDescription className={kb.open ? 'sr-only' : 'pt-1 text-[13.5px] leading-6 text-[#6F6559]'}>{contextualIntro}</SheetDescription>
           </SheetHeader>
 
-          {chatMessages.length === 0 && (
+          {chatMessages.length === 0 && !kb.open && (
             <div className="mt-4 grid grid-cols-3 gap-2">
               {valueChips.map((chip) => (
                 <div key={chip.label} className="rounded-[14px] border border-[#DED2C1] bg-white px-2.5 py-2.5">
@@ -439,7 +496,11 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
           )}
 
           {isTheaLlmTester && chatMessages.length > 0 && (
-            <div ref={chatScrollRef} className="mt-5 max-h-[38dvh] space-y-3 overflow-y-auto pr-1">
+            <div
+              ref={chatScrollRef}
+              className="mt-5 max-h-[38dvh] space-y-3 overflow-y-auto pr-1"
+              style={kb.open ? { maxHeight: Math.max(120, kb.height - 200) } : undefined}
+            >
               <div ref={chatContentRef} className="space-y-3">
                 {chatMessages.map((message, index) =>
                   message.role === 'user' ? (
