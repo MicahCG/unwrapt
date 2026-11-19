@@ -4,6 +4,20 @@
 
 export type GoodyPaymentMethod = { id?: string | null; name?: string | null; balance?: number | null };
 
+/**
+ * Which key places the order. The Commerce key (catalog) cannot see this workspace's Balance or cards; a
+ * workspace Automation API key can. When one is configured, orders use it and the workspace's own payment methods;
+ * otherwise we keep the Commerce key (and Commerce Stored Value).
+ */
+export const pickOrderApiKey = (
+  environment: "production" | "sandbox",
+  read: (name: string) => string | undefined,
+  commerceKey: string | undefined,
+): { key: string | undefined; source: "automation" | "commerce" } => {
+  const automation = read(environment === "production" ? "GOODY_PRODUCTION_AUTOMATION_API_KEY" : "GOODY_SANDBOX_AUTOMATION_API_KEY")?.trim();
+  return automation ? { key: automation, source: "automation" } : { key: commerceKey, source: "commerce" };
+};
+
 export type PaymentChoice =
   | { ok: true; id: string; reason: "override" | "balance" }
   | { ok: false; error: string };

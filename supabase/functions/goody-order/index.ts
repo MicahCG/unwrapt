@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { choosePaymentMethod, type GoodyPaymentMethod } from "../_shared/goodyPayment.ts";
+import { choosePaymentMethod, pickOrderApiKey, type GoodyPaymentMethod } from "../_shared/goodyPayment.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { goodyMailingCountry } from "../_shared/isoCountry.ts";
 
@@ -187,13 +187,18 @@ Deno.serve(async (req: Request) => {
       return json({ success: false, error: "Recipient country must be a 2-letter ISO 3166-1 code" }, 400);
     }
 
+    // Orders are paid from the workspace's own Balance/cards, which only a workspace Automation key can see.
+    const orderKey = pickOrderApiKey(goodyEnvironment(), (name) => Deno.env.get(name), apiKey);
+    console.log(`Goody order key source: ${orderKey.source}`);
+    const orderApiKey = orderKey.key || apiKey;
+
     // Ask Goody which payment methods exist rather than guessing an id: the old hard-coded
     // "COMMERCE_STORED_VALUE" came back "Payment method not found".
     let methods: GoodyPaymentMethod[] = [];
     let lookupFailure = "";
     try {
       const listResponse = await fetch(`${goodyBaseUrl()}/v1/payment_methods`, {
-        headers: { Authorization: `Bearer ${apiKey}` },
+        headers: { Authorization: `Bearer ${orderApiKey}` },
         signal: AbortSignal.timeout(8000),
       });
       if (listResponse.ok) {
@@ -246,7 +251,7 @@ Deno.serve(async (req: Request) => {
 
     const orderResponse = await fetch(`${goodyBaseUrl()}/v1/order_batches`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${orderApiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify(orderBody),
       signal: AbortSignal.timeout(15000),
     });
