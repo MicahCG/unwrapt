@@ -137,9 +137,10 @@ const ProductCard: React.FC<{
       <button type="button" onClick={onOpen} className="u-press text-left" aria-label={`View ${product.title}`}>
         <ProductImage src={product.featured_image_url} className="aspect-square w-full rounded-[11px]" />
         <p className="mt-2 line-clamp-2 min-h-[32px] text-[12px] font-semibold leading-4 text-[#2A2520]">{product.title}</p>
-        <p className="mt-1 text-[12px] font-semibold text-[#B65B3C]">{money(withServiceFee(product.price), product.currency)}</p>
+        <p className="mt-1 text-[12px] font-semibold text-[#B65B3C]">{money(product.price, product.currency)}</p>
         <p className="text-[10.5px] leading-4" style={{ color: U.muted }}>
-          {shipping != null && shipping > 0 ? `+ about ${money(shipping, product.currency)} shipping & tax` : '+ shipping & tax'}
+          {`+ ${money(SERVICE_FEE, product.currency)} fee`}
+          {shipping != null && shipping > 0 ? ` + about ${money(shipping, product.currency)} shipping & tax` : ' + shipping & tax'}
         </p>
       </button>
       <button
@@ -196,7 +197,7 @@ export const ProductCards: React.FC<{
               <ProductImage src={detail.featured_image_url} className="aspect-[4/3] w-full rounded-[20px]" />
               <SheetHeader className="mt-4 text-left">
                 <SheetTitle className="font-display text-[24px] font-normal leading-tight text-[#2A2520]">{detail.title}</SheetTitle>
-                <SheetDescription className="text-[15px] font-semibold text-[#B65B3C]">{money(withServiceFee(detail.price), detail.currency)}</SheetDescription>
+                <SheetDescription className="text-[15px] font-semibold text-[#B65B3C]">{money(detail.price, detail.currency)}</SheetDescription>
               </SheetHeader>
               <dl className="mt-3 space-y-1 rounded-[14px] bg-white/70 px-3 py-2.5 text-[13px] text-[#5A5147]">
                 <div className="flex justify-between gap-3"><dt>Gift</dt><dd>{money(detail.price, detail.currency)}</dd></div>

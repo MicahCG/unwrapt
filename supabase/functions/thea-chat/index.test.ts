@@ -5,6 +5,7 @@
 // import doesn't start a live HTTP listener - see the comment there.)
 import { assert, assertEquals } from "https://deno.land/std@0.190.0/testing/asserts.ts";
 import {
+  pickCardProducts,
   searchGoodyGifts,
   looksLikeMoreOptionsIntent,
   wantsPetGifts,
@@ -1487,4 +1488,22 @@ Deno.test("looksLikeMoreOptionsIntent recognizes asks for new items but not othe
   for (const no of ["I'd like the Holiday Cookie & Brownie Duo", "yes confirm", "anything under 25?", "tell me more about the pickleballs"]) {
     assert(!looksLikeMoreOptionsIntent(no), no);
   }
+});
+
+const P = (id: string, title: string) => ({ id, title });
+const found = [P("1", "Frizzle High Heat Cooking Oil"), P("2", "Coffee Beans by Methodical Coffee"), P("3", "Charcuterie Trio"), P("4", "Set of 3 Pickleballs")];
+
+Deno.test("pickCardProducts keeps exact matches and never overrides a review", () => {
+  assertEquals(pickCardProducts("x", [found[0]], found, false), [found[0]]);
+  assertEquals(pickCardProducts("Here are some ideas", [], found, true), []);
+});
+
+Deno.test("pickCardProducts shows what the search returned when the reply's titles didn't match exactly", () => {
+  const reply = "Two options under $25:\n- Frizzle Cooking Oil ($14)\n- Methodical Coffee Beans ($16)";
+  assertEquals(pickCardProducts(reply, [], found, false).map((p) => p.id), ["1", "2"]);
+});
+
+Deno.test("pickCardProducts falls back to the top results when the reply names none, and to nothing without a search", () => {
+  assertEquals(pickCardProducts("Here are some ideas", [], found, false, 3).map((p) => p.id), ["1", "2", "3"]);
+  assertEquals(pickCardProducts("Here are some ideas", [], [], false), []);
 });

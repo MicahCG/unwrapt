@@ -1,13 +1,13 @@
 ---
 id: FB-20261119-c082
 type: bug
-status: open
+status: fixed
 title: Thea reports a gift as 'unavailable' when it is really too late to deliver on time
 reporter: kevin
 created: 2026-11-19
 area: thea-chat
 platform: 
-assignee: 
+assignee: claude
 fix: 
 verified_by: 
 ---
@@ -27,3 +27,4 @@ Say plainly that it cannot arrive in time (and when it would), and offer fast-sh
 (none attached)
 
 ## Notes / fix log
+- 2026-11-19 fixed: Root cause found in a live chat: follow-up searches were shown as text only and saved nothing, so a later pick had no product to fall back on and the lookup error read as 'unavailable'. Now every search shows cards and is saved, the lookup retries a fresh catalog, the error says it is not an out-of-stock, and the prompt forbids calling a gift unavailable. Awaiting verification.

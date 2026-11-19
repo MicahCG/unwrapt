@@ -1,13 +1,13 @@
 ---
 id: FB-20261119-9cf5
 type: feature
-status: open
+status: fixed
 title: Simplify Thea's gift flow and show proposals as cards, not text lists
 reporter: kevin
 created: 2026-11-19
 area: thea-chat
 platform: 
-assignee: 
+assignee: claude
 fix: 
 verified_by: 
 ---
@@ -27,3 +27,4 @@ Every set of proposals renders as selectable cards; fewer turns from pick to sch
 (none attached)
 
 ## Notes / fix log
+- 2026-11-19 fixed: Search results now always render as cards (matching loosely-worded titles, else the top results) and the bullet list is stripped. The longer confirm-twice path is not changed here. Awaiting verification.

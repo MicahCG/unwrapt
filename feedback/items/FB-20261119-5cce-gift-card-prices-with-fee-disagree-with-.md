@@ -1,13 +1,13 @@
 ---
 id: FB-20261119-5cce
 type: bug
-status: open
+status: fixed
 title: Gift card prices (with fee) disagree with the prices Thea quotes in text
 reporter: kevin
 created: 2026-11-19
 area: thea-chat
 platform: 
-assignee: 
+assignee: claude
 fix: 
 verified_by: 
 ---
@@ -27,3 +27,4 @@ One consistent way of stating price: the same total on cards and in text, with a
 (none attached)
 
 ## Notes / fix log
+- 2026-11-19 fixed: Cards now headline the gift's own price (what Thea quotes) with the service fee and shipping underneath; prompt tells Thea to quote the gift price and never fold in the fee. Awaiting verification.
