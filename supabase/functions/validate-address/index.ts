@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { buildSuggestion, isPoBox, splitUnit, type Addr } from "../_shared/addressMatch.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -79,10 +80,41 @@ serve(async (req) => {
       }
     }
 
+    // Is the street itself real? The US Census geocoder is free, needs no key and returns the standardized
+    // address. A miss is a warning, not an error (new builds and rural routes are sometimes absent), and an
+    // outage never blocks anyone: streetChecked stays false.
+    let streetChecked = false;
+    let streetFound = false;
+    let suggestion: Addr | null = null;
+    if (errors.length === 0 && country === 'United States' && !isPoBox(street)) {
+      try {
+        const { base } = splitUnit(street);
+        const oneLine = `${base}, ${city.trim()}, ${state.trim()} ${zipCode.trim().substring(0, 5)}`;
+        const res = await fetch(
+          `https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=${encodeURIComponent(oneLine)}&benchmark=Public_AR_Current&format=json`,
+          { signal: AbortSignal.timeout(6000) },
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const match = data?.result?.addressMatches?.[0];
+          streetChecked = true;
+          streetFound = Boolean(match);
+          if (match?.matchedAddress) {
+            suggestion = buildSuggestion({ street, city, state, zip: zipCode }, String(match.matchedAddress));
+          }
+        }
+      } catch (e) {
+        console.warn('Street verification unavailable:', e);
+      }
+    }
+
     return new Response(JSON.stringify({ 
       valid: errors.length === 0, 
       errors,
-      verified: errors.length === 0
+      verified: errors.length === 0 && streetFound && !suggestion,
+      streetChecked,
+      streetFound,
+      suggestion,
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

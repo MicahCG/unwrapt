@@ -15,6 +15,7 @@ import { sanitizeInput, sanitizeAddress } from '@/utils/inputSanitization';
 import { ErrorHandler } from '@/utils/errorHandler';
 import { rateLimiter, RATE_LIMITS } from '@/utils/rateLimiter';
 import { useQueryClient } from '@tanstack/react-query';
+import { checkAddress, isAddressComplete, type AddressCheck } from '@/lib/addressVerification';
 import OccasionFields from '@/components/recipients/OccasionFields';
 
 interface AddRecipientFormProps {
@@ -30,6 +31,9 @@ interface AddRecipientFormProps {
 export const AddRecipientForm: React.FC<AddRecipientFormProps> = ({ onCancel, onSuccess, initialName }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showAddress, setShowAddress] = useState(false);
+  // Result of checking the delivery address before saving; non-null means we're asking the user to decide.
+  const [addressCheck, setAddressCheck] = useState<Extract<AddressCheck, { status: 'suggest' | 'notfound' }> | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const thea = useContext(TheaContextValue); // null outside the provider (e.g. onboarding): just no nudge button
@@ -58,6 +62,7 @@ export const AddRecipientForm: React.FC<AddRecipientFormProps> = ({ onCancel, on
   const [newInterest, setNewInterest] = useState('');
 
   const handleInputChange = (field: string, value: string) => {
+    if (['street', 'city', 'state', 'zip_code', 'country'].includes(field)) setAddressCheck(null);
     let sanitizedValue = value;
 
     // Apply appropriate sanitization based on field type
@@ -141,6 +146,30 @@ export const AddRecipientForm: React.FC<AddRecipientFormProps> = ({ onCancel, on
       return;
     }
 
+    // Confirm the delivery address is real before saving it, so a typo doesn't surface weeks later
+    // when a gift is about to ship. Only blocks on clearly invalid input; everything else is the user's call.
+    if (isAddressComplete(formData)) {
+      setIsVerifying(true);
+      const check = await checkAddress(formData);
+      setIsVerifying(false);
+      if (check.status === 'invalid') {
+        setShowAddress(true);
+        toast({ title: 'Check the address', description: check.errors.join(' '), variant: 'destructive' });
+        return;
+      }
+      if (check.status === 'suggest' || check.status === 'notfound') {
+        setShowAddress(true);
+        setAddressCheck(check);
+        return;
+      }
+    }
+
+    await saveRecipient(formData);
+  };
+
+  const saveRecipient = async (data: typeof formData) => {
+    if (!user) return;
+    setAddressCheck(null);
     setIsLoading(true);
 
     try {
@@ -149,19 +178,19 @@ export const AddRecipientForm: React.FC<AddRecipientFormProps> = ({ onCancel, on
         .insert([
           {
             user_id: user.id,
-            name: formData.name,
+            name: data.name,
             email: null,
             phone: null,
-            relationship: formData.relationship || null,
-            birthday: formData.birthday || null,
-            anniversary: formData.anniversary || null,
-            street: formData.street || null,
-            city: formData.city || null,
-            state: formData.state || null,
-            zip_code: formData.zip_code || null,
-            country: formData.country,
+            relationship: data.relationship || null,
+            birthday: data.birthday || null,
+            anniversary: data.anniversary || null,
+            street: data.street || null,
+            city: data.city || null,
+            state: data.state || null,
+            zip_code: data.zip_code || null,
+            country: data.country,
             notes: null,
-            interests: formData.interests.length > 0 ? formData.interests : null,
+            interests: data.interests.length > 0 ? data.interests : null,
           }
         ]);
 
@@ -340,12 +369,46 @@ export const AddRecipientForm: React.FC<AddRecipientFormProps> = ({ onCancel, on
       </div>
 
 
+      {addressCheck && (
+        <div role="alert" className="space-y-3 rounded-2xl border border-[#E0C9A6] bg-[#FBF3E4] p-4 text-sm text-[#3B332B]">
+          {addressCheck.status === 'suggest' ? (
+            <>
+              <p className="font-medium">Did you mean this address?</p>
+              <p>
+                {addressCheck.suggestion.street}<br />
+                {addressCheck.suggestion.city}, {addressCheck.suggestion.state} {addressCheck.suggestion.zip_code}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" className="bg-[#2A2520] text-[#F4ECDD] hover:bg-[#2A2520]/90"
+                  onClick={() => {
+                    const next = { ...formData, ...addressCheck.suggestion };
+                    setFormData(next);
+                    void saveRecipient(next);
+                  }}>
+                  Use this address
+                </Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => void saveRecipient(formData)}>Keep mine</Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="font-medium">We couldn't find that address.</p>
+              <p>Check the street, city and ZIP for typos. If it's new or rural it may just be missing from our records.</p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" className="bg-[#2A2520] text-[#F4ECDD] hover:bg-[#2A2520]/90" onClick={() => { setAddressCheck(null); setShowAddress(true); }}>Edit address</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => void saveRecipient(formData)}>Save anyway</Button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-[auto_1fr] gap-2 pt-2">
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isLoading || !formData.name.trim()} className="h-11 bg-[#2A2520] text-[#F4ECDD] hover:bg-[#2A2520]/90">
-          {isLoading ? 'Adding...' : 'Add Recipient'}
+        <Button type="submit" disabled={isLoading || isVerifying || !formData.name.trim()} className="h-11 bg-[#2A2520] text-[#F4ECDD] hover:bg-[#2A2520]/90">
+          {isVerifying ? 'Checking address...' : isLoading ? 'Adding...' : 'Add Recipient'}
         </Button>
       </div>
     </form>
