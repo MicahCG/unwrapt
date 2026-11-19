@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsx scripts/write-seo-files.ts && vite build && tsx scripts/prerender-public.ts",
+    "feedback": "node scripts/feedback.mjs",
+    "feedback:check": "node scripts/feedback.mjs check",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "test": "tsx --test src/seo/routing.test.ts",
     "test:html": "tsx --test src/seo/static-output.test.ts",

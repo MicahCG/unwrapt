@@ -11,7 +11,7 @@ import { MapPin, Package, Truck } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { giftOrderTiming } from '@/lib/giftTiming';
 import { getWalletBreakdown } from '@/lib/wallet';
-const SERVICE_FEE = 7;
+import { SERVICE_FEE } from '@/lib/pricing';
 import { cleanName } from '@/lib/utils';
 import { getGiftRecommendations, type GiftCatalogItem } from '@/lib/giftCatalog';
 import { ProductImage } from '@/components/dashboard/TheaChatCards';
@@ -443,7 +443,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
                           <h3 className="line-clamp-2 text-[13px] font-semibold leading-[1.3]" style={{ color: U.ink }}>{item.name}</h3>
                           <p className="mt-1 truncate text-[11px]" style={{ color: '#8A7E6E' }}>{item.brand || 'Curated by Unwrapt'}</p>
                           {item.why && <p className="mt-1.5 line-clamp-2 text-[11px] leading-4" style={{ color: '#6F6559' }}>{item.why}</p>}
-                          <p className="mt-auto pt-2 font-mono text-[12px]" style={{ color: '#5A5147' }}>{money(item.price!)}</p>
+                          <p className="mt-auto pt-2 font-mono text-[12px]" style={{ color: '#5A5147' }}>{money(isVip ? item.price! + SERVICE_FEE : item.price!)}</p>
                           <button
                             type="button"
                             onClick={() => pick(item)}
@@ -484,7 +484,7 @@ const ScheduleGiftModal: React.FC<ScheduleGiftModalProps> = ({ recipient, isOpen
                   <div className="min-w-0 flex-1">
                     <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: U.muted }}>Gift</div>
                     <div className="line-clamp-2 text-[14px] font-semibold leading-5" style={{ color: U.ink }}>{product?.name || 'No gift chosen yet'}</div>
-                    {product?.price != null && <div className="font-mono text-[12px]" style={{ color: '#5A5147' }}>{money(product.price)}</div>}
+                    {product?.price != null && <div className="font-mono text-[12px]" style={{ color: '#5A5147' }}>{money(isVip ? product.price + SERVICE_FEE : product.price)}</div>}
                   </div>
                   <button type="button" onClick={() => setStep('choose')} className="u-press min-h-10 shrink-0 rounded-full px-3 text-[12.5px] font-semibold" style={{ color: U.accent }}>
                     {product ? 'Change' : 'Choose'}
