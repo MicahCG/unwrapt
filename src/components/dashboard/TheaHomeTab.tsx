@@ -15,6 +15,7 @@ import {
 import {
   ChatUiModules,
   ProductCards,
+  type ShipTo,
   ReviewCard,
   type ChatProduct,
   type ChatUiFocus,
@@ -233,6 +234,8 @@ type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;
   products?: ChatProduct[];
+  /** Who the gifts are for (from the server), so cards can show real shipping & tax. */
+  activeRecipient?: { id: string; name: string } | null;
   review?: GiftReview | null;
   /** Interactive modules from present_ui (calendar connect, add/edit recipient). */
   ui?: ChatUiModule[];
@@ -499,7 +502,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     try {
       const { data, error } = await supabase.functions.invoke('thea-chat', { body: { action: 'history', mode: 'dashboard' } });
       if (error || !data?.success) throw error || new Error(data?.error || 'History unavailable');
-      const restored = ((data.messages || []) as Pick<ChatMessage, 'role' | 'content' | 'products' | 'review'>[])
+      const restored = ((data.messages || []) as Pick<ChatMessage, 'role' | 'content' | 'products' | 'review' | 'activeRecipient'>[])
         .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
         .map((m): ChatMessage => ({
           role: m.role,
@@ -507,6 +510,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
           // Cards the server saved with the turn, so a reload/other device shows the same chat.
           ...(m.products?.length ? { products: m.products } : {}),
           ...(m.review ? { review: m.review } : {}),
+          ...(m.activeRecipient ? { activeRecipient: m.activeRecipient } : {}),
         }));
       setMessages((current) => (current.some((m) => m.role === 'user') ? current : restored));
       setHistory('ready');
@@ -858,6 +862,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
           role: 'assistant',
           content: addressEnsured.reply,
           products: (data.products || []) as ChatProduct[],
+          activeRecipient: (data.activeRecipient || null) as { id: string; name: string } | null,
           review: (data.review || null) as GiftReview | null,
           ui: ui.length ? ui : undefined,
           unsaved: writes.some((w) => !w.ok && saveTools.has(w.tool)),
@@ -988,6 +993,17 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
   };
 
   // A review's address comes from the live recipient, so saving one (here or anywhere) updates the card.
+  // Real shipping & tax on gift cards needs the recipient's full US address; otherwise cards just say it's added later.
+  const shipToFor = (active?: { id: string } | null): ShipTo | null => {
+    const recipient = active ? recipients.find((r) => r.id === active.id) : null;
+    if (!recipient || !hasRecipientAddress(recipient)) return null;
+    const country = (recipient.country || 'United States').trim();
+    return {
+      name: recipient.name, street: recipient.street!, city: recipient.city!, state: recipient.state!,
+      zip_code: recipient.zip_code!, country: country === 'US' || country === 'USA' ? 'United States' : country,
+    };
+  };
+
   const reviewAddress = (review: GiftReview): ReviewAddress | null => {
     const recipient = recipients.find((r) => r.id === review.recipientId);
     if (!recipient || !hasRecipientAddress(recipient)) return null;
@@ -1161,7 +1177,7 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
                     <p className="mt-1 text-[12px]" style={{ color: U.accent }}>Something here didn’t save, so nothing changed.</p>
                   )}
                   {message.products && message.products.length > 0 && (
-                    <ProductCards products={message.products} selectedId={selectedProductId} disabled={sending} onSelect={selectProduct} />
+                    <ProductCards products={message.products} selectedId={selectedProductId} disabled={sending} shipTo={shipToFor(message.activeRecipient)} onSelect={selectProduct} />
                   )}
                   {message.review && (
                     <ReviewCard
