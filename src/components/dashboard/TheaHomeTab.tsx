@@ -499,9 +499,15 @@ const TheaHomeTab: React.FC<TheaHomeTabProps> = ({
     try {
       const { data, error } = await supabase.functions.invoke('thea-chat', { body: { action: 'history', mode: 'dashboard' } });
       if (error || !data?.success) throw error || new Error(data?.error || 'History unavailable');
-      const restored = ((data.messages || []) as { role: ChatMessage['role']; content: string }[])
+      const restored = ((data.messages || []) as Pick<ChatMessage, 'role' | 'content' | 'products' | 'review'>[])
         .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
-        .map((m) => ({ role: m.role, content: m.role === 'assistant' ? cleanTheaText(m.content) : m.content }));
+        .map((m): ChatMessage => ({
+          role: m.role,
+          content: m.role === 'assistant' ? cleanTheaText(m.content) : m.content,
+          // Cards the server saved with the turn, so a reload/other device shows the same chat.
+          ...(m.products?.length ? { products: m.products } : {}),
+          ...(m.review ? { review: m.review } : {}),
+        }));
       setMessages((current) => (current.some((m) => m.role === 'user') ? current : restored));
       setHistory('ready');
     } catch (err) {
