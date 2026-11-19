@@ -102,7 +102,7 @@ const RecipientDetailSheet: React.FC<RecipientDetailSheetProps> = ({
             <Sparkles className="h-4 w-4 text-[#B65B3C]" /> Browse ideas
           </button>
         </div>
-        <button onClick={() => openThea({ surface: 'recipient', recipientName: name })} className="u-touch-card mt-2.5 flex w-full items-center justify-center gap-2 rounded-[16px] bg-[#EEE5D5] px-3 py-3 text-[12.5px] font-semibold text-[#5A5147]"><Sparkles className="h-4 w-4 text-[#B65B3C]" /> Ask Thea about {name.split(' ')[0]}</button>
+        <button onClick={() => openThea({ surface: 'recipient', recipientName: name, autoStart: true })} className="u-touch-card mt-2.5 flex w-full items-center justify-center gap-2 rounded-[16px] bg-[#EEE5D5] px-3 py-3 text-[12.5px] font-semibold text-[#5A5147]"><Sparkles className="h-4 w-4 text-[#B65B3C]" /> Ask Thea about {name.split(' ')[0]}</button>
 
         <section className="mt-6">
           <div className="mb-2.5 flex items-center justify-between">
