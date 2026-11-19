@@ -105,8 +105,24 @@ const cleanInterests = (value: unknown) => {
 const goodyImage = (product: GoodyProduct) =>
   product.images?.[0]?.image_large?.url || product.variants?.[0]?.image_large?.url || null;
 
-/** Pull as much of the live Goody catalog as we can, not just page 1. */
-const fetchGoodyProducts = async (): Promise<GoodyProduct[]> => {
+/** Fetch one 100-product page; null on any failure so a bad page never sinks the whole catalog. */
+const fetchGoodyPage = async (baseUrl: string, apiKey: string, page: number): Promise<GoodyProduct[] | null> => {
+  try {
+    const response = await fetch(`${baseUrl}/v1/products?page=${page}&per_page=100`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) return null;
+    const payload = await response.json() as { data?: GoodyProduct[] };
+    return (payload.data || []).filter((product) => product.id && product.name);
+  } catch {
+    return null;
+  }
+};
+
+const PAGES_PER_BATCH = 4;
+
+const fetchGoodyProductsUncached = async (): Promise<GoodyProduct[]> => {
   const environment = Deno.env.get("GOODY_API_ENV") === "production" ? "production" : "sandbox";
   const apiKey = environment === "production"
     ? Deno.env.get("GOODY_PRODUCTION_COMMERCE_API_KEY")
@@ -120,24 +136,44 @@ const fetchGoodyProducts = async (): Promise<GoodyProduct[]> => {
   const seen = new Set<string>();
   const products: GoodyProduct[] = [];
 
-  for (let page = 1; page <= GOODY_MAX_PAGES; page++) {
-    const response = await fetch(`${baseUrl}/v1/products?page=${page}&per_page=100`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!response.ok) break;
-    const payload = await response.json() as { data?: GoodyProduct[] };
-    const batch = (payload.data || []).filter((product) => product.id && product.name);
-    if (!batch.length) break;
-    for (const product of batch) {
-      if (seen.has(product.id!)) continue;
-      seen.add(product.id!);
-      products.push(product);
+  // Pages used to be fetched one after another (up to 10 round trips). Fetch them in parallel
+  // batches instead; stop at the first short or empty page.
+  for (let start = 1; start <= GOODY_MAX_PAGES; start += PAGES_PER_BATCH) {
+    const pages = Array.from({ length: Math.min(PAGES_PER_BATCH, GOODY_MAX_PAGES - start + 1) }, (_, i) => start + i);
+    const results = await Promise.all(pages.map((page) => fetchGoodyPage(baseUrl, apiKey, page)));
+    let done = false;
+    for (const batch of results) {
+      if (!batch || batch.length === 0) { done = true; break; }
+      for (const product of batch) {
+        if (seen.has(product.id!)) continue;
+        seen.add(product.id!);
+        products.push(product);
+      }
+      if (batch.length < 100) { done = true; break; }
     }
-    if (batch.length < 100) break;
+    if (done) break;
   }
 
   return products;
+};
+
+// The catalog changes slowly, but every open of the Ideas sheet used to re-download all of it.
+// Keep it per warm instance for a few minutes, and share one in-flight load between concurrent requests.
+const CATALOG_TTL_MS = 5 * 60 * 1000;
+let catalogCache: { products: GoodyProduct[]; at: number } | null = null;
+let catalogInFlight: Promise<GoodyProduct[]> | null = null;
+
+const fetchGoodyProducts = async (): Promise<GoodyProduct[]> => {
+  if (catalogCache && Date.now() - catalogCache.at < CATALOG_TTL_MS) return catalogCache.products;
+  if (!catalogInFlight) {
+    catalogInFlight = fetchGoodyProductsUncached()
+      .then((products) => {
+        if (products.length) catalogCache = { products, at: Date.now() };  // never cache an empty/failed load
+        return products;
+      })
+      .finally(() => { catalogInFlight = null; });
+  }
+  return catalogInFlight;
 };
 
 const productText = (product: GoodyProduct) =>
@@ -404,6 +440,9 @@ Decision rules:
   }
 };
 
+const RECOMMEND_TTL_MS = 5 * 60 * 1000;
+const recommendCache = new Map<string, { at: number; payload: unknown }>();
+
 const getGoodyCatalog = async (
   interests: string[],
   limit: number,
@@ -413,9 +452,13 @@ const getGoodyCatalog = async (
   unmatchedInterests: string[];
   askUser: AskUserOffer[];
 }> => {
-  const products = await fetchGoodyProducts();
+  // The planning step (OpenAI) doesn't depend on the catalog, so run both at the same time.
+  const [products, plan] = await Promise.all([
+    fetchGoodyProducts(),
+    interests.length ? planCatalogSearch(interests) : Promise.resolve(null),
+  ]);
 
-  if (!interests.length) {
+  if (!interests.length || !plan) {
     return {
       products: products.slice(0, limit).map((product) => toCatalogItem(product)),
       matchedInterests: [],
@@ -424,7 +467,6 @@ const getGoodyCatalog = async (
     };
   }
 
-  const plan = await planCatalogSearch(interests);
   const scanTerms = [...new Set([...plan.searchTerms, ...plan.adjacentInterests])];
   const shortlist = shortlistByTerms(products, scanTerms);
 
@@ -528,15 +570,26 @@ Deno.serve(async (req: Request) => {
     const interests = cleanInterests(body.interests);
     const limit = Math.min(Math.max(Number(body.limit) || 3, 1), 6);
 
+    // The same interests + limit within a few minutes returns the finished answer without
+    // re-scanning the catalog or calling OpenAI again.
+    const cacheKey = `${[...interests].sort().join("|")}#${limit}`;
+    const hit = recommendCache.get(cacheKey);
+    if (hit && Date.now() - hit.at < RECOMMEND_TTL_MS) return json(hit.payload);
+
     const { products, matchedInterests, unmatchedInterests, askUser } = await getGoodyCatalog(interests, limit);
-    return json({
+    const payload = {
       success: true,
       source: "goody",
       products,
       matchedInterests,
       unmatchedInterests,
       askUser,
-    });
+    };
+    if (products.length) {
+      if (recommendCache.size > 200) recommendCache.clear();
+      recommendCache.set(cacheKey, { at: Date.now(), payload });
+    }
+    return json(payload);
   } catch (error) {
     console.error("gift-catalog failed", error);
     return json({

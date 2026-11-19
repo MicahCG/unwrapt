@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Sparkles } from 'lucide-react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { getGiftRecommendations, type GiftCatalogItem } from '@/lib/giftCatalog';
@@ -23,6 +23,13 @@ const price = (product: GiftCatalogItem) =>
     ? 'Price at review'
     : new Intl.NumberFormat('en-US', { style: 'currency', currency: product.currency, maximumFractionDigits: 0 }).format(product.price);
 
+/** Shared with Dashboard so the catalog can be fetched before the sheet is even opened. */
+export const catalogPreviewQuery = (requested: string[]) => ({
+  queryKey: ['catalog-preview', [...requested].sort().join('|')],
+  queryFn: () => getGiftRecommendations(requested, 6),
+  staleTime: 30 * 60 * 1000,
+});
+
 const CatalogPreviewSheet: React.FC<CatalogPreviewSheetProps> = ({
   open,
   onOpenChange,
@@ -39,11 +46,11 @@ const CatalogPreviewSheet: React.FC<CatalogPreviewSheetProps> = ({
 
   const requested = filter === ALL ? saved : [filter];
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ['catalog-preview', [...requested].sort().join('|')],
-    queryFn: () => getGiftRecommendations(requested, 6),
+    ...catalogPreviewQuery(requested),
     enabled: open,
-    staleTime: 10 * 60 * 1000,
     retry: 1,
+    // Switching the interest filter keeps the current grid on screen instead of flashing empty.
+    placeholderData: keepPreviousData,
   });
   const products = data?.products || [];
   const first = recipientName?.split(' ')[0];

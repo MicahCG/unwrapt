@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import GiftScheduledSuccess from '@/components/GiftScheduledSuccess';
 import { toast } from '@/hooks/use-toast';
@@ -15,7 +15,7 @@ import { ApprovalScreen } from '@/components/unwrapt2/ApprovalScreen';
 import { U } from '@/components/unwrapt2/theme';
 import { Settings } from 'lucide-react';
 import RecipientDetailSheet from '@/components/RecipientDetailSheet';
-import CatalogPreviewSheet from '@/components/CatalogPreviewSheet';
+import CatalogPreviewSheet, { catalogPreviewQuery } from '@/components/CatalogPreviewSheet';
 import { type RecipientRecord, type GiftRecord } from '@/lib/giftStatus';
 import { findResumableGift, resumeGiftPayment, hasCompleteShippingAddress } from '@/lib/giftPayment';
 import TheaHomeTab from '@/components/dashboard/TheaHomeTab';
@@ -29,6 +29,7 @@ type DashboardTab = 'thea' | 'manual';
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [successRecipient, setSuccessRecipient] = useState(null);
@@ -411,6 +412,15 @@ const Dashboard = () => {
     [typedRecipients, recipientDetailId],
   );
   const autopilotThreshold = AUTOPILOT_THRESHOLDS[(userProfile as any)?.autopilot_level] ?? AUTOPILOT_THRESHOLDS.ask100;
+
+  // Opening a person's panel is the strongest hint that the Ideas catalog is next: start loading it now
+  // (same query key the sheet uses) so it's usually ready by the time they tap through.
+  const detailInterests = recipientDetail?.interests;
+  useEffect(() => {
+    const saved = (detailInterests || []).slice(0, 3);
+    if (!recipientDetail || !saved.length) return;
+    void queryClient.prefetchQuery(catalogPreviewQuery(saved));
+  }, [recipientDetail?.id, detailInterests, queryClient]);
 
   return (
     <>
