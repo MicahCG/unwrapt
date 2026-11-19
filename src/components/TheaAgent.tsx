@@ -14,6 +14,7 @@ import { VIPUpgradeModal } from '@/components/subscription/VIPUpgradeModal';
 import { VIP_MONTHLY_AMOUNT_LABEL } from '@/lib/stripe';
 import { VoiceDictateButton } from '@/components/dashboard/VoiceDictateButton';
 import { useSpeechDictation } from '@/hooks/useSpeechDictation';
+import { cleanTheaText } from '@/lib/theaText';
 import {
   dismissTheaUpgrade,
   hasTheaValueSeen,
@@ -184,6 +185,40 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Real chat for VIPs (it's what they pay for) and allowlisted testers; everyone else still gets intent routing.
   const isTheaLlmTester = isVip || isTheaLlmEmailAllowed(user?.email);
+  // A different account (log out / log in) must never see the previous account's messages.
+  const chatOwnerRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (chatOwnerRef.current === user?.id) return;
+    chatOwnerRef.current = user?.id;
+    setChatMessages([]);
+    setChatProducts([]);
+  }, [user?.id]);
+
+  // The conversation is saved per account on the server (same one the desktop home chat uses), so
+  // load it whenever the sheet opens instead of starting blank. The server copy is the source of
+  // truth; it already includes everything sent from this sheet.
+  const sendingRef = useRef(false);
+  sendingRef.current = sending;
+  useEffect(() => {
+    if (!open || !user?.id || !isTheaLlmTester) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('thea-chat', { body: { action: 'history', mode: 'dashboard' } });
+        if (error || !data?.success) throw error || new Error(data?.error || 'History unavailable');
+        const restored = ((data.messages || []) as ChatMessage[])
+          .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+          .map((m) => ({ role: m.role, content: m.role === 'assistant' ? cleanTheaText(m.content) : m.content }));
+        if (!cancelled && !sendingRef.current) setChatMessages(restored);
+      } catch (err) {
+        console.error('Thea history failed to load', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, user?.id, isTheaLlmTester]);
+
   const userMessageCount = chatMessages.filter((m) => m.role === 'user').length;
   const previewComplete =
     !isVip &&
@@ -232,7 +267,8 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setContext(nextContext);
     setQuestion('');
     setMatchedIntent(null);
-    setChatMessages([]);
+    // Messages are NOT cleared here: the saved conversation is restored from the server on open
+    // (see the history effect below), so desktop and mobile always show the same chat.
     setChatProducts([]);
     setChatFailed(false);
     setHasGiftVisuals(false);
@@ -285,7 +321,7 @@ export const TheaProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     try {
-      const { data, error } = await supabase.functions.invoke('thea-chat', { body: { messages: nextMessages } });
+      const { data, error } = await supabase.functions.invoke('thea-chat', { body: { messages: nextMessages, mode: 'dashboard' } });
       if (error || !data?.success) throw error || new Error(data?.error || 'Thea request failed');
       setChatMessages([...nextMessages, { role: 'assistant', content: data.reply }]);
       const products = (data.products || []) as ThreadProduct[];

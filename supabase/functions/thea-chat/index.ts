@@ -3217,6 +3217,18 @@ const getOrCreateConversation = async (
       .select("id")
       .single();
     if (error) {
+      // 23505 = unique violation: a concurrent request (history load, another device) created the
+      // conversation first. Use theirs so the chat never splits in two.
+      if ((error as { code?: string }).code === "23505") {
+        const { data: winner } = await authClient
+          .from("conversations")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("mode", mode)
+          .limit(1)
+          .maybeSingle();
+        if (winner) return winner.id;
+      }
       console.error("Failed to create conversation", error);
       return null;
     }
