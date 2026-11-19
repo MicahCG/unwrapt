@@ -13,10 +13,10 @@ verified_by:
 ---
 
 ## What happened
-(describe the problem or the idea)
+Reporter's note: 'Calendar confirmation for the recipient.'
 
 ## Expected / desired
-(what should happen instead)
+A confirmation step so the user can confirm the calendar event/birthday details for a recipient. (Needs a design decision before building; see PR discussion.)
 
 ## Message context
 (none attached)

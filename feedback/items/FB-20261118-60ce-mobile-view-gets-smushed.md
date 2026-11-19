@@ -13,10 +13,10 @@ verified_by:
 ---
 
 ## What happened
-(describe the problem or the idea)
+Reporter's note: 'The view gets smushed too' (mobile).
 
 ## Expected / desired
-(what should happen instead)
+On mobile, content is no longer squashed; rows keep their natural height and scroll.
 
 ## Message context
 (none attached)

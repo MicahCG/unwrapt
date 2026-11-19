@@ -1,13 +1,13 @@
 ---
 id: FB-20261118-ae44
 type: feature
-status: open
+status: fixed
 title: Adding a gift is confusing across the different entry points; asking Thea should start the chat automatically
 reporter: kevin
 created: 2026-11-18
 area: onboarding
 platform: 
-assignee: 
+assignee: claude
 fix: 
 verified_by: 
 ---
@@ -25,3 +25,4 @@ verified_by:
 (none attached)
 
 ## Notes / fix log
+- 2026-11-19 fixed: Ask Thea buttons now auto-start the chat: PR #91.

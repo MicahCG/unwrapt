@@ -13,10 +13,10 @@ verified_by:
 ---
 
 ## What happened
-(describe the problem or the idea)
+Reporter's note: 'Sync Google calendar for a new birthday.'
 
 ## Expected / desired
-(what should happen instead)
+When a new birthday is added, offer to sync it to Google Calendar so it is picked up. (Needs a design decision before building; see PR discussion.)
 
 ## Message context
 (none attached)
