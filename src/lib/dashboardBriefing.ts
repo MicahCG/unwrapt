@@ -305,7 +305,11 @@ export function buildBriefingMessage(displayName: string, briefing: DashboardBri
     }
   }
 
-  if (briefing.inMotion.length) {
+  // The opening message should be a glance, not a report: when something needs the user, leave the
+  // status-only sections (in motion / delivered) out. They're one question away.
+  const needsAttention = briefing.needsInfo.length > 0;
+
+  if (briefing.inMotion.length && !needsAttention) {
     lines.push('');
     lines.push('In motion:');
     for (const item of briefing.inMotion.slice(0, 2)) {
@@ -313,7 +317,7 @@ export function buildBriefingMessage(displayName: string, briefing: DashboardBri
     }
   }
 
-  if (briefing.recentlyDelivered.length) {
+  if (briefing.recentlyDelivered.length && !needsAttention) {
     lines.push('');
     lines.push('Just delivered:');
     for (const item of briefing.recentlyDelivered.slice(0, 2)) {
@@ -338,7 +342,7 @@ export function buildBriefingMessage(displayName: string, briefing: DashboardBri
 }
 
 export function briefingQuickChips(briefing: DashboardBriefing): BriefingItem[] {
-  return [...briefing.needsInfo, ...briefing.upcoming].slice(0, 4);
+  return [...briefing.needsInfo, ...briefing.upcoming].slice(0, 2);
 }
 
 /**
