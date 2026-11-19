@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,8 @@ import { Plus, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
+import { TheaContextValue } from '@/hooks/useThea';
 import { sanitizeInput, sanitizeAddress } from '@/utils/inputSanitization';
 import { ErrorHandler } from '@/utils/errorHandler';
 import { rateLimiter, RATE_LIMITS } from '@/utils/rateLimiter';
@@ -30,6 +32,7 @@ export const AddRecipientForm: React.FC<AddRecipientFormProps> = ({ onCancel, on
   const [showAddress, setShowAddress] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
+  const thea = useContext(TheaContextValue); // null outside the provider (e.g. onboarding): just no nudge button
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState({
@@ -166,10 +169,38 @@ export const AddRecipientForm: React.FC<AddRecipientFormProps> = ({ onCancel, on
         throw error;
       }
 
-      toast({
-        title: "Success!",
-        description: "Recipient added successfully",
-      });
+      // A gentle, specific nudge: say what Thea still needs, and offer to finish it together right now.
+      const hasAddress = Boolean(formData.street && formData.city && formData.state && formData.zip_code);
+      const missing = [
+        formData.interests.length === 0 && 'what they love',
+        !hasAddress && 'a shipping address',
+        !formData.birthday && !formData.anniversary && 'a date',
+      ].filter(Boolean) as string[];
+      const first = formData.name.trim().split(/\s+/)[0] || 'They';
+      if (missing.length && thea) {
+        toast({
+          title: `${first} is added`,
+          description: `Add ${missing.join(', ').replace(/, ([^,]*)$/, ' and $1')} and Thea can start planning ahead.`,
+          action: (
+            <ToastAction
+              altText={`Finish setting up ${first} with Thea`}
+              onClick={() => thea.openThea({
+                surface: 'recipient',
+                recipientName: formData.name.trim(),
+                autoStart: true,
+                starter: `I just added ${formData.name.trim()}. Help me finish setting them up so you can plan their gifts.`,
+              })}
+            >
+              Finish with Thea
+            </ToastAction>
+          ),
+        });
+      } else {
+        toast({
+          title: "Success!",
+          description: "Recipient added successfully",
+        });
+      }
 
       queryClient.invalidateQueries({ queryKey: ['recipients'] });
       onSuccess();
