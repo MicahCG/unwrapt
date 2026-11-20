@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { trackingUrl } from "../_shared/trackingLink.ts";
 import { digestInnerHtml, digestSubject, type DigestItem } from "../_shared/giftTipsDigest.ts";
 import { cleanPersonName, theaNote, wrapEmail } from "../_shared/emailLayout.ts";
 
@@ -466,11 +467,11 @@ function getEmailInner(type: EmailType, greeting: string, data: any, appUrl: str
             <h3>Shipping Details</h3>
             ${data?.giftDescription ? `<p><strong>Gift:</strong> ${data.giftDescription}</p>` : ''}
             <p><strong>For:</strong> ${data?.recipientName}${data?.occasion ? ` (${data.occasion})` : ''}</p>
-            ${data?.trackingNumber ? `<p><strong>Tracking number:</strong> ${data.trackingNumber}</p>` : '<p><strong>Tracking:</strong> the carrier didn\'t share a number, but you can follow the order in Goody.</p>'}
+            ${data?.trackingNumber ? `<p><strong>Tracking number:</strong> <a href="${trackingUrl(data.trackingNumber)}" style="color:#B5532F;font-weight:600;">${data.trackingNumber}</a></p>` : '<p><strong>Tracking:</strong> a tracking number will show on your dashboard once the carrier shares one.</p>'}
           </div>
           <p>I'll email you again the moment it's delivered.</p>
           <div class="cta">
-            <a href="https://www.ongoody.com/plus/track" class="button">Track in Goody</a>
+            <a href="${appUrl}" class="button">View Dashboard</a>
           </div>
         </div>
       `;
@@ -487,7 +488,7 @@ function getEmailInner(type: EmailType, greeting: string, data: any, appUrl: str
             <h3>Delivered</h3>
             ${data?.giftDescription ? `<p><strong>Gift:</strong> ${data.giftDescription}</p>` : ''}
             <p><strong>For:</strong> ${data?.recipientName}${data?.occasion ? ` (${data.occasion})` : ''}</p>
-            ${data?.trackingNumber ? `<p><strong>Tracking number:</strong> ${data.trackingNumber}</p>` : ''}
+            ${data?.trackingNumber ? `<p><strong>Tracking number:</strong> <a href="${trackingUrl(data.trackingNumber)}" style="color:#B5532F;font-weight:600;">${data.trackingNumber}</a></p>` : ''}
           </div>
           <p>A quick text to say you're thinking of them goes a long way.</p>
           <div class="cta">
