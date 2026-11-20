@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
 import { shouldAutoOrderGift, isGiftPlaceByReached, todayIsoLocal, type AutoOrderGift } from "../_shared/giftTiming.ts";
 import { restoreLatestWalletCharge } from "../_shared/executeReservedCharge.ts";
+import { checkGoodyBalanceAndAlert, goodyBalanceCredentials, thresholdUsd } from "../_shared/goodyBalance.ts";
 
 const SERVICE_FEE = 0; // No service fee
 // Address chase still starts a few days before the default place-by. Ordering itself uses place-by
@@ -45,6 +46,15 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       { auth: { persistSession: false } }
     );
+
+    // Warn the admin(s) if the Goody balance that pays for orders is running low (best effort).
+    const goodyCredentials = goodyBalanceCredentials((name) => Deno.env.get(name));
+    await checkGoodyBalanceAndAlert(supabaseClient, {
+      apiKey: goodyCredentials.apiKey,
+      baseUrl: goodyCredentials.baseUrl,
+      thresholdUsd: thresholdUsd(Deno.env.get("GOODY_LOW_BALANCE_THRESHOLD_USD")),
+      source: "nightly",
+    });
 
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());

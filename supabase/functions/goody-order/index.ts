@@ -3,6 +3,7 @@ import { choosePaymentMethod, pickOrderApiKey, type GoodyPaymentMethod } from ".
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { goodyMailingCountry } from "../_shared/isoCountry.ts";
 import { goodyRecipientName } from "../_shared/goodyRecipient.ts";
+import { checkGoodyBalanceAndAlert, thresholdUsd } from "../_shared/goodyBalance.ts";
 
 // CORS stays inlined rather than imported from ../_shared/cors.ts. Country
 // codes are normalized in ../_shared/isoCountry.ts, which `supabase functions
@@ -285,6 +286,14 @@ Deno.serve(async (req: Request) => {
       })
       .eq("id", scheduledGiftId);
     if (updateError) console.error("Failed to record goody_order_id on scheduled_gifts", updateError);
+
+    // The order just spent from the Balance: warn the admin(s) if it is now low (best effort, never fails the order).
+    await checkGoodyBalanceAndAlert(admin, {
+      apiKey: orderApiKey,
+      baseUrl: goodyBaseUrl(),
+      thresholdUsd: thresholdUsd(Deno.env.get("GOODY_LOW_BALANCE_THRESHOLD_USD")),
+      source: "after-order",
+    });
 
     return json({ success: true, goodyOrderId, selectedProduct: { productId: product.id, productName: product.name } });
   } catch (error) {
