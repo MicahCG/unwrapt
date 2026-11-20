@@ -36,6 +36,8 @@ export const theaNote = (type: string, data: { recipientName?: string; occasion?
     case "gift_confirmed_with_address":
     case "funds_reserved":
       return "All set on my end. I'll handle the timing and keep you posted.";
+    case "order_placed":
+      return "It's ordered. I'll keep an eye on it and let you know when it ships.";
     case "gift_sent":
       return "It's on its way. I'll let you know when it arrives.";
     default:

@@ -408,6 +408,43 @@ serve(async (req) => {
       .update({ fulfillment_error: null, fulfillment_error_at: null })
       .eq('id', scheduledGiftId);
 
+    // Tell the user the order is placed, once, for every route (button, chat, nightly job). Best-effort: an
+    // email failure must never turn a placed order into an error.
+    if (!(typedOrderResult.data as { alreadyFulfilled?: boolean }).alreadyFulfilled) {
+      try {
+        const { data: orderedGift } = await supabaseService
+          .from('scheduled_gifts')
+          .select('user_id, recipient_id, occasion, occasion_date, gift_type, gift_description, gift_image_url, payment_amount')
+          .eq('id', scheduledGiftId)
+          .single();
+        if (orderedGift) {
+          const [{ data: orderedRecipient }, { data: orderer }] = await Promise.all([
+            supabaseService.from('recipients').select('name').eq('id', orderedGift.recipient_id).single(),
+            supabaseService.from('profiles').select('email, full_name').eq('id', orderedGift.user_id).single(),
+          ]);
+          if (orderer?.email) {
+            await supabaseService.functions.invoke('send-notification-email', {
+              body: {
+                type: 'order_placed',
+                recipientEmail: orderer.email,
+                userName: orderer.full_name || undefined,
+                data: {
+                  recipientName: orderedRecipient?.name || 'your recipient',
+                  occasion: orderedGift.occasion || undefined,
+                  occasionDate: orderedGift.occasion_date || undefined,
+                  giftDescription: orderedGift.gift_type || orderedGift.gift_description || undefined,
+                  giftImage: orderedGift.gift_image_url || undefined,
+                  priceRange: orderedGift.payment_amount != null ? `$${Number(orderedGift.payment_amount).toFixed(2)}` : undefined,
+                },
+              },
+            });
+          }
+        }
+      } catch (emailError) {
+        console.error('Order placed email failed (order is unaffected)', emailError);
+      }
+    }
+
     return new Response(JSON.stringify({
       success: true,
       message: "Gift fulfillment processed successfully",
