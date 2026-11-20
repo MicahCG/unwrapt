@@ -32,3 +32,8 @@ Deno.test("Thea speaks on reminders and tips, and stays quiet on billing mail", 
   assertEquals(theaNote("low_wallet_balance"), null);
   assertEquals(theaNote("trial_ending"), null);
 });
+
+Deno.test("Thea confirms a placed order in her own voice", () => {
+  const note = theaNote("order_placed", { recipientName: "Kora" });
+  assert(note && note.includes("ordered"));
+});

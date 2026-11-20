@@ -598,18 +598,7 @@ async function handleOrderFulfillment(supabaseClient: any, gift: any, recipient:
       .update({ fulfillment_error: null, fulfillment_error_at: null })
       .eq("id", gift.id);
 
-    await supabaseClient.functions.invoke("send-notification-email", {
-      body: {
-        type: "gift_sent",
-        recipientEmail: recipient.profiles.email,
-        data: {
-          recipientName: recipient.name,
-          occasion: gift.occasion,
-          trackingNumber: fulfillmentData?.trackingNumber
-        }
-      }
-    });
-
+    // The order-placed email is sent by process-gift-fulfillment itself; "shipped" comes from Goody's webhook.
     await logAutomation(supabaseClient, gift.user_id, recipient.id, gift.id, "fulfillment", "success", {
       orderId: fulfillmentData?.orderId
     });

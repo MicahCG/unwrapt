@@ -18,6 +18,7 @@ type EmailType =
   | 'address_confirmation_reminder'
   | 'address_escalation'
   | 'gift_ready_to_ship'
+  | 'order_placed'
   | 'gift_sent'
   | 'gift_expired'
   | 'low_wallet_balance'
@@ -162,6 +163,8 @@ function getEmailSubject(type: EmailType, data: any): string | null {
       return `🚨 URGENT: Address required TODAY for ${data?.recipientName}'s gift`;
     case 'gift_ready_to_ship':
       return `📦 ${data?.recipientName}'s gift is ready to ship!`;
+    case 'order_placed':
+      return `📦 Ordered: ${data?.giftDescription || 'your gift'} for ${data?.recipientName}`;
     case 'gift_sent':
       return `✅ Gift shipped to ${data?.recipientName}!`;
     case 'gift_expired':
@@ -388,6 +391,39 @@ function getEmailInner(type: EmailType, greeting: string, data: any, appUrl: str
           <p>You'll receive tracking information as soon as the carrier picks up the package.</p>
           <div class="cta">
             <a href="${appUrl}" class="button">View Dashboard</a>
+          </div>
+        </div>
+      `;
+
+    case 'order_placed':
+      return `
+        <div class="header-success">
+          <h2>📦 Your order is placed</h2>
+          <p>${greeting}</p>
+        </div>
+        <div class="content">
+          <p>Your gift for <strong>${data?.recipientName}</strong> has been ordered and is on its way to being packed and shipped.</p>
+          ${data?.giftImage ? `
+          <div class="gift-preview">
+            <img src="${data.giftImage}" alt="${data?.giftDescription || 'Gift'}" style="max-width: 100%; border-radius: 14px; margin: 16px 0;">
+          </div>
+          ` : ''}
+          <div class="info-box success">
+            <h3>Order Details</h3>
+            <p><strong>Gift:</strong> ${data?.giftDescription || 'Curated selection'}</p>
+            <p><strong>For:</strong> ${data?.recipientName}${data?.occasion ? ` (${data.occasion}${data?.occasionDate ? `, ${formatDate(data.occasionDate)}` : ''})` : ''}</p>
+            ${data?.priceRange ? `<p><strong>Total:</strong> ${data.priceRange}</p>` : ''}
+          </div>
+          <div class="info-box">
+            <h3>What Happens Next</h3>
+            <ul>
+              <li>The funds held for this gift have been used</li>
+              <li>You'll get another email when it ships, with tracking when it's available</li>
+              <li>Delivery times come from the shipper, so it may land a little after the occasion if the order was late</li>
+            </ul>
+          </div>
+          <div class="cta">
+            <a href="${appUrl}" class="button">View Your Dashboard</a>
           </div>
         </div>
       `;
