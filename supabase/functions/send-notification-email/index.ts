@@ -20,6 +20,7 @@ type EmailType =
   | 'gift_ready_to_ship'
   | 'order_placed'
   | 'gift_sent'
+  | 'gift_delivered'
   | 'gift_expired'
   | 'low_wallet_balance'
   | 'goody_balance_low'
@@ -167,7 +168,9 @@ function getEmailSubject(type: EmailType, data: any): string | null {
     case 'order_placed':
       return `📦 Ordered: ${data?.giftDescription || 'your gift'} for ${data?.recipientName}`;
     case 'gift_sent':
-      return `✅ Gift shipped to ${data?.recipientName}!`;
+      return `🚚 On its way: ${data?.giftDescription || 'your gift'} for ${data?.recipientName}`;
+    case 'gift_delivered':
+      return `🎉 Delivered: ${data?.recipientName}'s gift has arrived`;
     case 'gift_expired':
       return `⚠️ Gift for ${data?.recipientName} has expired`;
     case 'goody_balance_low':
@@ -454,19 +457,39 @@ function getEmailInner(type: EmailType, greeting: string, data: any, appUrl: str
     case 'gift_sent':
       return `
         <div class="header-success">
-          <h2>✅ Gift Shipped!</h2>
+          <h2>🚚 Your gift has shipped</h2>
           <p>${greeting}</p>
         </div>
         <div class="content">
-          <p>Great news! The gift for <strong>${data?.recipientName}</strong> has been shipped and is on its way!</p>
-          <div class="info-box">
-            <h3>Tracking Information</h3>
-            <p><strong>Recipient:</strong> ${data?.recipientName}</p>
-            <p><strong>Occasion:</strong> ${data?.occasion}</p>
-            ${data?.trackingNumber ? `<p><strong>Tracking Number:</strong> ${data.trackingNumber}</p>` : ''}
-            <p><strong>Expected Delivery:</strong> ${formatDate(data?.deliveryDate)}</p>
+          <p>The gift for <strong>${data?.recipientName}</strong> is on its way.</p>
+          <div class="info-box success">
+            <h3>Shipping Details</h3>
+            ${data?.giftDescription ? `<p><strong>Gift:</strong> ${data.giftDescription}</p>` : ''}
+            <p><strong>For:</strong> ${data?.recipientName}${data?.occasion ? ` (${data.occasion})` : ''}</p>
+            ${data?.trackingNumber ? `<p><strong>Tracking number:</strong> ${data.trackingNumber}</p>` : '<p><strong>Tracking:</strong> the carrier didn\'t share a number, but you can follow the order in Goody.</p>'}
           </div>
-          <p>The gift should arrive right on time. Sit back and enjoy knowing you made someone's day special!</p>
+          <p>I'll email you again the moment it's delivered.</p>
+          <div class="cta">
+            <a href="https://www.ongoody.com/plus/track" class="button">Track in Goody</a>
+          </div>
+        </div>
+      `;
+
+    case 'gift_delivered':
+      return `
+        <div class="header-success">
+          <h2>🎉 It's been delivered</h2>
+          <p>${greeting}</p>
+        </div>
+        <div class="content">
+          <p>The gift for <strong>${data?.recipientName}</strong> has arrived.</p>
+          <div class="info-box success">
+            <h3>Delivered</h3>
+            ${data?.giftDescription ? `<p><strong>Gift:</strong> ${data.giftDescription}</p>` : ''}
+            <p><strong>For:</strong> ${data?.recipientName}${data?.occasion ? ` (${data.occasion})` : ''}</p>
+            ${data?.trackingNumber ? `<p><strong>Tracking number:</strong> ${data.trackingNumber}</p>` : ''}
+          </div>
+          <p>A quick text to say you're thinking of them goes a long way.</p>
           <div class="cta">
             <a href="${appUrl}" class="button">View Dashboard</a>
           </div>

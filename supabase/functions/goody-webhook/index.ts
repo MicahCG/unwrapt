@@ -77,7 +77,9 @@ const handleOrderShipped = async (admin: ReturnType<typeof createClient>, order:
   // tracking_number is only sent to approved distribution partners, so it's often absent.
   const trackingNumber = (shipments.find((s) => s.tracking_number)?.tracking_number as string | undefined) || null;
 
-  await admin
+  // Only gifts that actually move to shipped: a replayed event or a late one after delivery changes nothing, and
+  // therefore must not email again.
+  const { data: moved } = await admin
     .from("scheduled_gifts")
     .update({
       status: "shipped",
@@ -85,8 +87,23 @@ const handleOrderShipped = async (admin: ReturnType<typeof createClient>, order:
       updated_at: new Date().toISOString(),
     })
     .eq("goody_order_id", goodyOrderId)
-    // A late or replayed shipped event must not move a delivered gift backwards.
-    .neq("status", "delivered");
+    .not("status", "in", "(shipped,delivered)")
+    .select("id, user_id, recipient_id, occasion, occasion_date, gift_description");
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  for (const gift of moved || []) {
+    const { data: recipient } = await admin.from("recipients").select("name").eq("id", gift.recipient_id).single();
+    const { data: userProfile } = await admin.from("profiles").select("email, full_name").eq("id", gift.user_id).single();
+    if (userProfile?.email) {
+      await sendNotificationEmail(supabaseUrl, serviceRoleKey, "gift_sent", userProfile.email, userProfile.full_name, {
+        recipientName: recipient?.name || "your recipient",
+        occasion: gift.occasion,
+        trackingNumber,
+        giftDescription: gift.gift_description,
+      });
+    }
+  }
 };
 
 const handleOrderDelivered = async (admin: ReturnType<typeof createClient>, order: Record<string, unknown>) => {
@@ -106,6 +123,8 @@ const handleOrderDelivered = async (admin: ReturnType<typeof createClient>, orde
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
   for (const gift of gifts) {
+    const { data: current } = await admin.from("scheduled_gifts").select("status").eq("id", gift.id).single();
+    const alreadyDelivered = current?.status === "delivered";
     await admin
       .from("scheduled_gifts")
       .update({
@@ -119,12 +138,12 @@ const handleOrderDelivered = async (admin: ReturnType<typeof createClient>, orde
     const { data: recipient } = await admin.from("recipients").select("name").eq("id", gift.recipient_id).single();
     const { data: userProfile } = await admin.from("profiles").select("email, full_name").eq("id", gift.user_id).single();
 
-    if (userProfile?.email) {
-      await sendNotificationEmail(supabaseUrl, serviceRoleKey, "gift_sent", userProfile.email, userProfile.full_name, {
+    // A replayed delivered event must not email twice.
+    if (userProfile?.email && !alreadyDelivered) {
+      await sendNotificationEmail(supabaseUrl, serviceRoleKey, "gift_delivered", userProfile.email, userProfile.full_name, {
         recipientName: recipient?.name || "your recipient",
         occasion: gift.occasion,
         trackingNumber,
-        deliveryDate: gift.occasion_date,
         giftDescription: gift.gift_description,
       });
     }
