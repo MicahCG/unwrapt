@@ -22,6 +22,7 @@ type EmailType =
   | 'gift_sent'
   | 'gift_expired'
   | 'low_wallet_balance'
+  | 'goody_balance_low'
   | 'auto_reload_success'
   | 'auto_reload_failed'
   | 'automation_failed'
@@ -169,8 +170,30 @@ function getEmailSubject(type: EmailType, data: any): string | null {
       return `✅ Gift shipped to ${data?.recipientName}!`;
     case 'gift_expired':
       return `⚠️ Gift for ${data?.recipientName} has expired`;
+    case 'goody_balance_low':
+      return `
+        <div class="header-warning">
+          <h2>💳 Your Goody balance is running low</h2>
+          <p>${greeting}</p>
+        </div>
+        <div class="content">
+          <p>Unwrapt pays for every gift out of the prepaid balance on your Goody account. When it runs out, orders fail and gifts don't ship.</p>
+          <div class="info-box">
+            <h3>Goody Balance</h3>
+            <p><strong>Available now:</strong> ${typeof data?.currentBalance === 'number' ? `$${data.currentBalance.toFixed(2)}` : 'unknown'}</p>
+            <p><strong>Alert level:</strong> $${Number(data?.requiredAmount ?? 55).toFixed(2)} (about two orders)</p>
+          </div>
+          <p>An order is roughly $26 with shipping and tax. Add funds in Goody, then you're set. You'll get this once. It only comes again after the balance has been topped up and then runs low again.</p>
+          <div class="cta">
+            <a href="https://www.ongoody.com/plus/balance/user" class="button">Add funds in Goody</a>
+          </div>
+        </div>
+      `;
+
     case 'low_wallet_balance':
       return `💳 Low wallet balance - Add funds for upcoming gifts`;
+    case 'goody_balance_low':
+      return `💳 Goody balance is low${typeof data?.currentBalance === 'number' ? ` ($${data.currentBalance.toFixed(2)})` : ''} - top up so orders keep shipping`;
     case 'auto_reload_success':
       return `✅ Wallet auto-reloaded with $${data?.reloadAmount?.toFixed(2)}`;
     case 'auto_reload_failed':
