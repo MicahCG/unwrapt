@@ -86,6 +86,12 @@ const H2_STYLE = `margin:0 0 8px 0;font-family:'Newsreader',Georgia,serif;font-s
 /** Mail clients that ignore <style> still get the parts that matter: buttons and headings. */
 export const inlineCriticalStyles = (html: string): string =>
   html
+    // Some clients drop <style>; keep the layout (padding, tinted panels) without it.
+    .replace(/<div class="(header-success|header-warning)">/g, (_m, c: string) => `<div class="${c}" style="padding:28px 28px 24px;background:${c === "header-success" ? "#EEF0E4" : "#FBEFE5"};">`)
+    .replace(/<div class="content">/g, `<div class="content" style="padding:28px 28px 32px;color:${INK};">`)
+    .replace(/<div class="info-box success">/g, `<div class="info-box success" style="background:#EEF0E4;border:1px solid rgba(110,123,91,0.25);border-radius:14px;padding:18px 20px;margin:20px 0;">`)
+    .replace(/<div class="info-box">/g, `<div class="info-box" style="background:${CREAM};border:1px solid rgba(42,37,32,0.08);border-radius:14px;padding:18px 20px;margin:20px 0;">`)
+    .replace(/<div class="cta">/g, `<div class="cta" style="padding:8px 0 4px;">`)
     .replace(/<a ([^>]*?)class="button secondary"([^>]*)>/g, `<a $1class="button secondary" style="${BUTTON_SECONDARY_STYLE}"$2>`)
     .replace(/<a ([^>]*?)class="button(?: primary)?"([^>]*)>/g, `<a $1class="button" style="${BUTTON_STYLE}"$2>`)
     .replace(/<h2>/g, `<h2 style="${H2_STYLE}">`)
