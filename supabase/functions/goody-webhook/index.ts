@@ -167,13 +167,23 @@ Deno.serve(async (req: Request) => {
     const svixId = req.headers.get("svix-id");
     const svixTimestamp = req.headers.get("svix-timestamp");
     const svixSignature = req.headers.get("svix-signature");
-    const signingSecret = Deno.env.get("GOODY_WEBHOOK_SIGNING_SECRET");
+    // The Commerce webhook and the workspace (Automation API) webhook each have their own signing secret.
+    const signingSecrets = [
+      Deno.env.get("GOODY_WEBHOOK_SIGNING_SECRET"),
+      Deno.env.get("GOODY_AUTOMATION_WEBHOOK_SIGNING_SECRET"),
+    ].filter((secret): secret is string => Boolean(secret && secret.trim()));
 
-    if (!signingSecret) return json({ error: "Webhook not configured" }, 500);
+    if (signingSecrets.length === 0) return json({ error: "Webhook not configured" }, 500);
     if (!svixId || !svixTimestamp || !svixSignature) return json({ error: "Missing signature headers" }, 401);
 
     const rawBody = await req.text();
-    const isValid = await verifySvixSignature(rawBody, svixId, svixTimestamp, svixSignature, signingSecret);
+    let isValid = false;
+    for (const secret of signingSecrets) {
+      if (await verifySvixSignature(rawBody, svixId, svixTimestamp, svixSignature, secret.trim())) {
+        isValid = true;
+        break;
+      }
+    }
     if (!isValid) return json({ error: "Invalid signature" }, 401);
 
     const payload = JSON.parse(rawBody) as { event_type?: string; data?: Record<string, unknown> };

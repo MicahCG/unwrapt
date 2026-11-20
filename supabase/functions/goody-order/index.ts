@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { choosePaymentMethod, pickOrderApiKey, type GoodyPaymentMethod } from "../_shared/goodyPayment.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { goodyMailingCountry } from "../_shared/isoCountry.ts";
+import { goodyRecipientName } from "../_shared/goodyRecipient.ts";
 
 // CORS stays inlined rather than imported from ../_shared/cors.ts. Country
 // codes are normalized in ../_shared/isoCountry.ts, which `supabase functions
@@ -175,7 +176,7 @@ Deno.serve(async (req: Request) => {
       cartItem.variants = [variantName];
     }
 
-    const [firstName, ...lastNameParts] = recipient.name.trim().split(/\s+/);
+    const recipientName = goodyRecipientName(recipient.name);
     const fromName = profile?.full_name || (profile?.email ? profile.email.split("@")[0] : "A friend");
 
     // Blank country keeps the historical US default. A stored English name
@@ -230,12 +231,10 @@ Deno.serve(async (req: Request) => {
       send_method: "direct_send",
       recipients: [
         {
-          first_name: firstName || "Gift",
-          last_name: lastNameParts.join(" ") || "Recipient",
+          ...recipientName,
           email: recipient.email || undefined,
           mailing_address: {
-            first_name: firstName || "Gift",
-            last_name: lastNameParts.join(" ") || "Recipient",
+            ...recipientName,
             address_1: recipient.street,
             address_2: recipient.apartment || undefined,
             city: recipient.city,
