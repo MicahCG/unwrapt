@@ -183,7 +183,7 @@ function getEmailSubject(type: EmailType, data: any): string | null {
             <p><strong>Available now:</strong> ${typeof data?.currentBalance === 'number' ? `$${data.currentBalance.toFixed(2)}` : 'unknown'}</p>
             <p><strong>Alert level:</strong> $${Number(data?.requiredAmount ?? 55).toFixed(2)} (about two orders)</p>
           </div>
-          <p>An order is roughly $26 with shipping and tax. Add funds in Goody, then you're set. This reminder repeats at most once a day.</p>
+          <p>An order is roughly $26 with shipping and tax. Add funds in Goody, then you're set. You'll get this once. It only comes again after the balance has been topped up and then runs low again.</p>
           <div class="cta">
             <a href="https://www.ongoody.com/plus/balance/user" class="button">Add funds in Goody</a>
           </div>

@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { alertRecipients, balanceCentsFrom, DEFAULT_LOW_BALANCE_USD, goodyBalanceCredentials, shouldAlertLowBalance, thresholdUsd } from "./goodyBalance.ts";
+import { alertRecipients, balanceCentsFrom, DEFAULT_LOW_BALANCE_USD, goodyBalanceCredentials, shouldAlertLowBalance, shouldRecordRecovery, thresholdUsd } from "./goodyBalance.ts";
 
 Deno.test("reads the BALANCE method in cents, ignoring cards", () => {
   assertEquals(balanceCentsFrom([{ id: "BALANCE", balance: 575 }, { id: "c1", name: "Visa" }]), 575);
@@ -13,20 +13,29 @@ Deno.test("threshold defaults to about two orders and accepts an override", () =
   assertEquals(thresholdUsd("-5"), DEFAULT_LOW_BALANCE_USD);
 });
 
-Deno.test("alerts below the threshold, not at or above it", () => {
-  assertEquals(shouldAlertLowBalance({ balanceCents: 575, thresholdUsd: 55 }), true);
-  assertEquals(shouldAlertLowBalance({ balanceCents: 5500, thresholdUsd: 55 }), false);
-  assertEquals(shouldAlertLowBalance({ balanceCents: 9000, thresholdUsd: 55 }), false);
+Deno.test("alerts the first time the balance is below the threshold, not at or above it", () => {
+  assertEquals(shouldAlertLowBalance({ balanceCents: 575, thresholdUsd: 55, lastEvent: null }), true);
+  assertEquals(shouldAlertLowBalance({ balanceCents: 5500, thresholdUsd: 55, lastEvent: null }), false);
+  assertEquals(shouldAlertLowBalance({ balanceCents: 9000, thresholdUsd: 55, lastEvent: "recovered" }), false);
 });
 
 Deno.test("stays quiet when the balance is unknown", () => {
-  assertEquals(shouldAlertLowBalance({ balanceCents: null, thresholdUsd: 55 }), false);
+  assertEquals(shouldAlertLowBalance({ balanceCents: null, thresholdUsd: 55, lastEvent: null }), false);
 });
 
-Deno.test("no second alert inside 24 hours, but one after", () => {
-  const now = new Date("2026-11-20T12:00:00Z");
-  assertEquals(shouldAlertLowBalance({ balanceCents: 100, thresholdUsd: 55, lastAlertAt: "2026-11-20T02:00:00Z", now }), false);
-  assertEquals(shouldAlertLowBalance({ balanceCents: 100, thresholdUsd: 55, lastAlertAt: "2026-11-19T02:00:00Z", now }), true);
+Deno.test("only one email per low period: no repeats until it has recovered", () => {
+  assertEquals(shouldAlertLowBalance({ balanceCents: 100, thresholdUsd: 55, lastEvent: "alert" }), false);
+  assertEquals(shouldAlertLowBalance({ balanceCents: 50, thresholdUsd: 55, lastEvent: "alert" }), false);
+  // topped up, recorded as recovered, then it runs low again: a new alert
+  assertEquals(shouldAlertLowBalance({ balanceCents: 100, thresholdUsd: 55, lastEvent: "recovered" }), true);
+});
+
+Deno.test("a top-up after an alert records the recovery; otherwise nothing to record", () => {
+  assertEquals(shouldRecordRecovery({ balanceCents: 6000, thresholdUsd: 55, lastEvent: "alert" }), true);
+  assertEquals(shouldRecordRecovery({ balanceCents: 100, thresholdUsd: 55, lastEvent: "alert" }), false);
+  assertEquals(shouldRecordRecovery({ balanceCents: 6000, thresholdUsd: 55, lastEvent: "recovered" }), false);
+  assertEquals(shouldRecordRecovery({ balanceCents: 6000, thresholdUsd: 55, lastEvent: null }), false);
+  assertEquals(shouldRecordRecovery({ balanceCents: null, thresholdUsd: 55, lastEvent: "alert" }), false);
 });
 
 Deno.test("credentials prefer the Automation key in production", () => {

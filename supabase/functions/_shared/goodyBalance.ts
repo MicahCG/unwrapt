@@ -6,7 +6,6 @@ import { pickOrderApiKey } from "./goodyPayment.ts";
 
 /** About two orders' worth (an order is roughly $26 with shipping and tax). Override with GOODY_LOW_BALANCE_THRESHOLD_USD. */
 export const DEFAULT_LOW_BALANCE_USD = 55;
-const COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 /** The Balance in cents, or null when Goody lists no balance-bearing method. */
 export const balanceCentsFrom = (methods: GoodyPaymentMethod[]): number | null => {
@@ -21,21 +20,26 @@ export const thresholdUsd = (raw: string | undefined): number => {
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_LOW_BALANCE_USD;
 };
 
-/** Alert when the balance is below the threshold and we haven't already alerted within the cooldown. */
+/** What we last recorded for the Balance: an alert we sent, or the balance recovering above the threshold. */
+export type BalanceEvent = "alert" | "recovered" | null;
+
+/**
+ * One email per low period. Alert when the balance is below the threshold and the last thing we recorded was not
+ * already an alert. Topping back up records "recovered", which re-arms the next alert.
+ */
 export const shouldAlertLowBalance = (input: {
   balanceCents: number | null;
   thresholdUsd: number;
-  lastAlertAt?: string | null;
-  now?: Date;
+  lastEvent: BalanceEvent;
 }): boolean => {
   if (input.balanceCents == null) return false; // can't tell: stay quiet rather than cry wolf
   if (input.balanceCents >= Math.round(input.thresholdUsd * 100)) return false;
-  if (input.lastAlertAt) {
-    const last = Date.parse(input.lastAlertAt);
-    if (Number.isFinite(last) && (input.now ?? new Date()).getTime() - last < COOLDOWN_MS) return false;
-  }
-  return true;
+  return input.lastEvent !== "alert";
 };
+
+/** True when the balance is healthy again after we alerted, so the alert can be re-armed. */
+export const shouldRecordRecovery = (input: { balanceCents: number | null; thresholdUsd: number; lastEvent: BalanceEvent }): boolean =>
+  input.balanceCents != null && input.balanceCents >= Math.round(input.thresholdUsd * 100) && input.lastEvent === "alert";
 
 /**
  * Who gets the alert: every admin plus any extra addresses in GOODY_LOW_BALANCE_ALERT_EMAILS (comma or space
@@ -74,7 +78,8 @@ export const goodyBalanceCredentials = (read: (name: string) => string | undefin
 type AdminClient = any;
 
 /**
- * Reads the Goody balance and, if it is low, emails every admin (at most once per day). Best effort: never throws,
+ * Reads the Goody balance and, when it first drops below the threshold, emails the alert recipients once (no repeats
+ * until it has recovered above the threshold). Best effort: never throws,
  * so it can ride along with ordering and the nightly job without ever breaking them.
  */
 export const checkGoodyBalanceAndAlert = async (
@@ -98,17 +103,26 @@ export const checkGoodyBalanceAndAlert = async (
     const adminIds = ((roles || []) as Array<{ user_id: string }>).map((r) => r.user_id);
     if (adminIds.length === 0) return { balanceUsd, alerted: false };
 
-    const since = new Date(Date.now() - COOLDOWN_MS).toISOString();
     const { data: recent } = await admin
       .from("automation_logs")
-      .select("created_at")
+      .select("action")
       .eq("stage", "goody_balance")
-      .eq("action", "low_balance_alert")
-      .gte("created_at", since)
+      .in("action", ["low_balance_alert", "balance_recovered"])
       .order("created_at", { ascending: false })
       .limit(1);
-    const lastAlertAt = (recent as Array<{ created_at: string }> | null)?.[0]?.created_at ?? null;
-    if (!shouldAlertLowBalance({ balanceCents: cents, thresholdUsd: opts.thresholdUsd, lastAlertAt })) {
+    const latest = (recent as Array<{ action: string }> | null)?.[0]?.action;
+    const lastEvent: BalanceEvent = latest === "low_balance_alert" ? "alert" : latest === "balance_recovered" ? "recovered" : null;
+
+    if (shouldRecordRecovery({ balanceCents: cents, thresholdUsd: opts.thresholdUsd, lastEvent })) {
+      await admin.from("automation_logs").insert({
+        user_id: adminIds[0],
+        stage: "goody_balance",
+        action: "balance_recovered",
+        details: { balanceUsd, thresholdUsd: opts.thresholdUsd, source: opts.source },
+      });
+      return { balanceUsd, alerted: false };
+    }
+    if (!shouldAlertLowBalance({ balanceCents: cents, thresholdUsd: opts.thresholdUsd, lastEvent })) {
       return { balanceUsd, alerted: false };
     }
 
