@@ -40,6 +40,8 @@ export const theaNote = (type: string, data: { recipientName?: string; occasion?
       return "It's ordered. I'll keep an eye on it and let you know when it ships.";
     case "gift_sent":
       return "It's on its way. I'll let you know when it arrives.";
+    case "gift_delivered":
+      return "It landed. I hope it makes their day.";
     default:
       return null;
   }
