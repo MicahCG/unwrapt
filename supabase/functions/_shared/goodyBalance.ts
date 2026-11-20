@@ -37,6 +37,29 @@ export const shouldAlertLowBalance = (input: {
   return true;
 };
 
+/**
+ * Who gets the alert: every admin plus any extra addresses in GOODY_LOW_BALANCE_ALERT_EMAILS (comma or space
+ * separated). Case-insensitive, de-duplicated, malformed entries dropped. Keeps addresses out of the code.
+ */
+export const alertRecipients = (
+  admins: Array<{ email: string | null; full_name: string | null }>,
+  extraRaw: string | undefined,
+): Array<{ email: string; name?: string }> => {
+  const seen = new Set<string>();
+  const out: Array<{ email: string; name?: string }> = [];
+  const add = (email: string | null | undefined, name?: string | null) => {
+    const clean = (email || "").trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) return;
+    const key = clean.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ email: clean, ...(name ? { name } : {}) });
+  };
+  for (const a of admins) add(a.email, a.full_name);
+  for (const e of (extraRaw || "").split(/[\s,;]+/)) add(e);
+  return out;
+};
+
 export const goodyBalanceCredentials = (read: (name: string) => string | undefined) => {
   const environment = read("GOODY_API_ENV") === "production" ? "production" : "sandbox";
   const commerce = environment === "production" ? read("GOODY_PRODUCTION_COMMERCE_API_KEY") : read("GOODY_SANDBOX_COMMERCE_API_KEY");
@@ -56,7 +79,7 @@ type AdminClient = any;
  */
 export const checkGoodyBalanceAndAlert = async (
   admin: AdminClient,
-  opts: { apiKey: string | undefined; baseUrl: string; thresholdUsd: number; source: string },
+  opts: { apiKey: string | undefined; baseUrl: string; thresholdUsd: number; source: string; extraEmails?: string },
 ): Promise<{ balanceUsd: number | null; alerted: boolean }> => {
   try {
     if (!opts.apiKey) return { balanceUsd: null, alerted: false };
@@ -91,13 +114,13 @@ export const checkGoodyBalanceAndAlert = async (
 
     const { data: profiles } = await admin.from("profiles").select("id, email, full_name").in("id", adminIds);
     let sent = false;
-    for (const p of (profiles || []) as Array<{ id: string; email: string | null; full_name: string | null }>) {
-      if (!p.email) continue;
+    const recipients = alertRecipients((profiles || []) as Array<{ email: string | null; full_name: string | null }>, opts.extraEmails);
+    for (const p of recipients) {
       const { error } = await admin.functions.invoke("send-notification-email", {
         body: {
           type: "goody_balance_low",
           recipientEmail: p.email,
-          userName: p.full_name || undefined,
+          userName: p.name,
           data: { currentBalance: balanceUsd, requiredAmount: opts.thresholdUsd },
         },
       });

@@ -292,6 +292,7 @@ Deno.serve(async (req: Request) => {
       apiKey: orderApiKey,
       baseUrl: goodyBaseUrl(),
       thresholdUsd: thresholdUsd(Deno.env.get("GOODY_LOW_BALANCE_THRESHOLD_USD")),
+      extraEmails: Deno.env.get("GOODY_LOW_BALANCE_ALERT_EMAILS"),
       source: "after-order",
     });
 

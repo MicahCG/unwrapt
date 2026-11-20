@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { balanceCentsFrom, DEFAULT_LOW_BALANCE_USD, goodyBalanceCredentials, shouldAlertLowBalance, thresholdUsd } from "./goodyBalance.ts";
+import { alertRecipients, balanceCentsFrom, DEFAULT_LOW_BALANCE_USD, goodyBalanceCredentials, shouldAlertLowBalance, thresholdUsd } from "./goodyBalance.ts";
 
 Deno.test("reads the BALANCE method in cents, ignoring cards", () => {
   assertEquals(balanceCentsFrom([{ id: "BALANCE", balance: 575 }, { id: "c1", name: "Visa" }]), 575);
@@ -32,4 +32,17 @@ Deno.test("no second alert inside 24 hours, but one after", () => {
 Deno.test("credentials prefer the Automation key in production", () => {
   const env: Record<string, string> = { GOODY_API_ENV: "production", GOODY_PRODUCTION_AUTOMATION_API_KEY: "auto", GOODY_PRODUCTION_COMMERCE_API_KEY: "comm" };
   assertEquals(goodyBalanceCredentials((n) => env[n]), { apiKey: "auto", baseUrl: "https://api.ongoody.com" });
+});
+
+Deno.test("alert goes to admins plus the extra addresses, de-duplicated case-insensitively", () => {
+  const r = alertRecipients(
+    [{ email: "Admin@Example.com", full_name: "A" }],
+    "Extra@Example.com, admin@example.com; not-an-email",
+  );
+  assertEquals(r.map((x) => x.email), ["Admin@Example.com", "Extra@Example.com"]);
+});
+
+Deno.test("with no extra addresses only the admins are alerted", () => {
+  assertEquals(alertRecipients([{ email: "a@b.co", full_name: null }], undefined).length, 1);
+  assertEquals(alertRecipients([], undefined), []);
 });

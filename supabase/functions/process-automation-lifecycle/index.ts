@@ -53,6 +53,7 @@ serve(async (req) => {
       apiKey: goodyCredentials.apiKey,
       baseUrl: goodyCredentials.baseUrl,
       thresholdUsd: thresholdUsd(Deno.env.get("GOODY_LOW_BALANCE_THRESHOLD_USD")),
+      extraEmails: Deno.env.get("GOODY_LOW_BALANCE_ALERT_EMAILS"),
       source: "nightly",
     });
 
