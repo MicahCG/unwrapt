@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
 import { shouldAutoOrderGift, isGiftPlaceByReached, todayIsoLocal, type AutoOrderGift } from "../_shared/giftTiming.ts";
 import { restoreLatestWalletCharge } from "../_shared/executeReservedCharge.ts";
+import { isAlreadyOrdered } from "../_shared/giftOrderState.ts";
 import { checkGoodyBalanceAndAlert, goodyBalanceCredentials, thresholdUsd } from "../_shared/goodyBalance.ts";
 
 const SERVICE_FEE = 0; // No service fee
@@ -68,6 +69,10 @@ serve(async (req) => {
       .neq("status", "cancelled")
       .neq("status", "expired")
       .neq("status", "delivered")
+      .neq("status", "ordered")
+      .neq("status", "fulfilled")
+      .neq("status", "shipped")
+      .is("goody_order_id", null)
       .gte("occasion_date", today.toISOString().split("T")[0]);
 
     if (giftsError) {
@@ -151,6 +156,9 @@ async function processGiftStage(supabaseClient: any, gift: any, recipient: any, 
   const daysUntilDelivery = Math.ceil((deliveryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   const todayIso = todayIsoLocal(today);
   const placeByReached = isGiftPlaceByReached(gift, todayIso);
+
+  // Already ordered: nothing left for the nightly job to do (belt and braces with the query filter).
+  if (isAlreadyOrdered(gift)) return;
 
   console.log(`  🎁 Gift: ${gift.occasion} - ${daysUntilDelivery} days until delivery, place-by reached: ${placeByReached}`);
 
